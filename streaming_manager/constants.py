@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "In one line"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
 SCHEMA_VERSION = 18
@@ -43,6 +43,20 @@ TIMER_OVERLAY_BACKGROUND_KEY = "timer_overlay_background"
 TIMER_OVERLAY_BACKGROUND_DEFAULT = "transparent"
 TIMER_OVERLAY_BACKGROUND_COLOR_KEY = "timer_overlay_background_color"
 TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT = "#000000"
+
+# Standalone OBS view of the existing Auction lot list. Presentation settings
+# reuse the generic settings table; no schema migration is required.
+AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY = "auction_lots_overlay_font_family"
+AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT = "Segoe UI"
+AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY = "auction_lots_overlay_font_size"
+AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT = 24
+AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY = "auction_lots_overlay_font_color"
+AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT = "#FFFFFF"
+AUCTION_LOTS_OVERLAY_BACKGROUND_KEY = "auction_lots_overlay_background"
+AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT = "transparent"
+AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY = "auction_lots_overlay_background_color"
+AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT = "#000000"
+AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY = "auction_lots_overlay_background_media_id"
 
 AUCTION_MIN_DURATION_MS = 1_000
 AUCTION_MAX_DURATION_MS = 24 * 60 * 60 * 1000
