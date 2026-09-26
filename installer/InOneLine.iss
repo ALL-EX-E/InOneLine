@@ -1,6 +1,6 @@
 ﻿#define MyAppName "In one line"
 #define MyAppExeName "InOneLine.exe"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Local Streaming Tools"
 #define MyAppId "{{D9AE3184-F16E-4B60-BDD9-D4B99541462E}"
 #ifndef DistRoot
@@ -17,7 +17,7 @@ VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Setup
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=1.0.1.0
 DefaultDirName=C:\InOneLine
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
