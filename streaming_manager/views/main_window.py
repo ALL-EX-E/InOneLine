@@ -129,6 +129,20 @@ class MainWindow(QMainWindow):
         self.api.set_auction_lots_state_provider(
             self.auction_tab.auction_lots_overlay_state
         )
+        # Duplicate navigation controls call the exact same Stream/OBS actions.
+        # No second URL or preview logic is maintained in Games/Auction.
+        self.games_tab.copy_list_overlay_url_btn.clicked.connect(
+            self.stream_tab.copy_list_overlay_url
+        )
+        self.games_tab.open_list_overlay_preview_btn.clicked.connect(
+            self.stream_tab.open_list_overlay_preview
+        )
+        self.auction_tab.conduct_copy_lots_overlay_url_btn.clicked.connect(
+            self.stream_tab.copy_auction_lots_overlay_url
+        )
+        self.auction_tab.conduct_open_lots_overlay_preview_btn.clicked.connect(
+            self.stream_tab.open_auction_lots_overlay_preview
+        )
         # R1.0.9: shared main-list XLSX controls belong to the Games workspace.
         # The synchronization engine itself remains on AuctionTab to preserve
         # the already-tested read/write/poll semantics unchanged.

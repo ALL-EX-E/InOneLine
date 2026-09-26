@@ -679,6 +679,25 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         self.conduct_scroll_btn.clicked.connect(self._toggle_desktop_lot_auto_scroll)
         conduct_heading_row.addWidget(self.conduct_scroll_btn)
+
+        self.conduct_copy_lots_overlay_url_btn = QPushButton(
+            "Копировать URL списка лотов"
+        )
+        self.conduct_copy_lots_overlay_url_btn.setToolTip(
+            "Скопировать URL OBS-оверлея текущего списка лотов"
+        )
+        conduct_heading_row.addWidget(self.conduct_copy_lots_overlay_url_btn)
+
+        self.conduct_open_lots_overlay_preview_btn = QPushButton(
+            "Открыть предпросмотр списка лотов"
+        )
+        self.conduct_open_lots_overlay_preview_btn.setToolTip(
+            "Открыть предпросмотр OBS-оверлея текущего списка лотов"
+        )
+        conduct_heading_row.addWidget(
+            self.conduct_open_lots_overlay_preview_btn
+        )
+
         conduct_heading_row.addStretch()
         self._sync_lot_scroll_buttons()
 

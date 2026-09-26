@@ -546,8 +546,21 @@ class GamesTab(QWidget):
         self.list_toggle_btn.setToolTip("Скрыть или показать таблицу со списком игр")
         self.list_toggle_btn.clicked.connect(self.toggle_games_list)
 
+        self.copy_list_overlay_url_btn = QPushButton("Копировать URL списка")
+        self.copy_list_overlay_url_btn.setToolTip(
+            "Скопировать URL отдельного OBS-списка с Top-3 и прокручиваемым списком"
+        )
+        self.open_list_overlay_preview_btn = QPushButton(
+            "Открыть предпросмотр списка"
+        )
+        self.open_list_overlay_preview_btn.setToolTip(
+            "Открыть отдельный OBS-список с Top-3 и прокручиваемым списком"
+        )
+
         sorting_actions.addWidget(self.sorting_rules_btn)
         sorting_actions.addWidget(self.list_toggle_btn)
+        sorting_actions.addWidget(self.copy_list_overlay_url_btn)
+        sorting_actions.addWidget(self.open_list_overlay_preview_btn)
         sorting_actions.addStretch()
         layout.addLayout(sorting_actions)
 

@@ -447,20 +447,12 @@ class StreamTab(QWidget):
         copy_list.setToolTip(
             "Скопировать отдельный URL списка игр для второго источника «Браузер» в OBS"
         )
-        copy_list.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                f"{self.api.base_url}/list-overlay"
-            )
-        )
+        copy_list.clicked.connect(self.copy_list_overlay_url)
         open_list = QPushButton("Открыть предпросмотр списка")
         open_list.setToolTip(
             "Открыть отдельный OBS-оверлей, содержащий только Top-3 и прокручиваемый список"
         )
-        open_list.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl(f"{self.api.base_url}/list-overlay")
-            )
-        )
+        open_list.clicked.connect(self.open_list_overlay_preview)
         list_btns.addWidget(copy_list)
         list_btns.addWidget(open_list)
         list_btns.addStretch()
@@ -653,13 +645,9 @@ class StreamTab(QWidget):
         save_auction_lots.setProperty("primary", True)
         save_auction_lots.clicked.connect(self._save_auction_lots_overlay_settings)
         copy_auction_lots = QPushButton("Копировать URL списка лотов")
-        copy_auction_lots.clicked.connect(
-            lambda: QApplication.clipboard().setText(f"{self.api.base_url}/auction-lots-overlay")
-        )
+        copy_auction_lots.clicked.connect(self.copy_auction_lots_overlay_url)
         open_auction_lots = QPushButton("Открыть предпросмотр списка лотов")
-        open_auction_lots.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/auction-lots-overlay?preview=1"))
-        )
+        open_auction_lots.clicked.connect(self.open_auction_lots_overlay_preview)
         auction_lots_actions.addWidget(save_auction_lots)
         auction_lots_actions.addWidget(copy_auction_lots)
         auction_lots_actions.addWidget(open_auction_lots)
@@ -932,6 +920,22 @@ class StreamTab(QWidget):
             "5. Разместите источник на сцене.\n\n"
             "Параметры ‘Shutdown source when not visible’ и ‘Refresh browser when scene becomes active’ "
             "не обязательны.",
+        )
+
+    def copy_list_overlay_url(self) -> None:
+        QApplication.clipboard().setText(f"{self.api.base_url}/list-overlay")
+
+    def open_list_overlay_preview(self) -> None:
+        QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/list-overlay"))
+
+    def copy_auction_lots_overlay_url(self) -> None:
+        QApplication.clipboard().setText(
+            f"{self.api.base_url}/auction-lots-overlay"
+        )
+
+    def open_auction_lots_overlay_preview(self) -> None:
+        QDesktopServices.openUrl(
+            QUrl(f"{self.api.base_url}/auction-lots-overlay?preview=1")
         )
 
     def _open_obs_json(self):

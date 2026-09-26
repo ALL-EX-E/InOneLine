@@ -45,29 +45,33 @@ body {
   z-index: 1;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
-#scroller {
+#header-shell {
+  flex: 0 0 auto;
   width: 100%;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: hidden;
 }
-#scroller::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+#viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
 }
 table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;
+  table-layout: fixed;
 }
-thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+#lots-table {
+  transform: translateY(0);
+  will-change: transform;
+}
+th {
   font-weight: 700;
   text-align: center;
   border-bottom: 1px solid currentColor;
@@ -82,20 +86,16 @@ th:not(:last-child),
 td:not(:last-child) {
   border-right: 1px solid color-mix(in srgb, currentColor 24%, transparent);
 }
-/* Compact columns take only the width required by their header/content.
-   The title is the single elastic column and yields space first. */
 .col-pos,
 .col-chance,
 .col-points {
-  width: 1%;
   text-align: center;
   white-space: nowrap;
   padding-left: .45em;
   padding-right: .45em;
 }
 .col-title {
-  width: 100%;
-  max-width: 0;
+  min-width: 0;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -103,12 +103,21 @@ td:not(:last-child) {
 }
 #empty {
   display: none;
+  position: absolute;
+  inset: 0;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
   text-align: center;
   opacity: .72;
+}
+#measure-cell {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  display: inline-block;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
 }
 #api-state {
   display: none;
@@ -129,14 +138,21 @@ body.preview #api-state.visible { display: block; }
 <div id="background"></div>
 <video id="background-video" autoplay muted loop playsinline></video>
 <div id="root">
-  <div id="scroller">
-    <table id="lots-table">
+  <div id="header-shell">
+    <table id="header-table">
+      <colgroup id="header-cols"></colgroup>
       <thead><tr id="header-row"></tr></thead>
+    </table>
+  </div>
+  <div id="viewport">
+    <table id="lots-table">
+      <colgroup id="body-cols"></colgroup>
       <tbody id="body"></tbody>
     </table>
     <div id="empty">Список лотов пуст</div>
   </div>
 </div>
+<span id="measure-cell" aria-hidden="true"></span>
 <div id="api-state">Нет связи с In one line</div>
 <script>
 (() => {
@@ -147,25 +163,29 @@ body.preview #api-state.visible { display: block; }
   const preview = new URLSearchParams(location.search).get("preview") === "1";
   if (preview) document.body.classList.add("preview");
 
-  const scroller = document.getElementById("scroller");
-  const table = document.getElementById("lots-table");
+  const headerShell = document.getElementById("header-shell");
+  const headerCols = document.getElementById("header-cols");
   const headerRow = document.getElementById("header-row");
+  const viewport = document.getElementById("viewport");
+  const bodyCols = document.getElementById("body-cols");
+  const table = document.getElementById("lots-table");
   const body = document.getElementById("body");
   const empty = document.getElementById("empty");
+  const measureCell = document.getElementById("measure-cell");
   const apiState = document.getElementById("api-state");
   const background = document.getElementById("background");
   const backgroundVideo = document.getElementById("background-video");
 
   let lastRowsSignature = "";
   let lastPresentationSignature = "";
+  let currentRows = [];
+  let currentShowChance = false;
   let autoScroll = false;
   let direction = 1;
-  // Same pattern as the existing working OBS list/rules overlays: keep an
-  // independent floating-point animation coordinate. Some Chromium/CEF builds
-  // quantize scrollTop writes to integer pixels, so reading scrollTop back on
-  // every frame can repeatedly lose sub-pixel progress at low speeds.
   let scrollY = 0;
   let lastFrame = performance.now();
+  let layoutFrameId = null;
+  const measureCache = new Map();
 
   function addCell(row, text, className, header = false) {
     const cell = document.createElement(header ? "th" : "td");
@@ -174,12 +194,104 @@ body.preview #api-state.visible { display: block; }
     row.appendChild(cell);
   }
 
+  function buildColumnGroup(target, widths, showChance) {
+    const fragment = document.createDocumentFragment();
+    const ordered = [
+      widths.start,
+      widths.current,
+      null,
+      ...(showChance ? [widths.chance] : []),
+      widths.points,
+    ];
+    for (const width of ordered) {
+      const col = document.createElement("col");
+      if (Number.isFinite(width)) col.style.width = Math.ceil(width) + "px";
+      fragment.appendChild(col);
+    }
+    target.replaceChildren(fragment);
+  }
+
+  function measureText(text, className, bold) {
+    const key = [
+      getComputedStyle(document.body).fontFamily,
+      getComputedStyle(document.body).fontSize,
+      className,
+      bold ? "700" : "400",
+      String(text ?? ""),
+    ].join("\u0000");
+    const cached = measureCache.get(key);
+    if (cached !== undefined) return cached;
+
+    measureCell.className = className;
+    measureCell.style.fontWeight = bold ? "700" : "400";
+    measureCell.textContent = String(text ?? "");
+    const width = Math.ceil(measureCell.getBoundingClientRect().width) + 2;
+    measureCache.set(key, width);
+    return width;
+  }
+
+  function maxMeasured(rows, valueGetter, className, headerText) {
+    let width = measureText(headerText, className, true);
+    for (const row of rows) {
+      width = Math.max(
+        width,
+        measureText(valueGetter(row), className, false)
+      );
+    }
+    return width;
+  }
+
+  function syncColumnWidths() {
+    layoutFrameId = null;
+    if (!currentRows.length) return;
+
+    const widths = {
+      start: maxMeasured(
+        currentRows,
+        row => row.start_position,
+        "col-pos",
+        "СТАРТ"
+      ),
+      current: maxMeasured(
+        currentRows,
+        row => row.current_position,
+        "col-pos",
+        "ТЕКУЩАЯ"
+      ),
+      chance: currentShowChance
+        ? maxMeasured(
+            currentRows,
+            row => row.chance_text,
+            "col-chance",
+            "ШАНС В КОЛЕСЕ"
+          )
+        : null,
+      points: maxMeasured(
+        currentRows,
+        row => row.points_text,
+        "col-points",
+        "БАЛЛЫ"
+      ),
+    };
+
+    buildColumnGroup(headerCols, widths, currentShowChance);
+    buildColumnGroup(bodyCols, widths, currentShowChance);
+    clampScroll();
+  }
+
+  function scheduleColumnSync() {
+    if (layoutFrameId !== null) cancelAnimationFrame(layoutFrameId);
+    layoutFrameId = requestAnimationFrame(syncColumnWidths);
+  }
+
   function renderRows(payload) {
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const showChance = Boolean(payload.show_wheel_chance);
     const signature = JSON.stringify([showChance, rows]);
-    if (signature === lastRowsSignature) return;
+    if (signature === lastRowsSignature) return false;
     lastRowsSignature = signature;
+    currentRows = rows;
+    currentShowChance = showChance;
 
     headerRow.replaceChildren();
     addCell(headerRow, "СТАРТ", "col-pos", true);
@@ -201,11 +313,13 @@ body.preview #api-state.visible { display: block; }
       fragment.appendChild(tr);
     }
     body.replaceChildren(fragment);
-    table.style.display = rows.length ? "table" : "none";
-    empty.style.display = rows.length ? "none" : "flex";
-    const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    scrollY = Math.min(scrollY, maximum);
-    scroller.scrollTop = Math.round(scrollY);
+
+    const hasRows = rows.length > 0;
+    headerShell.style.display = hasRows ? "block" : "none";
+    table.style.display = hasRows ? "table" : "none";
+    empty.style.display = hasRows ? "none" : "flex";
+    scheduleColumnSync();
+    return true;
   }
 
   function clearMediaBackground() {
@@ -220,7 +334,7 @@ body.preview #api-state.visible { display: block; }
   function applyPresentation(presentation) {
     const p = presentation || {};
     const signature = JSON.stringify(p);
-    if (signature === lastPresentationSignature) return;
+    if (signature === lastPresentationSignature) return false;
     lastPresentationSignature = signature;
 
     document.documentElement.style.setProperty(
@@ -235,6 +349,7 @@ body.preview #api-state.visible { display: block; }
       "--font-color",
       String(p.font_color || "#FFFFFF")
     );
+    measureCache.clear();
 
     const mode = String(p.background || "transparent");
     document.body.style.backgroundColor =
@@ -253,6 +368,23 @@ body.preview #api-state.visible { display: block; }
         background.style.display = "block";
       }
     }
+    scheduleColumnSync();
+    return true;
+  }
+
+  function maximumScroll() {
+    return Math.max(0, table.scrollHeight - viewport.clientHeight);
+  }
+
+  function applyScroll() {
+    table.style.transform = `translateY(${-scrollY}px)`;
+  }
+
+  function clampScroll() {
+    const maximum = maximumScroll();
+    scrollY = Math.max(0, Math.min(scrollY, maximum));
+    if (maximum <= 0) direction = 1;
+    applyScroll();
   }
 
   function applyPayload(payload) {
@@ -261,8 +393,7 @@ body.preview #api-state.visible { display: block; }
     const nextAutoScroll = Boolean((payload || {}).auto_scroll);
     if (nextAutoScroll !== autoScroll) {
       autoScroll = nextAutoScroll;
-      scrollY = Math.max(0, Number(scroller.scrollTop) || 0);
-      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const maximum = maximumScroll();
       direction = scrollY >= maximum - 1 && maximum > 0 ? -1 : 1;
       lastFrame = performance.now();
     }
@@ -272,7 +403,7 @@ body.preview #api-state.visible { display: block; }
     const dt = Math.min(100, Math.max(0, now - lastFrame));
     lastFrame = now;
     if (autoScroll) {
-      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const maximum = maximumScroll();
       if (maximum > 0) {
         scrollY += direction * SPEED_PX_PER_SECOND * dt / 1000;
         if (scrollY >= maximum) {
@@ -282,13 +413,10 @@ body.preview #api-state.visible { display: block; }
           scrollY = 0;
           direction = 1;
         }
-        // Keep the fractional accumulator above, but write whole CSS pixels to
-        // the native scroll container so OBS/CEF cannot discard every sub-pixel
-        // step. The sticky header therefore remains native and fixed.
-        scroller.scrollTop = Math.round(scrollY);
+        applyScroll();
       } else if (scrollY !== 0) {
         scrollY = 0;
-        scroller.scrollTop = 0;
+        applyScroll();
       }
     }
     requestAnimationFrame(scrollFrame);
@@ -306,10 +434,9 @@ body.preview #api-state.visible { display: block; }
   }
 
   new ResizeObserver(() => {
-    const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    scrollY = Math.min(scrollY, maximum);
-    scroller.scrollTop = Math.round(scrollY);
-  }).observe(scroller);
+    scheduleColumnSync();
+    clampScroll();
+  }).observe(viewport);
 
   setInterval(update, POLL_MS);
   requestAnimationFrame(scrollFrame);
