@@ -75,6 +75,11 @@ class LocalApiServer:
         self._httpd: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self.last_error: str = ""
+        self._auction_lots_runtime_lock = threading.Lock()
+        self._auction_lots_runtime = {
+            "mode": "max_amount",
+            "auto_scroll": False,
+        }
 
     @property
     def running(self) -> bool:
@@ -84,15 +89,35 @@ class LocalApiServer:
     def base_url(self) -> str:
         return f"http://{self.host}:{self.port}"
 
+    def set_auction_lots_runtime(
+        self,
+        *,
+        mode: str | None = None,
+        auto_scroll: bool | None = None,
+    ) -> None:
+        with self._auction_lots_runtime_lock:
+            if mode in {"max_amount", "weighted_wheel"}:
+                self._auction_lots_runtime["mode"] = str(mode)
+            if auto_scroll is not None:
+                self._auction_lots_runtime["auto_scroll"] = bool(auto_scroll)
+
+    def auction_lots_runtime(self) -> dict[str, object]:
+        with self._auction_lots_runtime_lock:
+            return dict(self._auction_lots_runtime)
+
     def start(self) -> None:
         if self.running:
             return
         db = self.db
+        api_server = self
         overlay_path = Path(__file__).resolve().parent / "web" / "overlay.html"
         list_overlay_path = Path(__file__).resolve().parent / "web" / "list_overlay.html"
         wheel_overlay_path = Path(__file__).resolve().parent / "web" / "wheel_overlay.html"
         rules_overlay_path = Path(__file__).resolve().parent / "web" / "rules_overlay.html"
         timer_overlay_path = Path(__file__).resolve().parent / "web" / "timer_overlay.html"
+        auction_lots_overlay_path = (
+            Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"
+        )
         # Static HTML does not change while the program is running. Read once
         # instead of hitting disk for every browser-source navigation/refresh.
         overlay_html = _inject_overlay_version_handshake(
@@ -109,6 +134,9 @@ class LocalApiServer:
         )
         timer_overlay_html = _inject_overlay_version_handshake(
             timer_overlay_path.read_text(encoding="utf-8"), APP_VERSION
+        )
+        auction_lots_overlay_html = _inject_overlay_version_handshake(
+            auction_lots_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
         data_root = db.path.parent
         background_dir = managed_media_directory(
@@ -365,6 +393,22 @@ class LocalApiServer:
                         )
                     return
 
+                if path in (
+                    "/auction-lots-overlay",
+                    "/obs-auction-lots",
+                    "/overlay/auction-lots",
+                ):
+                    try:
+                        self._send_html(auction_lots_overlay_html)
+                    except OSError as exc:
+                        self._send_html(
+                            "<h1>Auction lots overlay unavailable</h1><pre>"
+                            + str(exc)
+                            + "</pre>",
+                            status=500,
+                        )
+                    return
+
                 if path in ("/rules-overlay", "/obs-rules", "/overlay/rules"):
                     try:
                         self._send_html(rules_overlay_html)
@@ -434,6 +478,15 @@ class LocalApiServer:
                 if path in ("/api/wheel", "/wheel"):
                     self._send_json(
                         db.current_wheel_payload(),
+                        pretty=pretty,
+                    )
+                    return
+
+                if path in ("/api/auction-lots", "/auction-lots"):
+                    self._send_json(
+                        db.current_auction_lots_payload(
+                            api_server.auction_lots_runtime()
+                        ),
                         pretty=pretty,
                     )
                     return
