@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — Wheel</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:"Segoe UI",Arial,sans-serif}
+body.preview{background:radial-gradient(circle at center,#1b2228,#0b0f12)}
+#root{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#stage{position:relative;width:min(92vw,92vh);height:min(92vw,92vh);opacity:0;transition:opacity .15s ease}
+#stage.visible{opacity:1}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+#winner{position:absolute;left:5%;right:5%;bottom:0;text-align:center;color:white;font-weight:700;font-size:clamp(18px,3.4vmin,42px);text-shadow:0 2px 10px #000;opacity:0}
+#winner.visible{opacity:1}
+#winner-chance{margin-top:.18em;font-size:.62em;font-weight:650}
+#preview-label{position:absolute;top:2%;left:0;right:0;text-align:center;color:#aeb8c0;font-size:clamp(12px,2vmin,22px);display:none}
+body.preview #preview-label{display:block}
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="stage">
+    <canvas id="wheel"></canvas>
+    <div id="preview-label">ПРЕДПРОСМОТР КОЛЕСА OBS</div>
+    <div id="winner">
+      <div id="winner-title"></div>
+      <div id="winner-chance"></div>
+    </div>
+  </div>
+</div>
+<script>
+const API="/api/wheel";
+const PALETTE=["#4FC3F7","#FF8A65","#BA68C8","#81C784","#FFD54F","#64B5F6","#F06292","#4DB6AC","#A1887F","#90A4AE","#9575CD","#DCE775"];
+const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
+const stage=document.getElementById("stage"),winnerEl=document.getElementById("winner");
+const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
+const preview=new URLSearchParams(location.search).get("preview")==="1";
+if(preview)document.body.classList.add("preview");
+let state=null,clockOffset=0,rafId=null,rafSpinId="";
+
+function motionProgress(progress,durationMs){
+ const t=Math.max(0,Math.min(1,Number(progress)||0));
+ if(t<=0)return 0;if(t>=1)return 1;
+ const duration=Math.max(1,Number(durationMs)||8000);
+ const accel=Math.min(2000,duration*.22)/duration,decel=Math.min(3000,duration*.30)/duration;
+ const cruise=Math.max(0,1-accel-decel),area=cruise+.5*(accel+decel),peak=1/Math.max(1e-9,area);
+ let pos=0;
+ if(t<=accel){
+   if(accel<=0)return 0;
+   pos=peak*(.5*t-(accel/(2*Math.PI))*Math.sin(Math.PI*t/accel));
+ }else if(t<1-decel){
+   pos=peak*(.5*accel+(t-accel));
+ }else{
+   if(decel<=0)return 1;
+   const u=Math.max(0,Math.min(decel,t-(1-decel)));
+   pos=peak*(.5*accel+cruise+.5*u+(decel/(2*Math.PI))*Math.sin(Math.PI*u/decel));
+ }
+ return Math.max(0,Math.min(1,pos));
+}
+function wrapAllLines(text,maxWidth){
+ text=(text||"").trim();if(!text)return [""];
+ const raw=text.split(/\s+/),parts=[];
+ for(const word of raw){
+   if(ctx.measureText(word).width<=maxWidth){parts.push(word);continue}
+   let chunk="";
+   for(const ch of word){
+     const next=chunk+ch;
+     if(chunk&&ctx.measureText(next).width>maxWidth){parts.push(chunk);chunk=ch}else chunk=next;
+   }
+   if(chunk)parts.push(chunk);
+ }
+ const lines=[];let line="";
+ for(const part of parts){
+   const candidate=line?line+" "+part:part;
+   if(!line||ctx.measureText(candidate).width<=maxWidth)line=candidate;
+   else{lines.push(line);line=part}
+ }
+ if(line)lines.push(line);
+ return lines.length?lines:[""];
+}
+function drawSectorTitle(title,deg,r){
+ const textWidth=r*.70,arcHeight=r*.56*(Math.max(4,deg)*Math.PI/180);
+ const textHeight=Math.max(18,Math.min(r*.34,arcHeight*.86));
+ const preferred=Math.max(10,Math.min(18,10+deg/10));
+ let size=preferred,lines=[String(title||"")],lineHeight=size*1.08;
+ for(;size>=6;size-=.5){
+   ctx.font=`700 ${size}px "Segoe UI",Arial`;
+   lineHeight=size*1.08;
+   lines=wrapAllLines(title,textWidth);
+   if(lines.length*lineHeight<=textHeight+.5)break;
+ }
+ // Даже если сектор слишком мал для комфортного шрифта, показываем полное
+ // название минимальным размером вместо искусственного обрезания через "…".
+ if(size<6){
+   size=6;ctx.font=`700 ${size}px "Segoe UI",Arial`;lineHeight=size*1.02;
+   lines=wrapAllLines(title,textWidth);
+ }
+ const total=(lines.length-1)*lineHeight;
+ lines.forEach((line,i)=>ctx.fillText(line,0,i*lineHeight-total/2,textWidth));
+}
+function sampleState(){
+ return {visible:true,ready:true,sectors:[
+   {game_id:1,title:"Mass Effect",weight:55},
+   {game_id:2,title:"Pragmata",weight:30},
+   {game_id:3,title:"Cairn",weight:15}
+ ],winner:null,animation:{spin_id:null,started_at:null,duration_ms:8000,target_rotation:0,complete:true}};
+}
+function resize(){
+ const dpr=Math.max(1,Math.min(2,devicePixelRatio||1));
+ const r=stage.getBoundingClientRect();
+ canvas.width=Math.max(2,Math.round(r.width*dpr));canvas.height=Math.max(2,Math.round(r.height*dpr));
+ ctx.setTransform(dpr,0,0,dpr,0,0);draw();
+}
+new ResizeObserver(resize).observe(stage);
+
+function rotationFor(s){
+ const a=s?.animation||{},target=Number(a.target_rotation||0);
+ if(!a.spin_id||!a.started_at)return {rotation:0,complete:true};
+ const start=Date.parse(a.started_at)-clockOffset,duration=Math.max(1,Number(a.duration_ms||8000));
+ const p=Math.max(0,Math.min(1,(Date.now()-start)/duration));
+ const visualProgress=motionProgress(p,duration);
+ return {rotation:target*visualProgress,complete:p>=1};
+}
+function formatProbability(probability){
+ const value=Number(probability);
+ if(!Number.isFinite(value))return null;
+ return (Math.max(0,value)*100).toFixed(2).replace(".",",")+" %";
+}
+function draw(){
+ const s=state||(preview?sampleState():null);
+ if(!s){stage.classList.remove("visible");return}
+ const show=preview||s.visible;
+ stage.classList.toggle("visible",!!show);
+ if(!show)return;
+
+ const w=stage.clientWidth,h=stage.clientHeight;
+ ctx.clearRect(0,0,w,h);
+ const cx=w/2,cy=h/2-8,r=Math.min(w,h)*.405;
+ const sectors=(s.sectors||[]).map(x=>({...x,weight:Math.max(0,Number(x.weight||0))}));
+ if(!sectors.length){
+   ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+   ctx.fillStyle="#25292D";ctx.fill();
+   ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;ctx.stroke();
+   ctx.fillStyle="#AEB8C0";ctx.font='700 22px "Segoe UI",Arial';
+   ctx.textAlign="center";ctx.textBaseline="middle";
+   ctx.fillText("НЕТ ЛОТОВ",cx,cy);
+   return;
+ }
+ let total=sectors.reduce((a,b)=>a+b.weight,0);
+ if(total<=0){sectors.forEach(x=>x.weight=1);total=sectors.length}
+
+ const anim=rotationFor(s),rot=anim.rotation*Math.PI/180;
+ ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);
+ let start=-Math.PI/2;
+ sectors.forEach((sec,i)=>{
+   const span=sec.weight/total*Math.PI*2,end=start+span;
+   ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,start,end);ctx.closePath();
+   ctx.fillStyle=PALETTE[i%PALETTE.length];ctx.fill();
+   ctx.strokeStyle="#15181B";ctx.lineWidth=1.5;ctx.stroke();
+
+   const deg=span*180/Math.PI;
+   if(deg>=4){
+     const mid=start+span/2,tx=Math.cos(mid)*r*.56,ty=Math.sin(mid)*r*.56;
+     ctx.save();ctx.translate(tx,ty);let angle=mid;
+     const norm=((angle%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+     if(norm>Math.PI/2&&norm<Math.PI*1.5)angle+=Math.PI;
+     ctx.rotate(angle);ctx.fillStyle="#111315";
+     ctx.textAlign="center";ctx.textBaseline="middle";
+     drawSectorTitle(sec.title,deg,r);
+     ctx.restore();
+   }
+   start=end;
+ });
+ ctx.beginPath();ctx.arc(0,0,r*.12,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
+ ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();ctx.restore();
+
+ // outer ring
+ ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;ctx.stroke();
+ // pointer
+ ctx.beginPath();ctx.moveTo(cx-20,cy-r-26);ctx.lineTo(cx+20,cy-r-26);ctx.lineTo(cx,cy-r+15);ctx.closePath();
+ ctx.fillStyle="#E53935";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
+
+ const winner=s.winner;
+ const reveal=anim.complete&&winner;
+ winnerTitleEl.textContent=reveal?`Победитель: ${winner.title}`:"";
+ const chance=reveal?winner.chance:null;
+ if(chance){
+   const formatted=chance.available?formatProbability(chance.probability):null;
+   winnerChanceEl.textContent=formatted?`Шанс в этом вращении: ${formatted}`:"Шанс в этом вращении: недоступен";
+ }else winnerChanceEl.textContent="";
+ winnerEl.classList.toggle("visible",!!reveal);
+}
+function stopAnimationLoop(){
+ if(rafId!==null)cancelAnimationFrame(rafId);
+ rafId=null;rafSpinId="";
+}
+function ensureAnimationLoop(){
+ const s=state||(preview?sampleState():null);
+ const spinId=s?.animation?.spin_id||"";
+ if(!spinId||rotationFor(s).complete){stopAnimationLoop();return}
+ if(rafId!==null&&rafSpinId===spinId)return;
+ if(rafId!==null)cancelAnimationFrame(rafId);
+ rafSpinId=spinId;
+ rafId=requestAnimationFrame(animationFrame);
+}
+function animationFrame(){
+ rafId=null;
+ const spinId=rafSpinId;
+ draw();
+ const s=state||(preview?sampleState():null);
+ const currentSpinId=s?.animation?.spin_id||"";
+ if(!s||currentSpinId!==spinId||rotationFor(s).complete){
+   rafSpinId="";
+   ensureAnimationLoop();
+   return;
+ }
+ rafId=requestAnimationFrame(animationFrame);
+}
+async function poll(){
+ try{
+   const res=await fetch(API,{cache:"no-store"});if(!res.ok)throw new Error(res.status);
+   const next=await res.json();
+   if(next.server_time)clockOffset=Date.parse(next.server_time)-Date.now();
+   state=next;
+ }catch(e){if(!preview)state=null}
+ draw();
+ ensureAnimationLoop();
+}
+setInterval(poll,200);poll();
+</script>
+</body>
+</html>

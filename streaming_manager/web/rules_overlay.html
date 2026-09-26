@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — OBS Rules</title>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+body.preview {
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.05) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+#root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+#root.visible { opacity: 1; }
+#viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#content {
+  width: 100%;
+  min-width: 0;
+  transform: translateY(0);
+  will-change: transform;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+#content p, #content div, #content h1, #content h2, #content h3, #content h4,
+#content ul, #content ol, #content blockquote { max-width: 100%; }
+#api-state {
+  display: none;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(120,20,20,.92);
+  color: #fff;
+  font: 600 13px "Segoe UI", Arial, sans-serif;
+}
+body.preview #api-state.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="viewport"><div id="content"></div></div>
+</div>
+<div id="api-state">Нет связи с In one line</div>
+<script>
+(() => {
+  const API = "/api/rules";
+  const POLL_MS = 500;
+  const SPEED = 22; // px/s
+  const PAUSE_TOP_MS = 1600;
+  const PAUSE_BOTTOM_MS = 1800;
+  const RETURN_MS = 650;
+
+  const root = document.getElementById("root");
+  const viewport = document.getElementById("viewport");
+  const content = document.getElementById("content");
+  const apiState = document.getElementById("api-state");
+  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  if (preview) document.body.classList.add("preview");
+
+  let lastPayloadKey = "";
+  let state = null;
+  let scrollY = 0;
+  let phase = "top";
+  let phaseStarted = performance.now();
+  let lastFrame = performance.now();
+  let scrollRafId = null;
+  let scrollWakeTimer = null;
+
+  function normalizeHex(value, fallback = "#000000") {
+    const text = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : fallback;
+  }
+
+  function rgba(hex, opacityPercent) {
+    const value = normalizeHex(hex).slice(1);
+    const r = parseInt(value.slice(0,2), 16);
+    const g = parseInt(value.slice(2,4), 16);
+    const b = parseInt(value.slice(4,6), 16);
+    const a = Math.max(0, Math.min(100, Number(opacityPercent) || 0)) / 100;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function resetScroll() {
+    scrollY = 0;
+    phase = "top";
+    phaseStarted = performance.now();
+    content.style.transform = "translateY(0px)";
+  }
+
+  function applyPayload(payload) {
+    state = payload || {};
+    const presentation = state.presentation || {};
+    const html = String(state.content_html || "");
+    const visible = !!state.visible && html.trim().length > 0;
+
+    root.classList.toggle("visible", visible);
+    root.style.background = presentation.background === "color"
+      ? rgba(presentation.background_color, presentation.background_opacity)
+      : "transparent";
+
+    const padding = Math.max(0, Math.min(200, Number(presentation.padding) || 0));
+    viewport.style.padding = `${padding}px`;
+    content.innerHTML = html;
+    resetScroll();
+    syncAnimationLoop();
+  }
+
+  async function update() {
+    try {
+      const response = await fetch(API, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const key = JSON.stringify(payload);
+      if (key !== lastPayloadKey) {
+        lastPayloadKey = key;
+        applyPayload(payload);
+      }
+      apiState.classList.remove("visible");
+    } catch (_error) {
+      apiState.classList.add("visible");
+    }
+  }
+
+  function stopAnimationLoop() {
+    if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
+    if (scrollWakeTimer !== null) clearTimeout(scrollWakeTimer);
+    scrollRafId = null;
+    scrollWakeTimer = null;
+  }
+
+  function syncAnimationLoop() {
+    const presentation = state?.presentation || {};
+    const autoscroll = !!presentation.autoscroll;
+    const visible = root.classList.contains("visible");
+    const maxScroll = Math.max(0, content.scrollHeight - viewport.clientHeight);
+
+    if (!visible || !autoscroll || maxScroll <= 1) {
+      stopAnimationLoop();
+      if (scrollY !== 0 || phase !== "top") resetScroll();
+      return;
+    }
+    if (scrollRafId !== null || scrollWakeTimer !== null) return;
+
+    const now = performance.now();
+    let wakeDelay = 0;
+    if (phase === "top") {
+      wakeDelay = PAUSE_TOP_MS - (now - phaseStarted);
+      if (wakeDelay <= 0) {
+        phase = "down";
+        phaseStarted = now;
+      }
+    } else if (phase === "bottom") {
+      wakeDelay = PAUSE_BOTTOM_MS - (now - phaseStarted);
+      if (wakeDelay <= 0) {
+        phase = "return";
+        phaseStarted = now;
+      }
+    }
+
+    if (wakeDelay > 0) {
+      scrollWakeTimer = setTimeout(() => {
+        scrollWakeTimer = null;
+        syncAnimationLoop();
+      }, wakeDelay);
+      return;
+    }
+
+    lastFrame = now;
+    scrollRafId = requestAnimationFrame(animate);
+  }
+
+  function animate(now) {
+    scrollRafId = null;
+    const dt = Math.min(.08, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    const presentation = state?.presentation || {};
+    const autoscroll = !!presentation.autoscroll;
+    const visible = root.classList.contains("visible");
+    const maxScroll = Math.max(0, content.scrollHeight - viewport.clientHeight);
+
+    if (!visible || !autoscroll || maxScroll <= 1) {
+      if (scrollY !== 0 || phase !== "top") resetScroll();
+      return;
+    }
+
+    if (phase === "top") {
+      if (now - phaseStarted >= PAUSE_TOP_MS) {
+        phase = "down";
+        phaseStarted = now;
+      }
+    } else if (phase === "down") {
+      scrollY = Math.min(maxScroll, scrollY + SPEED * dt);
+      if (scrollY >= maxScroll - .5) {
+        scrollY = maxScroll;
+        phase = "bottom";
+        phaseStarted = now;
+      }
+    } else if (phase === "bottom") {
+      if (now - phaseStarted >= PAUSE_BOTTOM_MS) {
+        phase = "return";
+        phaseStarted = now;
+      }
+    } else if (phase === "return") {
+      const p = Math.max(0, Math.min(1, (now - phaseStarted) / RETURN_MS));
+      scrollY = maxScroll * (1 - (1 - Math.pow(1 - p, 3)));
+      if (p >= 1) resetScroll();
+    }
+
+    content.style.transform = `translateY(${-Math.min(maxScroll, scrollY)}px)`;
+    syncAnimationLoop();
+  }
+
+  new ResizeObserver(() => {
+    const maxScroll = Math.max(0, content.scrollHeight - viewport.clientHeight);
+    scrollY = Math.min(scrollY, maxScroll);
+    if (maxScroll <= 1) resetScroll();
+    syncAnimationLoop();
+  }).observe(viewport);
+
+  update();
+  setInterval(update, POLL_MS);
+  syncAnimationLoop();
+})();
+</script>
+</body>
+</html>

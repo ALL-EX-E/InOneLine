@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — OBS List</title>
+<style>
+:root {
+  --panel-bg: rgba(10, 13, 16, 0.82);
+  --list-border: rgba(255,255,255,.92);
+  --list-glow-strong: rgba(255,255,255,.65);
+  --list-glow-soft: rgba(255,255,255,.58);
+  --list-glow-inner: rgba(255,255,255,.22);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: #fff;
+  font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+}
+#list-panel {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 9px;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+  border: 1px solid var(--list-border);
+  box-shadow:
+    0 0 6px var(--list-glow-strong),
+    0 0 16px var(--list-glow-soft),
+    inset 0 0 8px var(--list-glow-inner);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+}
+#top-three { flex: 0 0 auto; }
+.top-three-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 7px;
+  padding: 4px 2px;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+.top-three-number {
+  align-self: start;
+  white-space: nowrap;
+  text-align: right;
+  color: inherit;
+}
+#top-three-divider {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 7px 2px 8px;
+  background: rgba(255,255,255,.48);
+}
+#top-three-divider.hidden { display: none; }
+#list-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+#game-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0);
+  will-change: transform;
+}
+.game-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 9px;
+  padding: 4px 2px;
+  font-size: 17px;
+  line-height: 1.15;
+}
+.game-title {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: manual;
+  text-shadow: 0 1px 2px rgba(0,0,0,.75);
+}
+.game-sum {
+  align-self: end;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+#api-state {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  inset: auto 8px 8px 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(120,20,20,.92);
+  font-size: 13px;
+  font-weight: 600;
+}
+#api-state.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="list-panel">
+  <div id="top-three"></div>
+  <div id="top-three-divider"></div>
+  <div id="list-viewport">
+    <div id="game-list"></div>
+  </div>
+  <div id="api-state">Нет связи с In one line</div>
+</div>
+<script>
+(() => {
+  const panel = document.getElementById("list-panel");
+  const topThree = document.getElementById("top-three");
+  const divider = document.getElementById("top-three-divider");
+  const viewport = document.getElementById("list-viewport");
+  const list = document.getElementById("game-list");
+  const apiState = document.getElementById("api-state");
+
+  const SPEED = 19;
+  let activeTypography = {};
+  let scrollingRows = [];
+  let lastRowsKey = "";
+  let lastMetricsKey = "";
+  let cycleHeight = 0;
+  let scrollY = 0;
+  let pauseUntil = performance.now() + 1800;
+  let lastTime = performance.now();
+  let scrollRafId = null;
+  let scrollWakeTimer = null;
+
+  function normalizeHexColor(value, fallback = "#FFFFFF") {
+    const text = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : fallback;
+  }
+
+  function hexToRgba(hex, alpha) {
+    const value = normalizeHexColor(hex).slice(1);
+    const r = Number.parseInt(value.slice(0, 2), 16);
+    const g = Number.parseInt(value.slice(2, 4), 16);
+    const b = Number.parseInt(value.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function applyGlow(overlayConfig) {
+    const legacy = normalizeHexColor(overlayConfig?.frame_color || "#FFFFFF");
+    const color = normalizeHexColor(
+      overlayConfig?.frame_colors?.list || legacy,
+      legacy
+    );
+    const root = document.documentElement.style;
+    root.setProperty("--list-border", hexToRgba(color, .92));
+    root.setProperty("--list-glow-strong", hexToRgba(color, .65));
+    root.setProperty("--list-glow-soft", hexToRgba(color, .58));
+    root.setProperty("--list-glow-inner", hexToRgba(color, .22));
+  }
+
+  function normalizeStyle(style, fallback) {
+    const source = style || {};
+    const size = Number(source.size);
+    const color = String(source.color || fallback.color);
+    return {
+      family: String(source.family || fallback.family),
+      size: Number.isFinite(size) ? Math.max(8, Math.min(96, size)) : fallback.size,
+      color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback.color,
+    };
+  }
+
+  function applyTextStyle(element, style, fallback) {
+    if (!element) return;
+    const value = normalizeStyle(style, fallback);
+    element.style.fontFamily = `"${value.family.replaceAll('"', '\\"')}", sans-serif`;
+    element.style.fontSize = `${value.size}px`;
+    element.style.color = value.color;
+  }
+
+  function applyTypography(typography) {
+    activeTypography = typography || {};
+    const fallback = { family: "Segoe UI", size: 17, color: "#FFFFFF" };
+    document.querySelectorAll(".top-three-row").forEach((row, index) => {
+      applyTextStyle(row, activeTypography[`top${index + 1}`], fallback);
+    });
+    document.querySelectorAll(".game-row").forEach((row) => {
+      applyTextStyle(row, activeTypography.list, fallback);
+    });
+  }
+
+  const sumFormatter = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
+
+  function formatSum(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n) || n === 0) return "";
+    return sumFormatter.format(n);
+  }
+
+  function createListRow(row) {
+    const el = document.createElement("div");
+    el.className = "game-row";
+
+    const name = document.createElement("div");
+    name.className = "game-title";
+    name.textContent = String(row?.title ?? "");
+
+    const sum = document.createElement("div");
+    sum.className = "game-sum";
+    sum.textContent = formatSum(row?.sum);
+
+    el.append(name, sum);
+    applyTextStyle(
+      el,
+      activeTypography.list,
+      { family: "Segoe UI", size: 17, color: "#FFFFFF" }
+    );
+    return el;
+  }
+
+  function renderRows(rows) {
+    const normalized = Array.isArray(rows) ? rows : [];
+    const key = JSON.stringify(normalized);
+    if (key === lastRowsKey) return false;
+    lastRowsKey = key;
+
+    topThree.innerHTML = "";
+    normalized.slice(0, 3).forEach((row, index) => {
+      const el = document.createElement("div");
+      el.className = "top-three-row";
+
+      const number = document.createElement("div");
+      number.className = "top-three-number";
+      number.textContent = `${index + 1} -`;
+
+      const name = document.createElement("div");
+      name.className = "game-title";
+      name.textContent = String(row?.title ?? "");
+
+      const sum = document.createElement("div");
+      sum.className = "game-sum";
+      sum.textContent = formatSum(row?.sum);
+
+      el.append(number, name, sum);
+      topThree.appendChild(el);
+    });
+
+    divider.classList.toggle("hidden", normalized.length <= 3);
+    scrollingRows = normalized.slice(3);
+    list.innerHTML = "";
+    scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
+    // Не сбрасываем scrollY/cycleHeight/pauseUntil при live-обновлении данных.
+    // rebuildInfiniteScroll(false) сохранит относительную позицию текущего цикла,
+    // даже если после изменения баллов SM строки пересортировались.
+    applyScroll();
+    return true;
+  }
+
+  function rebuildInfiniteScroll(reset = false) {
+    if (scrollingRows.length === 0 || viewport.clientHeight <= 1) {
+      cycleHeight = 0;
+      scrollY = 0;
+      list.innerHTML = "";
+      scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
+      applyScroll();
+      syncScrollLoop();
+      return;
+    }
+
+    const oldHeight = cycleHeight;
+    const oldScroll = scrollY;
+
+    list.innerHTML = "";
+    scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
+    cycleHeight = list.scrollHeight;
+    if (cycleHeight <= 1) {
+      scrollY = 0;
+      applyScroll();
+      syncScrollLoop();
+      return;
+    }
+
+    const copies = Math.max(2, Math.ceil(viewport.clientHeight / cycleHeight) + 2);
+    for (let i = 1; i < copies; i += 1) {
+      scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
+    }
+
+    if (reset || oldHeight <= 1) {
+      scrollY = 0;
+      pauseUntil = performance.now() + 1800;
+    } else {
+      scrollY = ((oldScroll / oldHeight) * cycleHeight) % cycleHeight;
+    }
+    applyScroll();
+    syncScrollLoop();
+  }
+
+  function applyScroll() {
+    list.style.transform = `translateY(${-scrollY}px)`;
+  }
+
+  async function update() {
+    try {
+      const response = await fetch("/api/data", { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const overlayConfig = data.overlay || {};
+
+      const rowsChanged = renderRows(data.auction_list || []);
+      applyTypography(overlayConfig.typography || {});
+      applyGlow(overlayConfig);
+
+      // list_enabled намеренно не учитывается: этот URL является независимым
+      // источником OBS и должен работать даже когда список скрыт в основном overlay.
+      // renderRows() already computes the only large row signature we need.
+      // Keep the geometry key small so a long game list is not serialized a
+      // second time on every 1-second Browser Source poll.
+      const metricsKey = JSON.stringify({
+        typography: overlayConfig.typography || {},
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+      if (rowsChanged || metricsKey !== lastMetricsKey) {
+        const reset = lastMetricsKey === "";
+        lastMetricsKey = metricsKey;
+        requestAnimationFrame(() => rebuildInfiniteScroll(reset));
+      }
+      apiState.classList.remove("visible");
+    } catch (err) {
+      apiState.classList.add("visible");
+    }
+  }
+
+  function stopScrollLoop() {
+    if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
+    if (scrollWakeTimer !== null) clearTimeout(scrollWakeTimer);
+    scrollRafId = null;
+    scrollWakeTimer = null;
+  }
+
+  function syncScrollLoop() {
+    if (cycleHeight <= 1) {
+      stopScrollLoop();
+      scrollY = 0;
+      applyScroll();
+      return;
+    }
+    if (scrollRafId !== null || scrollWakeTimer !== null) return;
+    const now = performance.now();
+    if (now < pauseUntil) {
+      scrollWakeTimer = setTimeout(() => {
+        scrollWakeTimer = null;
+        syncScrollLoop();
+      }, Math.max(0, pauseUntil - now));
+      return;
+    }
+    lastTime = now;
+    scrollRafId = requestAnimationFrame(animate);
+  }
+
+  function animate(now) {
+    scrollRafId = null;
+    if (cycleHeight <= 1) {
+      syncScrollLoop();
+      return;
+    }
+    if (now < pauseUntil) {
+      syncScrollLoop();
+      return;
+    }
+    const dt = Math.min(.05, (now - lastTime) / 1000);
+    lastTime = now;
+    scrollY += SPEED * dt;
+    if (scrollY >= cycleHeight) scrollY %= cycleHeight;
+    applyScroll();
+    scrollRafId = requestAnimationFrame(animate);
+  }
+
+  addEventListener("resize", () => {
+    lastMetricsKey = "";
+    requestAnimationFrame(() => rebuildInfiniteScroll(false));
+  });
+
+  update();
+  setInterval(update, 1000);
+  syncScrollLoop();
+})();
+</script>
+</body>
+</html>

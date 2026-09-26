@@ -1,0 +1,1465 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Callable
+
+from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer, QUrl
+from PySide6.QtGui import QAction, QBrush, QColor, QDesktopServices, QFont, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QApplication, QAbstractItemView, QAbstractSpinBox, QCheckBox, QComboBox, QColorDialog, QDialog,
+    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFontComboBox, QFormLayout,
+    QFrame, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
+    QMainWindow, QMessageBox, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox,
+    QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+)
+
+from ..api_server import LocalApiServer
+from ..constants import (
+    APP_NAME, APP_VERSION, COOP_LABELS, DEFAULT_API_HOST,
+    RULES_OVERLAY_AUTOSCROLL_DEFAULT, RULES_OVERLAY_AUTOSCROLL_KEY,
+    RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT, RULES_OVERLAY_BACKGROUND_COLOR_KEY,
+    RULES_OVERLAY_BACKGROUND_DEFAULT, RULES_OVERLAY_BACKGROUND_KEY,
+    RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT, RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
+    RULES_OVERLAY_PADDING_DEFAULT, RULES_OVERLAY_PADDING_KEY,
+    RULES_OVERLAY_VISIBLE_DEFAULT, RULES_OVERLAY_VISIBLE_KEY,
+    TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT, TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
+    TIMER_OVERLAY_BACKGROUND_DEFAULT, TIMER_OVERLAY_BACKGROUND_KEY,
+    TIMER_OVERLAY_FONT_COLOR_DEFAULT, TIMER_OVERLAY_FONT_COLOR_KEY,
+    TIMER_OVERLAY_FONT_FAMILY_DEFAULT, TIMER_OVERLAY_FONT_FAMILY_KEY,
+    TIMER_OVERLAY_FONT_SIZE_DEFAULT, TIMER_OVERLAY_FONT_SIZE_KEY,
+    STATUS_ABANDONED, STATUS_COMPLETED, STATUS_LABELS, STATUS_NOT_PLAYED, STATUS_PLAYED,
+    STATUS_PLAYING, STREAM_FORMATS,
+)
+from ..database import (
+    Database, DuplicateGameError, Game, display_date, display_datetime_local,
+    format_points, normalize_date_text, normalize_text_key, parse_date,
+)
+from ..media import (
+    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+    MEDIA_STORAGE_EXTERNAL,
+    MEDIA_STORAGE_MANAGED,
+    media_asset_available,
+    managed_media_directory,
+    resolve_media_asset_path,
+    supported_media_extensions,
+)
+from ..exporters import (
+    export_pointauc_csv, export_public_csv, export_public_json, export_public_xlsx,
+    pointauc_text,
+)
+from ..random_sources import RandomDraw, RandomOrgClient
+from ..workers import FunctionWorker
+from .common import (
+    APP_STYLE, FocusClearingWidget, ScrollSafeComboBox, ScrollSafeFontComboBox,
+    ScrollSafeSpinBox, _center, _selected_id, make_wide_step_control, pick_screen_color,
+)
+
+class StreamTab(QWidget):
+    def __init__(self, db: Database, api: LocalApiServer):
+        super().__init__()
+        self.db = db
+        self.api = api
+        self.thread_pool = QThreadPool.globalInstance()
+        self._background_copy_worker: FunctionWorker | None = None
+        self.background_dir = managed_media_directory(
+            self.db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+        )
+        self.background_dir.mkdir(parents=True, exist_ok=True)
+
+        # Вкладка может быть длиннее доступной высоты окна из-за большого
+        # количества настроек. Поэтому весь её контент находится в QScrollArea:
+        # элементы больше не сжимаются и не исчезают при уменьшении окна.
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+
+        self.stream_scroll = QScrollArea(self)
+        self.stream_scroll.setWidgetResizable(True)
+        self.stream_scroll.setFrameShape(QFrame.NoFrame)
+        self.stream_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.stream_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        self.stream_content = QWidget()
+        self.stream_content.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Preferred,
+        )
+
+        layout = QVBoxLayout(self.stream_content)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
+
+        self.stream_scroll.setWidget(self.stream_content)
+        outer_layout.addWidget(self.stream_scroll)
+
+        heading = QLabel("Данные для OBS")
+        heading.setStyleSheet("font-size: 15pt; font-weight: 700;")
+        layout.addWidget(heading)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(10)
+        form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.game_combo = ScrollSafeComboBox()
+        self.game_combo.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
+
+        self.info_field = QLineEdit()
+        self.info_field.setPlaceholderText("Введите текст информационного блока…")
+        self.info_field.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
+
+        self.info_enabled = QCheckBox("Показывать")
+        self.info_enabled.setToolTip(
+            "Если выключено, информационный блок полностью скрывается, "
+            "а остальные элементы занимают освободившееся место."
+        )
+        self.info_enabled.toggled.connect(self._update_info_enabled_state)
+
+        info_row = QWidget()
+        info_layout = QHBoxLayout(info_row)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(8)
+        info_layout.addWidget(self.info_field, 1)
+        info_layout.addWidget(self.info_enabled)
+        info_layout.addStretch()
+
+        self.format_combo = ScrollSafeComboBox()
+        self.format_combo.addItems(STREAM_FORMATS)
+        self.format_combo.setMaximumWidth(180)
+
+        form.addRow("Текущая игра:", self.game_combo)
+        form.addRow("Текст информационного блока:", info_row)
+        form.addRow("Формат:", self.format_combo)
+        layout.addLayout(form)
+
+        background_heading = QLabel("Фон оверлея")
+        background_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(background_heading)
+
+        background_form = QFormLayout()
+        background_form.setVerticalSpacing(10)
+        background_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        background_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.background_combo = ScrollSafeComboBox()
+        self.background_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.background_combo.currentIndexChanged.connect(
+            self._update_background_path_field
+        )
+
+        self.choose_background_btn = QPushButton("Добавить фон…")
+        self.choose_background_btn.setToolTip(
+            "Добавить новый фон и решить: скопировать его в программу или использовать исходный файл"
+        )
+        self.choose_background_btn.clicked.connect(self._import_background_media)
+
+        background_row = QWidget()
+        background_row_layout = QHBoxLayout(background_row)
+        background_row_layout.setContentsMargins(0, 0, 0, 0)
+        background_row_layout.setSpacing(8)
+        background_row_layout.addWidget(self.background_combo, 1)
+        background_row_layout.addWidget(self.choose_background_btn)
+        background_form.addRow("Фон:", background_row)
+
+        self.background_path = QLineEdit()
+        self.background_path.setReadOnly(True)
+        self.background_path.setPlaceholderText(
+            "Фон не выбран — используется стандартная подложка оверлея"
+        )
+        self.repair_background_btn = QPushButton("Восстановить ссылку…")
+        self.repair_background_btn.setEnabled(False)
+        self.repair_background_btn.setVisible(False)
+        self.repair_background_btn.setToolTip(
+            "Восстановить потерянную ссылку на исходный внешний файл"
+        )
+        self.repair_background_btn.clicked.connect(self._repair_background_reference)
+        background_path_row = QWidget()
+        background_path_layout = QHBoxLayout(background_path_row)
+        background_path_layout.setContentsMargins(0, 0, 0, 0)
+        background_path_layout.setSpacing(8)
+        background_path_layout.addWidget(self.background_path, 1)
+        background_path_layout.addWidget(self.repair_background_btn)
+        background_form.addRow("Источник:", background_path_row)
+
+        self.background_status = QLabel("Фон не выбран")
+        self.background_status.setProperty("muted", True)
+        background_form.addRow("Состояние:", self.background_status)
+
+        self.background_mode = ScrollSafeComboBox()
+        self.background_mode.addItem("Растянуть", "stretch")
+        self.background_mode.addItem("Вписать", "contain")
+        self.background_mode.addItem("Заполнить", "cover")
+        self.background_mode.addItem("По центру", "center")
+        self.background_mode.setMaximumWidth(220)
+        background_form.addRow("Режим отображения:", self.background_mode)
+
+        background_help = QLabel(
+            "После выбора файла можно «Копировать в программу» или «Использовать исходный файл». "
+            "Копия хранится только в отдельной папке data\\overlay_backgrounds; оригинал программа "
+            "никогда не изменяет и не удаляет. Ссылки на исходные файлы обслуживаются OBS через "
+            "защищённый локальный media-route без раскрытия произвольного доступа к файловой системе. "
+            "Если исходный файл перемещён или удалён, фон безопасно отключается и его можно переуказать. "
+            "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM. GIF воспроизводится как анимация, "
+            "видео — без звука и по кругу. Фон применяется после «Сохранить параметры стрима»."
+        )
+        background_help.setWordWrap(True)
+        background_help.setProperty("muted", True)
+        background_form.addRow("", background_help)
+        layout.addLayout(background_form)
+
+        overlay_heading = QLabel("Внешний вид оверлея")
+        overlay_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(overlay_heading)
+
+        overlay_form = QFormLayout()
+        overlay_form.setVerticalSpacing(10)
+        overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.webcam_enabled = QCheckBox("Показывать")
+        self.webcam_position = ScrollSafeComboBox()
+        self.webcam_position.addItem("Справа сверху", "top_right")
+        self.webcam_position.addItem("Справа снизу", "bottom_right")
+        self.webcam_position.addItem("Слева сверху", "top_left")
+        self.webcam_position.addItem("Слева снизу", "bottom_left")
+        self.webcam_position.setMinimumWidth(190)
+        self.webcam_enabled.toggled.connect(
+            self.webcam_position.setEnabled
+        )
+
+        webcam_row = QWidget()
+        webcam_layout = QHBoxLayout(webcam_row)
+        webcam_layout.setContentsMargins(0, 0, 0, 0)
+        webcam_layout.setSpacing(8)
+        webcam_layout.addWidget(self.webcam_enabled)
+        webcam_layout.addWidget(self.webcam_position)
+        webcam_layout.addStretch()
+        overlay_form.addRow("Область веб-камеры:", webcam_row)
+
+        self.overlay_list_enabled = QCheckBox("Показывать")
+        self.overlay_list_side = ScrollSafeComboBox()
+        self.overlay_list_side.addItem("Авто — за веб-камерой", "auto")
+        self.overlay_list_side.addItem("Справа", "right")
+        self.overlay_list_side.addItem("Слева", "left")
+        self.overlay_list_side.setMinimumWidth(190)
+        self.overlay_list_enabled.toggled.connect(
+            self.overlay_list_side.setEnabled
+        )
+
+        list_row = QWidget()
+        list_layout = QHBoxLayout(list_row)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+        list_layout.setSpacing(8)
+        list_layout.addWidget(self.overlay_list_enabled)
+        list_layout.addWidget(self.overlay_list_side)
+        list_layout.addStretch()
+        overlay_form.addRow("Список игр:", list_row)
+
+        self.info_position = ScrollSafeComboBox()
+        self.info_position.addItem("Авто — за веб-камерой", "auto")
+        self.info_position.addItem("Справа сверху", "top_right")
+        self.info_position.addItem("Справа снизу", "bottom_right")
+        self.info_position.addItem("Слева сверху", "top_left")
+        self.info_position.addItem("Слева снизу", "bottom_left")
+        self.info_position.setMinimumWidth(190)
+        self.info_position.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
+        overlay_form.addRow("Положение информации:", self.info_position)
+
+        glow_heading = QLabel("Цвета светящегося контура")
+        glow_heading.setStyleSheet("font-weight: 600;")
+        overlay_form.addRow("", glow_heading)
+
+        self.frame_color_buttons: dict[str, QPushButton] = {}
+        frame_color_rows = (
+            ("game", "Игровая рамка:"),
+            ("webcam", "Рамка веб-камеры:"),
+            ("list", "Рамка списка:"),
+            ("info", "Рамка доп. информации:"),
+        )
+        for color_key, color_label in frame_color_rows:
+            color_btn = QPushButton()
+            color_btn.setToolTip(
+                f"Выбрать цвет светящегося контура: {color_label.rstrip(':').lower()}"
+            )
+            frame_color_text_width = color_btn.fontMetrics().horizontalAdvance(
+                "#FFFFFF"
+            )
+            color_btn.setMinimumWidth(
+                max(112, frame_color_text_width + 38)
+            )
+            color_btn.setMaximumWidth(
+                max(160, frame_color_text_width + 58)
+            )
+            self._set_color_button(color_btn, "#FFFFFF")
+            color_btn.clicked.connect(
+                lambda checked=False, key=color_key: self._choose_frame_color(key)
+            )
+            pipette_btn = QPushButton("⌖")
+            pipette_btn.setToolTip(
+                "Выбрать цвет непосредственно с экрана. Левый клик — принять, Escape — отмена."
+            )
+            pipette_btn.clicked.connect(
+                lambda checked=False, button=color_btn: self._pick_color_from_screen(button)
+            )
+            color_row = QWidget()
+            color_row_layout = QHBoxLayout(color_row)
+            color_row_layout.setContentsMargins(0, 0, 0, 0)
+            color_row_layout.setSpacing(8)
+            color_row_layout.addWidget(color_btn)
+            color_row_layout.addWidget(pipette_btn)
+            color_row_layout.addStretch()
+            self.frame_color_buttons[color_key] = color_btn
+            overlay_form.addRow(color_label, color_row)
+
+        overlay_help = QLabel(
+            "Авто: список и информационный блок следуют за веб-камерой. "
+            "Если камера снизу — список и информация находятся над ней. "
+            "Если камера переносится влево — автоматические блоки тоже переходят влево.\n"
+            "Только внутренние области игровой рамки и рамки веб-камеры прозрачны; "
+            "остальной фон оверлея непрозрачный. В OBS разместите Browser Source "
+            "с этим оверлеем выше источника игры и веб-камеры."
+        )
+        overlay_help.setWordWrap(True)
+        overlay_help.setProperty("muted", True)
+        overlay_form.addRow("", overlay_help)
+
+        layout.addLayout(overlay_form)
+
+        typography_heading = QLabel("Шрифты оверлея")
+        typography_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(typography_heading)
+
+        typography_help = QLabel(
+            "Для каждого элемента можно отдельно выбрать семейство шрифта, "
+            "размер и цвет. Настройки применяются после сохранения параметров."
+        )
+        typography_help.setWordWrap(True)
+        typography_help.setProperty("muted", True)
+        layout.addWidget(typography_help)
+
+        self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
+        typography_layout = QVBoxLayout()
+        typography_layout.setSpacing(10)
+
+        self._add_typography_row(
+            typography_layout, "title", "Название текущей игры", 30, "#FFFFFF"
+        )
+        self._add_typography_row(
+            typography_layout, "top1", "Top-1", 17, "#FFFFFF"
+        )
+        self._add_typography_row(
+            typography_layout, "top2", "Top-2", 17, "#FFFFFF"
+        )
+        self._add_typography_row(
+            typography_layout, "top3", "Top-3", 17, "#FFFFFF"
+        )
+        self._add_typography_row(
+            typography_layout, "list", "Прокручиваемый список", 17, "#FFFFFF"
+        )
+        self._add_typography_row(
+            typography_layout, "info", "Доп. информация", 17, "#FFFFFF"
+        )
+        layout.addLayout(typography_layout)
+
+        save = QPushButton("Сохранить параметры стрима")
+        save.setProperty("primary", True)
+        save.clicked.connect(self.save)
+        layout.addWidget(save, 0, Qt.AlignLeft)
+
+        line = QFrame()
+        line.setProperty("line", True)
+        layout.addWidget(line)
+
+        api_heading = QLabel("Локальный API")
+        api_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(api_heading)
+
+        self.api_label = QLabel()
+        self.api_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.api_label.setProperty("muted", True)
+        layout.addWidget(self.api_label)
+
+        btns = QHBoxLayout()
+        btns.setSpacing(8)
+        copy = QPushButton("Копировать URL оверлея")
+        copy.setToolTip(
+            "Скопировать адрес, который нужно добавить в OBS как источник «Браузер»"
+        )
+        copy.clicked.connect(
+            lambda: QApplication.clipboard().setText(
+                f"{self.api.base_url}/overlay"
+            )
+        )
+
+        overlay_btn = QPushButton("Открыть предпросмотр оверлея")
+        overlay_btn.setToolTip(
+            "Открыть предварительный просмотр оверлея в браузере"
+        )
+        overlay_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.api.base_url}/overlay?preview=1")
+            )
+        )
+
+        health = QPushButton("Проверить API")
+        health.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/health")))
+        data_btn = QPushButton("Открыть JSON OBS")
+        data_btn.setToolTip(
+            "Открыть диагностические данные OBS в читаемом виде. "
+            "Это не графический оверлей."
+        )
+        data_btn.clicked.connect(self._open_obs_json)
+        btns.addWidget(copy)
+        btns.addWidget(overlay_btn)
+        btns.addWidget(health)
+        btns.addWidget(data_btn)
+        btns.addStretch()
+        layout.addLayout(btns)
+
+        # Browser applications may reuse an already-open diagnostics tab when
+        # asked to navigate to the exact same URL.  A unique query value makes
+        # every operator click perform a fresh /api/data request, while the
+        # server itself remains no-store and recalculates media availability.
+        self._obs_json_open_counter = 0
+
+        list_btns = QHBoxLayout()
+        list_btns.setSpacing(8)
+        copy_list = QPushButton("Копировать URL списка")
+        copy_list.setToolTip(
+            "Скопировать отдельный URL списка игр для второго источника «Браузер» в OBS"
+        )
+        copy_list.clicked.connect(
+            lambda: QApplication.clipboard().setText(
+                f"{self.api.base_url}/list-overlay"
+            )
+        )
+        open_list = QPushButton("Открыть предпросмотр списка")
+        open_list.setToolTip(
+            "Открыть отдельный OBS-оверлей, содержащий только Top-3 и прокручиваемый список"
+        )
+        open_list.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.api.base_url}/list-overlay")
+            )
+        )
+        list_btns.addWidget(copy_list)
+        list_btns.addWidget(open_list)
+        list_btns.addStretch()
+        layout.addLayout(list_btns)
+
+        timer_line = QFrame()
+        timer_line.setProperty("line", True)
+        layout.addWidget(timer_line)
+        timer_heading = QLabel("Виджет таймера аукциона")
+        timer_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(timer_heading)
+
+        timer_form = QFormLayout()
+        timer_form.setVerticalSpacing(10)
+        timer_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        timer_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.timer_overlay_font = ScrollSafeFontComboBox()
+        self.timer_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        timer_form.addRow("Шрифт:", self.timer_overlay_font)
+
+        self.timer_overlay_font_size = ScrollSafeSpinBox()
+        self.timer_overlay_font_size.setRange(8, 300)
+        self.timer_overlay_font_size.setSuffix(" px")
+        self.timer_overlay_font_size.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.timer_overlay_font_size_control = make_wide_step_control(
+            self.timer_overlay_font_size,
+            up_tooltip="Увеличить размер таймера",
+            down_tooltip="Уменьшить размер таймера",
+        )
+        timer_form.addRow("Размер:", self.timer_overlay_font_size_control)
+
+        timer_text_color_row = QWidget()
+        timer_text_color_layout = QHBoxLayout(timer_text_color_row)
+        timer_text_color_layout.setContentsMargins(0, 0, 0, 0)
+        timer_text_color_layout.setSpacing(8)
+        self.timer_overlay_font_color_btn = QPushButton()
+        self.timer_overlay_font_color_btn.clicked.connect(self._choose_timer_font_color)
+        self.timer_overlay_font_color_pick_btn = QPushButton("⌖")
+        self.timer_overlay_font_color_pick_btn.setToolTip("Выбрать цвет таймера с экрана")
+        self.timer_overlay_font_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.timer_overlay_font_color_btn)
+        )
+        timer_text_color_layout.addWidget(self.timer_overlay_font_color_btn)
+        timer_text_color_layout.addWidget(self.timer_overlay_font_color_pick_btn)
+        timer_text_color_layout.addStretch()
+        timer_form.addRow("Цвет текста:", timer_text_color_row)
+
+        timer_background_row = QWidget()
+        timer_background_layout = QHBoxLayout(timer_background_row)
+        timer_background_layout.setContentsMargins(0, 0, 0, 0)
+        timer_background_layout.setSpacing(12)
+        self.timer_background_transparent = QRadioButton("Прозрачный")
+        self.timer_background_color_mode = QRadioButton("Цвет")
+        self.timer_background_transparent.toggled.connect(self._update_timer_background_enabled_state)
+        self.timer_background_color_mode.toggled.connect(self._update_timer_background_enabled_state)
+        timer_background_layout.addWidget(self.timer_background_transparent)
+        timer_background_layout.addWidget(self.timer_background_color_mode)
+        timer_background_layout.addStretch()
+        timer_form.addRow("Фон:", timer_background_row)
+
+        timer_bg_color_row = QWidget()
+        timer_bg_color_layout = QHBoxLayout(timer_bg_color_row)
+        timer_bg_color_layout.setContentsMargins(0, 0, 0, 0)
+        timer_bg_color_layout.setSpacing(8)
+        self.timer_background_color_btn = QPushButton()
+        self.timer_background_color_btn.clicked.connect(self._choose_timer_background_color)
+        self.timer_background_color_pick_btn = QPushButton("⌖")
+        self.timer_background_color_pick_btn.setToolTip("Выбрать цвет фона таймера с экрана")
+        self.timer_background_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.timer_background_color_btn)
+        )
+        timer_bg_color_layout.addWidget(self.timer_background_color_btn)
+        timer_bg_color_layout.addWidget(self.timer_background_color_pick_btn)
+        timer_bg_color_layout.addStretch()
+        timer_form.addRow("Цвет фона:", timer_bg_color_row)
+        layout.addLayout(timer_form)
+
+        timer_actions = QHBoxLayout()
+        timer_actions.setSpacing(8)
+        save_timer = QPushButton("Сохранить виджет таймера")
+        save_timer.setProperty("primary", True)
+        save_timer.clicked.connect(self._save_timer_overlay_settings)
+        copy_timer = QPushButton("Копировать URL таймера")
+        copy_timer.clicked.connect(
+            lambda: QApplication.clipboard().setText(f"{self.api.base_url}/timer-overlay")
+        )
+        open_timer = QPushButton("Открыть предпросмотр таймера")
+        open_timer.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/timer-overlay?preview=1"))
+        )
+        timer_help = QPushButton("Как добавить в OBS")
+        timer_help.clicked.connect(self._show_timer_obs_help)
+        timer_actions.addWidget(save_timer)
+        timer_actions.addWidget(copy_timer)
+        timer_actions.addWidget(open_timer)
+        timer_actions.addWidget(timer_help)
+        timer_actions.addStretch()
+        layout.addLayout(timer_actions)
+
+        rules_line = QFrame()
+        rules_line.setProperty("line", True)
+        layout.addWidget(rules_line)
+        rules_heading = QLabel("Виджет правил аукциона")
+        rules_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(rules_heading)
+
+        rules_form = QFormLayout()
+        rules_form.setVerticalSpacing(10)
+        rules_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        rules_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.rules_overlay_visible = QCheckBox("Показывать правила в OBS")
+        rules_form.addRow("Видимость:", self.rules_overlay_visible)
+        self.rules_overlay_autoscroll = QCheckBox("Автопрокрутка")
+        rules_form.addRow("Прокрутка:", self.rules_overlay_autoscroll)
+
+        background_row = QWidget()
+        background_layout = QHBoxLayout(background_row)
+        background_layout.setContentsMargins(0, 0, 0, 0)
+        background_layout.setSpacing(12)
+        self.rules_background_transparent = QRadioButton("Прозрачный")
+        self.rules_background_color_mode = QRadioButton("Цвет")
+        self.rules_background_transparent.toggled.connect(
+            self._update_rules_background_enabled_state
+        )
+        self.rules_background_color_mode.toggled.connect(
+            self._update_rules_background_enabled_state
+        )
+        background_layout.addWidget(self.rules_background_transparent)
+        background_layout.addWidget(self.rules_background_color_mode)
+        background_layout.addStretch()
+        rules_form.addRow("Фон:", background_row)
+
+        rules_color_row = QWidget()
+        rules_color_layout = QHBoxLayout(rules_color_row)
+        rules_color_layout.setContentsMargins(0, 0, 0, 0)
+        rules_color_layout.setSpacing(8)
+        self.rules_background_color_btn = QPushButton()
+        self.rules_background_color_btn.clicked.connect(self._choose_rules_background_color)
+        self.rules_background_color_pick_btn = QPushButton("⌖")
+        self.rules_background_color_pick_btn.setToolTip(
+            "Выбрать цвет фона непосредственно с экрана"
+        )
+        self.rules_background_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.rules_background_color_btn)
+        )
+        rules_color_layout.addWidget(self.rules_background_color_btn)
+        rules_color_layout.addWidget(self.rules_background_color_pick_btn)
+        rules_color_layout.addStretch()
+        rules_form.addRow("Цвет фона:", rules_color_row)
+
+        self.rules_background_opacity = ScrollSafeSpinBox()
+        self.rules_background_opacity.setRange(0, 100)
+        self.rules_background_opacity.setSuffix(" %")
+        self.rules_background_opacity.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.rules_background_opacity_control = make_wide_step_control(
+            self.rules_background_opacity,
+            up_tooltip="Увеличить непрозрачность",
+            down_tooltip="Уменьшить непрозрачность",
+        )
+        rules_form.addRow("Непрозрачность:", self.rules_background_opacity_control)
+
+        self.rules_overlay_padding = ScrollSafeSpinBox()
+        self.rules_overlay_padding.setRange(0, 200)
+        self.rules_overlay_padding.setSuffix(" px")
+        self.rules_overlay_padding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.rules_overlay_padding_control = make_wide_step_control(
+            self.rules_overlay_padding,
+            up_tooltip="Увеличить внутренний отступ",
+            down_tooltip="Уменьшить внутренний отступ",
+        )
+        rules_form.addRow("Внутренний отступ:", self.rules_overlay_padding_control)
+        layout.addLayout(rules_form)
+
+        rules_actions = QHBoxLayout()
+        rules_actions.setSpacing(8)
+        save_rules = QPushButton("Сохранить виджет правил")
+        save_rules.setProperty("primary", True)
+        save_rules.clicked.connect(self._save_rules_overlay_settings)
+        copy_rules = QPushButton("Копировать URL правил")
+        copy_rules.clicked.connect(
+            lambda: QApplication.clipboard().setText(f"{self.api.base_url}/rules-overlay")
+        )
+        open_rules = QPushButton("Открыть предпросмотр правил")
+        open_rules.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.api.base_url}/rules-overlay?preview=1")
+            )
+        )
+        rules_help = QPushButton("Как добавить в OBS")
+        rules_help.clicked.connect(self._show_rules_obs_help)
+        rules_actions.addWidget(save_rules)
+        rules_actions.addWidget(copy_rules)
+        rules_actions.addWidget(open_rules)
+        rules_actions.addWidget(rules_help)
+        rules_actions.addStretch()
+        layout.addLayout(rules_actions)
+
+        layout.addStretch()
+        self.refresh()
+
+    def _update_timer_background_enabled_state(self) -> None:
+        enabled = self.timer_background_color_mode.isChecked()
+        self.timer_background_color_btn.setEnabled(enabled)
+        self.timer_background_color_pick_btn.setEnabled(enabled)
+
+    def _choose_timer_font_color(self) -> None:
+        current = QColor(str(self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT))
+        selected = QColorDialog.getColor(current, self, "Выберите цвет таймера")
+        if selected.isValid():
+            self._set_color_button(self.timer_overlay_font_color_btn, selected.name())
+
+    def _choose_timer_background_color(self) -> None:
+        current = QColor(str(self.timer_background_color_btn.property("fontColor") or TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT))
+        selected = QColorDialog.getColor(current, self, "Выберите цвет фона таймера")
+        if selected.isValid():
+            self._set_color_button(self.timer_background_color_btn, selected.name())
+
+    def _save_timer_overlay_settings(self) -> None:
+        background = "color" if self.timer_background_color_mode.isChecked() else "transparent"
+        self.db.set_settings_bulk({
+            TIMER_OVERLAY_FONT_FAMILY_KEY: self.timer_overlay_font.currentFont().family(),
+            TIMER_OVERLAY_FONT_SIZE_KEY: str(self.timer_overlay_font_size.value()),
+            TIMER_OVERLAY_FONT_COLOR_KEY: str(
+                self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT
+            ),
+            TIMER_OVERLAY_BACKGROUND_KEY: background,
+            TIMER_OVERLAY_BACKGROUND_COLOR_KEY: str(
+                self.timer_background_color_btn.property("fontColor") or TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT
+            ),
+        })
+        QMessageBox.information(
+            self,
+            "OBS Timer",
+            "Настройки виджета таймера сохранены. Открытый Browser Source обновится автоматически.",
+        )
+
+    def _show_timer_obs_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Как добавить таймер в OBS",
+            "1. Скопируйте URL таймера.\n"
+            "2. OBS → Источники → Браузер.\n"
+            "3. Вставьте URL.\n"
+            "4. Задайте Width / Height.\n"
+            "5. Разместите источник на сцене.\n\n"
+            "Источник содержит только значение таймера и не воспроизводит музыку. "
+            "Параметры ‘Shutdown source when not visible’ и ‘Refresh browser when scene becomes active’ "
+            "не обязательны.",
+        )
+
+    def _update_rules_background_enabled_state(self) -> None:
+        enabled = self.rules_background_color_mode.isChecked()
+        self.rules_background_color_btn.setEnabled(enabled)
+        self.rules_background_color_pick_btn.setEnabled(enabled)
+        self.rules_background_opacity.setEnabled(enabled)
+
+    def _choose_rules_background_color(self) -> None:
+        current = QColor(str(self.rules_background_color_btn.property("fontColor") or "#000000"))
+        selected = QColorDialog.getColor(current, self, "Выберите цвет фона правил")
+        if selected.isValid():
+            self._set_color_button(self.rules_background_color_btn, selected.name())
+
+    def _save_rules_overlay_settings(self) -> None:
+        background = "color" if self.rules_background_color_mode.isChecked() else "transparent"
+        self.db.set_settings_bulk({
+            RULES_OVERLAY_VISIBLE_KEY: "1" if self.rules_overlay_visible.isChecked() else "0",
+            RULES_OVERLAY_AUTOSCROLL_KEY: "1" if self.rules_overlay_autoscroll.isChecked() else "0",
+            RULES_OVERLAY_BACKGROUND_KEY: background,
+            RULES_OVERLAY_BACKGROUND_COLOR_KEY: str(
+                self.rules_background_color_btn.property("fontColor") or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
+            ),
+            RULES_OVERLAY_BACKGROUND_OPACITY_KEY: str(self.rules_background_opacity.value()),
+            RULES_OVERLAY_PADDING_KEY: str(self.rules_overlay_padding.value()),
+        })
+        QMessageBox.information(
+            self,
+            "OBS Rules",
+            "Настройки виджета правил сохранены. Открытый Browser Source обновится автоматически.",
+        )
+
+    def _show_rules_obs_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Как добавить правила в OBS",
+            "1. Скопируйте URL правил.\n"
+            "2. OBS → Источники → Браузер.\n"
+            "3. Вставьте URL.\n"
+            "4. Задайте Width / Height.\n"
+            "5. Разместите источник на сцене.\n\n"
+            "Параметры ‘Shutdown source when not visible’ и ‘Refresh browser when scene becomes active’ "
+            "не обязательны.",
+        )
+
+    def _open_obs_json(self):
+        self._refresh_selected_background_availability()
+        self._obs_json_open_counter += 1
+        QDesktopServices.openUrl(
+            QUrl(
+                f"{self.api.base_url}/api/data?pretty=1&refresh={self._obs_json_open_counter}"
+            )
+        )
+
+    @staticmethod
+    def _supported_background_extensions() -> set[str]:
+        return set(supported_media_extensions(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS))
+
+    def _background_assets(self):
+        return self.db.sync_managed_media_category(
+            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+        )
+
+    @staticmethod
+    def _background_asset_label(asset, available: bool) -> str:
+        if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
+            label = f"{asset.display_name} — исходный файл"
+        else:
+            label = asset.display_name
+        return label if available else f"⚠ файл недоступен: {label}"
+
+    def _refresh_selected_background_availability(self):
+        asset = self._selected_background_asset()
+        if asset is None:
+            self._update_background_path_field()
+            return
+        available = media_asset_available(self.db.path.parent, asset)
+        index = self.background_combo.currentIndex()
+        if index >= 0:
+            expected = self._background_asset_label(asset, available)
+            if self.background_combo.itemText(index) != expected:
+                self.background_combo.setItemText(index, expected)
+        self._update_background_path_field()
+
+    def _refresh_background_library(self, selected_asset_id: int | str | None = None):
+        if selected_asset_id is None:
+            selected_asset_id = self.background_combo.currentData()
+        try:
+            selected_id = int(selected_asset_id) if str(selected_asset_id or "").isdigit() else None
+        except (TypeError, ValueError):
+            selected_id = None
+
+        assets = self._background_assets()
+        self.background_combo.blockSignals(True)
+        self.background_combo.clear()
+        self.background_combo.addItem("— без фоновой картинки —", "")
+        for asset in assets:
+            available = media_asset_available(self.db.path.parent, asset)
+            self.background_combo.addItem(
+                self._background_asset_label(asset, available),
+                asset.id,
+            )
+
+        idx = self.background_combo.findData(selected_id) if selected_id is not None else 0
+        self.background_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.background_combo.blockSignals(False)
+        self._update_background_path_field()
+
+    def _selected_background_asset(self):
+        raw = self.background_combo.currentData()
+        if not str(raw or "").isdigit():
+            return None
+        asset = self.db.get_media_asset(int(raw))
+        if asset is None or asset.category != MEDIA_CATEGORY_OVERLAY_BACKGROUNDS:
+            return None
+        return asset
+
+    def _update_background_path_field(self, *args):
+        asset = self._selected_background_asset()
+        if asset is None:
+            self.background_path.clear()
+            self.background_status.setText("Фон не выбран")
+            self.repair_background_btn.setEnabled(False)
+            self.repair_background_btn.setVisible(False)
+            return
+
+        try:
+            path = resolve_media_asset_path(self.db.path.parent, asset)
+        except (OSError, ValueError):
+            path = Path(asset.external_path or asset.managed_name)
+        available = media_asset_available(self.db.path.parent, asset)
+        self.background_path.setText(str(path))
+
+        needs_external_repair = (
+            asset.storage_mode == MEDIA_STORAGE_EXTERNAL and not available
+        )
+        if available:
+            status_text = "Доступен"
+        elif needs_external_repair:
+            status_text = (
+                "Файл недоступен — нажмите «Восстановить ссылку…» "
+                "или добавьте другой фон"
+            )
+        else:
+            status_text = (
+                "Файл недоступен — добавьте фон заново или выберите другой"
+            )
+        self.background_status.setText(status_text)
+        self.repair_background_btn.setVisible(needs_external_repair)
+        self.repair_background_btn.setEnabled(needs_external_repair)
+
+    def _unique_background_target(self, source_name: str) -> Path:
+        source_path = Path(source_name)
+        stem = source_path.stem
+        suffix = source_path.suffix
+        existing = {p.name.casefold() for p in self.background_dir.iterdir() if p.is_file()}
+        candidate = self.background_dir / source_path.name
+        number = 2
+        while candidate.name.casefold() in existing:
+            candidate = self.background_dir / f"{stem} ({number}){suffix}"
+            number += 1
+        return candidate
+
+    @staticmethod
+    def _copy_background_video(source: Path, target: Path) -> Path:
+        try:
+            shutil.copy2(source, target)
+        except Exception:
+            try:
+                target.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        return target
+
+    def _background_video_copy_ready(self, target: Path):
+        asset = self.db.ensure_managed_media_asset(
+            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+            target.name,
+            target.name,
+        )
+        self._refresh_background_library(asset.id)
+
+    def _background_video_copy_failed(self, exc):
+        QMessageBox.critical(
+            self,
+            "Ошибка копирования фона",
+            f"Не удалось скопировать видео во внутреннюю библиотеку:\n{exc}",
+        )
+
+    def _background_video_copy_finished(self):
+        self._background_copy_worker = None
+        self.choose_background_btn.setEnabled(True)
+        self.choose_background_btn.setText("Добавить фон…")
+
+    def _start_background_video_copy(self, source: Path, target: Path):
+        if self._background_copy_worker is not None:
+            return
+        self.choose_background_btn.setEnabled(False)
+        self.choose_background_btn.setText("Копирование…")
+        worker = FunctionWorker(self._copy_background_video, source, target)
+        self._background_copy_worker = worker
+        worker.signals.result.connect(self._background_video_copy_ready)
+        worker.signals.error.connect(self._background_video_copy_failed)
+        worker.signals.finished.connect(self._background_video_copy_finished)
+        self.thread_pool.start(worker)
+
+    def _choose_background_storage_mode(self, source: Path) -> str | None:
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Как использовать фон?")
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setText(f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?")
+        dialog.setInformativeText(
+            "«Копировать в программу» создаст управляемую копию в отдельной папке "
+            "data\\overlay_backgrounds. «Использовать исходный файл» сохранит ссылку "
+            "на оригинал; сам оригинал программа не изменяет и не удаляет."
+        )
+        copy_button = dialog.addButton(
+            "Копировать в программу", QMessageBox.ButtonRole.AcceptRole
+        )
+        external_button = dialog.addButton(
+            "Использовать исходный файл", QMessageBox.ButtonRole.ActionRole
+        )
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked is copy_button:
+            return MEDIA_STORAGE_MANAGED
+        if clicked is external_button:
+            return MEDIA_STORAGE_EXTERNAL
+        return None
+
+    def _import_background_media(self):
+        if self._background_copy_worker is not None:
+            return
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите фон оверлея",
+            "",
+            "Поддерживаемые фоны (*.png *.jpg *.jpeg *.webp *.gif *.mp4 *.webm);;"
+            "Изображения (*.png *.jpg *.jpeg *.webp);;"
+            "GIF (*.gif);;Видео (*.mp4 *.webm);;Все файлы (*.*)",
+        )
+        if not path:
+            return
+
+        source = Path(path)
+        if source.suffix.lower() not in self._supported_background_extensions():
+            QMessageBox.warning(
+                self,
+                "Неподдерживаемый формат",
+                "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
+            )
+            return
+        if not source.is_file():
+            QMessageBox.critical(self, "Ошибка", "Выбранный файл не найден.")
+            return
+
+        try:
+            self.background_dir.mkdir(parents=True, exist_ok=True)
+            # Every file chosen through the operator picker uses the same W2
+            # storage decision, including video and files that already happen
+            # to be inside the managed background directory.
+            storage_mode = self._choose_background_storage_mode(source)
+            if storage_mode is None:
+                return
+            if storage_mode == MEDIA_STORAGE_EXTERNAL:
+                asset = self.db.register_external_media_asset(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                    source,
+                )
+                self._refresh_background_library(asset.id)
+                return
+
+            # Copy mode for a file already in the dedicated managed category
+            # means "use this existing managed copy"; never copy a file onto
+            # itself.
+            if source.resolve().parent == self.background_dir.resolve():
+                asset = self.db.ensure_managed_media_asset(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                    source.name,
+                    source.name,
+                )
+                self._refresh_background_library(asset.id)
+                return
+
+            if source.suffix.lower() in {".mp4", ".webm"}:
+                existing_video = next(
+                    (
+                        item
+                        for item in self.background_dir.iterdir()
+                        if item.is_file() and item.name.casefold() == source.name.casefold()
+                    ),
+                    None,
+                )
+                if existing_video is not None:
+                    QMessageBox.information(
+                        self,
+                        "Фон уже есть",
+                        f'Файл «{source.name}» уже есть в библиотеке фонов.\n'
+                        "Будет выбран существующий файл.",
+                    )
+                    asset = self.db.ensure_managed_media_asset(
+                        MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                        existing_video.name,
+                        existing_video.name,
+                    )
+                    self._refresh_background_library(asset.id)
+                    return
+                target = self.background_dir / source.name
+                self._start_background_video_copy(source, target)
+                return
+
+            target = self._unique_background_target(source.name)
+            shutil.copy2(source, target)
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                target.name,
+                source.name,
+            )
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Ошибка выбора фона",
+                f"Не удалось подготовить выбранный фон:\n{exc}",
+            )
+            return
+
+        self._refresh_background_library(asset.id)
+
+    def _repair_background_reference(self):
+        asset = self._selected_background_asset()
+        if asset is None or asset.storage_mode != MEDIA_STORAGE_EXTERNAL:
+            return
+        current = Path(asset.external_path) if asset.external_path else Path.home()
+        start_dir = str(current.parent if current.parent.exists() else Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Переукажите исходный файл фона",
+            start_dir,
+            "Поддерживаемые фоны (*.png *.jpg *.jpeg *.webp *.gif *.mp4 *.webm);;"
+            "Все файлы (*.*)",
+        )
+        if not path:
+            return
+        source = Path(path)
+        if not source.is_file():
+            QMessageBox.warning(self, "Файл недоступен", "Выбранный файл не найден.")
+            return
+        if source.suffix.lower() not in self._supported_background_extensions():
+            QMessageBox.warning(
+                self,
+                "Неподдерживаемый формат",
+                "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
+            )
+            return
+        try:
+            repaired = self.db.update_external_media_asset(asset.id, source)
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(
+                self,
+                "Ошибка переуказания",
+                f"Не удалось обновить ссылку на файл:\n{exc}",
+            )
+            return
+        self._refresh_background_library(repaired.id)
+
+    def _add_typography_row(
+        self,
+        parent_layout: QVBoxLayout,
+        key: str,
+        label: str,
+        default_size: int,
+        default_color: str,
+    ):
+        # Название элемента вынесено на отдельную строку. Благодаря этому
+        # настройки остаются читаемыми даже в узком окне / split-screen режиме.
+        item_label = QLabel(label)
+        item_label.setStyleSheet("font-weight: 600;")
+        item_label.setSizePolicy(
+            QSizePolicy.Preferred,
+            QSizePolicy.Fixed,
+        )
+        parent_layout.addWidget(item_label)
+
+        font_combo = ScrollSafeFontComboBox()
+        font_combo.setMinimumWidth(190)
+        font_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        size_spin = ScrollSafeSpinBox()
+        size_spin.setRange(8, 96)
+        size_spin.setValue(default_size)
+        size_spin.setSuffix(" px")
+
+        # Нативные стрелки QSpinBox на некоторых темах Windows имеют маленькую
+        # реальную область нажатия. Поэтому отключаем их и используем две
+        # отдельные крупные кнопки с гарантированным hitbox.
+        size_spin.setButtonSymbols(
+            QAbstractSpinBox.ButtonSymbols.NoButtons
+        )
+        size_text_width = size_spin.fontMetrics().horizontalAdvance("96 px")
+        size_spin.setMinimumWidth(max(92, size_text_width + 34))
+        size_spin.setMaximumWidth(max(120, size_text_width + 48))
+
+        step_up_btn = QPushButton("▲")
+        step_down_btn = QPushButton("▼")
+        step_button_size = max(38, size_spin.sizeHint().height())
+        for step_btn in (step_up_btn, step_down_btn):
+            step_btn.setFixedSize(step_button_size, step_button_size)
+            step_btn.setAutoRepeat(True)
+            step_btn.setAutoRepeatDelay(350)
+            step_btn.setAutoRepeatInterval(80)
+
+        step_up_btn.setToolTip("Увеличить размер шрифта")
+        step_down_btn.setToolTip("Уменьшить размер шрифта")
+        step_up_btn.clicked.connect(size_spin.stepUp)
+        step_down_btn.clicked.connect(size_spin.stepDown)
+
+        color_btn = QPushButton()
+        color_text_width = color_btn.fontMetrics().horizontalAdvance("#FFFFFF")
+        color_btn.setMinimumWidth(max(112, color_text_width + 38))
+        color_btn.setMaximumWidth(max(150, color_text_width + 54))
+        color_btn.setToolTip("Выбрать цвет шрифта")
+        self._set_color_button(color_btn, default_color)
+        color_btn.clicked.connect(
+            lambda checked=False, row_key=key: self._choose_typography_color(row_key)
+        )
+        pipette_btn = QPushButton("⌖")
+        pipette_btn.setToolTip(
+            "Выбрать цвет непосредственно с экрана. Левый клик — принять, Escape — отмена."
+        )
+        pipette_btn.clicked.connect(
+            lambda checked=False, button=color_btn: self._pick_color_from_screen(button)
+        )
+
+        row = QWidget()
+        row.setSizePolicy(
+            QSizePolicy.Expanding,
+            QSizePolicy.Fixed,
+        )
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(8)
+        row_layout.addWidget(font_combo, 1)
+        row_layout.addWidget(QLabel("Размер:"))
+        row_layout.addWidget(size_spin)
+        row_layout.addWidget(step_up_btn)
+        row_layout.addWidget(step_down_btn)
+        row_layout.addWidget(QLabel("Цвет:"))
+        row_layout.addWidget(color_btn)
+        row_layout.addWidget(pipette_btn)
+
+        # Запрещаем вертикальное схлопывание строки, которое раньше было
+        # заметно в невысоком окне.
+        row.setMinimumHeight(
+            max(
+                font_combo.sizeHint().height(),
+                size_spin.sizeHint().height(),
+                step_button_size,
+                color_btn.sizeHint().height(),
+                pipette_btn.sizeHint().height(),
+            )
+        )
+
+        self.typography_controls[key] = (font_combo, size_spin, color_btn)
+        parent_layout.addWidget(row)
+
+    @staticmethod
+    def _set_color_button(button: QPushButton, color_text: str):
+        color = QColor(color_text)
+        if not color.isValid():
+            color = QColor("#FFFFFF")
+        value = color.name().upper()
+        button.setProperty("fontColor", value)
+        button.setText(value)
+
+        # Контрастная подпись на самой кнопке выбора цвета.
+        luminance = (
+            0.299 * color.red()
+            + 0.587 * color.green()
+            + 0.114 * color.blue()
+        )
+        text_color = "#111111" if luminance > 165 else "#FFFFFF"
+        button.setStyleSheet(
+            f"background: {value}; color: {text_color}; "
+            "border: 1px solid #60666c; font-weight: 600;"
+        )
+
+    def _pick_color_from_screen(self, button: QPushButton):
+        selected = pick_screen_color(self)
+        if selected is not None and selected.isValid():
+            self._set_color_button(button, selected.name())
+
+    def _choose_frame_color(self, key: str):
+        button = self.frame_color_buttons.get(key)
+        if button is None:
+            return
+        current = QColor(
+            str(button.property("fontColor") or "#FFFFFF")
+        )
+        selected = QColorDialog.getColor(
+            current,
+            self,
+            "Выберите цвет светящегося контура",
+        )
+        if selected.isValid():
+            self._set_color_button(button, selected.name())
+
+    def _choose_typography_color(self, key: str):
+        controls = self.typography_controls.get(key)
+        if not controls:
+            return
+        button = controls[2]
+        current = QColor(str(button.property("fontColor") or "#FFFFFF"))
+        selected = QColorDialog.getColor(
+            current,
+            self,
+            "Выберите цвет шрифта",
+        )
+        if selected.isValid():
+            self._set_color_button(button, selected.name())
+
+    def _load_typography_settings(self, settings: dict[str, str] | None = None):
+        settings = settings if settings is not None else self.db.get_settings()
+        defaults = {
+            "title": ("Segoe UI", 30, "#FFFFFF"),
+            "top1": ("Segoe UI", 17, "#FFFFFF"),
+            "top2": ("Segoe UI", 17, "#FFFFFF"),
+            "top3": ("Segoe UI", 17, "#FFFFFF"),
+            "list": ("Segoe UI", 17, "#FFFFFF"),
+            "info": ("Segoe UI", 17, "#FFFFFF"),
+        }
+        for key, (default_family, default_size, default_color) in defaults.items():
+            font_combo, size_spin, color_btn = self.typography_controls[key]
+            family = settings.get(
+                f"overlay_font_{key}_family", default_family
+            )
+            font_combo.setCurrentFont(QFont(family))
+
+            try:
+                size = int(settings.get(
+                    f"overlay_font_{key}_size", str(default_size)
+                ))
+            except (TypeError, ValueError):
+                size = default_size
+            size_spin.setValue(max(size_spin.minimum(), min(size_spin.maximum(), size)))
+
+            color = settings.get(
+                f"overlay_font_{key}_color", default_color
+            )
+            self._set_color_button(color_btn, color)
+
+    def _collect_typography_settings(self) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for key, (font_combo, size_spin, color_btn) in self.typography_controls.items():
+            values[f"overlay_font_{key}_family"] = font_combo.currentFont().family()
+            values[f"overlay_font_{key}_size"] = str(size_spin.value())
+            values[f"overlay_font_{key}_color"] = str(
+                color_btn.property("fontColor") or "#FFFFFF"
+            )
+        return values
+
+    def _update_info_enabled_state(self):
+        enabled = self.info_enabled.isChecked()
+        self.info_field.setEnabled(enabled)
+        if hasattr(self, "info_position"):
+            self.info_position.setEnabled(enabled)
+        self.info_field.setToolTip(
+            ""
+            if enabled
+            else "Информационный блок отключён. Сохранённый текст не удаляется."
+        )
+
+    @staticmethod
+    def _set_combo_by_data(combo: QComboBox, value: str, fallback: int = 0):
+        idx = combo.findData(value)
+        combo.setCurrentIndex(idx if idx >= 0 else fallback)
+
+    def refresh(self):
+        # All stream/overlay settings are read in one transaction. This keeps
+        # tab switches and OBS configuration refreshes cheap even as the number
+        # of appearance options grows.
+        settings = self.db.get_settings()
+        setting = settings.get
+
+        current = setting("stream_current_game_id", "")
+        self.game_combo.blockSignals(True)
+        self.game_combo.clear()
+        self.game_combo.addItem("— автоматически: первая ПРОХОДИТСЯ —", "")
+        for game in self.db.list_games():
+            self.game_combo.addItem(game.title, str(game.id))
+        idx = self.game_combo.findData(current)
+        self.game_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        self.game_combo.blockSignals(False)
+
+        self.info_field.setText(setting("stream_info", ""))
+
+        info_enabled = setting("stream_info_enabled", "1") == "1"
+        self.info_enabled.blockSignals(True)
+        self.info_enabled.setChecked(info_enabled)
+        self.info_enabled.blockSignals(False)
+        self._update_info_enabled_state()
+
+        fmt = setting("stream_format", "16:9")
+        idx = self.format_combo.findText(fmt)
+        self.format_combo.setCurrentIndex(idx if idx >= 0 else 0)
+
+        background_media_id = setting("overlay_background_media_id", "")
+        if not background_media_id:
+            # Migration 16 normally populates this.  Keep a defensive legacy
+            # adoption path for partially upgraded/copied settings databases.
+            legacy_file = setting("overlay_background_file", "")
+            if legacy_file and Path(legacy_file).name == legacy_file:
+                try:
+                    legacy_asset = self.db.ensure_managed_media_asset(
+                        MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                        legacy_file,
+                        legacy_file,
+                    )
+                except ValueError:
+                    legacy_asset = None
+                if legacy_asset is not None:
+                    background_media_id = str(legacy_asset.id)
+        self._refresh_background_library(background_media_id)
+        self._set_combo_by_data(
+            self.background_mode,
+            setting("overlay_background_mode", "stretch"),
+        )
+
+        webcam_enabled = setting("overlay_webcam_enabled", "1") == "1"
+        self.webcam_enabled.setChecked(webcam_enabled)
+        self.webcam_position.setEnabled(webcam_enabled)
+        self._set_combo_by_data(
+            self.webcam_position,
+            setting("overlay_webcam_position", "top_right"),
+        )
+
+        list_enabled = setting("overlay_list_enabled", "1") == "1"
+        self.overlay_list_enabled.setChecked(list_enabled)
+        self.overlay_list_side.setEnabled(list_enabled)
+        self._set_combo_by_data(
+            self.overlay_list_side,
+            setting("overlay_list_side", "auto"),
+        )
+        self._set_combo_by_data(
+            self.info_position,
+            setting("overlay_info_position", "auto"),
+        )
+
+        legacy_frame_color = setting("overlay_frame_color", "#FFFFFF")
+        for color_key, color_btn in self.frame_color_buttons.items():
+            self._set_color_button(
+                color_btn,
+                setting(
+                    f"overlay_frame_{color_key}_color",
+                    legacy_frame_color,
+                ),
+            )
+        self._update_info_enabled_state()
+        self._load_typography_settings(settings)
+
+        self.timer_overlay_font.setCurrentFont(QFont(
+            setting(TIMER_OVERLAY_FONT_FAMILY_KEY, TIMER_OVERLAY_FONT_FAMILY_DEFAULT)
+        ))
+        try:
+            timer_font_size = int(setting(
+                TIMER_OVERLAY_FONT_SIZE_KEY, str(TIMER_OVERLAY_FONT_SIZE_DEFAULT)
+            ))
+        except ValueError:
+            timer_font_size = TIMER_OVERLAY_FONT_SIZE_DEFAULT
+        self.timer_overlay_font_size.setValue(max(8, min(300, timer_font_size)))
+        self._set_color_button(
+            self.timer_overlay_font_color_btn,
+            setting(TIMER_OVERLAY_FONT_COLOR_KEY, TIMER_OVERLAY_FONT_COLOR_DEFAULT),
+        )
+        timer_background = setting(TIMER_OVERLAY_BACKGROUND_KEY, TIMER_OVERLAY_BACKGROUND_DEFAULT)
+        self.timer_background_color_mode.setChecked(timer_background == "color")
+        self.timer_background_transparent.setChecked(timer_background != "color")
+        self._set_color_button(
+            self.timer_background_color_btn,
+            setting(TIMER_OVERLAY_BACKGROUND_COLOR_KEY, TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT),
+        )
+        self._update_timer_background_enabled_state()
+
+        self.rules_overlay_visible.setChecked(
+            setting(RULES_OVERLAY_VISIBLE_KEY, "1" if RULES_OVERLAY_VISIBLE_DEFAULT else "0") == "1"
+        )
+        self.rules_overlay_autoscroll.setChecked(
+            setting(RULES_OVERLAY_AUTOSCROLL_KEY, "1" if RULES_OVERLAY_AUTOSCROLL_DEFAULT else "0") == "1"
+        )
+        rules_background = setting(RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT)
+        self.rules_background_color_mode.setChecked(rules_background == "color")
+        self.rules_background_transparent.setChecked(rules_background != "color")
+        self._set_color_button(
+            self.rules_background_color_btn,
+            setting(RULES_OVERLAY_BACKGROUND_COLOR_KEY, RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT),
+        )
+        try:
+            opacity = int(setting(
+                RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
+                str(RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT),
+            ))
+        except ValueError:
+            opacity = RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT
+        self.rules_background_opacity.setValue(max(0, min(100, opacity)))
+        try:
+            padding = int(setting(RULES_OVERLAY_PADDING_KEY, str(RULES_OVERLAY_PADDING_DEFAULT)))
+        except ValueError:
+            padding = RULES_OVERLAY_PADDING_DEFAULT
+        self.rules_overlay_padding.setValue(max(0, min(200, padding)))
+        self._update_rules_background_enabled_state()
+
+        state = "РАБОТАЕТ" if self.api.running else f"НЕ ЗАПУЩЕН: {self.api.last_error or 'неизвестная ошибка'}"
+        self.api_label.setText(
+            f"Состояние: {state}\n"
+            f"Оверлей OBS: {self.api.base_url}/overlay\n"
+            f"Отдельный список OBS: {self.api.base_url}/list-overlay\n"
+            f"Таймер OBS: {self.api.base_url}/timer-overlay\n"
+            f"Правила OBS: {self.api.base_url}/rules-overlay\n"
+            f"OBS JSON: {self.api.base_url}/api/data\n"
+            f"Публичный JSON: {self.api.base_url}/api/public"
+        )
+
+    def save(self):
+        background_asset = self._selected_background_asset()
+        legacy_background_file = (
+            background_asset.managed_name
+            if background_asset is not None
+            and background_asset.storage_mode == MEDIA_STORAGE_MANAGED
+            else ""
+        )
+        values = {
+            "stream_current_game_id": str(self.game_combo.currentData() or ""),
+            # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
+            "stream_info": self.info_field.text().strip(),
+            "stream_info_enabled": "1" if self.info_enabled.isChecked() else "0",
+            "stream_format": self.format_combo.currentText(),
+            "overlay_background_media_id": (
+                str(background_asset.id) if background_asset is not None else ""
+            ),
+            # Kept only for compatibility with pre-W2 versions.  External
+            # absolute paths are never written into the legacy filename key.
+            "overlay_background_file": legacy_background_file,
+            "overlay_background_mode": str(self.background_mode.currentData() or "stretch"),
+            "overlay_webcam_enabled": "1" if self.webcam_enabled.isChecked() else "0",
+            "overlay_webcam_position": str(self.webcam_position.currentData() or "top_right"),
+            "overlay_list_enabled": "1" if self.overlay_list_enabled.isChecked() else "0",
+            "overlay_list_side": str(self.overlay_list_side.currentData() or "auto"),
+            "overlay_info_position": str(self.info_position.currentData() or "auto"),
+        }
+        for color_key, color_btn in self.frame_color_buttons.items():
+            values[f"overlay_frame_{color_key}_color"] = str(
+                color_btn.property("fontColor") or "#FFFFFF"
+            )
+        values.update(self._collect_typography_settings())
+
+        self.db.set_settings_bulk(values)
+        QMessageBox.information(self, "Стрим", "Параметры сохранены. OBS API обновлён.")
+

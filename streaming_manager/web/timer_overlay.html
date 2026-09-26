@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — OBS Timer</title>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+body.preview {
+  background-image:
+    linear-gradient(45deg, rgba(255,255,255,.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255,255,255,.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255,255,255,.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,.05) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+#root {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+#timer {
+  --digit-cell: .72em;
+  --colon-cell: .42em;
+  --dot-cell: .34em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  white-space: nowrap;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  text-align: center;
+  transform-origin: center center;
+  user-select: none;
+}
+.timer-char {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 1em;
+  line-height: 1;
+  overflow: visible;
+}
+.timer-digit { width: var(--digit-cell); }
+.timer-colon { width: var(--colon-cell); }
+.timer-dot { width: var(--dot-cell); }
+#metric-probe {
+  position: fixed;
+  left: -10000px;
+  top: -10000px;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+  font-size: 100px;
+  line-height: 1;
+  font-weight: 700;
+}
+#api-state {
+  display: none;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: rgba(120,20,20,.92);
+  color: #fff;
+  font: 600 13px "Segoe UI", Arial, sans-serif;
+}
+body.preview #api-state.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="root"><div id="timer" aria-label="00:10:00.000"></div></div>
+<div id="metric-probe" aria-hidden="true">0</div>
+<div id="api-state">Нет связи с In one line</div>
+<script>
+(() => {
+  const API = "/api/timer";
+  const POLL_MS = 100;
+  const TIMER_PATTERN = "00:00:00.000";
+  const root = document.getElementById("root");
+  const timer = document.getElementById("timer");
+  const metricProbe = document.getElementById("metric-probe");
+  const apiState = document.getElementById("api-state");
+  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  if (preview) document.body.classList.add("preview");
+
+  let state = null;
+  let configuredFontSize = 96;
+  let currentFontFamily = "Segoe UI";
+  let presentationSignature = "";
+  let anchorRemainingMs = 0;
+  let anchorPerformanceMs = performance.now();
+  let frameId = null;
+  let geometryFrameId = null;
+  let pollTimerId = null;
+  const timerSlots = [];
+
+  function buildTimerSlots() {
+    if (timerSlots.length) return;
+    for (const marker of TIMER_PATTERN) {
+      const span = document.createElement("span");
+      span.className = "timer-char " + (
+        marker === ":" ? "timer-colon" : marker === "." ? "timer-dot" : "timer-digit"
+      );
+      span.textContent = marker;
+      timer.appendChild(span);
+      timerSlots.push(span);
+    }
+  }
+
+  function setTimerText(text) {
+    const normalized = String(text || "00:00:00.000").padStart(TIMER_PATTERN.length, "0");
+    buildTimerSlots();
+    for (let index = 0; index < timerSlots.length; index += 1) {
+      const next = normalized[index] || TIMER_PATTERN[index];
+      if (timerSlots[index].textContent !== next) timerSlots[index].textContent = next;
+    }
+    timer.setAttribute("aria-label", normalized);
+  }
+
+  function normalizeHex(value, fallback) {
+    const text = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(text) ? text.toUpperCase() : fallback;
+  }
+
+  function formatMilliseconds(value) {
+    let ms = Math.max(0, Math.ceil(Number(value) || 0));
+    const hours = Math.floor(ms / 3600000);
+    ms -= hours * 3600000;
+    const minutes = Math.floor(ms / 60000);
+    ms -= minutes * 60000;
+    const seconds = Math.floor(ms / 1000);
+    const millis = ms - seconds * 1000;
+    return `${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}.${String(millis).padStart(3,"0")}`;
+  }
+
+  function currentRemaining(now = performance.now()) {
+    if (!state || !state.running) return Math.max(0, Number(state?.remaining_ms) || 0);
+    return Math.max(0, anchorRemainingMs - (now - anchorPerformanceMs));
+  }
+
+  function measureGlyph(glyph) {
+    metricProbe.textContent = glyph;
+    return Math.max(1, metricProbe.getBoundingClientRect().width);
+  }
+
+  function updateGlyphMetrics() {
+    metricProbe.style.fontFamily = currentFontFamily;
+    const digitWidth = Math.max(..."0123456789".split("").map(measureGlyph));
+    const padding = Math.max(1, digitWidth * .06);
+    const colonWidth = Math.max(measureGlyph(":"), digitWidth * .28) + padding;
+    const dotWidth = Math.max(measureGlyph("."), digitWidth * .20) + padding;
+    timer.style.setProperty("--digit-cell", `${(digitWidth + padding) / 100}em`);
+    timer.style.setProperty("--colon-cell", `${colonWidth / 100}em`);
+    timer.style.setProperty("--dot-cell", `${dotWidth / 100}em`);
+  }
+
+  function fitTimer() {
+    const width = root.clientWidth;
+    const height = root.clientHeight;
+    if (width <= 0 || height <= 0) return;
+
+    const base = Math.max(8, Math.min(300, Number(configuredFontSize) || 96));
+    timer.style.fontSize = `${base}px`;
+
+    const measuredWidth = Math.max(1, timer.scrollWidth);
+    const measuredHeight = Math.max(1, timer.scrollHeight);
+    const scale = Math.min(1, (width * .97) / measuredWidth, (height * .94) / measuredHeight);
+    // Integer CSS pixels avoid subpixel font-size oscillation/blur in OBS.
+    timer.style.fontSize = `${Math.max(8, Math.floor(base * scale))}px`;
+  }
+
+  function refreshGeometry() {
+    geometryFrameId = null;
+    updateGlyphMetrics();
+    fitTimer();
+  }
+
+  function scheduleGeometryRefresh() {
+    if (geometryFrameId !== null) cancelAnimationFrame(geometryFrameId);
+    geometryFrameId = requestAnimationFrame(refreshGeometry);
+  }
+
+  function applyPresentation(presentation) {
+    const p = presentation || {};
+    const family = String(p.font_family || "Segoe UI").trim() || "Segoe UI";
+    const fontSize = Math.max(8, Math.min(300, Number(p.font_size) || 96));
+    const fontColor = normalizeHex(p.font_color, "#FFFFFF");
+    const background = p.background === "color" ? "color" : "transparent";
+    const backgroundColor = normalizeHex(p.background_color, "#000000");
+    const signature = [family, fontSize, fontColor, background, backgroundColor].join("\u0000");
+    if (signature === presentationSignature) return;
+    presentationSignature = signature;
+
+    currentFontFamily = family;
+    configuredFontSize = fontSize;
+    timer.style.fontFamily = family;
+    metricProbe.style.fontFamily = family;
+    timer.style.color = fontColor;
+    root.style.background = background === "color" ? backgroundColor : "transparent";
+    scheduleGeometryRefresh();
+
+    if (document.fonts?.load) {
+      document.fonts.load(`700 100px ${JSON.stringify(family)}`).then(
+        scheduleGeometryRefresh,
+        () => {}
+      );
+    }
+  }
+
+  function stopFrameLoop() {
+    if (frameId !== null) cancelAnimationFrame(frameId);
+    frameId = null;
+  }
+
+  function syncFrameLoop() {
+    if (!state?.running) {
+      stopFrameLoop();
+      return;
+    }
+    if (frameId === null) frameId = requestAnimationFrame(tick);
+  }
+
+  function tick(now) {
+    frameId = null;
+    const remaining = currentRemaining(now);
+    setTimerText(formatMilliseconds(remaining));
+    if (remaining > 0 && state?.running) frameId = requestAnimationFrame(tick);
+  }
+
+  function applyPayload(payload) {
+    state = payload || {};
+    anchorRemainingMs = Math.max(0, Number(state.remaining_ms) || 0);
+    anchorPerformanceMs = performance.now();
+    setTimerText(formatMilliseconds(anchorRemainingMs));
+    applyPresentation(state.presentation || {});
+    syncFrameLoop();
+  }
+
+  function schedulePoll(delay = POLL_MS) {
+    if (pollTimerId !== null) clearTimeout(pollTimerId);
+    pollTimerId = setTimeout(() => {
+      pollTimerId = null;
+      update();
+    }, delay);
+  }
+
+  async function update() {
+    try {
+      const response = await fetch(API, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      applyPayload(await response.json());
+      apiState.classList.remove("visible");
+    } catch (_error) {
+      apiState.classList.add("visible");
+    } finally {
+      // A short non-overlapping poll cadence is deliberate here.  Browser-side
+      // interpolation makes the running countdown smooth, but only an
+      // authoritative API read can detect discrete Pause/Resume/Start state
+      // transitions.  100 ms keeps those transitions visually aligned with
+      // the desktop timer without creating overlapping localhost requests.
+      schedulePoll();
+    }
+  }
+
+  buildTimerSlots();
+  setTimerText("00:10:00.000");
+  new ResizeObserver(scheduleGeometryRefresh).observe(root);
+  if (document.fonts?.ready) document.fonts.ready.then(scheduleGeometryRefresh);
+  update();
+})();
+</script>
+</body>
+</html>

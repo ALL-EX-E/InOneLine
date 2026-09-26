@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — OBS Overlay</title>
+<style>
+:root {
+  --canvas-w: 2560px;
+  --canvas-h: 1440px;
+  --panel-bg: rgba(10, 13, 16, 0.82);
+  --panel-border: rgba(240, 247, 255, 0.70);
+  --muted: rgba(235, 242, 248, 0.72);
+  --frame-border: rgba(255, 255, 255, .92);
+  --frame-glow-strong: rgba(255, 255, 255, .65);
+  --frame-glow-soft: rgba(255, 255, 255, .58);
+  --frame-glow-inner: rgba(255, 255, 255, .22);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: #fff;
+  font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
+}
+body.preview {
+  background:
+    radial-gradient(circle at 30% 25%, rgba(57, 83, 104, .40), transparent 35%),
+    radial-gradient(circle at 70% 75%, rgba(60, 53, 86, .30), transparent 38%),
+    #11161b;
+}
+#viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+#overlay {
+  position: absolute;
+  width: 2560px;
+  height: 1440px;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
+  pointer-events: none;
+}
+#overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 2560px;
+  height: 1440px;
+  pointer-events: none;
+}
+.background-video-host {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+#overlay-background-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-position: center center;
+  background: transparent;
+}
+.frame {
+  position: absolute;
+  background: transparent;
+  border: 3px solid var(--local-frame-border, var(--frame-border));
+  box-shadow:
+    0 0 7px var(--local-frame-glow-strong, var(--frame-glow-strong)),
+    0 0 20px var(--local-frame-glow-soft, var(--frame-glow-soft)),
+    inset 0 0 10px var(--local-frame-glow-inner, var(--frame-glow-inner));
+  border-radius: 8px;
+}
+
+/*
+  Эти две области служат только направляющими/рамками оверлея.
+  В обычном OBS-режиме их центр всегда полностью прозрачен, чтобы
+  Browser Source можно было держать верхним слоем над игрой и веб-камерой.
+*/
+#game-frame,
+#webcam-frame {
+  background-color: transparent !important;
+}
+#game-title-banner {
+  position: absolute;
+  top: 34px;
+  left: 14px;
+  width: 2199px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  font-size: 30px;
+  line-height: 1.08;
+  font-weight: 700;
+  text-align: center;
+  text-shadow:
+    0 1px 3px rgba(0,0,0,.95),
+    0 0 10px rgba(0,0,0,.65);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#game-frame {
+  top: 101px;
+  left: 14px;
+  width: 2199px;
+  height: 1238px;
+}
+.preview-label {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,.28);
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+body.preview .preview-label { display: flex; }
+
+.side-column {
+  position: absolute;
+  top: 15px;
+  bottom: 15px;
+  width: 305px;
+  display: flex;
+  flex-direction: column;
+}
+#left-column { left: 15px; }
+#right-column { right: 15px; }
+.side-column.hidden { display: none; }
+
+.side-stack {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.side-stack:not(:empty).top-stack { margin-bottom: 12px; }
+.side-stack:not(:empty).bottom-stack { margin-top: 12px; }
+
+.list-slot {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+#webcam-frame {
+  position: relative;
+  width: 305px;
+  height: 305px;
+  flex: 0 0 305px;
+}
+#webcam-frame.hidden { display: none; }
+.panel {
+  position: relative;
+  background: var(--panel-bg);
+  border: 1px solid var(--local-frame-border, var(--frame-border));
+  box-shadow:
+    0 0 6px var(--local-frame-glow-strong, var(--frame-glow-strong)),
+    0 0 16px var(--local-frame-glow-soft, var(--frame-glow-soft)),
+    inset 0 0 8px var(--local-frame-glow-inner, var(--frame-glow-inner));
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+}
+#list-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  padding: 10px 9px;
+  display: flex;
+  flex-direction: column;
+}
+#list-panel.hidden { display: none; }
+#top-three {
+  flex: 0 0 auto;
+}
+.top-three-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 7px;
+  padding: 4px 2px;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 700;
+}
+.top-three-number {
+  align-self: start;
+  min-width: 0;
+  white-space: nowrap;
+  text-align: right;
+  color: inherit;
+}
+#top-three-divider {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 7px 2px 8px;
+  background: rgba(255,255,255,.48);
+}
+#top-three-divider.hidden {
+  display: none;
+}
+#list-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+#game-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0);
+  will-change: transform;
+}
+.game-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 9px;
+  padding: 4px 2px;
+  font-size: 17px;
+  line-height: 1.15;
+}
+.game-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgba(0,0,0,.75);
+}
+.game-sum {
+  align-self: end;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+#info-panel {
+  flex: 0 0 auto;
+  min-height: 118px;
+  padding: 13px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+#info-panel.hidden {
+  display: none;
+}
+#current-extra {
+  font-size: 17px;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+#api-state {
+  display: none;
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(120, 20, 20, .90);
+  font-size: 18px;
+  font-weight: 600;
+}
+#api-state.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="overlay">
+    <!--
+      Непрозрачная подложка оверлея с двумя динамическими прозрачными вырезами.
+      Под Browser Source просвечивают ТОЛЬКО игровое окно и веб-камера.
+    -->
+    <svg id="overlay-backdrop" viewBox="0 0 2560 1440" aria-hidden="true">
+      <defs>
+        <mask id="overlay-cutout-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="2560" height="1440">
+          <rect x="0" y="0" width="2560" height="1440" fill="white" />
+          <rect id="game-cutout" x="17" y="104" width="2193" height="1232" rx="5" ry="5" fill="black" />
+          <rect id="webcam-cutout" x="2243" y="18" width="299" height="299" rx="5" ry="5" fill="black" />
+        </mask>
+      </defs>
+      <rect
+        id="overlay-backdrop-fill"
+        x="0" y="0" width="2560" height="1440"
+        fill="#11161b"
+        mask="url(#overlay-cutout-mask)"
+      />
+      <image
+        id="overlay-background-image"
+        x="0" y="0" width="2560" height="1440"
+        preserveAspectRatio="none"
+        mask="url(#overlay-cutout-mask)"
+        style="display:none"
+      />
+      <foreignObject
+        id="overlay-background-video-container"
+        x="0" y="0" width="2560" height="1440"
+        mask="url(#overlay-cutout-mask)"
+        style="display:none;overflow:hidden"
+      >
+        <div xmlns="http://www.w3.org/1999/xhtml" class="background-video-host">
+          <video
+            id="overlay-background-video"
+            autoplay muted loop playsinline preload="auto"
+          ></video>
+        </div>
+      </foreignObject>
+    </svg>
+
+    <div id="game-title-banner">Нет текущей игры</div>
+
+    <div id="game-frame" class="frame">
+      <div class="preview-label">Игровое окно</div>
+    </div>
+
+    <div id="left-column" class="side-column">
+      <div id="left-top" class="side-stack top-stack"></div>
+      <div id="left-list" class="list-slot"></div>
+      <div id="left-bottom" class="side-stack bottom-stack"></div>
+    </div>
+
+    <div id="right-column" class="side-column">
+      <div id="right-top" class="side-stack top-stack"></div>
+      <div id="right-list" class="list-slot"></div>
+      <div id="right-bottom" class="side-stack bottom-stack"></div>
+    </div>
+
+    <div id="movable-elements" style="display:none">
+      <div id="webcam-frame" class="frame">
+        <div class="preview-label" style="font-size:26px">Веб-камера</div>
+      </div>
+
+      <div id="list-panel" class="panel">
+        <div id="top-three"></div>
+        <div id="top-three-divider"></div>
+        <div id="list-viewport">
+          <div id="game-list"></div>
+        </div>
+      </div>
+
+      <div id="info-panel" class="panel">
+        <div id="current-extra"></div>
+      </div>
+    </div>
+
+    <div id="api-state">Нет связи с In one line</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const LOGICAL_W = 2560;
+  const LOGICAL_H = 1440;
+
+  const LEFT_X = 14;
+  const LEFT_TOP = 101;
+  const LEFT_RIGHT = 347;
+  const LEFT_BOTTOM = 101;
+  const LEFT_W = LOGICAL_W - LEFT_X - LEFT_RIGHT; // 2199
+  const LEFT_H = LOGICAL_H - LEFT_TOP - LEFT_BOTTOM; // 1238
+
+  const overlay = document.getElementById("overlay");
+  const titleBanner = document.getElementById("game-title-banner");
+  const frame = document.getElementById("game-frame");
+  const backgroundImage = document.getElementById("overlay-background-image");
+  const backgroundVideoContainer = document.getElementById(
+    "overlay-background-video-container"
+  );
+  const backgroundVideo = document.getElementById("overlay-background-video");
+  const gameCutout = document.getElementById("game-cutout");
+  const webcamCutout = document.getElementById("webcam-cutout");
+  const parking = document.getElementById("movable-elements");
+
+  const leftColumn = document.getElementById("left-column");
+  const rightColumn = document.getElementById("right-column");
+  const slots = {
+    left: {
+      top: document.getElementById("left-top"),
+      list: document.getElementById("left-list"),
+      bottom: document.getElementById("left-bottom"),
+    },
+    right: {
+      top: document.getElementById("right-top"),
+      list: document.getElementById("right-list"),
+      bottom: document.getElementById("right-bottom"),
+    },
+  };
+
+  const webcamFrame = document.getElementById("webcam-frame");
+  const listPanel = document.getElementById("list-panel");
+  const topThree = document.getElementById("top-three");
+  const topThreeDivider = document.getElementById("top-three-divider");
+  const listViewport = document.getElementById("list-viewport");
+  const list = document.getElementById("game-list");
+  const infoPanel = document.getElementById("info-panel");
+  const extraEl = document.getElementById("current-extra");
+  const apiState = document.getElementById("api-state");
+
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("preview") === "1") {
+    document.body.classList.add("preview");
+  }
+
+  function scaleOverlay() {
+    const scale = Math.min(innerWidth / LOGICAL_W, innerHeight / LOGICAL_H);
+    overlay.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+
+  let backgroundStateKey = "";
+  let backgroundLoadToken = 0;
+
+  const BACKGROUND_IMAGE_EXTENSIONS = new Set([
+    ".png", ".jpg", ".jpeg", ".webp", ".gif"
+  ]);
+  const BACKGROUND_VIDEO_EXTENSIONS = new Set([".mp4", ".webm"]);
+
+  function backgroundExtension(filename) {
+    const clean = String(filename || "").split(/[?#]/, 1)[0].toLowerCase();
+    const dot = clean.lastIndexOf(".");
+    return dot >= 0 ? clean.slice(dot) : "";
+  }
+
+  function resetBackgroundImage() {
+    backgroundImage.style.display = "none";
+    backgroundImage.removeAttribute("href");
+    backgroundImage.removeAttribute("xlink:href");
+    backgroundImage.setAttribute("x", "0");
+    backgroundImage.setAttribute("y", "0");
+    backgroundImage.setAttribute("width", String(LOGICAL_W));
+    backgroundImage.setAttribute("height", String(LOGICAL_H));
+    backgroundImage.setAttribute("preserveAspectRatio", "none");
+  }
+
+  function resetBackgroundVideo() {
+    backgroundVideo.pause();
+    backgroundVideoContainer.style.display = "none";
+    backgroundVideo.removeAttribute("src");
+    backgroundVideo.style.objectFit = "fill";
+    // load() сбрасывает прежний MediaElement и освобождает старый файл.
+    try { backgroundVideo.load(); } catch (_) {}
+  }
+
+  function clearBackgroundMedia() {
+    backgroundLoadToken += 1;
+    resetBackgroundImage();
+    resetBackgroundVideo();
+  }
+
+  function applyImageBackground(filename, mode, url, token) {
+    resetBackgroundVideo();
+
+    if (mode === "center") {
+      // Для режима «По центру» используем исходный пиксельный размер файла.
+      // Изображение/GIF может выходить за холст — SVG обрежет лишнее.
+      const probe = new Image();
+      probe.onload = () => {
+        if (token !== backgroundLoadToken) return;
+        const width = Math.max(1, probe.naturalWidth || LOGICAL_W);
+        const height = Math.max(1, probe.naturalHeight || LOGICAL_H);
+        backgroundImage.setAttribute("x", String((LOGICAL_W - width) / 2));
+        backgroundImage.setAttribute("y", String((LOGICAL_H - height) / 2));
+        backgroundImage.setAttribute("width", String(width));
+        backgroundImage.setAttribute("height", String(height));
+        backgroundImage.setAttribute("preserveAspectRatio", "none");
+        backgroundImage.setAttribute("href", url);
+        backgroundImage.style.display = "";
+      };
+      probe.onerror = () => {
+        if (token === backgroundLoadToken) clearBackgroundMedia();
+      };
+      probe.src = url;
+      return;
+    }
+
+    backgroundImage.setAttribute("x", "0");
+    backgroundImage.setAttribute("y", "0");
+    backgroundImage.setAttribute("width", String(LOGICAL_W));
+    backgroundImage.setAttribute("height", String(LOGICAL_H));
+    backgroundImage.setAttribute(
+      "preserveAspectRatio",
+      mode === "stretch"
+        ? "none"
+        : mode === "contain"
+          ? "xMidYMid meet"
+          : "xMidYMid slice"
+    );
+    backgroundImage.setAttribute("href", url);
+    backgroundImage.style.display = "";
+  }
+
+  function applyVideoBackground(mode, url, token) {
+    resetBackgroundImage();
+    backgroundVideoContainer.style.display = "";
+    backgroundVideo.muted = true;
+    backgroundVideo.loop = true;
+    backgroundVideo.autoplay = true;
+    backgroundVideo.playsInline = true;
+    backgroundVideo.style.objectPosition = "center center";
+    backgroundVideo.style.objectFit =
+      mode === "stretch"
+        ? "fill"
+        : mode === "contain"
+          ? "contain"
+          : mode === "cover"
+            ? "cover"
+            : "none";
+
+    const onCanPlay = () => {
+      if (token !== backgroundLoadToken) return;
+      const playPromise = backgroundVideo.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {});
+      }
+    };
+    backgroundVideo.onloadeddata = onCanPlay;
+    backgroundVideo.oncanplay = onCanPlay;
+    backgroundVideo.onerror = () => {
+      if (token === backgroundLoadToken) clearBackgroundMedia();
+    };
+    backgroundVideo.src = url;
+    backgroundVideo.load();
+  }
+
+  function applyBackgroundMedia(config) {
+    const cfg = config || {};
+    const filename = String(cfg.file || "").trim();
+    const extension = backgroundExtension(filename);
+    const allowedModes = new Set(["stretch", "contain", "cover", "center"]);
+    const mode = allowedModes.has(cfg.mode) ? cfg.mode : "stretch";
+    const explicitType = String(cfg.type || "").toLowerCase();
+    const mediaType = explicitType === "video" || explicitType === "image"
+      ? explicitType
+      : BACKGROUND_VIDEO_EXTENSIONS.has(extension)
+        ? "video"
+        : BACKGROUND_IMAGE_EXTENSIONS.has(extension)
+          ? "image"
+          : "";
+    const available = cfg.available !== false;
+    const configuredUrl = String(cfg.url || "").trim();
+    const url = configuredUrl || (filename
+      ? `/overlay-background/${encodeURIComponent(filename)}`
+      : "");
+    const key = JSON.stringify({ filename, mediaType, mode, available, url });
+    if (key === backgroundStateKey) return;
+    backgroundStateKey = key;
+
+    if (!filename || !mediaType || !available || !url) {
+      clearBackgroundMedia();
+      return;
+    }
+
+    const token = ++backgroundLoadToken;
+    if (mediaType === "video") {
+      applyVideoBackground(mode, url, token);
+    } else {
+      applyImageBackground(filename, mode, url, token);
+    }
+  }
+
+  function normalizeHexColor(value, fallback = "#FFFFFF") {
+    const text = String(value || "").trim();
+    return /^#[0-9a-fA-F]{6}$/.test(text)
+      ? text.toUpperCase()
+      : fallback;
+  }
+
+  function hexToRgba(hex, alpha) {
+    const value = normalizeHexColor(hex).slice(1);
+    const r = Number.parseInt(value.slice(0, 2), 16);
+    const g = Number.parseInt(value.slice(2, 4), 16);
+    const b = Number.parseInt(value.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function applyFrameColor(value) {
+    // Legacy shared color remains as a CSS fallback.
+    const color = normalizeHexColor(value);
+    const root = document.documentElement.style;
+    root.setProperty("--frame-border", hexToRgba(color, 0.92));
+    root.setProperty("--frame-glow-strong", hexToRgba(color, 0.65));
+    root.setProperty("--frame-glow-soft", hexToRgba(color, 0.58));
+    root.setProperty("--frame-glow-inner", hexToRgba(color, 0.22));
+  }
+
+  function applyElementGlowColor(element, value) {
+    if (!element) return;
+    const color = normalizeHexColor(value);
+    element.style.setProperty(
+      "--local-frame-border", hexToRgba(color, 0.92)
+    );
+    element.style.setProperty(
+      "--local-frame-glow-strong", hexToRgba(color, 0.65)
+    );
+    element.style.setProperty(
+      "--local-frame-glow-soft", hexToRgba(color, 0.58)
+    );
+    element.style.setProperty(
+      "--local-frame-glow-inner", hexToRgba(color, 0.22)
+    );
+  }
+
+  function applyFrameColors(config) {
+    const cfg = config || {};
+    const legacy = normalizeHexColor(cfg.frame_color || "#FFFFFF");
+    const colors = cfg.frame_colors || {};
+
+    applyFrameColor(legacy);
+    applyElementGlowColor(frame, colors.game || legacy);
+    applyElementGlowColor(webcamFrame, colors.webcam || legacy);
+    applyElementGlowColor(listPanel, colors.list || legacy);
+    applyElementGlowColor(infoPanel, colors.info || legacy);
+  }
+
+  function parseCorner(value, fallback = "top_right") {
+    const valid = new Set([
+      "top_right", "bottom_right", "top_left", "bottom_left"
+    ]);
+    const normalized = valid.has(value) ? value : fallback;
+    const [vertical, side] = normalized.split("_");
+    return { vertical, side };
+  }
+
+  function appendToStack(element, side, vertical, before = false) {
+    const stack = slots[side][vertical];
+    if (before && stack.firstChild) {
+      stack.insertBefore(element, stack.firstChild);
+    } else {
+      stack.appendChild(element);
+    }
+  }
+
+  function getLogicalRect(element) {
+    if (!element || element.classList.contains("hidden")) return null;
+
+    let x = 0;
+    let y = 0;
+    let node = element;
+
+    // offsetLeft/offsetTop дают координаты в логической сетке 2560×1440 и
+    // не зависят от масштаба Browser Source.
+    while (node && node !== overlay) {
+      x += node.offsetLeft;
+      y += node.offsetTop;
+      node = node.offsetParent;
+    }
+
+    if (node !== overlay) return null;
+
+    return {
+      x,
+      y,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+    };
+  }
+
+  function setCutout(rectElement, rect, borderInset = 3) {
+    if (!rect || rect.width <= borderInset * 2 || rect.height <= borderInset * 2) {
+      rectElement.setAttribute("x", "0");
+      rectElement.setAttribute("y", "0");
+      rectElement.setAttribute("width", "0");
+      rectElement.setAttribute("height", "0");
+      return;
+    }
+
+    rectElement.setAttribute("x", String(rect.x + borderInset));
+    rectElement.setAttribute("y", String(rect.y + borderInset));
+    rectElement.setAttribute("width", String(rect.width - borderInset * 2));
+    rectElement.setAttribute("height", String(rect.height - borderInset * 2));
+    rectElement.setAttribute("rx", "5");
+    rectElement.setAttribute("ry", "5");
+  }
+
+  function updateCutouts() {
+    // Вырез начинается внутри 3px рамки: сама линия и свечение остаются
+    // частью верхнего Browser Source, а изображение игры/камеры видно под ними.
+    setCutout(gameCutout, getLogicalRect(frame), 3);
+    setCutout(webcamCutout, getLogicalRect(webcamFrame), 3);
+  }
+
+  function applyGameFrame(format, leftUsed, rightUsed) {
+    const leftMargin = leftUsed ? 347 : 14;
+    const rightMargin = rightUsed ? 347 : 14;
+    const availableWidth = LOGICAL_W - leftMargin - rightMargin;
+    const aspect = format === "4:3" ? (4 / 3) : (16 / 9);
+
+    // Высота зоны заголовка зависит от реально выбранного пользователем шрифта.
+    // Раньше баннер был жёстко 50 px, поэтому крупный шрифт (например 96 px)
+    // визуально обрезался. Теперь рамка при необходимости немного опускается.
+    const titleFontSize = Math.max(
+      8,
+      Number.parseFloat(getComputedStyle(titleBanner).fontSize) || 30
+    );
+    const titleHeight = Math.ceil(titleFontSize * 1.22);
+    const titleOuterMargin = 8;
+    const titleFrameGap = 10;
+    const minimumFrameTop = Math.max(
+      LEFT_TOP,
+      titleOuterMargin + titleHeight + titleFrameGap
+    );
+
+    const availableHeight = Math.max(
+      240,
+      LOGICAL_H - minimumFrameTop - LEFT_BOTTOM
+    );
+
+    let width = Math.min(availableWidth, availableHeight * aspect);
+    let height = width / aspect;
+    if (height > availableHeight) {
+      height = availableHeight;
+      width = height * aspect;
+    }
+
+    const left = leftMargin + (availableWidth - width) / 2;
+    const top = minimumFrameTop + (availableHeight - height) / 2;
+
+    frame.style.left = `${left}px`;
+    frame.style.top = `${top}px`;
+    frame.style.width = `${width}px`;
+    frame.style.height = `${height}px`;
+
+    titleBanner.style.left = `${left}px`;
+    titleBanner.style.width = `${width}px`;
+    titleBanner.style.height = `${titleHeight}px`;
+    titleBanner.style.top = `${Math.max(
+      titleOuterMargin,
+      top - titleHeight - titleFrameGap
+    )}px`;
+  }
+
+  function applyOverlayLayout(config, game) {
+    const cfg = config || {};
+
+    const webcamEnabled = cfg.webcam_enabled !== false;
+    const webcamPos = parseCorner(cfg.webcam_position || "top_right");
+
+    const listEnabled = cfg.list_enabled !== false;
+    let listSide = cfg.list_side || "auto";
+    if (!["left", "right"].includes(listSide)) {
+      listSide = webcamEnabled ? webcamPos.side : "right";
+    }
+
+    const infoEnabled = game?.reviews_enabled !== false;
+    const infoSetting = cfg.info_position || "auto";
+    let infoPos;
+    if (infoSetting === "auto") {
+      infoPos = {
+        side: webcamEnabled ? webcamPos.side : listSide,
+        vertical: "bottom",
+      };
+    } else {
+      infoPos = parseCorner(infoSetting, "bottom_right");
+    }
+
+    // Отключённые элементы убираются из рабочих колонок полностью.
+    if (!webcamEnabled) parking.appendChild(webcamFrame);
+    if (!listEnabled) parking.appendChild(listPanel);
+    if (!infoEnabled) parking.appendChild(infoPanel);
+
+    webcamFrame.classList.toggle("hidden", !webcamEnabled);
+    listPanel.classList.toggle("hidden", !listEnabled);
+    infoPanel.classList.toggle("hidden", !infoEnabled);
+
+    if (webcamEnabled) {
+      appendToStack(webcamFrame, webcamPos.side, webcamPos.vertical);
+    }
+
+    if (listEnabled) {
+      slots[listSide].list.appendChild(listPanel);
+    }
+
+    if (infoEnabled) {
+      const cameraAtSameBottom =
+        webcamEnabled &&
+        webcamPos.side === infoPos.side &&
+        webcamPos.vertical === "bottom" &&
+        infoPos.vertical === "bottom";
+
+      // При нижней камере информационный блок ставится прямо над ней.
+      appendToStack(
+        infoPanel,
+        infoPos.side,
+        infoPos.vertical,
+        cameraAtSameBottom
+      );
+    }
+
+    const leftUsed =
+      (webcamEnabled && webcamPos.side === "left") ||
+      (listEnabled && listSide === "left") ||
+      (infoEnabled && infoPos.side === "left");
+
+    const rightUsed =
+      (webcamEnabled && webcamPos.side === "right") ||
+      (listEnabled && listSide === "right") ||
+      (infoEnabled && infoPos.side === "right");
+
+    leftColumn.classList.toggle("hidden", !leftUsed);
+    rightColumn.classList.toggle("hidden", !rightUsed);
+
+    applyGameFrame(game?.format || "16:9", leftUsed, rightUsed);
+
+    // Геометрия рамки и прозрачного выреза должна меняться атомарно.
+    // getBoundingClientRect() принудительно завершает текущую раскладку, поэтому
+    // первый вызов сразу синхронизирует маску с новой рамкой. Повтор в следующем
+    // кадре страхует flex-перемещение веб-камеры между колонками.
+    updateCutouts();
+    requestAnimationFrame(updateCutouts);
+  }
+
+  function normalizeTypographyStyle(style, fallback) {
+    const source = style || {};
+    const size = Number(source.size);
+    const color = String(source.color || fallback.color);
+    return {
+      family: String(source.family || fallback.family),
+      size: Number.isFinite(size) ? Math.max(8, Math.min(96, size)) : fallback.size,
+      color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback.color,
+    };
+  }
+
+  function applyTextStyle(element, style, fallback) {
+    if (!element) return;
+    const value = normalizeTypographyStyle(style, fallback);
+    element.style.fontFamily = `"${value.family.replaceAll('"', '\\"')}", sans-serif`;
+    element.style.fontSize = `${value.size}px`;
+    element.style.color = value.color;
+  }
+
+  function applyTypography(config) {
+    const typography = config || {};
+    activeTypography = typography;
+    const defaultTitle = { family: "Segoe UI", size: 30, color: "#FFFFFF" };
+    const defaultText = { family: "Segoe UI", size: 17, color: "#FFFFFF" };
+
+    applyTextStyle(titleBanner, typography.title, defaultTitle);
+    applyTextStyle(extraEl, typography.info, defaultText);
+
+    document.querySelectorAll(".top-three-row").forEach((row, index) => {
+      applyTextStyle(row, typography[`top${index + 1}`], defaultText);
+    });
+    document.querySelectorAll(".game-row").forEach((row) => {
+      applyTextStyle(row, typography.list, defaultText);
+    });
+  }
+
+  const sumFormatter = new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 2
+  });
+
+  function formatSum(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n) || n === 0) return "";
+    return sumFormatter.format(n);
+  }
+
+  function escapeText(text) {
+    return String(text ?? "");
+  }
+
+  let activeTypography = {};
+
+  function createListRow(row) {
+    const el = document.createElement("div");
+    el.className = "game-row";
+
+    const name = document.createElement("div");
+    name.className = "game-title";
+    name.textContent = escapeText(row.title);
+
+    const sum = document.createElement("div");
+    sum.className = "game-sum";
+    sum.textContent = formatSum(row.sum);
+
+    el.append(name, sum);
+    applyTextStyle(
+      el,
+      activeTypography.list,
+      { family: "Segoe UI", size: 17, color: "#FFFFFF" }
+    );
+    return el;
+  }
+
+  let lastListKey = "";
+  let scrollingRows = [];
+  let scrollCycleHeight = 0;
+  let lastScrollMetricsKey = "";
+
+  function renderList(rows) {
+    const normalizedRows = Array.isArray(rows) ? rows : [];
+    const key = JSON.stringify(normalizedRows);
+    if (key === lastListKey) return false;
+    lastListKey = key;
+
+    // Первые три позиции всегда закреплены сверху и не участвуют в прокрутке.
+    topThree.innerHTML = "";
+    const fixedRows = normalizedRows.slice(0, 3);
+    fixedRows.forEach((row, index) => {
+      const el = document.createElement("div");
+      el.className = "top-three-row";
+
+      const number = document.createElement("div");
+      number.className = "top-three-number";
+      number.textContent = `${index + 1} -`;
+
+      const name = document.createElement("div");
+      name.className = "game-title";
+      name.textContent = escapeText(row.title);
+
+      const sum = document.createElement("div");
+      sum.className = "game-sum";
+      sum.textContent = formatSum(row.sum);
+
+      el.append(number, name, sum);
+      topThree.appendChild(el);
+    });
+
+    topThreeDivider.classList.toggle(
+      "hidden",
+      fixedRows.length === 0 || normalizedRows.length <= 3
+    );
+
+    // Прокручивается только список начиная с четвёртой позиции.
+    // Здесь создаём один цикл, но НЕ измеряем его высоту: на первом кадре
+    // панель ещё может находиться в скрытом parking-контейнере.
+    scrollingRows = normalizedRows.slice(3);
+    list.innerHTML = "";
+    scrollingRows.forEach((row) => {
+      list.appendChild(createListRow(row));
+    });
+
+    scrollCycleHeight = 0;
+    scrollY = 0;
+    pauseUntil = performance.now() + 1800;
+    applyScroll();
+    return true;
+  }
+
+  function rebuildInfiniteScroll(resetPosition = false) {
+    if (
+      scrollingRows.length === 0 ||
+      listPanel.classList.contains("hidden") ||
+      listViewport.clientHeight <= 1
+    ) {
+      scrollCycleHeight = 0;
+      scrollY = 0;
+      list.innerHTML = "";
+      scrollingRows.forEach((row) => {
+        list.appendChild(createListRow(row));
+      });
+      applyScroll();
+      syncScrollLoop();
+      return;
+    }
+
+    const previousCycleHeight = scrollCycleHeight;
+    const previousScrollY = scrollY;
+
+    // Измеряем ровно один цикл уже после размещения панели и применения шрифтов.
+    list.innerHTML = "";
+    scrollingRows.forEach((row) => {
+      list.appendChild(createListRow(row));
+    });
+
+    scrollCycleHeight = list.scrollHeight;
+    if (scrollCycleHeight <= 1) {
+      scrollY = 0;
+      applyScroll();
+      syncScrollLoop();
+      return;
+    }
+
+    // Создаём запас копий ниже видимой области, чтобы прокрутка выглядела
+    // визуально бесконечной и продолжалась без скачка к началу.
+    const minCopies = Math.max(
+      2,
+      Math.ceil(listViewport.clientHeight / scrollCycleHeight) + 2
+    );
+    for (let i = 1; i < minCopies; i += 1) {
+      scrollingRows.forEach((row) => {
+        list.appendChild(createListRow(row));
+      });
+    }
+
+    if (resetPosition || previousCycleHeight <= 1) {
+      scrollY = 0;
+      pauseUntil = performance.now() + 1800;
+    } else {
+      const progress = previousScrollY / previousCycleHeight;
+      scrollY = (progress * scrollCycleHeight) % scrollCycleHeight;
+    }
+
+    applyScroll();
+    syncScrollLoop();
+  }
+
+  function renderGame(game) {
+    titleBanner.textContent = game?.name || "Нет текущей игры";
+
+    const enabled = game?.reviews_enabled !== false;
+    const extra = String(game?.reviews || "").trim();
+
+    if (enabled) {
+      extraEl.textContent = extra;
+      extraEl.style.display = extra ? "" : "none";
+    }
+  }
+
+  async function update() {
+    try {
+      const response = await fetch("/api/data", { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const game = data.game || {};
+      const overlayConfig = data.overlay || {};
+      renderGame(game);
+
+      // Сначала создаём строки и применяем шрифты, затем размещаем панели.
+      // Только после этого можно корректно измерить высоту прокручиваемого списка.
+      const rowsChanged = renderList(data.auction_list || []);
+      applyTypography(overlayConfig.typography || {});
+      applyFrameColors(overlayConfig);
+      applyBackgroundMedia(overlayConfig.background || {});
+      applyOverlayLayout(overlayConfig, game);
+
+      // renderList() already computes the large row signature. Keep this
+      // geometry/layout signature small instead of serializing every row twice
+      // per poll, which reduces Browser Source allocation/GC pressure.
+      const scrollMetricsKey = JSON.stringify({
+        typography: overlayConfig.typography || {},
+        webcam_enabled: overlayConfig.webcam_enabled,
+        webcam_position: overlayConfig.webcam_position,
+        list_enabled: overlayConfig.list_enabled,
+        list_side: overlayConfig.list_side,
+        info_position: overlayConfig.info_position,
+        info_enabled: game?.reviews_enabled !== false,
+      });
+
+      if (rowsChanged || scrollMetricsKey !== lastScrollMetricsKey) {
+        const resetPosition = lastScrollMetricsKey === "";
+        lastScrollMetricsKey = scrollMetricsKey;
+        requestAnimationFrame(() => {
+          rebuildInfiniteScroll(resetPosition);
+        });
+      }
+
+      apiState.classList.remove("visible");
+    } catch (err) {
+      apiState.classList.add("visible");
+    }
+  }
+
+  let scrollY = 0;
+  let lastTime = performance.now();
+  let pauseUntil = performance.now() + 2500;
+  let scrollRafId = null;
+  let scrollWakeTimer = null;
+  const SPEED = 19; // logical pixels per second
+
+  function applyScroll() {
+    list.style.transform = `translateY(${-scrollY}px)`;
+  }
+
+  function stopScrollLoop() {
+    if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
+    if (scrollWakeTimer !== null) clearTimeout(scrollWakeTimer);
+    scrollRafId = null;
+    scrollWakeTimer = null;
+  }
+
+  function syncScrollLoop() {
+    if (scrollCycleHeight <= 1) {
+      stopScrollLoop();
+      scrollY = 0;
+      applyScroll();
+      return;
+    }
+    if (scrollRafId !== null || scrollWakeTimer !== null) return;
+    const now = performance.now();
+    if (now < pauseUntil) {
+      scrollWakeTimer = setTimeout(() => {
+        scrollWakeTimer = null;
+        syncScrollLoop();
+      }, Math.max(0, pauseUntil - now));
+      return;
+    }
+    lastTime = now;
+    scrollRafId = requestAnimationFrame(animate);
+  }
+
+  function animate(now) {
+    scrollRafId = null;
+    if (scrollCycleHeight <= 1) {
+      syncScrollLoop();
+      return;
+    }
+    if (now < pauseUntil) {
+      syncScrollLoop();
+      return;
+    }
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    scrollY += SPEED * dt;
+    if (scrollY >= scrollCycleHeight) {
+      scrollY = scrollY % scrollCycleHeight;
+    }
+    applyScroll();
+    scrollRafId = requestAnimationFrame(animate);
+  }
+
+  addEventListener("resize", () => {
+    scaleOverlay();
+    requestAnimationFrame(updateCutouts);
+  });
+  scaleOverlay();
+  update();
+  setInterval(update, 1000);
+  syncScrollLoop();
+})();
+</script>
+</body>
+</html>
