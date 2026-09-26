@@ -997,6 +997,49 @@ class StreamTab(QWidget):
         self.background_combo.blockSignals(False)
         self._update_background_path_field()
 
+    def _refresh_auction_lots_background_library(
+        self,
+        selected_asset_id: int | str | None = None,
+    ) -> None:
+        if selected_asset_id is None:
+            selected_asset_id = self.auction_lots_background_combo.currentData()
+        try:
+            selected_id = (
+                int(selected_asset_id)
+                if str(selected_asset_id or "").isdigit()
+                else None
+            )
+        except (TypeError, ValueError):
+            selected_id = None
+
+        assets = self._background_assets()
+        self.auction_lots_background_combo.blockSignals(True)
+        self.auction_lots_background_combo.clear()
+        self.auction_lots_background_combo.addItem("— без фонового файла —", "")
+        for asset in assets:
+            available = media_asset_available(self.db.path.parent, asset)
+            self.auction_lots_background_combo.addItem(
+                self._background_asset_label(asset, available),
+                asset.id,
+            )
+        idx = (
+            self.auction_lots_background_combo.findData(selected_id)
+            if selected_id is not None
+            else 0
+        )
+        self.auction_lots_background_combo.setCurrentIndex(
+            idx if idx >= 0 else 0
+        )
+        self.auction_lots_background_combo.blockSignals(False)
+
+    def _select_imported_background(self, target: str, asset_id: int) -> None:
+        if target == "auction_lots":
+            self._refresh_auction_lots_background_library(asset_id)
+            self._refresh_background_library()
+        else:
+            self._refresh_background_library(asset_id)
+            self._refresh_auction_lots_background_library()
+
     def _selected_background_asset(self):
         raw = self.background_combo.currentData()
         if not str(raw or "").isdigit():
@@ -1070,7 +1113,10 @@ class StreamTab(QWidget):
             target.name,
             target.name,
         )
-        self._refresh_background_library(asset.id)
+        self._select_imported_background(
+            self._background_copy_target,
+            asset.id,
+        )
 
     def _background_video_copy_failed(self, exc):
         QMessageBox.critical(
@@ -1083,12 +1129,26 @@ class StreamTab(QWidget):
         self._background_copy_worker = None
         self.choose_background_btn.setEnabled(True)
         self.choose_background_btn.setText("Добавить фон…")
+        self.auction_lots_choose_background_btn.setText("Добавить фон…")
+        self._update_auction_lots_background_enabled_state()
 
-    def _start_background_video_copy(self, source: Path, target: Path):
+    def _start_background_video_copy(
+        self,
+        source: Path,
+        target: Path,
+        selection_target: str = "main",
+    ):
         if self._background_copy_worker is not None:
             return
+        self._background_copy_target = selection_target
         self.choose_background_btn.setEnabled(False)
-        self.choose_background_btn.setText("Копирование…")
+        self.auction_lots_choose_background_btn.setEnabled(False)
+        active_button = (
+            self.auction_lots_choose_background_btn
+            if selection_target == "auction_lots"
+            else self.choose_background_btn
+        )
+        active_button.setText("Копирование…")
         worker = FunctionWorker(self._copy_background_video, source, target)
         self._background_copy_worker = worker
         worker.signals.result.connect(self._background_video_copy_ready)
@@ -1122,6 +1182,12 @@ class StreamTab(QWidget):
         return None
 
     def _import_background_media(self):
+        self._import_background_media_for("main")
+
+    def _import_auction_lots_background_media(self):
+        self._import_background_media_for("auction_lots")
+
+    def _import_background_media_for(self, selection_target: str):
         if self._background_copy_worker is not None:
             return
 
@@ -1161,7 +1227,7 @@ class StreamTab(QWidget):
                     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
                     source,
                 )
-                self._refresh_background_library(asset.id)
+                self._select_imported_background(selection_target, asset.id)
                 return
 
             # Copy mode for a file already in the dedicated managed category
@@ -1173,7 +1239,7 @@ class StreamTab(QWidget):
                     source.name,
                     source.name,
                 )
-                self._refresh_background_library(asset.id)
+                self._select_imported_background(selection_target, asset.id)
                 return
 
             if source.suffix.lower() in {".mp4", ".webm"}:
@@ -1197,10 +1263,10 @@ class StreamTab(QWidget):
                         existing_video.name,
                         existing_video.name,
                     )
-                    self._refresh_background_library(asset.id)
+                    self._select_imported_background(selection_target, asset.id)
                     return
                 target = self.background_dir / source.name
-                self._start_background_video_copy(source, target)
+                self._start_background_video_copy(source, target, selection_target)
                 return
 
             target = self._unique_background_target(source.name)
@@ -1218,7 +1284,7 @@ class StreamTab(QWidget):
             )
             return
 
-        self._refresh_background_library(asset.id)
+        self._select_imported_background(selection_target, asset.id)
 
     def _repair_background_reference(self):
         asset = self._selected_background_asset()
