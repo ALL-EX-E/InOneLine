@@ -116,6 +116,11 @@ class AuctionSearchMixin:
             elif not should_run and timer.isActive():
                 timer.stop()
         self._sync_lot_scroll_buttons()
+        api = getattr(self.window(), "api", None)
+        if api is not None:
+            api.set_auction_lots_runtime(
+                auto_scroll=self._desktop_lot_auto_scroll_enabled
+            )
 
     def _toggle_desktop_lot_auto_scroll(self):
         self._set_desktop_lot_auto_scroll(
@@ -156,8 +161,8 @@ class AuctionSearchMixin:
         return direction
 
     def _auto_scroll_conduct_lots(self):
-        # One shared operator switch controls both local auction tables. It is
-        # intentionally independent from every OBS/list-overlay autoscroll.
+        # One shared operator switch controls both local auction tables and the
+        # dedicated auction-lots OBS overlay.
         if not self._desktop_lot_auto_scroll_enabled:
             return
 
