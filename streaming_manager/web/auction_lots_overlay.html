@@ -63,16 +63,14 @@ thead th {
   z-index: 2;
   font-weight: 700;
   text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,.28);
-  background: rgba(28,31,34,.86);
+  border-bottom: 1px solid currentColor;
 }
 th, td {
   padding: .48em .65em;
   vertical-align: middle;
 }
-tbody tr:nth-child(odd) { background: rgba(28,31,34,.72); }
-tbody tr:nth-child(even) { background: rgba(38,42,46,.72); }
-td { border-bottom: 1px solid rgba(255,255,255,.06); }
+tbody tr { background: transparent; }
+td { border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
 .col-pos { width: 8.5%; text-align: center; white-space: nowrap; }
 .col-title {
   width: auto;
@@ -177,11 +175,12 @@ body.preview #api-state.visible { display: block; }
       addCell(tr, item.points_text, "col-points");
       fragment.appendChild(tr);
     }
+    const previousScrollTop = scroller.scrollTop;
     body.replaceChildren(fragment);
     table.style.display = rows.length ? "table" : "none";
     empty.style.display = rows.length ? "none" : "flex";
-    scroller.scrollTop = 0;
-    direction = 1;
+    const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    scroller.scrollTop = Math.min(previousScrollTop, maximum);
   }
 
   function clearMediaBackground() {
