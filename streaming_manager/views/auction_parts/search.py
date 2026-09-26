@@ -116,12 +116,6 @@ class AuctionSearchMixin:
             elif not should_run and timer.isActive():
                 timer.stop()
         self._sync_lot_scroll_buttons()
-        api = getattr(self.window(), "api", None)
-        if api is not None:
-            api.set_auction_lots_runtime(
-                auto_scroll=self._desktop_lot_auto_scroll_enabled
-            )
-
     def _toggle_desktop_lot_auto_scroll(self):
         self._set_desktop_lot_auto_scroll(
             not bool(self._desktop_lot_auto_scroll_enabled)

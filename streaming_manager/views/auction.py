@@ -1615,11 +1615,16 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._update_session_controls(None)
         self._refresh_conduct_wheel_chances_in_place(None)
 
-        api = getattr(self.window(), "api", None)
-        if api is not None:
-            api.set_auction_lots_runtime(
-                mode=str(self.mode_combo.currentData() or "max_amount")
-            )
+    def auction_lots_overlay_state(self) -> dict[str, object]:
+        """Expose existing Auction-owned transient state without duplicating it."""
+        return {
+            "mode": (
+                "weighted_wheel"
+                if self._timer_context == "wheel"
+                else "max_amount"
+            ),
+            "auto_scroll": bool(self._desktop_lot_auto_scroll_enabled),
+        }
 
     def set_main_tab_visible(
         self, visible: bool, *, refresh_pending: bool = False

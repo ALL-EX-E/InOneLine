@@ -126,6 +126,9 @@ class MainWindow(QMainWindow):
             open_integrations=self.open_integrations_settings,
             integration_runtime_health=self._integration_runtime_health_snapshot,
         )
+        self.api.set_auction_lots_state_provider(
+            self.auction_tab.auction_lots_overlay_state
+        )
         # R1.0.9: shared main-list XLSX controls belong to the Games workspace.
         # The synchronization engine itself remains on AuctionTab to preserve
         # the already-tested read/write/poll semantics unchanged.

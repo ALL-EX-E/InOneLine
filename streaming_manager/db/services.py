@@ -1478,26 +1478,21 @@ class ServicesMixin:
 
             if session is None:
                 mode = runtime_mode
-                game_rows = conn.execute(
-                    f"""
-                    SELECT id, title, sm_points
-                    FROM games
-                    WHERE auction_only=0
-                      AND archived=0
-                      AND status IN (?, ?)
-                    ORDER BY {self.GAME_ORDER_SQL}
-                    """,
-                    (STATUS_PLAYED, STATUS_NOT_PLAYED),
-                ).fetchall()
+                # Reuse the same canonical pre-start source as pointauc_games()
+                # instead of repeating its status/filter/order business rules.
+                game_rows = self._list_games_conn(
+                    conn,
+                    status_filter="middle",
+                )
                 rows = [
                     {
-                        "game_id": int(row["id"]),
+                        "game_id": int(game.id),
                         "start_position": position,
                         "current_position": position,
-                        "title": str(row["title"]),
-                        "total_sm_points": int(row["sm_points"] or 0),
+                        "title": str(game.title),
+                        "total_sm_points": int(game.sm_points or 0),
                     }
-                    for position, row in enumerate(game_rows, start=1)
+                    for position, game in enumerate(game_rows, start=1)
                 ]
                 wheel_payload = (
                     self._preview_wheel_payload_from_conn(conn)

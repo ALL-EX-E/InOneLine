@@ -75,11 +75,10 @@ class LocalApiServer:
         self._httpd: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
         self.last_error: str = ""
-        self._auction_lots_runtime_lock = threading.Lock()
-        self._auction_lots_runtime = {
-            "mode": "max_amount",
-            "auto_scroll": False,
-        }
+        # Read-only bridge to the AuctionTab-owned transient state. The API
+        # stores only the provider reference, never a second copy of mode or
+        # auto-scroll values.
+        self._auction_lots_state_provider = None
 
     @property
     def running(self) -> bool:
@@ -89,21 +88,19 @@ class LocalApiServer:
     def base_url(self) -> str:
         return f"http://{self.host}:{self.port}"
 
-    def set_auction_lots_runtime(
-        self,
-        *,
-        mode: str | None = None,
-        auto_scroll: bool | None = None,
-    ) -> None:
-        with self._auction_lots_runtime_lock:
-            if mode in {"max_amount", "weighted_wheel"}:
-                self._auction_lots_runtime["mode"] = str(mode)
-            if auto_scroll is not None:
-                self._auction_lots_runtime["auto_scroll"] = bool(auto_scroll)
+    def set_auction_lots_state_provider(self, provider) -> None:
+        """Attach the single AuctionTab-owned transient-state reader."""
+        self._auction_lots_state_provider = provider
 
-    def auction_lots_runtime(self) -> dict[str, object]:
-        with self._auction_lots_runtime_lock:
-            return dict(self._auction_lots_runtime)
+    def auction_lots_state(self) -> dict[str, object]:
+        provider = self._auction_lots_state_provider
+        if provider is None:
+            return {}
+        try:
+            state = provider()
+        except Exception:
+            return {}
+        return dict(state) if isinstance(state, dict) else {}
 
     def start(self) -> None:
         if self.running:
@@ -485,7 +482,7 @@ class LocalApiServer:
                 if path in ("/api/auction-lots", "/auction-lots"):
                     self._send_json(
                         db.current_auction_lots_payload(
-                            api_server.auction_lots_runtime()
+                            api_server.auction_lots_state()
                         ),
                         pretty=pretty,
                     )
