@@ -160,6 +160,11 @@ body.preview #api-state.visible { display: block; }
   let lastPresentationSignature = "";
   let autoScroll = false;
   let direction = 1;
+  // Same pattern as the existing working OBS list/rules overlays: keep an
+  // independent floating-point animation coordinate. Some Chromium/CEF builds
+  // quantize scrollTop writes to integer pixels, so reading scrollTop back on
+  // every frame can repeatedly lose sub-pixel progress at low speeds.
+  let scrollY = 0;
   let lastFrame = performance.now();
 
   function addCell(row, text, className, header = false) {
@@ -195,12 +200,12 @@ body.preview #api-state.visible { display: block; }
       addCell(tr, item.points_text, "col-points");
       fragment.appendChild(tr);
     }
-    const previousScrollTop = scroller.scrollTop;
     body.replaceChildren(fragment);
     table.style.display = rows.length ? "table" : "none";
     empty.style.display = rows.length ? "none" : "flex";
     const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    scroller.scrollTop = Math.min(previousScrollTop, maximum);
+    scrollY = Math.min(scrollY, maximum);
+    scroller.scrollTop = Math.round(scrollY);
   }
 
   function clearMediaBackground() {
@@ -256,7 +261,9 @@ body.preview #api-state.visible { display: block; }
     const nextAutoScroll = Boolean((payload || {}).auto_scroll);
     if (nextAutoScroll !== autoScroll) {
       autoScroll = nextAutoScroll;
-      direction = 1;
+      scrollY = Math.max(0, Number(scroller.scrollTop) || 0);
+      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      direction = scrollY >= maximum - 1 && maximum > 0 ? -1 : 1;
       lastFrame = performance.now();
     }
   }
@@ -267,16 +274,21 @@ body.preview #api-state.visible { display: block; }
     if (autoScroll) {
       const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
       if (maximum > 0) {
-        let next = scroller.scrollTop
-          + direction * SPEED_PX_PER_SECOND * dt / 1000;
-        if (next >= maximum) {
-          next = maximum;
+        scrollY += direction * SPEED_PX_PER_SECOND * dt / 1000;
+        if (scrollY >= maximum) {
+          scrollY = maximum;
           direction = -1;
-        } else if (next <= 0) {
-          next = 0;
+        } else if (scrollY <= 0) {
+          scrollY = 0;
           direction = 1;
         }
-        scroller.scrollTop = next;
+        // Keep the fractional accumulator above, but write whole CSS pixels to
+        // the native scroll container so OBS/CEF cannot discard every sub-pixel
+        // step. The sticky header therefore remains native and fixed.
+        scroller.scrollTop = Math.round(scrollY);
+      } else if (scrollY !== 0) {
+        scrollY = 0;
+        scroller.scrollTop = 0;
       }
     }
     requestAnimationFrame(scrollFrame);
@@ -292,6 +304,12 @@ body.preview #api-state.visible { display: block; }
       apiState.classList.add("visible");
     }
   }
+
+  new ResizeObserver(() => {
+    const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    scrollY = Math.min(scrollY, maximum);
+    scroller.scrollTop = Math.round(scrollY);
+  }).observe(scroller);
 
   setInterval(update, POLL_MS);
   requestAnimationFrame(scrollFrame);
