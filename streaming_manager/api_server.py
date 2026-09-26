@@ -490,7 +490,9 @@ class LocalApiServer:
 
                 if path in ("/api/timer", "/timer"):
                     self._send_json(
-                        db.current_timer_payload(),
+                        db.current_timer_payload(
+                            api_server.auction_lots_state()
+                        ),
                         pretty=pretty,
                     )
                     return

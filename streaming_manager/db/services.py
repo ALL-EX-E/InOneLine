@@ -1369,14 +1369,23 @@ class ServicesMixin:
         seconds, millis = divmod(remainder, 1000)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
 
-    def current_timer_payload(self) -> dict[str, Any]:
+    def current_timer_payload(
+        self,
+        runtime_state: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Read-only contract for the standalone authoritative OBS timer.
 
         This is deliberately a presentation adapter over the existing auction
         timer state. It never creates, advances or persists a second timer.
         """
+        runtime = dict(runtime_state or {})
+        runtime_mode = str(runtime.get("mode") or "max_amount")
+        if runtime_mode not in {"max_amount", "weighted_wheel"}:
+            runtime_mode = "max_amount"
+
         keys = (
             "auction_max_amount_default_duration_ms",
+            "auction_wheel_default_duration_ms",
             TIMER_OVERLAY_FONT_FAMILY_KEY,
             TIMER_OVERLAY_FONT_SIZE_KEY,
             TIMER_OVERLAY_FONT_COLOR_KEY,
@@ -1387,26 +1396,50 @@ class ServicesMixin:
             settings = self._get_settings_conn(conn, keys)
             session = self._get_open_auction_session_conn(conn)
 
+        timer_kind = "auction"
+        timer_running = False
+        timer_paused = False
         if session is None:
-            default_ms = self._timer_overlay_bounded_int(
-                settings.get("auction_max_amount_default_duration_ms"),
-                600_000,
-                AUCTION_MIN_DURATION_MS,
-                AUCTION_MAX_DURATION_MS,
-            )
+            if runtime_mode == "weighted_wheel":
+                default_ms = self._timer_overlay_bounded_int(
+                    settings.get("auction_wheel_default_duration_ms"),
+                    8_000,
+                    self.WHEEL_MIN_DURATION_MS,
+                    self.WHEEL_MAX_DURATION_MS,
+                )
+                timer_kind = "wheel"
+            else:
+                default_ms = self._timer_overlay_bounded_int(
+                    settings.get("auction_max_amount_default_duration_ms"),
+                    600_000,
+                    AUCTION_MIN_DURATION_MS,
+                    AUCTION_MAX_DURATION_MS,
+                )
             remaining_ms = default_ms
             auction_id: int | None = None
             status = "idle"
-            mode = ""
+            mode = runtime_mode
         else:
             auction_id = int(session["id"])
             status = str(session.get("status") or "")
             mode = str(session.get("mode") or "")
-            remaining_ms = (
-                self._remaining_ms_from_session(session)
-                if status in {"running", "paused"}
-                else 0
-            )
+            if status in {"running", "paused"}:
+                remaining_ms = self._remaining_ms_from_session(session)
+                timer_running = status == "running"
+                timer_paused = status == "paused"
+            elif status == "awaiting_wheel":
+                timer_kind = "wheel"
+                remaining_ms = max(
+                    0,
+                    int(session.get("wheel_duration_ms") or 8_000),
+                )
+            elif status == "winner_selected" and session.get("wheel_spin_id"):
+                timer_kind = "wheel"
+                wheel_timer = self._wheel_animation_timer_state(session)
+                remaining_ms = int(wheel_timer["remaining_ms"])
+                timer_running = bool(wheel_timer["running"])
+            else:
+                remaining_ms = 0
 
         background = str(
             settings.get(TIMER_OVERLAY_BACKGROUND_KEY, TIMER_OVERLAY_BACKGROUND_DEFAULT)
@@ -1430,8 +1463,9 @@ class ServicesMixin:
             "active": session is not None,
             "status": status,
             "mode": mode,
-            "running": status == "running",
-            "paused": status == "paused",
+            "timer_kind": timer_kind,
+            "running": bool(timer_running),
+            "paused": bool(timer_paused),
             "remaining_ms": int(remaining_ms),
             "text": self._format_timer_overlay_milliseconds(remaining_ms),
             "presentation": {

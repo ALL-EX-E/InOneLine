@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -585,18 +586,46 @@ class WheelMixin:
         }
 
     @staticmethod
-    def _wheel_animation_complete(session: dict[str, Any]) -> bool:
+    def _wheel_animation_timer_state(session: dict[str, Any]) -> dict[str, Any]:
+        """Return the authoritative wheel countdown derived from saved spin fields."""
+        duration_ms = max(0, int(session.get("wheel_duration_ms") or 8000))
         spin_id = session.get("wheel_spin_id")
         started_at = session.get("wheel_started_at")
-        duration_ms = int(session.get("wheel_duration_ms") or 8000)
         if not spin_id or not started_at:
-            return True
+            return {
+                "remaining_ms": duration_ms,
+                "running": False,
+                "complete": True,
+            }
         try:
             start = datetime.fromisoformat(str(started_at))
+            now = datetime.now(timezone.utc)
+            if now < start:
+                return {
+                    "remaining_ms": duration_ms,
+                    "running": False,
+                    "complete": False,
+                }
             finish = start + timedelta(milliseconds=duration_ms)
-            return datetime.now(timezone.utc) >= finish
+            remaining_ms = max(
+                0,
+                math.ceil((finish - now).total_seconds() * 1000.0),
+            )
+            return {
+                "remaining_ms": remaining_ms,
+                "running": remaining_ms > 0,
+                "complete": remaining_ms <= 0,
+            }
         except (TypeError, ValueError):
-            return True
+            return {
+                "remaining_ms": duration_ms,
+                "running": False,
+                "complete": True,
+            }
+
+    @classmethod
+    def _wheel_animation_complete(cls, session: dict[str, Any]) -> bool:
+        return bool(cls._wheel_animation_timer_state(session)["complete"])
 
     def prepare_wheel_animation(
         self,
