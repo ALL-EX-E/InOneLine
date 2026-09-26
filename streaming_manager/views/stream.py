@@ -1640,6 +1640,54 @@ class StreamTab(QWidget):
         )
         self._update_timer_background_enabled_state()
 
+        self.auction_lots_overlay_font.setCurrentFont(QFont(
+            setting(
+                AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+                AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT,
+            )
+        ))
+        try:
+            auction_lots_font_size = int(setting(
+                AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
+                str(AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT),
+            ))
+        except ValueError:
+            auction_lots_font_size = AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT
+        self.auction_lots_overlay_font_size.setValue(
+            max(8, min(160, auction_lots_font_size))
+        )
+        self._set_color_button(
+            self.auction_lots_overlay_font_color_btn,
+            setting(
+                AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
+                AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT,
+            ),
+        )
+        auction_lots_background = setting(
+            AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
+            AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT,
+        )
+        self.auction_lots_background_media_mode.setChecked(
+            auction_lots_background == "media"
+        )
+        self.auction_lots_background_color_mode.setChecked(
+            auction_lots_background == "color"
+        )
+        self.auction_lots_background_transparent.setChecked(
+            auction_lots_background not in {"color", "media"}
+        )
+        self._set_color_button(
+            self.auction_lots_background_color_btn,
+            setting(
+                AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
+                AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+            ),
+        )
+        self._refresh_auction_lots_background_library(
+            setting(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+        )
+        self._update_auction_lots_background_enabled_state()
+
         self.rules_overlay_visible.setChecked(
             setting(RULES_OVERLAY_VISIBLE_KEY, "1" if RULES_OVERLAY_VISIBLE_DEFAULT else "0") == "1"
         )
@@ -1674,6 +1722,7 @@ class StreamTab(QWidget):
             f"Оверлей OBS: {self.api.base_url}/overlay\n"
             f"Отдельный список OBS: {self.api.base_url}/list-overlay\n"
             f"Таймер OBS: {self.api.base_url}/timer-overlay\n"
+            f"Список лотов OBS: {self.api.base_url}/auction-lots-overlay\n"
             f"Правила OBS: {self.api.base_url}/rules-overlay\n"
             f"OBS JSON: {self.api.base_url}/api/data\n"
             f"Публичный JSON: {self.api.base_url}/api/public"
