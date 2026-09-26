@@ -399,43 +399,51 @@ class AuctionSessionMixin:
             ).fetchone()[0]
         return max(0, int(value or 0))
 
+    def _list_auction_entries_conn(
+        self,
+        conn: sqlite3.Connection,
+        auction_id: int,
+    ) -> list[dict[str, Any]]:
+        """Return the authoritative ordered lot rows through an existing connection."""
+        rows = conn.execute(
+            """
+            SELECT
+                ae.id AS entry_id,
+                ae.auction_id,
+                ae.game_id,
+                ae.active,
+                ae.result,
+                ae.starting_sm_points,
+                ae.bid_sm_points,
+                ae.start_position,
+                (ae.starting_sm_points + ae.bid_sm_points)
+                    AS total_sm_points,
+                COALESCE(g.title, ae.snapshot_title) AS title,
+                COALESCE(g.review, ae.snapshot_review) AS review,
+                COALESCE(g.status, ae.snapshot_status) AS status,
+                COALESCE(g.archived, 0) AS archived,
+                COALESCE(g.auction_only, 0) AS auction_only
+            FROM auction_entries ae
+            LEFT JOIN games g ON g.id = ae.game_id
+            WHERE ae.auction_id=? AND ae.active=1
+            ORDER BY
+                total_sm_points DESC,
+                CASE WHEN ae.start_position IS NULL THEN 1 ELSE 0 END ASC,
+                ae.start_position ASC,
+                COALESCE(g.title, ae.snapshot_title) COLLATE NOCASE ASC,
+                ae.game_id ASC,
+                ae.id ASC
+            """,
+            (int(auction_id),),
+        ).fetchall()
+        result = [dict(row) for row in rows]
+        for current_position, row in enumerate(result, start=1):
+            row["current_position"] = current_position
+        return result
+
     def list_auction_entries(self, auction_id: int) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = conn.execute(
-                """
-                SELECT
-                    ae.id AS entry_id,
-                    ae.auction_id,
-                    ae.game_id,
-                    ae.active,
-                    ae.result,
-                    ae.starting_sm_points,
-                    ae.bid_sm_points,
-                    ae.start_position,
-                    (ae.starting_sm_points + ae.bid_sm_points)
-                        AS total_sm_points,
-                    COALESCE(g.title, ae.snapshot_title) AS title,
-                    COALESCE(g.review, ae.snapshot_review) AS review,
-                    COALESCE(g.status, ae.snapshot_status) AS status,
-                    COALESCE(g.archived, 0) AS archived,
-                    COALESCE(g.auction_only, 0) AS auction_only
-                FROM auction_entries ae
-                LEFT JOIN games g ON g.id = ae.game_id
-                WHERE ae.auction_id=? AND ae.active=1
-                ORDER BY
-                    total_sm_points DESC,
-                    CASE WHEN ae.start_position IS NULL THEN 1 ELSE 0 END ASC,
-                    ae.start_position ASC,
-                    COALESCE(g.title, ae.snapshot_title) COLLATE NOCASE ASC,
-                    ae.game_id ASC,
-                    ae.id ASC
-                """,
-                (auction_id,),
-            ).fetchall()
-            result = [dict(row) for row in rows]
-            for current_position, row in enumerate(result, start=1):
-                row["current_position"] = current_position
-            return result
+            return self._list_auction_entries_conn(conn, auction_id)
 
     def list_auction_history_events(
         self,
