@@ -817,6 +817,80 @@ class StreamTab(QWidget):
             "не обязательны.",
         )
 
+    def _update_auction_lots_background_enabled_state(self) -> None:
+        color_enabled = self.auction_lots_background_color_mode.isChecked()
+        media_enabled = self.auction_lots_background_media_mode.isChecked()
+        self.auction_lots_background_color_btn.setEnabled(color_enabled)
+        self.auction_lots_background_color_pick_btn.setEnabled(color_enabled)
+        self.auction_lots_background_combo.setEnabled(media_enabled)
+        self.auction_lots_choose_background_btn.setEnabled(
+            media_enabled and self._background_copy_worker is None
+        )
+
+    def _choose_auction_lots_font_color(self) -> None:
+        current = str(
+            self.auction_lots_overlay_font_color_btn.property("fontColor")
+            or AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT
+        )
+        color = QColorDialog.getColor(
+            QColor(current), self, "Цвет текста списка лотов"
+        )
+        if color.isValid():
+            self._set_color_button(
+                self.auction_lots_overlay_font_color_btn,
+                color.name().upper(),
+            )
+
+    def _choose_auction_lots_background_color(self) -> None:
+        current = str(
+            self.auction_lots_background_color_btn.property("fontColor")
+            or AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT
+        )
+        color = QColorDialog.getColor(
+            QColor(current), self, "Цвет фона списка лотов"
+        )
+        if color.isValid():
+            self._set_color_button(
+                self.auction_lots_background_color_btn,
+                color.name().upper(),
+            )
+
+    def _save_auction_lots_overlay_settings(self) -> None:
+        if self.auction_lots_background_media_mode.isChecked():
+            background = "media"
+        elif self.auction_lots_background_color_mode.isChecked():
+            background = "color"
+        else:
+            background = "transparent"
+
+        media_value = self.auction_lots_background_combo.currentData()
+        media_id = (
+            str(media_value)
+            if str(media_value or "").isdigit()
+            else ""
+        )
+        self.db.set_settings_bulk({
+            AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY:
+                self.auction_lots_overlay_font.currentFont().family(),
+            AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY:
+                str(self.auction_lots_overlay_font_size.value()),
+            AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY: str(
+                self.auction_lots_overlay_font_color_btn.property("fontColor")
+                or AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_OVERLAY_BACKGROUND_KEY: background,
+            AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY: str(
+                self.auction_lots_background_color_btn.property("fontColor")
+                or AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: media_id,
+        })
+        QMessageBox.information(
+            self,
+            "OBS Auction Lots",
+            "Настройки списка лотов сохранены. Открытый Browser Source обновится автоматически.",
+        )
+
     def _update_rules_background_enabled_state(self) -> None:
         enabled = self.rules_background_color_mode.isChecked()
         self.rules_background_color_btn.setEnabled(enabled)
