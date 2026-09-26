@@ -812,42 +812,33 @@ class WheelMixin:
                 raise KeyError(auction_id)
             return self._wheel_payload_from_conn(conn, session)
 
-    def current_wheel_payload(self) -> dict[str, Any]:
-        """Состояние колеса для OBS даже до запуска сессии."""
-        with self.connect() as conn:
-            session = self._get_open_auction_session_conn(conn)
-            if session is not None:
-                return self._wheel_payload_from_conn(conn, session)
+    def _preview_wheel_payload_from_conn(self, conn) -> dict[str, Any]:
+        """Build the existing pre-start wheel preview without a nested DB connection."""
+        rows = conn.execute(
+            """
+            SELECT id, title, sm_points
+            FROM games
+            WHERE auction_only=0
+              AND archived=0
+              AND status IN (?, ?)
+            ORDER BY
+                sm_points DESC,
+                CASE WHEN release_date IS NULL THEN 1 ELSE 0 END ASC,
+                release_date DESC,
+                updated_at DESC,
+                id ASC
+            """,
+            (STATUS_PLAYED, STATUS_NOT_PLAYED),
+        ).fetchall()
 
-            # Эквивалент pointauc_games() для preview, но в уже открытом
-            # соединении. Для middle-группы общий list_games ORDER BY сводится
-            # к этому порядку.
-            rows = conn.execute(
-                """
-                SELECT id, title, sm_points
-                FROM games
-                WHERE auction_only=0
-                  AND archived=0
-                  AND status IN (?, ?)
-                ORDER BY
-                    sm_points DESC,
-                    CASE WHEN release_date IS NULL THEN 1 ELSE 0 END ASC,
-                    release_date DESC,
-                    updated_at DESC,
-                    id ASC
-                """,
-                (STATUS_PLAYED, STATUS_NOT_PLAYED),
-            ).fetchall()
-
-            raw = [
-                (
-                    int(row["id"]),
-                    max(0, int(row["sm_points"] or 0)),
-                    str(row["title"]),
-                )
-                for row in rows
-            ]
-
+        raw = [
+            (
+                int(row["id"]),
+                max(0, int(row["sm_points"] or 0)),
+                str(row["title"]),
+            )
+            for row in rows
+        ]
         total = sum(weight for _, weight, _ in raw)
         equal_mode = total <= 0 and bool(raw)
         algorithm_version = self.WHEEL_ALGORITHM_V2
@@ -901,3 +892,10 @@ class WheelMixin:
             ),
         }
 
+    def current_wheel_payload(self) -> dict[str, Any]:
+        """Состояние колеса для OBS даже до запуска сессии."""
+        with self.connect() as conn:
+            session = self._get_open_auction_session_conn(conn)
+            if session is not None:
+                return self._wheel_payload_from_conn(conn, session)
+            return self._preview_wheel_payload_from_conn(conn)
