@@ -138,9 +138,9 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # A7: while a history-linked lot is hovered, the Conduct auto-scroll
         # must stay frozen at the revealed row without changing operator selection.
         self._history_hover_pauses_auto_scroll = False
-        # Both inner auction tables share one session-only desktop-autoscroll
-        # switch. It deliberately starts OFF on every application launch and is
-        # never stored in settings. OBS/list-overlay autoscroll is independent.
+        # Both inner auction tables and the dedicated auction-lots OBS overlay
+        # share one session-only auto-scroll switch. It deliberately starts OFF
+        # on every application launch and is never stored in settings.
         self._desktop_lot_auto_scroll_enabled = False
         self._lots_scroll_direction = 1
         self._conduct_scroll_direction = 1
@@ -206,8 +206,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.count_label.setProperty("badge", True)
         self.lots_scroll_btn = QPushButton("Включить прокрутку")
         self.lots_scroll_btn.setToolTip(
-            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов. "
-            "На OBS-оверлеи эта кнопка не влияет."
+            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов "
+            "и OBS-оверлея списка лотов."
         )
         self.lots_scroll_btn.clicked.connect(self._toggle_desktop_lot_auto_scroll)
 
@@ -482,6 +482,22 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         timer_buttons.addWidget(self.timer_reset_btn)
         timer_layout.addLayout(timer_buttons)
 
+        timer_obs_row = QHBoxLayout()
+        timer_obs_row.setSpacing(5)
+        self.copy_timer_overlay_btn = QPushButton("Копировать URL таймера")
+        self.copy_timer_overlay_btn.setToolTip(
+            "Скопировать существующий OBS Browser Source таймера"
+        )
+        self.copy_timer_overlay_btn.clicked.connect(
+            lambda: QApplication.clipboard().setText(
+                f"{self.window().api.base_url}/timer-overlay"
+            )
+        )
+        timer_obs_row.addStretch()
+        timer_obs_row.addWidget(self.copy_timer_overlay_btn)
+        timer_obs_row.addStretch()
+        timer_layout.addLayout(timer_obs_row)
+
         self.timer_finish_widget = QWidget()
         timer_finish_row = QHBoxLayout(self.timer_finish_widget)
         timer_finish_row.setContentsMargins(0, 0, 0, 0)
@@ -658,8 +674,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.conduct_scroll_btn = QPushButton("Включить прокрутку")
         self.conduct_scroll_btn.setToolTip(
-            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов. "
-            "На OBS-оверлеи эта кнопка не влияет."
+            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов "
+            "и OBS-оверлея списка лотов."
         )
         self.conduct_scroll_btn.clicked.connect(self._toggle_desktop_lot_auto_scroll)
         conduct_heading_row.addWidget(self.conduct_scroll_btn)
@@ -1598,6 +1614,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self._update_session_controls(None)
         self._refresh_conduct_wheel_chances_in_place(None)
+
+        api = getattr(self.window(), "api", None)
+        if api is not None:
+            api.set_auction_lots_runtime(
+                mode=str(self.mode_combo.currentData() or "max_amount")
+            )
 
     def set_main_tab_visible(
         self, visible: bool, *, refresh_pending: bool = False
