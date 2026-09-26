@@ -15,6 +15,12 @@ from ..constants import (
     AUCTION_MANUAL_BID_POINTS_MAX, AUCTION_MANUAL_BID_POINTS_MIN,
     AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
     AUCTION_WHEEL_CHANCE_VISIBLE_DEFAULT, AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT, TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT, TIMER_OVERLAY_BACKGROUND_KEY,
     TIMER_OVERLAY_FONT_COLOR_DEFAULT, TIMER_OVERLAY_FONT_COLOR_KEY,
@@ -38,7 +44,7 @@ from ..conversion import (
     parse_decimal, parse_positive_rate,
 )
 from .common import (
-    Game, points_from_text, display_date,
+    Game, points_from_text, display_date, format_points,
     normalize_title_key, parse_date, utc_now,
 )
 
@@ -1443,6 +1449,184 @@ class ServicesMixin:
                     settings.get(TIMER_OVERLAY_BACKGROUND_COLOR_KEY),
                     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
                 ),
+            },
+        }
+
+    def current_auction_lots_payload(
+        self,
+        runtime_state: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Read-only OBS adapter over the existing Auction lot list."""
+        runtime = dict(runtime_state or {})
+        runtime_mode = str(runtime.get("mode") or "max_amount")
+        if runtime_mode not in {"max_amount", "weighted_wheel"}:
+            runtime_mode = "max_amount"
+        auto_scroll = bool(runtime.get("auto_scroll", False))
+
+        keys = (
+            AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
+            AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+            AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
+            AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
+            AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
+            AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
+            AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+        )
+        with self.connect() as conn:
+            settings = self._get_settings_conn(conn, keys)
+            session = self._get_open_auction_session_conn(conn)
+
+            if session is None:
+                mode = runtime_mode
+                game_rows = conn.execute(
+                    f"""
+                    SELECT id, title, sm_points
+                    FROM games
+                    WHERE auction_only=0
+                      AND archived=0
+                      AND status IN (?, ?)
+                    ORDER BY {self.GAME_ORDER_SQL}
+                    """,
+                    (STATUS_PLAYED, STATUS_NOT_PLAYED),
+                ).fetchall()
+                rows = [
+                    {
+                        "game_id": int(row["id"]),
+                        "start_position": position,
+                        "current_position": position,
+                        "title": str(row["title"]),
+                        "total_sm_points": int(row["sm_points"] or 0),
+                    }
+                    for position, row in enumerate(game_rows, start=1)
+                ]
+                wheel_payload = (
+                    self._preview_wheel_payload_from_conn(conn)
+                    if mode == "weighted_wheel"
+                    else {}
+                )
+                auction_id: int | None = None
+                status = "preview"
+            else:
+                auction_id = int(session["id"])
+                mode = str(session.get("mode") or "max_amount")
+                status = str(session.get("status") or "")
+                rows = self._list_auction_entries_conn(conn, auction_id)
+                wheel_payload = (
+                    self._wheel_payload_from_conn(conn, session)
+                    if mode == "weighted_wheel"
+                    else {}
+                )
+
+            media_raw = str(
+                settings.get(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+            ).strip()
+            background_asset = (
+                self._get_media_asset_conn(conn, int(media_raw))
+                if media_raw.isdigit()
+                else None
+            )
+
+        chance_raw = str(
+            settings.get(
+                AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
+                "1" if AUCTION_WHEEL_CHANCE_VISIBLE_DEFAULT else "0",
+            )
+        ).strip().casefold()
+        show_wheel_chance = bool(
+            mode == "weighted_wheel"
+            and chance_raw in {"1", "true", "yes", "on"}
+        )
+        probability_by_game = {
+            int(sector["game_id"]): float(sector.get("probability") or 0.0)
+            for sector in (wheel_payload or {}).get("sectors", [])
+            if sector.get("game_id") is not None
+        }
+
+        payload_rows = []
+        for row in rows:
+            game_id = int(row["game_id"])
+            probability = probability_by_game.get(game_id, 0.0)
+            payload_rows.append({
+                "game_id": game_id,
+                "start_position": row.get("start_position") or "",
+                "current_position": row.get("current_position") or "",
+                "title": str(row.get("title") or ""),
+                "total_sm_points": int(row.get("total_sm_points") or 0),
+                "points_text": format_points(int(row.get("total_sm_points") or 0)),
+                "probability": probability,
+                "chance_text": (
+                    f"{max(0.0, probability) * 100.0:.2f}".replace(".", ",")
+                    + " %"
+                ),
+            })
+
+        background = str(
+            settings.get(
+                AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
+                AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT,
+            )
+            or AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT
+        ).strip().casefold()
+        if background not in {"transparent", "color", "media"}:
+            background = AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT
+
+        family = str(
+            settings.get(
+                AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+                AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT,
+            )
+            or AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT
+        ).strip()[:160] or AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT
+
+        if (
+            background_asset is not None
+            and background_asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+        ):
+            background_file = background_asset.display_name
+            background_type = media_kind_for_name(background_file)
+            background_available = media_asset_available(
+                self.path.parent, background_asset
+            )
+            background_url = (
+                f"/media/{background_asset.id}" if background_available else ""
+            )
+            background_asset_id: int | None = background_asset.id
+        else:
+            background_file = ""
+            background_type = ""
+            background_available = False
+            background_url = ""
+            background_asset_id = None
+
+        return {
+            "auction_id": auction_id,
+            "status": status,
+            "mode": mode,
+            "show_wheel_chance": show_wheel_chance,
+            "auto_scroll": auto_scroll,
+            "rows": payload_rows,
+            "presentation": {
+                "font_family": family,
+                "font_size": self._timer_overlay_bounded_int(
+                    settings.get(AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY),
+                    AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, 8, 160,
+                ),
+                "font_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY),
+                    AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT,
+                ),
+                "background": background,
+                "background_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY),
+                    AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+                ),
+                "background_media": {
+                    "asset_id": background_asset_id,
+                    "file": background_file,
+                    "type": background_type,
+                    "available": bool(background_available),
+                    "url": background_url,
+                },
             },
         }
 
