@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In one line — Auction lots</title>
+<style>
+:root {
+  --font-family: "Segoe UI", Arial, sans-serif;
+  --font-size: 24px;
+  --font-color: #FFFFFF;
+}
+* { box-sizing: border-box; }
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  color: var(--font-color);
+}
+#background, #background-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: none;
+}
+#background {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+#background-video {
+  object-fit: cover;
+  pointer-events: none;
+}
+#root {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+#scroller {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,.28);
+  background: rgba(28,31,34,.86);
+}
+th, td {
+  padding: .48em .65em;
+  vertical-align: middle;
+}
+tbody tr:nth-child(odd) { background: rgba(28,31,34,.72); }
+tbody tr:nth-child(even) { background: rgba(38,42,46,.72); }
+td { border-bottom: 1px solid rgba(255,255,255,.06); }
+.col-pos { width: 8.5%; text-align: center; white-space: nowrap; }
+.col-title {
+  width: auto;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.col-chance { width: 15%; text-align: center; white-space: nowrap; }
+.col-points { width: 12%; text-align: center; white-space: nowrap; }
+#empty {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  opacity: .72;
+}
+#api-state {
+  display: none;
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: rgba(0,0,0,.72);
+  color: #fff;
+  font: 14px "Segoe UI", sans-serif;
+}
+body.preview #api-state.visible { display: block; }
+</style>
+</head>
+<body>
+<div id="background"></div>
+<video id="background-video" autoplay muted loop playsinline></video>
+<div id="root">
+  <div id="scroller">
+    <table id="lots-table">
+      <thead><tr id="header-row"></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div id="empty">Список лотов пуст</div>
+  </div>
+</div>
+<div id="api-state">Нет связи с In one line</div>
+<script>
+(() => {
+  "use strict";
+  const API = "/api/auction-lots";
+  const POLL_MS = 200;
+  const SPEED_PX_PER_SECOND = 25;
+  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  if (preview) document.body.classList.add("preview");
+
+  const scroller = document.getElementById("scroller");
+  const table = document.getElementById("lots-table");
+  const headerRow = document.getElementById("header-row");
+  const body = document.getElementById("body");
+  const empty = document.getElementById("empty");
+  const apiState = document.getElementById("api-state");
+  const background = document.getElementById("background");
+  const backgroundVideo = document.getElementById("background-video");
+
+  let lastRowsSignature = "";
+  let lastPresentationSignature = "";
+  let autoScroll = false;
+  let direction = 1;
+  let lastFrame = performance.now();
+
+  function addCell(row, text, className, header = false) {
+    const cell = document.createElement(header ? "th" : "td");
+    cell.className = className;
+    cell.textContent = String(text ?? "");
+    row.appendChild(cell);
+  }
+
+  function renderRows(payload) {
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+    const showChance = Boolean(payload.show_wheel_chance);
+    const signature = JSON.stringify([showChance, rows]);
+    if (signature === lastRowsSignature) return;
+    lastRowsSignature = signature;
+
+    headerRow.replaceChildren();
+    addCell(headerRow, "СТАРТ", "col-pos", true);
+    addCell(headerRow, "ТЕКУЩАЯ", "col-pos", true);
+    addCell(headerRow, "НАЗВАНИЕ", "col-title", true);
+    if (showChance) {
+      addCell(headerRow, "ШАНС В КОЛЕСЕ", "col-chance", true);
+    }
+    addCell(headerRow, "БАЛЛЫ", "col-points", true);
+
+    const fragment = document.createDocumentFragment();
+    for (const item of rows) {
+      const tr = document.createElement("tr");
+      addCell(tr, item.start_position, "col-pos");
+      addCell(tr, item.current_position, "col-pos");
+      addCell(tr, item.title, "col-title");
+      if (showChance) addCell(tr, item.chance_text, "col-chance");
+      addCell(tr, item.points_text, "col-points");
+      fragment.appendChild(tr);
+    }
+    body.replaceChildren(fragment);
+    table.style.display = rows.length ? "table" : "none";
+    empty.style.display = rows.length ? "none" : "flex";
+    scroller.scrollTop = 0;
+    direction = 1;
+  }
+
+  function clearMediaBackground() {
+    background.style.display = "none";
+    background.style.backgroundImage = "";
+    if (!backgroundVideo.paused) backgroundVideo.pause();
+    backgroundVideo.removeAttribute("src");
+    backgroundVideo.load();
+    backgroundVideo.style.display = "none";
+  }
+
+  function applyPresentation(presentation) {
+    const p = presentation || {};
+    const signature = JSON.stringify(p);
+    if (signature === lastPresentationSignature) return;
+    lastPresentationSignature = signature;
+
+    document.documentElement.style.setProperty(
+      "--font-family",
+      JSON.stringify(String(p.font_family || "Segoe UI"))
+    );
+    document.documentElement.style.setProperty(
+      "--font-size",
+      Math.max(8, Number(p.font_size) || 24) + "px"
+    );
+    document.documentElement.style.setProperty(
+      "--font-color",
+      String(p.font_color || "#FFFFFF")
+    );
+
+    const mode = String(p.background || "transparent");
+    document.body.style.backgroundColor =
+      mode === "color" ? String(p.background_color || "#000000") : "transparent";
+    clearMediaBackground();
+
+    const media = p.background_media || {};
+    if (mode === "media" && media.available && media.url) {
+      if (String(media.type || "") === "video") {
+        backgroundVideo.src = String(media.url);
+        backgroundVideo.style.display = "block";
+        backgroundVideo.play().catch(() => {});
+      } else {
+        background.style.backgroundImage =
+          'url("' + String(media.url).replace(/"/g, "%22") + '")';
+        background.style.display = "block";
+      }
+    }
+  }
+
+  function applyPayload(payload) {
+    renderRows(payload || {});
+    applyPresentation((payload || {}).presentation || {});
+    const nextAutoScroll = Boolean((payload || {}).auto_scroll);
+    if (nextAutoScroll !== autoScroll) {
+      autoScroll = nextAutoScroll;
+      direction = 1;
+      lastFrame = performance.now();
+    }
+  }
+
+  function scrollFrame(now) {
+    const dt = Math.min(100, Math.max(0, now - lastFrame));
+    lastFrame = now;
+    if (autoScroll) {
+      const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      if (maximum > 0) {
+        let next = scroller.scrollTop
+          + direction * SPEED_PX_PER_SECOND * dt / 1000;
+        if (next >= maximum) {
+          next = maximum;
+          direction = -1;
+        } else if (next <= 0) {
+          next = 0;
+          direction = 1;
+        }
+        scroller.scrollTop = next;
+      }
+    }
+    requestAnimationFrame(scrollFrame);
+  }
+
+  async function update() {
+    try {
+      const response = await fetch(API, { cache: "no-store" });
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      applyPayload(await response.json());
+      apiState.classList.remove("visible");
+    } catch (_error) {
+      apiState.classList.add("visible");
+    }
+  }
+
+  setInterval(update, POLL_MS);
+  requestAnimationFrame(scrollFrame);
+  update();
+})();
+</script>
+</body>
+</html>
