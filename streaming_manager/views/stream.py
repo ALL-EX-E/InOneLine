@@ -20,6 +20,12 @@ from PySide6.QtWidgets import (
 from ..api_server import LocalApiServer
 from ..constants import (
     APP_NAME, APP_VERSION, COOP_LABELS, DEFAULT_API_HOST,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+    AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
     RULES_OVERLAY_AUTOSCROLL_DEFAULT, RULES_OVERLAY_AUTOSCROLL_KEY,
     RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT, RULES_OVERLAY_BACKGROUND_COLOR_KEY,
     RULES_OVERLAY_BACKGROUND_DEFAULT, RULES_OVERLAY_BACKGROUND_KEY,
@@ -65,6 +71,7 @@ class StreamTab(QWidget):
         self.api = api
         self.thread_pool = QThreadPool.globalInstance()
         self._background_copy_worker: FunctionWorker | None = None
+        self._background_copy_target = "main"
         self.background_dir = managed_media_directory(
             self.db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
         )
@@ -553,6 +560,111 @@ class StreamTab(QWidget):
         timer_actions.addWidget(timer_help)
         timer_actions.addStretch()
         layout.addLayout(timer_actions)
+
+        auction_lots_line = QFrame()
+        auction_lots_line.setProperty("line", True)
+        layout.addWidget(auction_lots_line)
+        auction_lots_heading = QLabel("Виджет списка лотов аукциона")
+        auction_lots_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(auction_lots_heading)
+
+        auction_lots_form = QFormLayout()
+        auction_lots_form.setVerticalSpacing(10)
+        auction_lots_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        auction_lots_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.auction_lots_overlay_font = ScrollSafeFontComboBox()
+        self.auction_lots_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        auction_lots_form.addRow("Шрифт:", self.auction_lots_overlay_font)
+
+        self.auction_lots_overlay_font_size = ScrollSafeSpinBox()
+        self.auction_lots_overlay_font_size.setRange(8, 160)
+        self.auction_lots_overlay_font_size.setSuffix(" px")
+        self.auction_lots_overlay_font_size_control = make_wide_step_control(
+            self.auction_lots_overlay_font_size,
+            up_tooltip="Увеличить размер текста списка лотов",
+            down_tooltip="Уменьшить размер текста списка лотов",
+        )
+        auction_lots_form.addRow("Размер:", self.auction_lots_overlay_font_size_control)
+
+        color_row = QWidget()
+        color_layout = QHBoxLayout(color_row)
+        color_layout.setContentsMargins(0, 0, 0, 0)
+        color_layout.setSpacing(8)
+        self.auction_lots_overlay_font_color_btn = QPushButton()
+        self.auction_lots_overlay_font_color_btn.clicked.connect(self._choose_auction_lots_font_color)
+        self.auction_lots_overlay_font_color_pick_btn = QPushButton("⌖")
+        self.auction_lots_overlay_font_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.auction_lots_overlay_font_color_btn)
+        )
+        color_layout.addWidget(self.auction_lots_overlay_font_color_btn)
+        color_layout.addWidget(self.auction_lots_overlay_font_color_pick_btn)
+        color_layout.addStretch()
+        auction_lots_form.addRow("Цвет текста:", color_row)
+
+        bg_mode_row = QWidget()
+        bg_mode_layout = QHBoxLayout(bg_mode_row)
+        bg_mode_layout.setContentsMargins(0, 0, 0, 0)
+        bg_mode_layout.setSpacing(12)
+        self.auction_lots_background_transparent = QRadioButton("Прозрачный")
+        self.auction_lots_background_color_mode = QRadioButton("Цвет")
+        self.auction_lots_background_media_mode = QRadioButton("Свой")
+        for control in (
+            self.auction_lots_background_transparent,
+            self.auction_lots_background_color_mode,
+            self.auction_lots_background_media_mode,
+        ):
+            control.toggled.connect(self._update_auction_lots_background_enabled_state)
+            bg_mode_layout.addWidget(control)
+        bg_mode_layout.addStretch()
+        auction_lots_form.addRow("Фон:", bg_mode_row)
+
+        bg_color_row = QWidget()
+        bg_color_layout = QHBoxLayout(bg_color_row)
+        bg_color_layout.setContentsMargins(0, 0, 0, 0)
+        bg_color_layout.setSpacing(8)
+        self.auction_lots_background_color_btn = QPushButton()
+        self.auction_lots_background_color_btn.clicked.connect(self._choose_auction_lots_background_color)
+        self.auction_lots_background_color_pick_btn = QPushButton("⌖")
+        self.auction_lots_background_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.auction_lots_background_color_btn)
+        )
+        bg_color_layout.addWidget(self.auction_lots_background_color_btn)
+        bg_color_layout.addWidget(self.auction_lots_background_color_pick_btn)
+        bg_color_layout.addStretch()
+        auction_lots_form.addRow("Цвет фона:", bg_color_row)
+
+        media_row = QWidget()
+        media_layout = QHBoxLayout(media_row)
+        media_layout.setContentsMargins(0, 0, 0, 0)
+        media_layout.setSpacing(8)
+        self.auction_lots_background_combo = ScrollSafeComboBox()
+        self.auction_lots_background_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.auction_lots_choose_background_btn = QPushButton("Добавить фон…")
+        self.auction_lots_choose_background_btn.clicked.connect(self._import_auction_lots_background_media)
+        media_layout.addWidget(self.auction_lots_background_combo, 1)
+        media_layout.addWidget(self.auction_lots_choose_background_btn)
+        auction_lots_form.addRow("Свой фон:", media_row)
+        layout.addLayout(auction_lots_form)
+
+        auction_lots_actions = QHBoxLayout()
+        auction_lots_actions.setSpacing(8)
+        save_auction_lots = QPushButton("Сохранить виджет списка лотов")
+        save_auction_lots.setProperty("primary", True)
+        save_auction_lots.clicked.connect(self._save_auction_lots_overlay_settings)
+        copy_auction_lots = QPushButton("Копировать URL списка лотов")
+        copy_auction_lots.clicked.connect(
+            lambda: QApplication.clipboard().setText(f"{self.api.base_url}/auction-lots-overlay")
+        )
+        open_auction_lots = QPushButton("Открыть предпросмотр списка лотов")
+        open_auction_lots.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/auction-lots-overlay?preview=1"))
+        )
+        auction_lots_actions.addWidget(save_auction_lots)
+        auction_lots_actions.addWidget(copy_auction_lots)
+        auction_lots_actions.addWidget(open_auction_lots)
+        auction_lots_actions.addStretch()
+        layout.addLayout(auction_lots_actions)
 
         rules_line = QFrame()
         rules_line.setProperty("line", True)
