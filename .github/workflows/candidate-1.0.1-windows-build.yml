@@ -33,6 +33,8 @@ jobs:
           import json
           import os
           import urllib.request
+          import sys
+          sys.path.insert(0, os.getcwd())
           from pathlib import Path
           from tempfile import TemporaryDirectory
 
