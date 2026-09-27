@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "In one line"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
 SCHEMA_VERSION = 18
