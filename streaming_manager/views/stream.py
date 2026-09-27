@@ -107,6 +107,14 @@ class StreamTab(QWidget):
         heading.setStyleSheet("font-size: 15pt; font-weight: 700;")
         layout.addWidget(heading)
 
+        obs_help_actions = QHBoxLayout()
+        obs_help_actions.setSpacing(8)
+        obs_help = QPushButton("Как добавить виджет в OBS")
+        obs_help.clicked.connect(self._show_obs_widget_help)
+        obs_help_actions.addWidget(obs_help)
+        obs_help_actions.addStretch()
+        layout.addLayout(obs_help_actions)
+
         form = QFormLayout()
         form.setVerticalSpacing(10)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
@@ -544,12 +552,9 @@ class StreamTab(QWidget):
         open_timer.clicked.connect(
             lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/timer-overlay?preview=1"))
         )
-        timer_help = QPushButton("Как добавить в OBS")
-        timer_help.clicked.connect(self._show_timer_obs_help)
         timer_actions.addWidget(save_timer)
         timer_actions.addWidget(copy_timer)
         timer_actions.addWidget(open_timer)
-        timer_actions.addWidget(timer_help)
         timer_actions.addStretch()
         layout.addLayout(timer_actions)
 
@@ -743,12 +748,9 @@ class StreamTab(QWidget):
                 QUrl(f"{self.api.base_url}/rules-overlay?preview=1")
             )
         )
-        rules_help = QPushButton("Как добавить в OBS")
-        rules_help.clicked.connect(self._show_rules_obs_help)
         rules_actions.addWidget(save_rules)
         rules_actions.addWidget(copy_rules)
         rules_actions.addWidget(open_rules)
-        rules_actions.addWidget(rules_help)
         rules_actions.addStretch()
         layout.addLayout(rules_actions)
 
@@ -791,16 +793,18 @@ class StreamTab(QWidget):
             "Настройки виджета таймера сохранены. Открытый Browser Source обновится автоматически.",
         )
 
-    def _show_timer_obs_help(self) -> None:
+    def _show_obs_widget_help(self) -> None:
         QMessageBox.information(
             self,
-            "Как добавить таймер в OBS",
-            "1. Скопируйте URL таймера.\n"
-            "2. OBS → Источники → Браузер.\n"
-            "3. Вставьте URL.\n"
-            "4. Задайте Width / Height.\n"
-            "5. Разместите источник на сцене.\n\n"
-            "Источник содержит только значение таймера и не воспроизводит музыку. "
+            "Как добавить виджет в OBS",
+            "1. У нужного виджета нажмите «Копировать URL…».\n"
+            "2. OBS → Источники → + → Браузер.\n"
+            "3. Создайте новый источник «Браузер».\n"
+            "4. Вставьте скопированный URL.\n"
+            "5. Задайте Width / Height под нужный размер виджета.\n"
+            "6. Разместите источник на сцене.\n"
+            "7. При необходимости измените настройки виджета в InOneLine и сохраните их. "
+            "Поддерживаемые настройки открытого Browser Source обновляются автоматически.\n\n"
             "Параметры ‘Shutdown source when not visible’ и ‘Refresh browser when scene becomes active’ "
             "не обязательны.",
         )
@@ -907,19 +911,6 @@ class StreamTab(QWidget):
             self,
             "OBS Rules",
             "Настройки виджета правил сохранены. Открытый Browser Source обновится автоматически.",
-        )
-
-    def _show_rules_obs_help(self) -> None:
-        QMessageBox.information(
-            self,
-            "Как добавить правила в OBS",
-            "1. Скопируйте URL правил.\n"
-            "2. OBS → Источники → Браузер.\n"
-            "3. Вставьте URL.\n"
-            "4. Задайте Width / Height.\n"
-            "5. Разместите источник на сцене.\n\n"
-            "Параметры ‘Shutdown source when not visible’ и ‘Refresh browser when scene becomes active’ "
-            "не обязательны.",
         )
 
     def copy_list_overlay_url(self) -> None:
