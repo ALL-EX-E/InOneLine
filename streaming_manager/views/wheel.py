@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
-    QBrush, QColor, QFontMetricsF, QPainter, QPainterPath, QPen, QPixmap, QPolygonF,
+    QBrush, QColor, QFontMetricsF, QMovie, QPainter, QPainterPath, QPen, QPixmap,
+    QPolygonF,
 )
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
@@ -45,6 +46,7 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._wheel_cache_key = None
         self._center_image_path = ""
         self._center_image_pixmap: QPixmap | None = None
+        self._center_image_movie: QMovie | None = None
         self._spin_id = None
         self._spin_start_monotonic: float | None = None
         self._finished_emitted_for_spin = None
@@ -71,9 +73,27 @@ class AuctionWheelWidget(QOpenGLWidget):
         normalized = str(path or "")
         if normalized == self._center_image_path:
             return
+
+        previous_movie = self._center_image_movie
+        self._center_image_movie = None
+        if previous_movie is not None:
+            previous_movie.stop()
+            previous_movie.deleteLater()
+
         self._center_image_path = normalized
         pixmap = QPixmap(normalized) if normalized else QPixmap()
         self._center_image_pixmap = None if pixmap.isNull() else pixmap
+
+        suffix = normalized.lower().rsplit(".", 1)[-1] if "." in normalized else ""
+        if normalized and suffix in {"gif", "webp"}:
+            movie = QMovie(normalized)
+            if movie.isValid() and movie.frameCount() != 1:
+                movie.setParent(self)
+                movie.frameChanged.connect(lambda _frame: self.update())
+                self._center_image_movie = movie
+                movie.start()
+            else:
+                movie.deleteLater()
         self.update()
 
     def set_payload(self, payload: dict | None):
@@ -412,6 +432,11 @@ class AuctionWheelWidget(QOpenGLWidget):
         painter.setBrush(QColor("#25292D"))
         painter.drawEllipse(center_rect)
         center_pixmap = self._center_image_pixmap
+        center_movie = self._center_image_movie
+        if center_movie is not None:
+            current = center_movie.currentPixmap()
+            if not current.isNull():
+                center_pixmap = current
         if center_pixmap is not None and not center_pixmap.isNull():
             source = QRectF(center_pixmap.rect())
             target_ratio = center_rect.width() / max(1.0, center_rect.height())
