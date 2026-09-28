@@ -95,16 +95,16 @@
 - FileVersion: `1.0.4.0`
 - Authenticode: `NotSigned`
 
-### Exact accepted source snapshot
+### Published source snapshot
 
 `InOneLine_Source_1.0.4.zip`
 
-- Размер: `1299817` байт
+- Размер: `1304352` байт
 - Файлов: `88`
-- SHA-256: `4e4f60bed84d428785bcf6f02f710dc001eb32a95c1f4fc09057597498e2f3a0`
+- SHA-256: `01e4e09df169e3d5cd1677cc4cb8c3b46ab16eceec5505df31be80c4d737d998`
 - ZIP CRC: PASS
 
-SOURCE — это exact source ZIP из принятого Windows artifact run `36406158610`. При публикации файл только переименован из candidate-имени в `InOneLine_Source_1.0.4.zip`; его байты не менялись. Служебные candidate-QA файлы и более поздние release-метаданные в официальный SOURCE ZIP не входят.
+Опубликованный SOURCE основан на принятом исходном снимке 1.0.4. После релиза архив был перепакован только для нейтрализации одного комментария, описывавшего сторонний продукт как референс интерфейса. Runtime-логика, данные, schema/migrations и installer не изменялись.
 
 ## Разработка с использованием ИИ
 
