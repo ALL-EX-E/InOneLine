@@ -229,6 +229,14 @@ class TwitchApiClient:
             headers={"Client-Id": client_id, "Authorization": f"Bearer {access}"},
         )
 
+    def get_user_by_login(self, client_id: str, access: str, login: str) -> dict:
+        return self._request_json(
+            "GET",
+            TWITCH_USERS_URL,
+            query={"login": str(login or "").strip()},
+            headers={"Client-Id": client_id, "Authorization": f"Bearer {access}"},
+        )
+
     @staticmethod
     def _api_headers(client_id: str, access: str) -> dict[str, str]:
         return {"Client-Id": client_id, "Authorization": f"Bearer {access}"}
@@ -541,6 +549,33 @@ class TwitchAdapter(IntegrationAdapter):
             provider_config=provider_config,
             credential=credential.to_json(),
         )
+
+    def resolve_profile_image(self, context, login: str) -> str:
+        """Return one Twitch profile-image URL through the existing authorized client."""
+        normalized = str(login or "").strip().lstrip("@").casefold()
+        if not normalized or len(normalized) > 64 or not all(
+            ch.isalnum() or ch == "_" for ch in normalized
+        ):
+            raise IntegrationError("Некорректное имя Twitch-канала.")
+        client_id = self._client_id(context)
+        credential = TwitchCredential.from_json(context.credential)
+        credential, _validation = self._validate_with_refresh(
+            context, client_id, credential
+        )
+        try:
+            payload = self.client.get_user_by_login(
+                client_id, credential.access, normalized
+            )
+        except TwitchHttpError as exc:
+            self._map_http_error(exc)
+            raise AssertionError("unreachable")
+        users = payload.get("data") or []
+        if not isinstance(users, list) or not users or not isinstance(users[0], dict):
+            raise IntegrationError(f"Twitch-канал @{normalized} не найден.")
+        image_url = str(users[0].get("profile_image_url") or "").strip()
+        if not image_url:
+            raise IntegrationError("Twitch не вернул изображение профиля этого канала.")
+        return image_url
 
     def _check(self, context) -> IntegrationOperationResult:
         client_id = self._client_id(context)
