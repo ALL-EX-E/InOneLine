@@ -1998,7 +1998,7 @@ class ServicesMixin:
         "value not provided". Unknown columns are ignored. For existing games
         only the non-empty values that were actually provided are updated.
 
-        Legacy Pointauc files are also accepted unchanged: one value per line
+        Legacy pipe-delimited files are also accepted unchanged: one value per line
         in the form ``Название игры|Баллы`` without a header.
 
         The complete file is validated before the first database write, and
@@ -2090,15 +2090,15 @@ class ServicesMixin:
             "ОТЗЫВ",
         }
 
-        # Legacy Pointauc compatibility: exactly the old headerless
-        # ``Название|Баллы`` representation exported by Pointauc/Streaming Manager.
+        # Legacy compatibility: exactly the old headerless
+        # ``Название|Баллы`` representation exported by earlier versions.
         first_nonempty = lines[0].strip()
-        is_pointauc = (
+        is_legacy_pipe = (
             "|" in first_nonempty
             and "НАЗВАНИЕ ИГРЫ" not in first_nonempty.upper()
         )
 
-        if is_pointauc:
+        if is_legacy_pipe:
             for line_no, line in enumerate(raw_text.splitlines(), start=1):
                 text = line.strip()
                 if not text:
@@ -2106,7 +2106,7 @@ class ServicesMixin:
                     continue
                 if "|" not in text:
                     raise ValueError(
-                        f"Некорректная строка Pointauc (строка {line_no}): "
+                        f"Некорректная строка формата «Название|Баллы» (строка {line_no}): "
                         "ожидается формат Название игры|Баллы."
                     )
                 title, amount_text = text.rsplit("|", 1)
@@ -2149,7 +2149,7 @@ class ServicesMixin:
             if "НАЗВАНИЕ ИГРЫ" not in norm:
                 raise ValueError(
                     "Не найден обязательный столбец: НАЗВАНИЕ ИГРЫ. "
-                    "Либо используйте Pointauc-формат Название игры|Баллы."
+                    "Либо используйте формат «Название игры|Баллы»."
                 )
 
             available = supported_headers.intersection(norm)
