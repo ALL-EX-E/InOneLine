@@ -43,7 +43,7 @@ jobs:
           schema = Path("streaming_manager/db/schema.py").read_text(encoding="utf-8")
           assert schema.count("self._run_migration(") == 14
           overlay = Path("streaming_manager/web/wheel_overlay.html").read_text(encoding="utf-8")
-          assert "drawCenterImage(cx,cy,r)" in overlay
+          assert "drawCenterBase(cx,cy,r)" in overlay
           assert "center_image" in overlay
           assert '<img id="center-image"' in overlay
           assert "centerImageEl.src=resolved" in overlay
