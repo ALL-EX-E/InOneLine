@@ -58,7 +58,7 @@ def export_public_xlsx(db: Database, path: str | Path) -> Path:
 
 
 def export_pointauc_csv(db: Database, path: str | Path) -> Path:
-    """Pointauc-compatible text: Название|целые баллы SM, без заголовка."""
+    """Legacy pipe-delimited text: Название|целые баллы SM, без заголовка."""
     path = Path(path)
     with path.open("w", encoding="utf-8-sig", newline="") as f:
         for game in db.pointauc_games():
