@@ -11,7 +11,7 @@ from urllib import parse as urlparse
 from urllib import request as urlrequest
 
 from PySide6.QtCore import QByteArray, QBuffer, QIODevice
-from PySide6.QtGui import QImageReader
+from PySide6.QtGui import QImageReader, QMovie
 
 
 MAX_REMOTE_IMAGE_BYTES = 10 * 1024 * 1024
@@ -22,8 +22,17 @@ USER_AGENT = "InOneLine/1.0.4 wheel-center-image"
 
 
 @dataclass(frozen=True)
+class PreparedImage:
+    image_bytes: bytes
+    extension: str
+    animated: bool
+
+
+@dataclass(frozen=True)
 class RemoteImageResult:
-    png_bytes: bytes
+    image_bytes: bytes
+    extension: str
+    animated: bool
     display_name: str
     resolved_url: str
 
@@ -240,12 +249,30 @@ def resolve_external_image_source(
     return raw, _url_display_name(raw)
 
 
-def normalize_image_bytes_to_png(raw: bytes) -> bytes:
+def _format_name(reader: QImageReader) -> str:
+    try:
+        return bytes(reader.format()).decode("ascii", "ignore").strip().casefold()
+    except Exception:
+        return ""
+
+
+def _movie_formats() -> set[str]:
+    result: set[str] = set()
+    for value in QMovie.supportedFormats():
+        try:
+            result.add(bytes(value).decode("ascii", "ignore").strip().casefold())
+        except Exception:
+            continue
+    return result
+
+
+def prepare_image_bytes(raw: bytes) -> PreparedImage:
     payload = QByteArray(raw)
     source = QBuffer()
     source.setData(payload)
     if not source.open(QIODevice.ReadOnly):
         raise ValueError("Не удалось прочитать изображение.")
+
     reader = QImageReader(source)
     size = reader.size()
     if not size.isValid() or size.width() <= 0 or size.height() <= 0:
@@ -256,23 +283,66 @@ def normalize_image_bytes_to_png(raw: bytes) -> bytes:
         or size.width() * size.height() > MAX_IMAGE_PIXELS
     ):
         raise ValueError("Изображение имеет слишком большое разрешение.")
-    image = reader.read()
-    if image.isNull():
+
+    image_format = _format_name(reader)
+    frame_count = reader.imageCount()
+    animated = bool(
+        image_format in {"gif", "webp"}
+        and image_format in _movie_formats()
+        and reader.supportsAnimation()
+        and frame_count != 1
+    )
+
+    first_frame = reader.read()
+    if first_frame.isNull():
         raise ValueError("Файл не удалось декодировать как изображение.")
+
+    # Preserve formats that Qt can animate locally. OBS/Chromium then receives
+    # the same original animation bytes through /media/<id>, so both renderers
+    # keep the animation instead of flattening it to frame 1.
+    if animated:
+        return PreparedImage(
+            image_bytes=bytes(raw),
+            extension=f".{image_format}",
+            animated=True,
+        )
 
     output = QByteArray()
     buffer = QBuffer(output)
-    if not buffer.open(QIODevice.WriteOnly) or not image.save(buffer, "PNG"):
+    if not buffer.open(QIODevice.WriteOnly) or not first_frame.save(buffer, "PNG"):
         raise ValueError(
             "Не удалось подготовить локальную PNG-копию изображения."
         )
-    # PySide6 may wrap/copy the QByteArray passed to QBuffer. Read the
-    # buffer's actual backing data after QImage.save() instead of assuming the
-    # original Python wrapper was updated in place.
+    return PreparedImage(
+        image_bytes=bytes(buffer.data()),
+        extension=".png",
+        animated=False,
+    )
+
+
+def normalize_image_bytes_to_png(raw: bytes) -> bytes:
+    """Compatibility helper for callers/tests that explicitly need one PNG frame."""
+    prepared = prepare_image_bytes(raw)
+    if prepared.extension == ".png":
+        return prepared.image_bytes
+
+    payload = QByteArray(prepared.image_bytes)
+    source = QBuffer()
+    source.setData(payload)
+    if not source.open(QIODevice.ReadOnly):
+        raise ValueError("Не удалось прочитать изображение.")
+    reader = QImageReader(source)
+    first_frame = reader.read()
+    if first_frame.isNull():
+        raise ValueError("Файл не удалось декодировать как изображение.")
+    output = QByteArray()
+    buffer = QBuffer(output)
+    if not buffer.open(QIODevice.WriteOnly) or not first_frame.save(buffer, "PNG"):
+        raise ValueError("Не удалось подготовить PNG-кадр изображения.")
     return bytes(buffer.data())
 
 
-def load_local_image_as_png(path: str) -> bytes:
+def load_local_image(path: str) -> PreparedImage:
     try:
         with open(path, "rb") as file:
             raw = file.read(MAX_REMOTE_IMAGE_BYTES + 1)
@@ -282,10 +352,15 @@ def load_local_image_as_png(path: str) -> bytes:
         ) from exc
     if len(raw) > MAX_REMOTE_IMAGE_BYTES:
         raise ValueError("Файл изображения слишком большой.")
-    return normalize_image_bytes_to_png(raw)
+    return prepare_image_bytes(raw)
 
 
-def download_external_image_as_png(
+def load_local_image_as_png(path: str) -> bytes:
+    """Backward-compatible one-frame helper retained for old callers/tests."""
+    return normalize_image_bytes_to_png(load_local_image(path).image_bytes)
+
+
+def download_external_image(
     source: str,
     *,
     twitch_profile_resolver: Callable[[str], str] | None = None,
@@ -304,8 +379,32 @@ def download_external_image_as_png(
         or content_type == "application/octet-stream"
     ):
         raise ValueError("По указанной ссылке получен не файл изображения.")
+    prepared = prepare_image_bytes(raw)
     return RemoteImageResult(
-        png_bytes=normalize_image_bytes_to_png(raw),
+        image_bytes=prepared.image_bytes,
+        extension=prepared.extension,
+        animated=prepared.animated,
         display_name=str(display_name or "remote image"),
         resolved_url=final_url,
+    )
+
+
+def download_external_image_as_png(
+    source: str,
+    *,
+    twitch_profile_resolver: Callable[[str], str] | None = None,
+) -> RemoteImageResult:
+    """Compatibility wrapper; new D19 callers should use download_external_image()."""
+    result = download_external_image(
+        source,
+        twitch_profile_resolver=twitch_profile_resolver,
+    )
+    if result.extension == ".png":
+        return result
+    return RemoteImageResult(
+        image_bytes=normalize_image_bytes_to_png(result.image_bytes),
+        extension=".png",
+        animated=False,
+        display_name=result.display_name,
+        resolved_url=result.resolved_url,
     )
