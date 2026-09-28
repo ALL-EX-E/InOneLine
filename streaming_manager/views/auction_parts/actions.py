@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QDialogBut
 
 from ...database import format_points
 from ...diagnostic_logs import sanitize_diagnostic_text
-from ...exporters import export_pointauc_csv, pointauc_text
+from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
 
@@ -54,7 +54,7 @@ class AuctionActionMixin:
             "rng_method": str(self.rng_combo.currentData() or "local"),
             "wheel_duration_ms": wheel_duration_ms,
             "duration_ms": duration_ms,
-            "lot_count": len(self.db.pointauc_games()),
+            "lot_count": len(self.db.auction_eligible_games()),
         }
 
         if params["rng_method"] not in ("random_org", "random_org_plus"):
@@ -688,7 +688,7 @@ class AuctionActionMixin:
         self.conduct_table.clearFocus()
         self.delete_lot_btn.clearFocus()
 
-    def export_pointauc(self):
+    def export_auction_csv(self):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Экспорт CSV",
@@ -698,13 +698,13 @@ class AuctionActionMixin:
         if not path:
             return
         try:
-            export_pointauc_csv(self.db, path)
+            export_auction_pipe_csv(self.db, path)
             QMessageBox.information(self, "Экспорт", f"Список сохранён:\n{path}")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка", str(exc))
 
-    def copy_pointauc(self):
-        QApplication.clipboard().setText(pointauc_text(self.db))
+    def copy_auction_list(self):
+        QApplication.clipboard().setText(auction_pipe_text(self.db))
         QMessageBox.information(
             self,
             "Экспорт",
