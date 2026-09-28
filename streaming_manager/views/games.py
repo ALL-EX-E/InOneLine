@@ -31,8 +31,8 @@ from ..database import (
     format_points, normalize_date_text, normalize_text_key, parse_date,
 )
 from ..exporters import (
-    export_pointauc_csv, export_public_csv, export_public_json, export_public_xlsx,
-    pointauc_text,
+    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
+    auction_pipe_text,
 )
 from ..random_sources import RandomDraw, RandomOrgClient
 from ..workers import FunctionWorker
