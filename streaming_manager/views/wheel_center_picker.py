@@ -6,6 +6,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
+    QFrame,
     QGridLayout,
     QLabel,
     QPushButton,
@@ -41,7 +42,7 @@ class WheelCenterPickerDialog(QDialog):
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.scroll.setFrameShape(QScrollArea.NoFrame)
+        self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setMinimumHeight(280)
 
         self.grid_host = QWidget()
