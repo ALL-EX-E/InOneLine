@@ -45,8 +45,12 @@ jobs:
           overlay = Path("streaming_manager/web/wheel_overlay.html").read_text(encoding="utf-8")
           assert "drawCenterImage(cx,cy,r)" in overlay
           assert "center_image" in overlay
+          assert "centerImageAnimated" in overlay
+          assert "centerAnimating" in overlay
           wheel = Path("streaming_manager/views/wheel.py").read_text(encoding="utf-8")
           assert "set_center_image_path" in wheel
+          assert "QMovie" in wheel
+          assert "_center_image_movie" in wheel
           assert "painter.setClipPath(clip)" in wheel
           rng = Path("streaming_manager/views/auction_parts/rng.py").read_text(encoding="utf-8")
           assert "center_image" not in rng
@@ -158,7 +162,7 @@ jobs:
           $setupSize = (Get-Item $setup).Length
           $sourceSize = (Get-Item $source).Length
           @"
-          InOneLine 1.0.4 D19 wheel center image candidate
+          InOneLine 1.0.4 D19 wheel center image candidate (animated center support)
           Branch: candidate/1.0.4-wheel-center-image
           Commit: $env:GITHUB_SHA
           Schema: 18
