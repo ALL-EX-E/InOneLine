@@ -45,8 +45,10 @@ jobs:
           overlay = Path("streaming_manager/web/wheel_overlay.html").read_text(encoding="utf-8")
           assert "drawCenterImage(cx,cy,r)" in overlay
           assert "center_image" in overlay
-          assert "centerImageAnimated" in overlay
-          assert "centerAnimating" in overlay
+          assert '<img id="center-image"' in overlay
+          assert "centerImageEl.src=resolved" in overlay
+          assert "object-fit:cover" in overlay
+          assert "ctx.drawImage(centerImage" not in overlay
           wheel = Path("streaming_manager/views/wheel.py").read_text(encoding="utf-8")
           assert "set_center_image_path" in wheel
           assert "QMovie" in wheel
