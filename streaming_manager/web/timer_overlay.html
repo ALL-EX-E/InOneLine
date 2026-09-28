@@ -90,6 +90,7 @@ body.preview #api-state.visible { display: block; }
 </head>
 <body>
 <div id="root"><div id="timer" aria-label="00:10:00.000"></div></div>
+<audio id="auction-audio" preload="auto"></audio>
 <div id="metric-probe" aria-hidden="true">0</div>
 <div id="api-state">Нет связи с In one line</div>
 <script>
@@ -101,10 +102,14 @@ body.preview #api-state.visible { display: block; }
   const timer = document.getElementById("timer");
   const metricProbe = document.getElementById("metric-probe");
   const apiState = document.getElementById("api-state");
+  const auctionAudio = document.getElementById("auction-audio");
   const preview = new URLSearchParams(location.search).get("preview") === "1";
   if (preview) document.body.classList.add("preview");
 
   let state = null;
+  let audioSourceKey = "";
+  let pendingAudioSeekSeconds = null;
+  let desiredAudioPlaying = false;
   let configuredFontSize = 96;
   let currentFontFamily = "Segoe UI";
   let presentationSignature = "";
@@ -228,6 +233,86 @@ body.preview #api-state.visible { display: block; }
     }
   }
 
+  function clearAuctionAudio() {
+    desiredAudioPlaying = false;
+    pendingAudioSeekSeconds = null;
+    if (!audioSourceKey && !auctionAudio.getAttribute("src")) return;
+    auctionAudio.pause();
+    auctionAudio.removeAttribute("src");
+    auctionAudio.load();
+    audioSourceKey = "";
+  }
+
+  function seekAuctionAudio(targetSeconds, force = false) {
+    const target = Math.max(0, Number(targetSeconds) || 0);
+    if (auctionAudio.readyState < 1) {
+      pendingAudioSeekSeconds = target;
+      return;
+    }
+    const current = Math.max(0, Number(auctionAudio.currentTime) || 0);
+    if (force || Math.abs(current - target) > 0.75) {
+      try {
+        auctionAudio.currentTime = target;
+      } catch (_error) {
+        pendingAudioSeekSeconds = target;
+      }
+    }
+  }
+
+  auctionAudio.addEventListener("loadedmetadata", () => {
+    if (pendingAudioSeekSeconds !== null) {
+      const target = pendingAudioSeekSeconds;
+      pendingAudioSeekSeconds = null;
+      seekAuctionAudio(target, true);
+    }
+    if (desiredAudioPlaying) {
+      const promise = auctionAudio.play();
+      if (promise?.catch) promise.catch(() => {});
+    }
+  });
+
+  function syncAuctionAudio(audioState) {
+    const audio = audioState || {};
+    if (
+      preview
+      || !audio.enabled
+      || audio.owner !== "auction"
+      || !audio.active
+      || !audio.url
+      || !audio.media_id
+    ) {
+      clearAuctionAudio();
+      return;
+    }
+
+    const key = `${String(audio.kind || "none")}:${String(audio.media_id)}`;
+    const targetSeconds = Math.max(0, Number(audio.position_ms) || 0) / 1000;
+    const sourceChanged = key !== audioSourceKey;
+    desiredAudioPlaying = Boolean(audio.playing);
+
+    if (sourceChanged) {
+      audioSourceKey = key;
+      pendingAudioSeekSeconds = targetSeconds;
+      auctionAudio.src = String(audio.url);
+      auctionAudio.load();
+    } else {
+      seekAuctionAudio(targetSeconds);
+    }
+
+    auctionAudio.loop = Boolean(audio.loop);
+    auctionAudio.muted = Boolean(audio.muted);
+    auctionAudio.volume = Math.max(0, Math.min(1, Number(audio.gain) || 0));
+
+    if (!desiredAudioPlaying) {
+      auctionAudio.pause();
+      return;
+    }
+    if (auctionAudio.readyState >= 1) {
+      const promise = auctionAudio.play();
+      if (promise?.catch) promise.catch(() => {});
+    }
+  }
+
   function stopFrameLoop() {
     if (frameId !== null) cancelAnimationFrame(frameId);
     frameId = null;
@@ -254,6 +339,7 @@ body.preview #api-state.visible { display: block; }
     anchorPerformanceMs = performance.now();
     setTimerText(formatMilliseconds(anchorRemainingMs));
     applyPresentation(state.presentation || {});
+    syncAuctionAudio(state.audio || {});
     syncFrameLoop();
   }
 
