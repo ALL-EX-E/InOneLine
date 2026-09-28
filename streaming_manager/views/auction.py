@@ -36,8 +36,8 @@ from ..database import (
     format_points, normalize_date_text, normalize_text_key, parse_date,
 )
 from ..exporters import (
-    export_pointauc_csv, export_public_csv, export_public_json, export_public_xlsx,
-    pointauc_text,
+    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
+    auction_pipe_text,
 )
 from ..random_sources import RandomDraw, RandomOrgClient
 from ..integrations import IntegrationManager
@@ -894,51 +894,51 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # ==========================================================
         # LEGACY COMPATIBLE EXPORT
         # ==========================================================
-        self.pointauc_page = QWidget()
-        pointauc_layout = QVBoxLayout(self.pointauc_page)
-        pointauc_layout.setContentsMargins(10, 10, 10, 10)
-        pointauc_layout.setSpacing(10)
+        self.legacy_export_page = QWidget()
+        legacy_export_layout = QVBoxLayout(self.legacy_export_page)
+        legacy_export_layout.setContentsMargins(10, 10, 10, 10)
+        legacy_export_layout.setSpacing(10)
 
-        pointauc_rules_row = QHBoxLayout()
-        self.pointauc_rules_btn = QPushButton("Правила вкладки")
-        self.pointauc_rules_btn.clicked.connect(
+        export_rules_row = QHBoxLayout()
+        self.export_rules_btn = QPushButton("Правила вкладки")
+        self.export_rules_btn.clicked.connect(
             lambda: self._toggle_rules(
-                self.pointauc_rules_label,
-                self.pointauc_rules_btn,
+                self.export_rules_label,
+                self.export_rules_btn,
             )
         )
-        pointauc_rules_row.addWidget(self.pointauc_rules_btn)
-        pointauc_rules_row.addStretch()
-        pointauc_layout.addLayout(pointauc_rules_row)
+        export_rules_row.addWidget(self.export_rules_btn)
+        export_rules_row.addStretch()
+        legacy_export_layout.addLayout(export_rules_row)
 
-        self.pointauc_rules_label = QLabel(
+        self.export_rules_label = QLabel(
             "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
             "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
             "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
         )
-        self.pointauc_rules_label.setWordWrap(True)
-        self.pointauc_rules_label.setProperty("muted", True)
-        self.pointauc_rules_label.setVisible(False)
-        pointauc_layout.addWidget(self.pointauc_rules_label)
+        self.export_rules_label.setWordWrap(True)
+        self.export_rules_label.setProperty("muted", True)
+        self.export_rules_label.setVisible(False)
+        legacy_export_layout.addWidget(self.export_rules_label)
 
         buttons = QHBoxLayout()
         export_btn = QPushButton("Экспорт CSV")
-        export_btn.clicked.connect(self.export_pointauc)
+        export_btn.clicked.connect(self.export_auction_csv)
         copy_btn = QPushButton("Копировать список")
-        copy_btn.clicked.connect(self.copy_pointauc)
+        copy_btn.clicked.connect(self.copy_auction_list)
         buttons.addWidget(export_btn)
         buttons.addWidget(copy_btn)
         buttons.addStretch()
-        pointauc_layout.addLayout(buttons)
+        legacy_export_layout.addLayout(buttons)
 
         shared_separator = QFrame()
         shared_separator.setFrameShape(QFrame.HLine)
         shared_separator.setFrameShadow(QFrame.Sunken)
-        pointauc_layout.addWidget(shared_separator)
+        legacy_export_layout.addWidget(shared_separator)
 
         shared_title = QLabel("Совместная таблица")
         shared_title.setStyleSheet("font-size: 12pt; font-weight: 700;")
-        pointauc_layout.addWidget(shared_title)
+        legacy_export_layout.addWidget(shared_title)
 
         shared_description = QLabel(
             "Обычный XLSX с основным списком игр. Файл можно хранить в папке "
@@ -948,7 +948,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         shared_description.setWordWrap(True)
         shared_description.setProperty("muted", True)
-        pointauc_layout.addWidget(shared_description)
+        legacy_export_layout.addWidget(shared_description)
 
         shared_buttons = QHBoxLayout()
         self.shared_xlsx_create_btn = QPushButton("Создать таблицу")
@@ -961,7 +961,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         shared_buttons.addWidget(self.shared_xlsx_connect_btn)
         shared_buttons.addWidget(self.shared_xlsx_disconnect_btn)
         shared_buttons.addStretch()
-        pointauc_layout.addLayout(shared_buttons)
+        legacy_export_layout.addLayout(shared_buttons)
 
         shared_form = QFormLayout()
         self.shared_xlsx_path_label = QLabel("Не подключена")
@@ -973,8 +973,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         shared_form.addRow("Таблица:", self.shared_xlsx_path_label)
         shared_form.addRow("Состояние:", self.shared_xlsx_status_label)
         shared_form.addRow("Последнее изменение:", self.shared_xlsx_modified_label)
-        pointauc_layout.addLayout(shared_form)
-        pointauc_layout.addStretch()
+        legacy_export_layout.addLayout(shared_form)
+        legacy_export_layout.addStretch()
 
         self._init_shared_xlsx_sync()
 
@@ -2056,7 +2056,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     "start_position": position,
                     "current_position": position,
                 }
-                for position, g in enumerate(self.db.pointauc_games(), start=1)
+                for position, g in enumerate(self.db.auction_eligible_games(), start=1)
             ]
         return self.db.list_auction_entries(int(session["id"]))
 
