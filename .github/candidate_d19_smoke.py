@@ -219,7 +219,7 @@ try:
         ).endswith("/42/animated/dark/3.0")
         assert TwitchAdapter._emote_image_url(
             twitch_payload, twitch_row, preview=True
-        ).endswith("/42/static/dark/1.0")
+        ).endswith("/42/animated/dark/1.0")
 
         import streaming_manager.remote_image as remote_image
 
@@ -287,11 +287,37 @@ try:
                         image_url="https://example.invalid/full.webp",
                         preview_url="https://example.invalid/preview.webp",
                         animated=True,
+                        thumbnail_bytes=animated_gif,
+                    ),
+                    EmoteCatalogItem(
+                        source="Twitch",
+                        emote_id="static-preview-id",
+                        name="StaticSmile",
+                        image_url="https://example.invalid/static.png",
+                        preview_url="https://example.invalid/static.png",
+                        animated=False,
                         thumbnail_bytes=static_image.image_bytes,
-                    )
+                    ),
                 ]
             )
-            assert len(picker._buttons) >= 2
+            assert len(picker._buttons) >= 3
+            animated_buttons = [
+                button
+                for button in picker._buttons
+                if button.is_animated_preview
+            ]
+            # One local managed GIF + one remote animated emote must both play
+            # inside the picker before the user selects either one.
+            assert len(animated_buttons) >= 2, len(animated_buttons)
+            picker_frames = [set() for _ in animated_buttons]
+            for button, frames in zip(animated_buttons, picker_frames):
+                button._movie.frameChanged.connect(
+                    lambda frame, bucket=frames: bucket.add(int(frame))
+                )
+            picker_loop = QEventLoop()
+            QTimer.singleShot(450, picker_loop.quit)
+            picker_loop.exec()
+            assert all(len(frames) >= 2 for frames in picker_frames), picker_frames
 
             # Quick selection updates the same persisted D19 setting and the
             # Settings combo through MainWindow's synchronization signal.
