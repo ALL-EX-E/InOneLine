@@ -168,7 +168,7 @@ jobs:
               assert pending["status"] == "awaiting_rate", pending
               db.set_conversion_rate("USD", "2", label="USD", kind="currency")
               applied = db.apply_pending_conversion_event(pending["pending_id"])
-              assert applied["status"] == "processed", applied
+              assert applied["status"] == "applied", applied
               logs = extend_logs(db, auction_id)
               assert len(logs) == 1, logs
               assert logs[0]["matched_reasons"] == ["external_donation"], logs
@@ -191,7 +191,7 @@ jobs:
                   label="Pending Points", kind="service", service="test"
               )
               applied = db.apply_pending_conversion_event(pending["pending_id"])
-              assert applied["status"] == "processed", applied
+              assert applied["status"] == "applied", applied
               logs = extend_logs(db, auction_id)
               assert len(logs) == 1, logs
               assert logs[0]["matched_reasons"] == ["external_service_unit"], logs
