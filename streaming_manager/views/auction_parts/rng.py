@@ -7,7 +7,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
 
 from ...database import format_points
-from ...exporters import export_pointauc_csv, pointauc_text
+from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
 from ..winner_verification import format_verification_preview, show_readonly_text_dialog
