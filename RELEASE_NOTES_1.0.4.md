@@ -70,7 +70,7 @@
 - локальный animated GIF;
 - локальный и OBS center-media contract;
 - native browser animation layer;
-- Pointauc-подобный quick picker;
+- быстрый выбор изображения;
 - синхронизацию quick picker ↔ Settings;
 - тестовые Twitch / 7TV / BetterTTV / FrankerFaceZ catalog parsers;
 - одновременное живое QMovie-превью локального GIF и remote animated emote прямо в picker;

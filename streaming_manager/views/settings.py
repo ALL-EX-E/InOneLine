@@ -2006,7 +2006,7 @@ class SettingsTab(QWidget):
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
-        # Match the requested Pointauc-style flow: a click in the app immediately
+        # Match the requested quick-picker flow: a click in the app immediately
         # opens DonationAlerts in the user's normal browser.
         QDesktopServices.openUrl(QUrl(info.authorization_url))
 
