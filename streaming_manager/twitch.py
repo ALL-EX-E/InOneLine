@@ -39,6 +39,8 @@ TWITCH_DEVICE_URL = "https://id.twitch.tv/oauth2/device"
 TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 TWITCH_VALIDATE_URL = "https://id.twitch.tv/oauth2/validate"
 TWITCH_USERS_URL = "https://api.twitch.tv/helix/users"
+TWITCH_CHANNEL_EMOTES_URL = "https://api.twitch.tv/helix/chat/emotes"
+TWITCH_GLOBAL_EMOTES_URL = "https://api.twitch.tv/helix/chat/emotes/global"
 TWITCH_REWARDS_URL = "https://api.twitch.tv/helix/channel_points/custom_rewards"
 TWITCH_REDEMPTIONS_URL = TWITCH_REWARDS_URL + "/redemptions"
 TWITCH_EVENTSUB_SUBSCRIPTIONS_URL = "https://api.twitch.tv/helix/eventsub/subscriptions"
@@ -240,6 +242,26 @@ class TwitchApiClient:
     @staticmethod
     def _api_headers(client_id: str, access: str) -> dict[str, str]:
         return {"Client-Id": client_id, "Authorization": f"Bearer {access}"}
+
+    def get_channel_emotes(
+        self,
+        client_id: str,
+        access: str,
+        broadcaster_id: str,
+    ) -> dict:
+        return self._request_json(
+            "GET",
+            TWITCH_CHANNEL_EMOTES_URL,
+            query={"broadcaster_id": str(broadcaster_id)},
+            headers=self._api_headers(client_id, access),
+        )
+
+    def get_global_emotes(self, client_id: str, access: str) -> dict:
+        return self._request_json(
+            "GET",
+            TWITCH_GLOBAL_EMOTES_URL,
+            headers=self._api_headers(client_id, access),
+        )
 
     def get_custom_rewards(
         self,
@@ -549,6 +571,106 @@ class TwitchAdapter(IntegrationAdapter):
             provider_config=provider_config,
             credential=credential.to_json(),
         )
+
+    @staticmethod
+    def _emote_image_url(payload: dict, row: dict, *, preview: bool = False) -> str:
+        template = str(payload.get("template") or "").strip()
+        emote_id = str(row.get("id") or "").strip()
+        formats = [str(value) for value in (row.get("format") or [])]
+        scales = [str(value) for value in (row.get("scale") or [])]
+        themes = [str(value) for value in (row.get("theme_mode") or [])]
+        if preview:
+            image_format = "static" if "static" in formats else (formats[0] if formats else "static")
+            scale = "1.0" if "1.0" in scales else (scales[0] if scales else "1.0")
+        else:
+            image_format = "animated" if "animated" in formats else ("static" if "static" in formats else (formats[0] if formats else "static"))
+            scale = "3.0" if "3.0" in scales else (scales[-1] if scales else "3.0")
+        theme = "dark" if "dark" in themes else (themes[0] if themes else "dark")
+        if template and emote_id:
+            return (
+                template.replace("{{id}}", emote_id)
+                .replace("{{format}}", image_format)
+                .replace("{{theme_mode}}", theme)
+                .replace("{{scale}}", scale)
+            )
+        images = row.get("images") if isinstance(row.get("images"), dict) else {}
+        if preview:
+            return str(images.get("url_1x") or images.get("url_2x") or images.get("url_4x") or "")
+        return str(images.get("url_4x") or images.get("url_2x") or images.get("url_1x") or "")
+
+    def list_center_emotes(self, context) -> dict:
+        """Return Twitch channel/global emotes plus the connected Twitch identity."""
+        client_id = self._client_id(context)
+        credential = TwitchCredential.from_json(context.credential)
+        credential, validation = self._validate_with_refresh(
+            context, client_id, credential
+        )
+        user_id = str(
+            validation.get("user_id")
+            or context.provider_config.get("twitch_user_id")
+            or ""
+        ).strip()
+        login = str(
+            validation.get("login")
+            or context.provider_config.get("login")
+            or ""
+        ).strip()
+        if not user_id:
+            try:
+                current = self.client.get_current_user(client_id, credential.access)
+            except TwitchHttpError as exc:
+                self._map_http_error(exc)
+                raise AssertionError("unreachable")
+            users = current.get("data") or []
+            if isinstance(users, list) and users and isinstance(users[0], dict):
+                user_id = str(users[0].get("id") or "").strip()
+                login = str(users[0].get("login") or login).strip()
+        if not user_id:
+            raise IntegrationError("Twitch не вернул ID подключённого аккаунта.")
+
+        payloads: list[dict] = []
+        try:
+            payloads.append(
+                self.client.get_channel_emotes(
+                    client_id, credential.access, user_id
+                )
+            )
+            payloads.append(
+                self.client.get_global_emotes(client_id, credential.access)
+            )
+        except TwitchHttpError as exc:
+            self._map_http_error(exc)
+            raise AssertionError("unreachable")
+
+        items: list[dict] = []
+        seen: set[str] = set()
+        for payload in payloads:
+            rows = payload.get("data") or []
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                emote_id = str(row.get("id") or "").strip()
+                if not emote_id or emote_id in seen:
+                    continue
+                image_url = self._emote_image_url(payload, row, preview=False)
+                preview_url = self._emote_image_url(payload, row, preview=True)
+                if not image_url:
+                    continue
+                seen.add(emote_id)
+                formats = [str(value) for value in (row.get("format") or [])]
+                items.append(
+                    {
+                        "source": "Twitch",
+                        "emote_id": emote_id,
+                        "name": str(row.get("name") or emote_id),
+                        "image_url": image_url,
+                        "preview_url": preview_url or image_url,
+                        "animated": "animated" in formats,
+                    }
+                )
+        return {"twitch_user_id": user_id, "login": login, "items": items}
 
     def resolve_profile_image(self, context, login: str) -> str:
         """Return one Twitch profile-image URL through the existing authorized client."""
