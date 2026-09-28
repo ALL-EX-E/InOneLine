@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonB
 from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
+from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
 from ...exporters import export_pointauc_csv, pointauc_text
 from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
@@ -604,6 +605,7 @@ class AuctionStateMixin:
         self._set_visible_state(self.wheel_obs_widget, show)
 
         if not show:
+            self.wheel_widget.set_center_image_path(None)
             self.wheel_widget.set_payload({})
             return
 
@@ -612,6 +614,21 @@ class AuctionStateMixin:
             if wheel_payload is None
             else wheel_payload
         )
+        center_path = None
+        center = (payload or {}).get("center_image") or {}
+        asset_id = center.get("asset_id")
+        if center.get("enabled") and str(asset_id or "").isdigit():
+            asset = self.db.get_media_asset(int(asset_id))
+            if (
+                asset is not None
+                and asset.category == MEDIA_CATEGORY_WHEEL_CENTER_ICONS
+                and media_asset_available(self.db.path.parent, asset)
+            ):
+                try:
+                    center_path = str(resolve_media_asset_path(self.db.path.parent, asset))
+                except (OSError, ValueError):
+                    center_path = None
+        self.wheel_widget.set_center_image_path(center_path)
         self.wheel_widget.set_payload(payload or {})
         self._refresh_wheel_soundtrack_availability()
         self._set_wheel_soundtrack_edit_enabled(not self.wheel_widget.is_spinning())
