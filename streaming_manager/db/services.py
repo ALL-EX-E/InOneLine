@@ -1395,6 +1395,49 @@ class ServicesMixin:
         if runtime_mode not in {"max_amount", "weighted_wheel"}:
             runtime_mode = "max_amount"
 
+        raw_audio = runtime.get("audio")
+        raw_audio = dict(raw_audio) if isinstance(raw_audio, dict) else {}
+        audio_owner = str(raw_audio.get("owner") or "idle")
+        if audio_owner not in {"idle", "music_player", "auction"}:
+            audio_owner = "idle"
+        audio_kind = str(raw_audio.get("kind") or "none")
+        if audio_kind not in {"none", "auction", "wheel"}:
+            audio_kind = "none"
+        try:
+            audio_media_id = int(raw_audio.get("media_id"))
+        except (TypeError, ValueError):
+            audio_media_id = None
+        try:
+            audio_position_ms = max(0, int(raw_audio.get("position_ms") or 0))
+        except (TypeError, ValueError):
+            audio_position_ms = 0
+        try:
+            audio_gain = max(0.0, min(1.0, float(raw_audio.get("gain") or 0.0)))
+        except (TypeError, ValueError):
+            audio_gain = 0.0
+        audio_enabled = bool(raw_audio.get("enabled"))
+        audio_active = bool(
+            audio_enabled
+            and audio_owner == "auction"
+            and raw_audio.get("active")
+            and audio_media_id is not None
+            and audio_kind in {"auction", "wheel"}
+        )
+        audio_payload = {
+            "enabled": audio_enabled,
+            "owner": audio_owner,
+            "active": audio_active,
+            "kind": audio_kind if audio_active else "none",
+            "media_id": audio_media_id if audio_active else None,
+            "url": f"/media/{audio_media_id}" if audio_active else "",
+            "playing": bool(raw_audio.get("playing")) if audio_active else False,
+            "paused": bool(raw_audio.get("paused")) if audio_active else False,
+            "position_ms": audio_position_ms if audio_active else 0,
+            "gain": audio_gain if audio_active else 0.0,
+            "muted": bool(raw_audio.get("muted")) if audio_active else False,
+            "loop": bool(raw_audio.get("loop")) if audio_active else False,
+        }
+
         keys = (
             "auction_max_amount_default_duration_ms",
             "auction_wheel_default_duration_ms",
@@ -1480,6 +1523,7 @@ class ServicesMixin:
             "paused": bool(timer_paused),
             "remaining_ms": int(remaining_ms),
             "text": self._format_timer_overlay_milliseconds(remaining_ms),
+            "audio": audio_payload,
             "presentation": {
                 "font_family": family,
                 "font_size": self._timer_overlay_bounded_int(
