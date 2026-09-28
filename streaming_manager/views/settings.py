@@ -33,6 +33,8 @@ from ..constants import (
     APP_NAME, APP_VERSION,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
+    AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY,
     AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
     AUCTION_AUTO_EXTEND_LEADER_ENABLED_DEFAULT,
@@ -360,26 +362,48 @@ class SettingsTab(QWidget):
         auto_grid.addWidget(self.auto_extend_new_lot_enabled, 2, 0)
         auto_grid.addWidget(self.auto_extend_new_lot_duration, 2, 1)
 
-        self.auto_extend_external_enabled = QCheckBox(
-            "Внешнее пожертвование (после подключения интеграций)"
-        )
+        self.auto_extend_external_enabled = QCheckBox("Внешнее пожертвование")
         self.auto_extend_external_enabled.setChecked(
             self._saved_bool_setting(
                 AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
                 AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
             )
         )
-        self.auto_extend_external_enabled.setEnabled(False)
         self.auto_extend_external_duration = self._make_auto_extend_duration_editor(
             AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
             AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT,
         )
-        self.auto_extend_external_duration.setEnabled(False)
-        self.auto_extend_external_enabled.setToolTip(
-            "Причина станет доступна после реализации рабочих B2/B3-интеграций."
+        self.auto_extend_external_service_units_enabled = QCheckBox(
+            "Также учитывать неденежные единицы интеграций"
+        )
+        self.auto_extend_external_service_units_enabled.setChecked(
+            self._saved_bool_setting(
+                AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY,
+                AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
+            )
+        )
+        self.auto_extend_external_service_units_enabled.setToolTip(
+            "Например: Twitch Channel Points, баллы/очки VK и аналогичные "
+            "неденежные единицы других интеграций."
+        )
+        self.auto_extend_external_service_units_enabled.setStyleSheet(
+            "margin-left: 20px;"
+        )
+        self.auto_extend_external_enabled.toggled.connect(
+            self.auto_extend_external_duration.setEnabled
+        )
+        self.auto_extend_external_enabled.toggled.connect(
+            self.auto_extend_external_service_units_enabled.setEnabled
+        )
+        self.auto_extend_external_duration.setEnabled(
+            self.auto_extend_external_enabled.isChecked()
+        )
+        self.auto_extend_external_service_units_enabled.setEnabled(
+            self.auto_extend_external_enabled.isChecked()
         )
         auto_grid.addWidget(self.auto_extend_external_enabled, 3, 0)
         auto_grid.addWidget(self.auto_extend_external_duration, 3, 1)
+        auto_grid.addWidget(self.auto_extend_external_service_units_enabled, 4, 0, 1, 2)
         auto_grid.setColumnStretch(2, 1)
         auction_layout.addLayout(auto_grid)
 
@@ -902,10 +926,13 @@ class SettingsTab(QWidget):
                     "1" if self.auto_extend_new_lot_enabled.isChecked() else "0"
                 ),
                 AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY: str(new_lot_extend_ms),
-                # External donations remain runtime-inactive until B2/B3, but
-                # their future S2 configuration has one canonical storage key.
                 AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY: (
                     "1" if self.auto_extend_external_enabled.isChecked() else "0"
+                ),
+                AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY: (
+                    "1"
+                    if self.auto_extend_external_service_units_enabled.isChecked()
+                    else "0"
                 ),
                 AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY: str(external_extend_ms),
                 AUCTION_AUTO_EXTEND_THRESHOLD_ENABLED_KEY: (
