@@ -85,7 +85,7 @@ from ..media import (
     managed_media_directory,
     resolve_media_asset_path,
 )
-from ..remote_image import download_external_image_as_png, load_local_image_as_png
+from ..remote_image import download_external_image, load_local_image
 from ..workers import FunctionWorker
 from ..time_input import parse_duration_input
 from .common import (
@@ -324,7 +324,8 @@ class SettingsTab(QWidget):
             "Одно изображение используется одновременно в локальном колесе и OBS. "
             "Оно остаётся неподвижным при вращении. Внешние изображения сначала "
             "проверяются и сохраняются как локальная PNG-копия, поэтому во время "
-            "стрима колесо не зависит от доступности внешнего сервиса."
+            "стрима колесо не зависит от доступности внешнего сервиса. "
+            "Анимированные GIF/WebP сохраняют анимацию, если формат поддерживается Qt."
         )
         wheel_center_note.setWordWrap(True)
         wheel_center_note.setProperty("muted", True)
@@ -362,8 +363,8 @@ class SettingsTab(QWidget):
         wheel_center_source_note = QLabel(
             "Примеры: twitch:канал — аватар Twitch; 7tv:ID / bttv:ID / ffz:ID — "
             "emote; также можно вставить страницу emote или прямой URL изображения. "
-            "Анимированный источник сохраняется как статичный первый кадр, чтобы local и OBS "
-            "показывали один и тот же результат."
+            "Поддерживаемые анимированные GIF/WebP сохраняются как анимация и работают "
+            "одинаково в local и OBS."
         )
         wheel_center_source_note.setWordWrap(True)
         wheel_center_source_note.setProperty("muted", True)
@@ -1112,19 +1113,23 @@ class SettingsTab(QWidget):
         )
 
     def _prepare_wheel_center_local(self, source_path: str) -> dict:
-        png = load_local_image_as_png(source_path)
+        prepared = load_local_image(source_path)
         return {
-            "png": png,
+            "data": prepared.image_bytes,
+            "extension": prepared.extension,
+            "animated": prepared.animated,
             "label": Path(source_path).name,
             "source": str(source_path),
         }
 
     def _prepare_wheel_center_remote(self, source: str) -> dict:
-        result = download_external_image_as_png(
+        result = download_external_image(
             source, twitch_profile_resolver=self._twitch_profile_image_url
         )
         return {
-            "png": result.png_bytes,
+            "data": result.image_bytes,
+            "extension": result.extension,
+            "animated": result.animated,
             "label": result.display_name,
             "source": result.resolved_url,
         }
@@ -1164,16 +1169,19 @@ class SettingsTab(QWidget):
 
     def _wheel_center_image_import_ready(self, result: dict) -> None:
         try:
-            png = bytes(result.get("png") or b"")
-            if not png:
+            data = bytes(result.get("data") or b"")
+            if not data:
                 raise ValueError("Подготовленное изображение пустое.")
-            digest = hashlib.sha256(png).hexdigest()[:16]
-            name = f"wheel-center-{digest}.png"
+            extension = str(result.get("extension") or ".png").strip().lower()
+            if extension not in {".png", ".gif", ".webp"}:
+                raise ValueError("Получен неподдерживаемый формат изображения.")
+            digest = hashlib.sha256(data).hexdigest()[:16]
+            name = f"wheel-center-{digest}{extension}"
             target = self.wheel_center_icons_dir / name
             if not target.exists():
-                temporary = target.with_suffix(".tmp")
+                temporary = target.with_name(target.name + ".tmp")
                 try:
-                    temporary.write_bytes(png)
+                    temporary.write_bytes(data)
                     temporary.replace(target)
                 except Exception:
                     temporary.unlink(missing_ok=True)
