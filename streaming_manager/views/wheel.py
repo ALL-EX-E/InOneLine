@@ -78,6 +78,10 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._center_image_movie = None
         if previous_movie is not None:
             previous_movie.stop()
+            # QMovie can keep the GIF/WebP file handle open on Windows until
+            # its source is cleared. Release it immediately when the selected
+            # center changes instead of waiting for deferred QObject deletion.
+            previous_movie.setFileName("")
             previous_movie.deleteLater()
 
         self._center_image_path = normalized
