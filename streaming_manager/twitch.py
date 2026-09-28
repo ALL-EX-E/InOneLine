@@ -580,7 +580,13 @@ class TwitchAdapter(IntegrationAdapter):
         scales = [str(value) for value in (row.get("scale") or [])]
         themes = [str(value) for value in (row.get("theme_mode") or [])]
         if preview:
-            image_format = "static" if "static" in formats else (formats[0] if formats else "static")
+            # The quick picker must show motion for animated Twitch emotes.
+            # Keep the small 1x payload, but request its animated rendition.
+            image_format = (
+                "animated"
+                if "animated" in formats
+                else ("static" if "static" in formats else (formats[0] if formats else "static"))
+            )
             scale = "1.0" if "1.0" in scales else (scales[0] if scales else "1.0")
         else:
             image_format = "animated" if "animated" in formats else ("static" if "static" in formats else (formats[0] if formats else "static"))
