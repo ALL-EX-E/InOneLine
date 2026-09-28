@@ -60,6 +60,10 @@ jobs:
           picker = Path("streaming_manager/views/wheel_center_picker.py").read_text(encoding="utf-8")
           assert "Загрузить своё изображение" in picker
           assert "QGridLayout" in picker
+          assert "QMovie" in picker
+          assert "set_movie_bytes" in picker
+          assert "set_movie_file" in picker
+          assert "is_animated_preview" in picker
           assert "QLineEdit" not in picker
           assert "QComboBox" not in picker
           assert "Поиск" not in picker
@@ -80,6 +84,7 @@ jobs:
           assert "TWITCH_CHANNEL_EMOTES_URL" in twitch
           assert "TWITCH_GLOBAL_EMOTES_URL" in twitch
           assert "def list_center_emotes" in twitch
+          assert "animated" in twitch and "preview" in twitch
 
           rng = Path("streaming_manager/views/auction_parts/rng.py").read_text(encoding="utf-8")
           assert "center_image" not in rng
