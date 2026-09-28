@@ -532,8 +532,8 @@ class SettingsTab(QWidget):
         self.settings_tabs.addTab(self.auction_scroll, "Аукцион")
 
         # B1 — единый центр реальных поддерживаемых сервисных адаптеров.
-        # Registry пуст до B2, поэтому никаких фальшивых карточек будущих
-        # карточек неподключённых или будущих сервисов здесь не создаётся.
+        # Registry пуст до B2, поэтому никаких фальшивых карточек
+        # неподключённых или будущих сервисов здесь не создаётся.
         self.integration_page = QWidget()
         integration_layout = QVBoxLayout(self.integration_page)
         integration_layout.setContentsMargins(18, 18, 18, 18)
