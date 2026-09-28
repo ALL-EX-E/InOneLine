@@ -94,6 +94,7 @@ class AuctionAudioMixin:
             "active": False,
             "kind": "none",
         }
+        self._audio_output_mode = self._saved_audio_output_mode()
         self._browser_audio_snapshot_timer = QTimer(self)
         self._browser_audio_snapshot_timer.setInterval(100)
         self._browser_audio_snapshot_timer.timeout.connect(
@@ -128,12 +129,16 @@ class AuctionAudioMixin:
             AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
         }:
             mode = AUCTION_AUDIO_OUTPUT_MODE_DEFAULT
+        self._audio_output_mode = mode
         self.db.set_setting(AUCTION_AUDIO_OUTPUT_MODE_KEY, mode)
         self._apply_audio_output_mode()
         self._refresh_browser_audio_snapshot()
 
     def _apply_audio_output_mode(self) -> None:
-        through_obs = self._saved_audio_output_mode() == AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER
+        through_obs = (
+            str(getattr(self, "_audio_output_mode", AUCTION_AUDIO_OUTPUT_MODE_DEFAULT))
+            == AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER
+        )
         self.auction_audio.set_transport_silent(through_obs)
         self.wheel_audio.set_transport_silent(through_obs)
 
@@ -172,7 +177,9 @@ class AuctionAudioMixin:
             self._release_auction_audio_owner()
 
     def _refresh_browser_audio_snapshot(self) -> None:
-        mode = self._saved_audio_output_mode()
+        mode = str(
+            getattr(self, "_audio_output_mode", AUCTION_AUDIO_OUTPUT_MODE_DEFAULT)
+        )
         coordinator = getattr(self, "audio_coordinator", None)
         owner = str(coordinator.owner) if coordinator is not None else "idle"
         snapshot: dict[str, object] = {
