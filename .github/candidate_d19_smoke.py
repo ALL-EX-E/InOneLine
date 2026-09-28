@@ -26,10 +26,17 @@ from streaming_manager.media import (
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
     managed_media_directory,
 )
+from streaming_manager.emote_catalog import (
+    EmoteCatalogItem,
+    _parse_7tv_emotes,
+    _parse_bttv_emotes,
+    _parse_ffz_emotes,
+)
 from streaming_manager.remote_image import (
     load_local_image,
     resolve_external_image_source,
 )
+from streaming_manager.twitch import TwitchAdapter
 from streaming_manager.views.main_window import MainWindow
 
 
@@ -139,6 +146,81 @@ try:
         assert url.endswith("/Example_Channel.png")
         assert label == "Twitch @Example_Channel"
 
+        seven = _parse_7tv_emotes(
+            {
+                "emote_set": {
+                    "emotes": [
+                        {
+                            "id": "seven-id",
+                            "name": "SevenSmile",
+                            "data": {"animated": True},
+                        }
+                    ]
+                }
+            }
+        )
+        assert len(seven) == 1
+        assert seven[0].source == "7TV"
+        assert seven[0].image_url.endswith("/seven-id/4x.webp")
+
+        bttv = _parse_bttv_emotes(
+            {
+                "channelEmotes": [
+                    {
+                        "id": "bttv-id",
+                        "code": "BttvSmile",
+                        "imageType": "gif",
+                    }
+                ],
+                "sharedEmotes": [],
+            }
+        )
+        assert len(bttv) == 1
+        assert bttv[0].source == "BTTV"
+        assert bttv[0].animated is True
+
+        ffz = _parse_ffz_emotes(
+            {
+                "sets": {
+                    "1": {
+                        "emoticons": [
+                            {
+                                "id": 123,
+                                "name": "FfzSmile",
+                                "urls": {
+                                    "1": "//cdn.example/ffz-1.png",
+                                    "4": "//cdn.example/ffz-4.png",
+                                },
+                            }
+                        ]
+                    }
+                }
+            }
+        )
+        assert len(ffz) == 1
+        assert ffz[0].source == "FFZ"
+        assert ffz[0].image_url == "https://cdn.example/ffz-4.png"
+        assert ffz[0].preview_url == "https://cdn.example/ffz-1.png"
+
+        twitch_payload = {
+            "template": (
+                "https://static-cdn.jtvnw.net/emoticons/v2/"
+                "{{id}}/{{format}}/{{theme_mode}}/{{scale}}"
+            )
+        }
+        twitch_row = {
+            "id": "42",
+            "format": ["static", "animated"],
+            "scale": ["1.0", "2.0", "3.0"],
+            "theme_mode": ["light", "dark"],
+        }
+        assert TwitchAdapter._emote_image_url(
+            twitch_payload, twitch_row, preview=False
+        ).endswith("/42/animated/dark/3.0")
+        assert TwitchAdapter._emote_image_url(
+            twitch_payload, twitch_row, preview=True
+        ).endswith("/42/static/dark/1.0")
+
         import streaming_manager.remote_image as remote_image
 
         original_fetch_json = remote_image._fetch_json
@@ -183,6 +265,43 @@ try:
             assert weighted_index >= 0
             auction.mode_combo.setCurrentIndex(weighted_index)
             auction._update_wheel_panel(None)
+            assert auction.wheel_widget._center_image_path == str(managed_path)
+
+            # Pointauc-like D19 quick picker: one upload action + one unified
+            # visual grid. No search/filter controls are part of this dialog.
+            auction._wheel_center_catalog_cache = []
+            auction._open_wheel_center_picker()
+            picker = auction._wheel_center_picker
+            assert picker is not None
+            assert picker.upload_btn.text() == "Загрузить своё изображение"
+            assert any(
+                int(item.get("asset_id") or 0) == int(asset.id)
+                for item in picker._local_items
+            )
+            picker.set_remote_items(
+                [
+                    EmoteCatalogItem(
+                        source="7TV",
+                        emote_id="preview-id",
+                        name="PreviewSmile",
+                        image_url="https://example.invalid/full.webp",
+                        preview_url="https://example.invalid/preview.webp",
+                        animated=True,
+                        thumbnail_bytes=static_image.image_bytes,
+                    )
+                ]
+            )
+            assert len(picker._buttons) >= 2
+
+            # Quick selection updates the same persisted D19 setting and the
+            # Settings combo through MainWindow's synchronization signal.
+            settings.wheel_center_image_combo.setCurrentIndex(0)
+            auction._apply_wheel_center_asset(int(asset.id))
+            assert db.get_setting(
+                WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, ""
+            ) == str(asset.id)
+            assert settings.wheel_center_image_combo.currentData() == asset.id
+
             assert auction.wheel_widget._center_image_path == str(managed_path)
             assert auction.wheel_widget._center_image_pixmap is not None
             assert not auction.wheel_widget._center_image_pixmap.isNull()
