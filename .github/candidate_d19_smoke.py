@@ -212,6 +212,8 @@ try:
             assert media_bytes.startswith(b"GIF8")
             assert media_type.startswith("image/gif"), media_type
 
+            auction.wheel_widget.set_center_image_path(None)
+            app.processEvents()
             managed_path.unlink()
             missing = db.current_wheel_payload()
             assert missing["center_image"]["enabled"] is False
