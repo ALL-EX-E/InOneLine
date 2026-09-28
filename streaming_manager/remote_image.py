@@ -266,7 +266,10 @@ def normalize_image_bytes_to_png(raw: bytes) -> bytes:
         raise ValueError(
             "Не удалось подготовить локальную PNG-копию изображения."
         )
-    return bytes(output)
+    # PySide6 may wrap/copy the QByteArray passed to QBuffer. Read the
+    # buffer's actual backing data after QImage.save() instead of assuming the
+    # original Python wrapper was updated in place.
+    return bytes(buffer.data())
 
 
 def load_local_image_as_png(path: str) -> bytes:
