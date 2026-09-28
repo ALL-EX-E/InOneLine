@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QSize, Qt, Signal
+from PySide6.QtGui import QIcon, QMovie, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QFrame,
@@ -16,6 +16,86 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class _PickerImageButton(QToolButton):
+    """62px picker cell with optional QMovie-backed live preview."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setIconSize(QSize(50, 50))
+        self.setFixedSize(62, 62)
+        self.setAutoRaise(False)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self._movie: QMovie | None = None
+        self._movie_buffer: QBuffer | None = None
+        self._movie_bytes: QByteArray | None = None
+
+    @property
+    def is_animated_preview(self) -> bool:
+        return self._movie is not None
+
+    def _stop_movie(self) -> None:
+        movie = self._movie
+        self._movie = None
+        if movie is not None:
+            movie.stop()
+            movie.deleteLater()
+        buffer = self._movie_buffer
+        self._movie_buffer = None
+        if buffer is not None:
+            buffer.close()
+            buffer.deleteLater()
+        self._movie_bytes = None
+
+    def set_static_icon(self, icon: QIcon) -> None:
+        self._stop_movie()
+        self.setIcon(icon)
+
+    def set_movie_file(self, path: str) -> bool:
+        self._stop_movie()
+        movie = QMovie(str(path or ""), parent=self)
+        if not movie.isValid() or movie.frameCount() == 1:
+            movie.deleteLater()
+            return False
+        movie.frameChanged.connect(self._movie_frame_changed)
+        self._movie = movie
+        movie.start()
+        return True
+
+    def set_movie_bytes(self, raw: bytes) -> bool:
+        self._stop_movie()
+        if not raw:
+            return False
+        payload = QByteArray(bytes(raw))
+        buffer = QBuffer(self)
+        buffer.setData(payload)
+        if not buffer.open(QIODevice.ReadOnly):
+            buffer.deleteLater()
+            return False
+        movie = QMovie(buffer, parent=self)
+        if not movie.isValid() or movie.frameCount() == 1:
+            movie.deleteLater()
+            buffer.close()
+            buffer.deleteLater()
+            return False
+        self._movie_bytes = payload
+        self._movie_buffer = buffer
+        self._movie = movie
+        movie.frameChanged.connect(self._movie_frame_changed)
+        movie.start()
+        return True
+
+    def _movie_frame_changed(self, _frame: int) -> None:
+        movie = self._movie
+        if movie is None:
+            return
+        pixmap = movie.currentPixmap()
+        if not pixmap.isNull():
+            self.setIcon(QIcon(pixmap))
+
+    def stop_preview(self) -> None:
+        self._stop_movie()
 
 
 class WheelCenterPickerDialog(QDialog):
@@ -62,7 +142,7 @@ class WheelCenterPickerDialog(QDialog):
 
         self._local_items: list[dict] = []
         self._remote_items: list[object] = []
-        self._buttons: list[QToolButton] = []
+        self._buttons: list[_PickerImageButton] = []
 
     @staticmethod
     def _icon_from_path(path: str) -> QIcon:
@@ -103,24 +183,21 @@ class WheelCenterPickerDialog(QDialog):
             item = self.grid.takeAt(0)
             widget = item.widget()
             if widget is not None:
+                if isinstance(widget, _PickerImageButton):
+                    widget.stop_preview()
                 widget.deleteLater()
         self._buttons.clear()
 
-    def _button(self, icon: QIcon, tooltip: str, callback) -> QToolButton:
-        button = QToolButton()
-        button.setIcon(icon)
-        button.setIconSize(QSize(50, 50))
-        button.setFixedSize(62, 62)
+    def _button(self, tooltip: str, callback) -> _PickerImageButton:
+        button = _PickerImageButton()
         button.setToolTip(str(tooltip or ""))
-        button.setAutoRaise(False)
         button.clicked.connect(callback)
-        button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._buttons.append(button)
         return button
 
     def _rebuild(self) -> None:
         self._clear_grid()
-        cells: list[QToolButton] = []
+        cells: list[_PickerImageButton] = []
 
         for item in self._local_items:
             try:
@@ -134,13 +211,14 @@ class WheelCenterPickerDialog(QDialog):
             if icon.isNull():
                 continue
             name = str(item.get("name") or Path(path).name)
-            cells.append(
-                self._button(
-                    icon,
-                    name,
-                    lambda _checked=False, value=asset_id: self.localAssetSelected.emit(value),
-                )
+            button = self._button(
+                name,
+                lambda _checked=False, value=asset_id: self.localAssetSelected.emit(value),
             )
+            suffix = Path(path).suffix.casefold()
+            if suffix not in {".gif", ".webp"} or not button.set_movie_file(path):
+                button.set_static_icon(icon)
+            cells.append(button)
 
         for item in self._remote_items:
             raw = bytes(getattr(item, "thumbnail_bytes", b"") or b"")
@@ -150,13 +228,14 @@ class WheelCenterPickerDialog(QDialog):
             name = str(getattr(item, "name", "") or "")
             source = str(getattr(item, "source", "") or "")
             tooltip = name if not source else f"{name} · {source}"
-            cells.append(
-                self._button(
-                    icon,
-                    tooltip,
-                    lambda _checked=False, value=item: self.remoteEmoteSelected.emit(value),
-                )
+            button = self._button(
+                tooltip,
+                lambda _checked=False, value=item: self.remoteEmoteSelected.emit(value),
             )
+            animated = bool(getattr(item, "animated", False))
+            if not animated or not button.set_movie_bytes(raw):
+                button.set_static_icon(icon)
+            cells.append(button)
 
         columns = 6
         for index, button in enumerate(cells):
@@ -164,3 +243,8 @@ class WheelCenterPickerDialog(QDialog):
 
         if not cells and not self.status.isVisible():
             self.set_loading_message("Нет доступных изображений.")
+
+
+    def closeEvent(self, event) -> None:
+        self._clear_grid()
+        super().closeEvent(event)
