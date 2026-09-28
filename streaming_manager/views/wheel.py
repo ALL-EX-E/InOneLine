@@ -23,6 +23,7 @@ class AuctionWheelWidget(QOpenGLWidget):
     """GPU-backed локальное изображение того же колеса, которое получает OBS."""
 
     spinFinished = Signal()
+    centerClicked = Signal()
 
     PALETTE = (
         "#4FC3F7",
@@ -68,6 +69,20 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._timer.setTimerType(Qt.PreciseTimer)
         self._timer.setInterval(8)
         self._timer.timeout.connect(self._advance_frame)
+
+    def mousePressEvent(self, event):
+        rect = self.rect().adjusted(10, 10, -10, -68)
+        side = max(2, min(rect.width(), rect.height()))
+        center = rect.center()
+        center_radius = (side / 2.0) * 0.12
+        pos = event.position()
+        dx = float(pos.x()) - float(center.x())
+        dy = float(pos.y()) - float(center.y())
+        if dx * dx + dy * dy <= center_radius * center_radius:
+            self.centerClicked.emit()
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def set_center_image_path(self, path: str | None) -> None:
         normalized = str(path or "")
