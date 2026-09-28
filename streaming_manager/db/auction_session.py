@@ -9,6 +9,8 @@ from typing import Any
 from ..constants import (
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
+    AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY,
     AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
     AUCTION_AUTO_EXTEND_LEADER_ENABLED_DEFAULT,
@@ -1088,6 +1090,7 @@ class AuctionSessionMixin:
             AUCTION_AUTO_EXTEND_NEW_LOT_ENABLED_KEY,
             AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY,
             AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
+            AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY,
             AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
             AUCTION_AUTO_EXTEND_THRESHOLD_ENABLED_KEY,
             AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
@@ -1119,12 +1122,28 @@ class AuctionSessionMixin:
                     AUCTION_AUTO_EXTEND_NEW_LOT_MS_DEFAULT,
                 ),
             },
-            # Runtime external-donation triggering intentionally remains unused
-            # until B2/B3. Future adapters reuse this same transaction helper.
             "external_donation": {
                 "enabled": self._auto_extend_bool(
                     values.get(AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY),
                     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
+                ),
+                "extension_ms": self._auto_extend_duration(
+                    values.get(AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY),
+                    AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT,
+                ),
+            },
+            "external_service_unit": {
+                "enabled": (
+                    self._auto_extend_bool(
+                        values.get(AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY),
+                        AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
+                    )
+                    and self._auto_extend_bool(
+                        values.get(
+                            AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_KEY
+                        ),
+                        AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
+                    )
                 ),
                 "extension_ms": self._auto_extend_duration(
                     values.get(AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY),
