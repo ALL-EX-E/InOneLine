@@ -43,6 +43,8 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._payload: dict = {}
         self._wheel_cache: QPixmap | None = None
         self._wheel_cache_key = None
+        self._center_image_path = ""
+        self._center_image_pixmap: QPixmap | None = None
         self._spin_id = None
         self._spin_start_monotonic: float | None = None
         self._finished_emitted_for_spin = None
@@ -64,6 +66,15 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._timer.setTimerType(Qt.PreciseTimer)
         self._timer.setInterval(8)
         self._timer.timeout.connect(self._advance_frame)
+
+    def set_center_image_path(self, path: str | None) -> None:
+        normalized = str(path or "")
+        if normalized == self._center_image_path:
+            return
+        self._center_image_path = normalized
+        pixmap = QPixmap(normalized) if normalized else QPixmap()
+        self._center_image_pixmap = None if pixmap.isNull() else pixmap
+        self.update()
 
     def set_payload(self, payload: dict | None):
         payload = dict(payload or {})
@@ -341,13 +352,6 @@ class AuctionWheelWidget(QOpenGLWidget):
 
             start_deg -= span
 
-        painter.setPen(QPen(QColor("#E8EDF2"), 2))
-        painter.setBrush(QColor("#25292D"))
-        painter.drawEllipse(
-            center,
-            radius * 0.12,
-            radius * 0.12,
-        )
         painter.end()
         return pixmap
 
@@ -394,6 +398,41 @@ class AuctionWheelWidget(QOpenGLWidget):
             QRectF(self._wheel_cache.rect()),
         )
         painter.restore()
+
+        # D19: center is painted after the rotating sector layer, so it remains
+        # physically stationary while the wheel spins.
+        center_radius = radius * 0.12
+        center_rect = QRectF(
+            center.x() - center_radius,
+            center.y() - center_radius,
+            center_radius * 2.0,
+            center_radius * 2.0,
+        )
+        painter.setPen(QPen(QColor("#E8EDF2"), 2))
+        painter.setBrush(QColor("#25292D"))
+        painter.drawEllipse(center_rect)
+        center_pixmap = self._center_image_pixmap
+        if center_pixmap is not None and not center_pixmap.isNull():
+            source = QRectF(center_pixmap.rect())
+            target_ratio = center_rect.width() / max(1.0, center_rect.height())
+            source_ratio = source.width() / max(1.0, source.height())
+            if source_ratio > target_ratio:
+                new_width = source.height() * target_ratio
+                source.setLeft(source.left() + (source.width() - new_width) / 2.0)
+                source.setWidth(new_width)
+            elif source_ratio < target_ratio:
+                new_height = source.width() / target_ratio
+                source.setTop(source.top() + (source.height() - new_height) / 2.0)
+                source.setHeight(new_height)
+            clip = QPainterPath()
+            clip.addEllipse(center_rect.adjusted(1, 1, -1, -1))
+            painter.save()
+            painter.setClipPath(clip)
+            painter.drawPixmap(center_rect, center_pixmap, source)
+            painter.restore()
+            painter.setPen(QPen(QColor("#E8EDF2"), 2))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(center_rect)
 
         pointer_y = wheel_rect.top() - 2
         pointer = QPolygonF(
