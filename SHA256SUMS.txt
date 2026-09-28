@@ -1,4 +1,4 @@
-# InOneLine 1.0.1 official release checksums
+# InOneLine 1.0.2 official release checksums
 
-922b2aec081919ff30c7e726afdeb6afd4338b928becc61a10a52dc99cadf1d7  InOneLine_Setup_1.0.1.exe
-108b2198bc3d931251dc19d58ccb14947ea19ca3832d559523c5391e44cca692  InOneLine_Source_1.0.1.zip
+6ec11138833786a09cba7066532630169920d92286d5997f2e9fe43a466620b5  InOneLine_Setup_1.0.2.exe
+07a200fa84bab4dfcfeb30a1bec51bca401e573d1c672d42ad8ad0c0b6393547  InOneLine_Source_1.0.2.zip
