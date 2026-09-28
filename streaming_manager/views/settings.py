@@ -51,6 +51,7 @@ from ..constants import (
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT,
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
     AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
+    WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
     COOP_LABELS, DEFAULT_API_HOST, STATUS_ABANDONED, STATUS_COMPLETED,
     STATUS_LABELS, STATUS_NOT_PLAYED, STATUS_PLAYED, STATUS_PLAYING, STREAM_FORMATS,
 )
@@ -78,6 +79,13 @@ from ..exporters import (
     pointauc_text,
 )
 from ..random_sources import RandomDraw, RandomOrgClient
+from ..media import (
+    MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
+    media_asset_available,
+    managed_media_directory,
+    resolve_media_asset_path,
+)
+from ..remote_image import download_external_image_as_png, load_local_image_as_png
 from ..workers import FunctionWorker
 from ..time_input import parse_duration_input
 from .common import (
@@ -130,6 +138,11 @@ class SettingsTab(QWidget):
         self._full_backup_worker = None
         self._full_restore_worker = None
         self._integration_worker = None
+        self._wheel_center_image_worker = None
+        self.wheel_center_icons_dir = managed_media_directory(
+            self.db.path.parent, MEDIA_CATEGORY_WHEEL_CENTER_ICONS
+        )
+        self.wheel_center_icons_dir.mkdir(parents=True, exist_ok=True)
         self._integration_buttons: list[QPushButton] = []
         self._integration_config_editors: dict[str, QLineEdit] = {}
         self._twitch_auth_dialog: QDialog | None = None
@@ -298,6 +311,69 @@ class SettingsTab(QWidget):
         )
         wheel_range.setProperty("muted", True)
         auction_layout.addWidget(wheel_range)
+
+        wheel_center_line = QFrame()
+        wheel_center_line.setProperty("line", True)
+        auction_layout.addWidget(wheel_center_line)
+
+        wheel_center_heading = QLabel("Изображение в центре колеса")
+        wheel_center_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        auction_layout.addWidget(wheel_center_heading)
+
+        wheel_center_note = QLabel(
+            "Одно изображение используется одновременно в локальном колесе и OBS. "
+            "Оно остаётся неподвижным при вращении. Внешние изображения сначала "
+            "проверяются и сохраняются как локальная PNG-копия, поэтому во время "
+            "стрима колесо не зависит от доступности внешнего сервиса."
+        )
+        wheel_center_note.setWordWrap(True)
+        wheel_center_note.setProperty("muted", True)
+        auction_layout.addWidget(wheel_center_note)
+
+        wheel_center_select_row = QHBoxLayout()
+        wheel_center_select_row.addWidget(QLabel("Изображение:"))
+        self.wheel_center_image_combo = ScrollSafeComboBox()
+        self.wheel_center_image_combo.setMinimumWidth(260)
+        self.wheel_center_image_combo.currentIndexChanged.connect(
+            self._update_wheel_center_image_status
+        )
+        wheel_center_select_row.addWidget(self.wheel_center_image_combo, 1)
+        self.add_wheel_center_file_btn = QPushButton("Добавить файл…")
+        self.add_wheel_center_file_btn.clicked.connect(
+            self._import_wheel_center_image_file
+        )
+        wheel_center_select_row.addWidget(self.add_wheel_center_file_btn)
+        auction_layout.addLayout(wheel_center_select_row)
+
+        wheel_center_external_row = QHBoxLayout()
+        wheel_center_external_row.addWidget(QLabel("Внешний источник:"))
+        self.wheel_center_image_source = QLineEdit()
+        self.wheel_center_image_source.setPlaceholderText(
+            "URL изображения, Twitch/7TV/BetterTTV/FrankerFaceZ ссылка или 7tv:ID / bttv:ID / ffz:ID / twitch:канал"
+        )
+        wheel_center_external_row.addWidget(self.wheel_center_image_source, 1)
+        self.add_wheel_center_url_btn = QPushButton("Загрузить")
+        self.add_wheel_center_url_btn.clicked.connect(
+            self._import_wheel_center_image_url
+        )
+        wheel_center_external_row.addWidget(self.add_wheel_center_url_btn)
+        auction_layout.addLayout(wheel_center_external_row)
+
+        wheel_center_source_note = QLabel(
+            "Примеры: twitch:канал — аватар Twitch; 7tv:ID / bttv:ID / ffz:ID — "
+            "emote; также можно вставить страницу emote или прямой URL изображения. "
+            "Анимированный источник сохраняется как статичный первый кадр, чтобы local и OBS "
+            "показывали один и тот же результат."
+        )
+        wheel_center_source_note.setWordWrap(True)
+        wheel_center_source_note.setProperty("muted", True)
+        auction_layout.addWidget(wheel_center_source_note)
+
+        self.wheel_center_image_status = QLabel("")
+        self.wheel_center_image_status.setProperty("muted", True)
+        self.wheel_center_image_status.setWordWrap(True)
+        auction_layout.addWidget(self.wheel_center_image_status)
+        self._refresh_wheel_center_image_library()
 
         auto_extend_line = QFrame()
         auto_extend_line.setProperty("line", True)
@@ -914,10 +990,14 @@ class SettingsTab(QWidget):
             QMessageBox.warning(self, "Настройки аукциона", str(exc))
             return
 
+        wheel_center_asset = self._selected_wheel_center_image_asset()
         self.db.set_settings_bulk(
             {
                 "auction_max_amount_default_duration_ms": str(max_amount_duration_ms),
                 "auction_wheel_default_duration_ms": str(wheel_duration_ms),
+                WHEEL_CENTER_IMAGE_MEDIA_ID_KEY: (
+                    str(wheel_center_asset.id) if wheel_center_asset is not None else ""
+                ),
                 AUCTION_AUTO_EXTEND_LEADER_ENABLED_KEY: (
                     "1" if self.auto_extend_leader_enabled.isChecked() else "0"
                 ),
@@ -965,6 +1045,158 @@ class SettingsTab(QWidget):
             "Настройки аукциона",
             "Настройки аукциона сохранены.",
         )
+
+    def _wheel_center_image_assets(self):
+        return self.db.sync_managed_media_category(MEDIA_CATEGORY_WHEEL_CENTER_ICONS)
+
+    def _selected_wheel_center_image_asset(self):
+        raw = self.wheel_center_image_combo.currentData()
+        if not str(raw or "").isdigit():
+            return None
+        asset = self.db.get_media_asset(int(raw))
+        if asset is None or asset.category != MEDIA_CATEGORY_WHEEL_CENTER_ICONS:
+            return None
+        return asset
+
+    def _refresh_wheel_center_image_library(self, selected_asset_id=None) -> None:
+        if selected_asset_id is None:
+            selected_asset_id = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
+        try:
+            selected_id = int(selected_asset_id) if str(selected_asset_id or "").isdigit() else None
+        except (TypeError, ValueError):
+            selected_id = None
+        combo = self.wheel_center_image_combo
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("— стандартный центр —", "")
+        for asset in self._wheel_center_image_assets():
+            available = media_asset_available(self.db.path.parent, asset)
+            label = asset.display_name if available else f"⚠ файл недоступен: {asset.display_name}"
+            combo.addItem(label, asset.id)
+        index = combo.findData(selected_id) if selected_id is not None else 0
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(False)
+        self._update_wheel_center_image_status()
+
+    def _update_wheel_center_image_status(self, _index: int = -1) -> None:
+        asset = self._selected_wheel_center_image_asset()
+        if asset is None:
+            self.wheel_center_image_status.setText(
+                "Используется стандартный центр колеса без пользовательского изображения."
+            )
+            self.wheel_center_image_status.setToolTip("")
+            return
+        available = media_asset_available(self.db.path.parent, asset)
+        try:
+            path = resolve_media_asset_path(self.db.path.parent, asset)
+            self.wheel_center_image_status.setToolTip(str(path))
+        except (OSError, ValueError):
+            self.wheel_center_image_status.setToolTip("")
+        self.wheel_center_image_status.setText(
+            "Локальная копия готова. Нажмите «Сохранить настройки аукциона»."
+            if available
+            else "Файл локальной копии недоступен — добавьте изображение заново."
+        )
+
+    def _set_wheel_center_import_busy(self, busy: bool) -> None:
+        self.add_wheel_center_file_btn.setEnabled(not busy)
+        self.add_wheel_center_url_btn.setEnabled(not busy)
+        self.wheel_center_image_source.setEnabled(not busy)
+        self.add_wheel_center_url_btn.setText("Загрузка…" if busy else "Загрузить")
+
+    def _twitch_profile_image_url(self, login: str) -> str:
+        return str(
+            self.integration_manager.call_adapter(
+                "twitch", "resolve_profile_image", str(login)
+            )
+        )
+
+    def _prepare_wheel_center_local(self, source_path: str) -> dict:
+        png = load_local_image_as_png(source_path)
+        return {
+            "png": png,
+            "label": Path(source_path).name,
+            "source": str(source_path),
+        }
+
+    def _prepare_wheel_center_remote(self, source: str) -> dict:
+        result = download_external_image_as_png(
+            source, twitch_profile_resolver=self._twitch_profile_image_url
+        )
+        return {
+            "png": result.png_bytes,
+            "label": result.display_name,
+            "source": result.resolved_url,
+        }
+
+    def _start_wheel_center_import(self, fn, *args) -> None:
+        if self._wheel_center_image_worker is not None:
+            return
+        self._set_wheel_center_import_busy(True)
+        worker = FunctionWorker(fn, *args)
+        self._wheel_center_image_worker = worker
+        worker.signals.result.connect(self._wheel_center_image_import_ready)
+        worker.signals.error.connect(self._wheel_center_image_import_failed)
+        worker.signals.finished.connect(self._wheel_center_image_import_finished)
+        self.thread_pool.start(worker)
+
+    def _import_wheel_center_image_file(self) -> None:
+        if self._wheel_center_image_worker is not None:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите изображение центра колеса",
+            "",
+            "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)",
+        )
+        if not path:
+            return
+        self._start_wheel_center_import(self._prepare_wheel_center_local, path)
+
+    def _import_wheel_center_image_url(self) -> None:
+        source = self.wheel_center_image_source.text().strip()
+        if not source:
+            QMessageBox.warning(
+                self, "Изображение центра", "Укажите URL или внешний источник изображения."
+            )
+            return
+        self._start_wheel_center_import(self._prepare_wheel_center_remote, source)
+
+    def _wheel_center_image_import_ready(self, result: dict) -> None:
+        try:
+            png = bytes(result.get("png") or b"")
+            if not png:
+                raise ValueError("Подготовленное изображение пустое.")
+            digest = hashlib.sha256(png).hexdigest()[:16]
+            name = f"wheel-center-{digest}.png"
+            target = self.wheel_center_icons_dir / name
+            if not target.exists():
+                temporary = target.with_suffix(".tmp")
+                try:
+                    temporary.write_bytes(png)
+                    temporary.replace(target)
+                except Exception:
+                    temporary.unlink(missing_ok=True)
+                    raise
+            label = str(result.get("label") or name).strip() or name
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_WHEEL_CENTER_ICONS, name, label
+            )
+            self._refresh_wheel_center_image_library(asset.id)
+            self.wheel_center_image_source.clear()
+        except Exception as exc:
+            self._wheel_center_image_import_failed(exc)
+
+    def _wheel_center_image_import_failed(self, exc) -> None:
+        QMessageBox.critical(
+            self,
+            "Изображение центра",
+            f"Не удалось добавить изображение:\n{sanitize_diagnostic_text(str(exc))}",
+        )
+
+    def _wheel_center_image_import_finished(self) -> None:
+        self._wheel_center_image_worker = None
+        self._set_wheel_center_import_busy(False)
 
     def _connected_conversion_units(self) -> list[ConversionUnit]:
         try:
