@@ -1740,6 +1740,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         return base
 
     def refresh_integration_status(self) -> None:
+        # A reconnect/account change may alter Twitch/7TV/BTTV/FFZ emotes.
+        self._wheel_center_catalog_cache = None
         button = getattr(self, "integration_status_btn", None)
         if button is None:
             return
