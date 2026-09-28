@@ -715,19 +715,21 @@ class WheelMixin:
         ).fetchone()
         raw = str(row["value"] if row is not None else "").strip()
         if not raw.isdigit():
-            return {"enabled": False, "asset_id": None, "url": ""}
+            return {"enabled": False, "asset_id": None, "url": "", "animated": False}
         asset = self._get_media_asset_conn(conn, int(raw))
         if (
             asset is None
             or asset.category != MEDIA_CATEGORY_WHEEL_CENTER_ICONS
             or not media_asset_available(self.path.parent, asset)
         ):
-            return {"enabled": False, "asset_id": None, "url": ""}
+            return {"enabled": False, "asset_id": None, "url": "", "animated": False}
+        media_name = str(asset.managed_name or asset.external_path or "").casefold()
         return {
             "enabled": True,
             "asset_id": int(asset.id),
             "url": f"/media/{int(asset.id)}",
             "name": asset.display_name,
+            "animated": media_name.endswith((".gif", ".webp")),
         }
 
     def _wheel_payload_from_conn(
