@@ -29,6 +29,7 @@ from ..constants import (
     SHARED_XLSX_PATH_KEY, SHARED_XLSX_POLL_INTERVAL_MS,
     STATUS_ABANDONED, STATUS_COMPLETED, STATUS_LABELS, STATUS_NOT_PLAYED,
     STATUS_PLAYED, STATUS_PLAYING, STREAM_FORMATS,
+    WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
 )
 from ..database import (
     Database, DuplicateGameError, Game, display_date, display_datetime_local,
@@ -40,6 +41,21 @@ from ..exporters import (
 )
 from ..random_sources import RandomDraw, RandomOrgClient
 from ..integrations import IntegrationManager
+from ..emote_catalog import (
+    EmoteCatalogItem,
+    fetch_third_party_channel_emotes,
+    hydrate_emote_thumbnails,
+)
+from ..media import (
+    MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
+    media_asset_available,
+    resolve_media_asset_path,
+)
+from ..wheel_center_media import (
+    prepare_local_center_image,
+    prepare_remote_center_image,
+    store_prepared_center_image,
+)
 from ..shared_xlsx import (
     SharedXlsxError, SharedXlsxTransientError, main_games_rows, read_shared_xlsx,
     state_hash, write_shared_xlsx,
@@ -52,6 +68,7 @@ from .common import (
     suspend_live_content_resize,
 )
 from .wheel import AuctionWheelWidget
+from .wheel_center_picker import WheelCenterPickerDialog
 from .auction_history import format_auction_history_event
 from .auction_bets import format_integration_bet_event
 from .rules_editor import AuctionRulesEditorDialog, AuctionRulesPreviewDialog
@@ -76,6 +93,8 @@ from .auction_parts.rng import AuctionRngMixin
 
 
 class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, AuctionRngMixin, AuctionAudioMixin, QWidget):
+    centerImageChanged = Signal(int)
+
     _LOT_COMPACT_COLUMNS = (0, 1, 3)
     _CONDUCT_COMPACT_COLUMNS = (0, 1, 3, 4)
 
@@ -117,6 +136,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.thread_pool = QThreadPool.globalInstance()
         self._auction_rng_worker = None
         self._wheel_rng_worker = None
+        self._wheel_center_picker: WheelCenterPickerDialog | None = None
+        self._wheel_center_catalog_worker = None
+        self._wheel_center_import_worker = None
+        self._wheel_center_catalog_cache: list[EmoteCatalogItem] | None = None
         self._timer_context = "auction"
         self._default_auction_duration_ms = (
             self._saved_max_amount_default_duration_ms()
@@ -835,6 +858,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.wheel_widget = AuctionWheelWidget()
         self.wheel_widget.spinFinished.connect(
             self._handle_local_wheel_spin_finished
+        )
+        self.wheel_widget.centerClicked.connect(
+            self._open_wheel_center_picker
+        )
+        self.wheel_widget.setToolTip(
+            "Нажмите на центр колеса, чтобы быстро выбрать изображение или смайлик."
         )
         wheel_panel_layout.addWidget(self.wheel_widget, 1)
 
