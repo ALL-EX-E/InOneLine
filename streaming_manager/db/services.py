@@ -54,6 +54,16 @@ SECRET_SETTING_KEY_FRAGMENTS = (
 )
 
 
+def _external_auto_extend_reasons(unit_kind: str) -> tuple[str, ...]:
+    """Map normalized external units to one auditable S2 reason."""
+    normalized = str(unit_kind or "").strip().lower()
+    if normalized == UNIT_KIND_CURRENCY:
+        return ("external_donation",)
+    if normalized == UNIT_KIND_SERVICE:
+        return ("external_service_unit",)
+    return ()
+
+
 def _setting_key_is_secret(key: str) -> bool:
     normalized = str(key).strip().casefold().replace("-", "_")
     if normalized.endswith("credential_ref") or normalized == "random_org_credential_ref":
@@ -831,7 +841,7 @@ class ServicesMixin:
                     contributor=str(contributor or "") or None,
                     external_event_id=provider_event_id,
                     record_contribution=False,
-                    extra_auto_extend_reasons=("external_donation",),
+                    extra_auto_extend_reasons=_external_auto_extend_reasons(kind),
                     preferred_game_id=normalized_game_id,
                 )
                 target_game_id = int(lot_result["game_id"])
@@ -1216,7 +1226,9 @@ class ServicesMixin:
                     contributor=str(row["contributor"] or "") or None,
                     external_event_id=str(row["external_event_id"]),
                     record_contribution=False,
-                    extra_auto_extend_reasons=("external_donation",),
+                    extra_auto_extend_reasons=_external_auto_extend_reasons(
+                        str(row["unit_kind"] or infer_unit_kind(unit))
+                    ),
                     preferred_game_id=game_id,
                 )
                 target_game_id = int(result["game_id"])
