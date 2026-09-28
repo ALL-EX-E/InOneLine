@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -10,6 +11,7 @@ from tempfile import TemporaryDirectory
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, os.getcwd())
 
+from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtGui import QImage
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -25,7 +27,7 @@ from streaming_manager.media import (
     managed_media_directory,
 )
 from streaming_manager.remote_image import (
-    load_local_image_as_png,
+    load_local_image,
     resolve_external_image_source,
 )
 from streaming_manager.views.main_window import MainWindow
@@ -70,6 +72,7 @@ try:
             "enabled": False,
             "asset_id": None,
             "url": "",
+            "animated": False,
         }
         sectors_before = json.dumps(
             before["sectors"], ensure_ascii=False, sort_keys=True
@@ -77,15 +80,29 @@ try:
 
         local_source = Path(root) / "source.png"
         write_test_png(local_source)
-        normalized = load_local_image_as_png(str(local_source))
-        assert normalized.startswith(b"\x89PNG\r\n\x1a\n")
+        static_image = load_local_image(str(local_source))
+        assert static_image.extension == ".png"
+        assert static_image.animated is False
+        assert static_image.image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+
+        # Deterministic two-frame GIF: D19 must preserve the animation bytes
+        # instead of flattening them to PNG frame 1.
+        animated_gif = base64.b64decode(
+            "R0lGODlhBAAEAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAABAAEAAAICQABCBxIsCCAgAAh+QQBCgABACwAAAAABAAEAIEA/wAAAAAAAAAAAAAICQABCBxIsCCAgAA7"
+        )
+        animated_source = Path(root) / "source.gif"
+        animated_source.write_bytes(animated_gif)
+        animated_image = load_local_image(str(animated_source))
+        assert animated_image.extension == ".gif", animated_image
+        assert animated_image.animated is True, animated_image
+        assert animated_image.image_bytes.startswith(b"GIF8")
 
         media_dir = managed_media_directory(
             db.path.parent, MEDIA_CATEGORY_WHEEL_CENTER_ICONS
         )
         media_dir.mkdir(parents=True, exist_ok=True)
-        managed_path = media_dir / "candidate-center.png"
-        managed_path.write_bytes(normalized)
+        managed_path = media_dir / "candidate-center.gif"
+        managed_path.write_bytes(animated_image.image_bytes)
         asset = db.ensure_managed_media_asset(
             MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
             managed_path.name,
@@ -97,6 +114,7 @@ try:
         assert after["center_image"]["enabled"] is True, after["center_image"]
         assert after["center_image"]["asset_id"] == asset.id
         assert after["center_image"]["url"] == f"/media/{asset.id}"
+        assert after["center_image"]["animated"] is True
         assert (
             json.dumps(after["sectors"], ensure_ascii=False, sort_keys=True)
             == sectors_before
@@ -168,18 +186,31 @@ try:
             assert auction.wheel_widget._center_image_path == str(managed_path)
             assert auction.wheel_widget._center_image_pixmap is not None
             assert not auction.wheel_widget._center_image_pixmap.isNull()
+            assert auction.wheel_widget._center_image_movie is not None
+            assert auction.wheel_widget._center_image_movie.isValid()
+            observed_frames = set()
+            auction.wheel_widget._center_image_movie.frameChanged.connect(
+                lambda frame: observed_frames.add(int(frame))
+            )
+            loop = QEventLoop()
+            QTimer.singleShot(450, loop.quit)
+            loop.exec()
+            assert len(observed_frames) >= 2, observed_frames
 
             with urllib.request.urlopen(
                 window.api.base_url + "/api/wheel", timeout=5
             ) as response:
                 api_payload = json.loads(response.read().decode("utf-8"))
             assert api_payload["center_image"]["asset_id"] == asset.id
+            assert api_payload["center_image"]["animated"] is True
 
             with urllib.request.urlopen(
                 window.api.base_url + f"/media/{asset.id}", timeout=5
             ) as response:
                 media_bytes = response.read()
-            assert media_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+                media_type = str(response.headers.get("Content-Type") or "")
+            assert media_bytes.startswith(b"GIF8")
+            assert media_type.startswith("image/gif"), media_type
 
             managed_path.unlink()
             missing = db.current_wheel_payload()
