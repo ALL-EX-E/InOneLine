@@ -75,8 +75,8 @@ from ..database import (
     format_points, normalize_date_text, normalize_text_key, parse_date,
 )
 from ..exporters import (
-    export_pointauc_csv, export_public_csv, export_public_json, export_public_xlsx,
-    pointauc_text,
+    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
+    auction_pipe_text,
 )
 from ..random_sources import RandomDraw, RandomOrgClient
 from ..media import (
@@ -732,27 +732,27 @@ class SettingsTab(QWidget):
         export_separator.setProperty("line", True)
         export_layout.addWidget(export_separator)
 
-        pointauc_heading = QLabel("Совместимый экспорт")
-        pointauc_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        export_layout.addWidget(pointauc_heading)
-        pointauc_note = QLabel(
+        compatible_export_heading = QLabel("Совместимый экспорт")
+        compatible_export_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        export_layout.addWidget(compatible_export_heading)
+        compatible_export_note = QLabel(
             "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
             "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
             "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
         )
-        pointauc_note.setWordWrap(True)
-        pointauc_note.setProperty("muted", True)
-        export_layout.addWidget(pointauc_note)
+        compatible_export_note.setWordWrap(True)
+        compatible_export_note.setProperty("muted", True)
+        export_layout.addWidget(compatible_export_note)
 
-        pointauc_buttons = QHBoxLayout()
-        self.export_pointauc_btn = QPushButton("Экспорт CSV")
-        self.copy_pointauc_btn = QPushButton("Копировать список")
-        self.export_pointauc_btn.clicked.connect(self.export_pointauc)
-        self.copy_pointauc_btn.clicked.connect(self.copy_pointauc)
-        pointauc_buttons.addWidget(self.export_pointauc_btn)
-        pointauc_buttons.addWidget(self.copy_pointauc_btn)
-        pointauc_buttons.addStretch()
-        export_layout.addLayout(pointauc_buttons)
+        compatible_export_buttons = QHBoxLayout()
+        self.export_auction_csv_btn = QPushButton("Экспорт CSV")
+        self.copy_auction_list_btn = QPushButton("Копировать список")
+        self.export_auction_csv_btn.clicked.connect(self.export_auction_csv)
+        self.copy_auction_list_btn.clicked.connect(self.copy_auction_list)
+        compatible_export_buttons.addWidget(self.export_auction_csv_btn)
+        compatible_export_buttons.addWidget(self.copy_auction_list_btn)
+        compatible_export_buttons.addStretch()
+        export_layout.addLayout(compatible_export_buttons)
         export_layout.addStretch()
 
         self.export_scroll = self._wrap_settings_page(self.export_page, export_layout)
@@ -874,11 +874,11 @@ class SettingsTab(QWidget):
     def export_public_xlsx(self) -> None:
         self._save_export_file("Экспорт Excel", "public_games.xlsx", ".xlsx", export_public_xlsx)
 
-    def export_pointauc(self) -> None:
-        self._save_export_file("Экспорт CSV", "auction.csv", ".csv", export_pointauc_csv)
+    def export_auction_csv(self) -> None:
+        self._save_export_file("Экспорт CSV", "auction.csv", ".csv", export_auction_pipe_csv)
 
-    def copy_pointauc(self) -> None:
-        QApplication.clipboard().setText(pointauc_text(self.db))
+    def copy_auction_list(self) -> None:
+        QApplication.clipboard().setText(auction_pipe_text(self.db))
         QMessageBox.information(
             self,
             "Экспорт",
