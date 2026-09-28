@@ -197,7 +197,7 @@ class AuctionAudioMixin:
             "loop": False,
         }
 
-        if not snapshot["enabled"] or owner != "auction":
+        if not snapshot["enabled"]:
             self._browser_audio_snapshot = snapshot
             return
 
