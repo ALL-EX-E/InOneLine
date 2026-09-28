@@ -1014,9 +1014,10 @@ class AuctionAudioMixin:
 
         paths, asset_ids, start_index = self._resolved_auction_soundtrack_playlist()
         self._auction_audio_session_id = session_id
-        self._auction_audio_asset_ids = list(asset_ids)
         if not paths:
+            self._auction_audio_asset_ids = []
             self.auction_audio.stop(immediate=True)
+            self._refresh_browser_audio_snapshot()
             self._refresh_auction_soundtrack_availability()
             return
         try:
@@ -1027,7 +1028,12 @@ class AuctionAudioMixin:
                 loop_one=self._saved_auction_soundtrack_loop_one(),
                 start_paused=status == "paused",
             )
+            # start_playlist() first resets the old transport and can emit
+            # stopped(), so align IDs only after the new transport is live.
+            self._auction_audio_asset_ids = list(asset_ids)
+            self._refresh_browser_audio_snapshot()
         except Exception as exc:
+            self._auction_audio_asset_ids = []
             self._auction_audio_error(str(exc))
         self._refresh_auction_soundtrack_availability()
 
