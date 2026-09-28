@@ -1,6 +1,6 @@
 ﻿#define MyAppName "In one line"
 #define MyAppExeName "InOneLine.exe"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Local Streaming Tools"
 #define MyAppId "{{D9AE3184-F16E-4B60-BDD9-D4B99541462E}"
 #ifndef DistRoot
@@ -17,7 +17,7 @@ VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Setup
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-VersionInfoVersion=1.0.2.0
+VersionInfoVersion=1.0.3.0
 DefaultDirName=C:\InOneLine
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
@@ -141,7 +141,7 @@ begin
   Result := Length(ExePath) < 260;
   if not Result then
     MsgBox(
-      'Выбранный путь слишком длинный для In one line 1.0.2.' + #13#10 + #13#10 +
+      'Выбранный путь слишком длинный для In one line 1.0.3.' + #13#10 + #13#10 +
       'Полный путь к InOneLine.exe должен быть короче 260 символов.' + #13#10 +
       'Выберите более короткую папку установки.',
       mbError, MB_OK
