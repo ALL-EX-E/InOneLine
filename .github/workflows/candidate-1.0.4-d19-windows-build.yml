@@ -129,10 +129,12 @@ jobs:
         run: |
           $stage = "$env:RUNNER_TEMP\source"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Get-ChildItem -Force | Where-Object { $_.Name -notin @('.git','.github','dist') } | ForEach-Object {
+          Get-ChildItem -Force | Where-Object { $_.Name -notin @('.git','.github','dist','build') } | ForEach-Object {
             Copy-Item $_.FullName -Destination $stage -Recurse -Force
           }
           Remove-Item "$stage\installer\output" -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem $stage -Directory -Recurse -Force | Where-Object { $_.Name -in @('__pycache__','.pytest_cache') } | Remove-Item -Recurse -Force
+          Get-ChildItem $stage -File -Recurse -Force | Where-Object { $_.Extension -in @('.pyc','.pyo') } | Remove-Item -Force
           Compress-Archive -Path "$stage\*" -DestinationPath "installer\output\InOneLine_CANDIDATE_1.0.4_D19_SOURCE.zip" -CompressionLevel Optimal
 
       - name: Write candidate build info
