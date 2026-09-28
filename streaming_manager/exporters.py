@@ -57,16 +57,16 @@ def export_public_xlsx(db: Database, path: str | Path) -> Path:
     return path
 
 
-def export_pointauc_csv(db: Database, path: str | Path) -> Path:
+def export_auction_pipe_csv(db: Database, path: str | Path) -> Path:
     """Legacy pipe-delimited text: Название|целые баллы SM, без заголовка."""
     path = Path(path)
     with path.open("w", encoding="utf-8-sig", newline="") as f:
-        for game in db.pointauc_games():
+        for game in db.auction_eligible_games():
             f.write(f"{game.title}|{format_points(game.sm_points)}\n")
     return path
 
 
-def pointauc_text(db: Database) -> str:
+def auction_pipe_text(db: Database) -> str:
     return "\n".join(
-        f"{game.title}|{format_points(game.sm_points)}" for game in db.pointauc_games()
+        f"{game.title}|{format_points(game.sm_points)}" for game in db.auction_eligible_games()
     )
