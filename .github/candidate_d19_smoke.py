@@ -140,7 +140,15 @@ try:
         finally:
             remote_image._fetch_json = original_fetch_json
 
-        window = MainWindow(db, paths)
+        # This focused smoke does not test the already-existing startup
+        # backup worker. Disable only that deferred QA side effect so the
+        # TemporaryDirectory cannot disappear while its worker is still active.
+        original_startup_backup = MainWindow._startup_backup
+        MainWindow._startup_backup = lambda self: None
+        try:
+            window = MainWindow(db, paths)
+        finally:
+            MainWindow._startup_backup = original_startup_backup
         try:
             settings = window.settings_tab
             index = settings.wheel_center_image_combo.findData(asset.id)
