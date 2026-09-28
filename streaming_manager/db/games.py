@@ -630,7 +630,7 @@ class GamesMixin:
             positions = self._auction_position_map_conn(conn)
         return {"rows": rows, "positions": positions}
 
-    def pointauc_games(self) -> list[Game]:
+    def auction_eligible_games(self) -> list[Game]:
         # Let SQLite filter the auction group instead of loading unrelated rows
         # and discarding them in Python.
         return self.list_games(status_filter="middle")
