@@ -1448,6 +1448,239 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_poll_timer.stop()
         self._shared_xlsx_write_timer.stop()
 
+    def _wheel_center_local_picker_items(self) -> list[dict]:
+        items: list[dict] = []
+        try:
+            assets = self.db.sync_managed_media_category(
+                MEDIA_CATEGORY_WHEEL_CENTER_ICONS
+            )
+        except Exception:
+            assets = []
+        for asset in assets:
+            if not media_asset_available(self.db.path.parent, asset):
+                continue
+            try:
+                path = resolve_media_asset_path(self.db.path.parent, asset)
+            except (OSError, ValueError):
+                continue
+            items.append(
+                {
+                    "asset_id": int(asset.id),
+                    "name": str(asset.display_name or path.name),
+                    "path": str(path),
+                }
+            )
+        return items
+
+    def _open_wheel_center_picker(self) -> None:
+        if self._wheel_center_picker is not None:
+            try:
+                self._wheel_center_picker.close()
+            except RuntimeError:
+                pass
+
+        dialog = WheelCenterPickerDialog(self)
+        self._wheel_center_picker = dialog
+        dialog.set_local_items(self._wheel_center_local_picker_items())
+        dialog.uploadRequested.connect(self._wheel_center_picker_upload)
+        dialog.localAssetSelected.connect(
+            self._wheel_center_picker_local_selected
+        )
+        dialog.remoteEmoteSelected.connect(
+            self._wheel_center_picker_remote_selected
+        )
+
+        if self._wheel_center_catalog_cache is not None:
+            dialog.set_remote_items(self._wheel_center_catalog_cache)
+        else:
+            dialog.set_loading_message("Загрузка смайликов…")
+            self._start_wheel_center_catalog_load()
+
+        center_global = self.wheel_widget.mapToGlobal(
+            self.wheel_widget.rect().center()
+        )
+        dialog.adjustSize()
+        dialog.move(
+            int(center_global.x() - dialog.width() / 2),
+            int(center_global.y() - dialog.height() / 2),
+        )
+        dialog.show()
+
+    def _start_wheel_center_catalog_load(self) -> None:
+        if self._wheel_center_catalog_worker is not None:
+            return
+        worker = FunctionWorker(self._load_wheel_center_catalog)
+        self._wheel_center_catalog_worker = worker
+        worker.signals.result.connect(self._wheel_center_catalog_ready)
+        worker.signals.error.connect(self._wheel_center_catalog_failed)
+        worker.signals.finished.connect(self._wheel_center_catalog_finished)
+        self.thread_pool.start(worker)
+
+    def _load_wheel_center_catalog(self) -> list[EmoteCatalogItem]:
+        row = self.db.get_integration_connection("twitch") or {}
+        if (
+            not bool(row.get("enabled"))
+            or str(row.get("status") or "") != "connected"
+        ):
+            return []
+
+        twitch = self.integration_manager.call_adapter(
+            "twitch",
+            "list_center_emotes",
+        )
+        twitch_id = str((twitch or {}).get("twitch_user_id") or "")
+        items: list[EmoteCatalogItem] = []
+        for raw in (twitch or {}).get("items", []):
+            if not isinstance(raw, dict):
+                continue
+            image_url = str(raw.get("image_url") or "").strip()
+            emote_id = str(raw.get("emote_id") or "").strip()
+            if not image_url or not emote_id:
+                continue
+            items.append(
+                EmoteCatalogItem(
+                    source=str(raw.get("source") or "Twitch"),
+                    emote_id=emote_id,
+                    name=str(raw.get("name") or emote_id),
+                    image_url=image_url,
+                    preview_url=str(raw.get("preview_url") or image_url),
+                    animated=bool(raw.get("animated")),
+                )
+            )
+
+        items.extend(fetch_third_party_channel_emotes(twitch_id))
+        seen: set[tuple[str, str]] = set()
+        unique: list[EmoteCatalogItem] = []
+        for item in items:
+            if item.dedupe_key in seen:
+                continue
+            seen.add(item.dedupe_key)
+            unique.append(item)
+        return hydrate_emote_thumbnails(unique)
+
+    def _wheel_center_catalog_ready(self, items) -> None:
+        self._wheel_center_catalog_cache = list(items or [])
+        dialog = self._wheel_center_picker
+        if dialog is not None:
+            try:
+                dialog.set_remote_items(self._wheel_center_catalog_cache)
+            except RuntimeError:
+                pass
+
+    def _wheel_center_catalog_failed(self, _exc) -> None:
+        dialog = self._wheel_center_picker
+        if dialog is not None:
+            try:
+                dialog.set_remote_items([])
+            except RuntimeError:
+                pass
+
+    def _wheel_center_catalog_finished(self) -> None:
+        self._wheel_center_catalog_worker = None
+
+    def _apply_wheel_center_asset(self, asset_id: int) -> None:
+        asset = self.db.get_media_asset(int(asset_id))
+        if (
+            asset is None
+            or asset.category != MEDIA_CATEGORY_WHEEL_CENTER_ICONS
+            or not media_asset_available(self.db.path.parent, asset)
+        ):
+            QMessageBox.warning(
+                self,
+                "Изображение центра",
+                "Выбранное изображение недоступно.",
+            )
+            return
+        self.db.set_setting(
+            WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
+            str(int(asset.id)),
+        )
+        self._update_wheel_panel(self._current_session())
+        self.centerImageChanged.emit(int(asset.id))
+        dialog = self._wheel_center_picker
+        if dialog is not None:
+            dialog.close()
+
+    def _wheel_center_picker_local_selected(self, asset_id: int) -> None:
+        self._apply_wheel_center_asset(int(asset_id))
+
+    def _wheel_center_picker_upload(self) -> None:
+        if self._wheel_center_import_worker is not None:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите изображение центра колеса",
+            "",
+            "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)",
+        )
+        if not path:
+            return
+        self._start_wheel_center_picker_import(
+            prepare_local_center_image,
+            path,
+        )
+
+    def _wheel_center_picker_remote_selected(self, item) -> None:
+        if self._wheel_center_import_worker is not None:
+            return
+        image_url = str(getattr(item, "image_url", "") or "").strip()
+        if not image_url:
+            return
+
+        def prepare():
+            result = prepare_remote_center_image(image_url)
+            label = str(getattr(item, "name", "") or "").strip()
+            source = str(getattr(item, "source", "") or "").strip()
+            if label:
+                result["label"] = (
+                    f"{label} ({source})" if source else label
+                )
+            return result
+
+        self._start_wheel_center_picker_import(prepare)
+
+    def _start_wheel_center_picker_import(self, fn, *args) -> None:
+        dialog = self._wheel_center_picker
+        if dialog is not None:
+            dialog.set_busy(True)
+        worker = FunctionWorker(fn, *args)
+        self._wheel_center_import_worker = worker
+        worker.signals.result.connect(
+            self._wheel_center_picker_import_ready
+        )
+        worker.signals.error.connect(
+            self._wheel_center_picker_import_failed
+        )
+        worker.signals.finished.connect(
+            self._wheel_center_picker_import_finished
+        )
+        self.thread_pool.start(worker)
+
+    def _wheel_center_picker_import_ready(self, prepared: dict) -> None:
+        try:
+            asset = store_prepared_center_image(self.db, prepared)
+        except Exception as exc:
+            self._wheel_center_picker_import_failed(exc)
+            return
+        self._apply_wheel_center_asset(int(asset.id))
+
+    def _wheel_center_picker_import_failed(self, exc) -> None:
+        dialog = self._wheel_center_picker
+        if dialog is not None:
+            try:
+                dialog.set_busy(False)
+                dialog.set_loading_message("")
+            except RuntimeError:
+                pass
+        QMessageBox.critical(
+            self,
+            "Изображение центра",
+            f"Не удалось добавить изображение:\n{str(exc)}",
+        )
+
+    def _wheel_center_picker_import_finished(self) -> None:
+        self._wheel_center_import_worker = None
+
     def refresh_auction_settings(self) -> None:
         """Reload persisted auction defaults without changing a live session."""
         self._default_auction_duration_ms = (
