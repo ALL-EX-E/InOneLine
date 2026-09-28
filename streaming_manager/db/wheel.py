@@ -5,7 +5,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from ..constants import STATUS_NOT_PLAYED, STATUS_PLAYED
+from ..constants import STATUS_NOT_PLAYED, STATUS_PLAYED, WHEEL_CENTER_IMAGE_MEDIA_ID_KEY
+from ..media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available
 from .common import utc_now
 
 
@@ -707,6 +708,28 @@ class WheelMixin:
 
         return self.wheel_payload(auction_id)
 
+    def _wheel_center_image_payload_from_conn(self, conn) -> dict[str, Any]:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key=?",
+            (WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,),
+        ).fetchone()
+        raw = str(row["value"] if row is not None else "").strip()
+        if not raw.isdigit():
+            return {"enabled": False, "asset_id": None, "url": ""}
+        asset = self._get_media_asset_conn(conn, int(raw))
+        if (
+            asset is None
+            or asset.category != MEDIA_CATEGORY_WHEEL_CENTER_ICONS
+            or not media_asset_available(self.path.parent, asset)
+        ):
+            return {"enabled": False, "asset_id": None, "url": ""}
+        return {
+            "enabled": True,
+            "asset_id": int(asset.id),
+            "url": f"/media/{int(asset.id)}",
+            "name": asset.display_name,
+        }
+
     def _wheel_payload_from_conn(
         self,
         conn,
@@ -817,6 +840,7 @@ class WheelMixin:
             "equal_weights": equal_mode,
             "sectors": sectors,
             "winner": winner,
+            "center_image": self._wheel_center_image_payload_from_conn(conn),
             "animation": {
                 "spin_id": session.get("wheel_spin_id"),
                 "started_at": session.get("wheel_started_at"),
@@ -909,6 +933,7 @@ class WheelMixin:
             "equal_weights": equal_mode,
             "sectors": sectors,
             "winner": None,
+            "center_image": self._wheel_center_image_payload_from_conn(conn),
             "animation": {
                 "spin_id": None,
                 "started_at": None,
