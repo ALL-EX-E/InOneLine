@@ -38,6 +38,7 @@ const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=docum
 const preview=new URLSearchParams(location.search).get("preview")==="1";
 if(preview)document.body.classList.add("preview");
 let state=null,clockOffset=0,rafId=null,rafSpinId="";
+let centerImage=null,centerImageUrl="",centerImageReady=false;
 
 function motionProgress(progress,durationMs){
  const t=Math.max(0,Math.min(1,Number(progress)||0));
@@ -127,9 +128,35 @@ function formatProbability(probability){
  if(!Number.isFinite(value))return null;
  return (Math.max(0,value)*100).toFixed(2).replace(".",",")+" %";
 }
+function syncCenterImage(s){
+ const center=s?.center_image||{};
+ const url=center.enabled?String(center.url||""):"";
+ if(url===centerImageUrl)return;
+ centerImageUrl=url;centerImageReady=false;centerImage=null;
+ if(!url)return;
+ const image=new Image();
+ image.onload=()=>{if(centerImage===image){centerImageReady=true;draw()}};
+ image.onerror=()=>{if(centerImage===image){centerImageReady=false;draw()}};
+ centerImage=image;
+ image.src=url+(url.includes("?")?"&":"?")+"asset="+encodeURIComponent(center.asset_id||"");
+}
+function drawCenterImage(cx,cy,r){
+ const cr=r*.12,size=cr*2;
+ ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
+ if(centerImageReady&&centerImage&&centerImage.naturalWidth>0&&centerImage.naturalHeight>0){
+   const sw=centerImage.naturalWidth,sh=centerImage.naturalHeight,targetRatio=1,sourceRatio=sw/sh;
+   let sx=0,sy=0,cw=sw,ch=sh;
+   if(sourceRatio>targetRatio){cw=sh*targetRatio;sx=(sw-cw)/2}
+   else if(sourceRatio<targetRatio){ch=sw/targetRatio;sy=(sh-ch)/2}
+   ctx.save();ctx.beginPath();ctx.arc(cx,cy,cr-1,0,Math.PI*2);ctx.clip();
+   ctx.drawImage(centerImage,sx,sy,cw,ch,cx-cr,cy-cr,size,size);ctx.restore();
+ }
+ ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();
+}
 function draw(){
  const s=state||(preview?sampleState():null);
  if(!s){stage.classList.remove("visible");return}
+ syncCenterImage(s);
  const show=preview||s.visible;
  stage.classList.toggle("visible",!!show);
  if(!show)return;
@@ -172,11 +199,12 @@ function draw(){
    }
    start=end;
  });
- ctx.beginPath();ctx.arc(0,0,r*.12,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
- ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();ctx.restore();
+ ctx.restore();
 
  // outer ring
  ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;ctx.stroke();
+ // D19 center image is a stationary presentation layer, independent of wheel rotation.
+ drawCenterImage(cx,cy,r);
  // pointer
  ctx.beginPath();ctx.moveTo(cx-20,cy-r-26);ctx.lineTo(cx+20,cy-r-26);ctx.lineTo(cx,cy-r+15);ctx.closePath();
  ctx.fillStyle="#E53935";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
