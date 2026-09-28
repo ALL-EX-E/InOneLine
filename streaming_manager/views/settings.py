@@ -732,11 +732,11 @@ class SettingsTab(QWidget):
         export_separator.setProperty("line", True)
         export_layout.addWidget(export_separator)
 
-        pointauc_heading = QLabel("Pointauc")
+        pointauc_heading = QLabel("Совместимый экспорт")
         pointauc_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         export_layout.addWidget(pointauc_heading)
         pointauc_note = QLabel(
-            "Для Pointauc используется текущий список ДЛЯ АУКА: только активные "
+            "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
             "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
             "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
         )
@@ -745,7 +745,7 @@ class SettingsTab(QWidget):
         export_layout.addWidget(pointauc_note)
 
         pointauc_buttons = QHBoxLayout()
-        self.export_pointauc_btn = QPushButton("Экспорт CSV для Pointauc")
+        self.export_pointauc_btn = QPushButton("Экспорт CSV")
         self.copy_pointauc_btn = QPushButton("Копировать список")
         self.export_pointauc_btn.clicked.connect(self.export_pointauc)
         self.copy_pointauc_btn.clicked.connect(self.copy_pointauc)
@@ -875,13 +875,13 @@ class SettingsTab(QWidget):
         self._save_export_file("Экспорт Excel", "public_games.xlsx", ".xlsx", export_public_xlsx)
 
     def export_pointauc(self) -> None:
-        self._save_export_file("Экспорт Pointauc", "pointauc.csv", ".csv", export_pointauc_csv)
+        self._save_export_file("Экспорт CSV", "auction.csv", ".csv", export_pointauc_csv)
 
     def copy_pointauc(self) -> None:
         QApplication.clipboard().setText(pointauc_text(self.db))
         QMessageBox.information(
             self,
-            "Pointauc",
+            "Экспорт",
             "Список скопирован в буфер обмена.",
         )
 
@@ -2006,7 +2006,7 @@ class SettingsTab(QWidget):
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
-        # Match the requested Pointauc-style flow: a click in the app immediately
+        # Match the requested quick-picker flow: a click in the app immediately
         # opens DonationAlerts in the user's normal browser.
         QDesktopServices.openUrl(QUrl(info.authorization_url))
 
