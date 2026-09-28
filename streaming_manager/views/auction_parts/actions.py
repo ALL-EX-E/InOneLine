@@ -691,15 +691,15 @@ class AuctionActionMixin:
     def export_pointauc(self):
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Экспорт Pointauc",
-            "pointauc.csv",
+            "Экспорт CSV",
+            "auction.csv",
             "CSV (*.csv);;Все файлы (*.*)",
         )
         if not path:
             return
         try:
             export_pointauc_csv(self.db, path)
-            QMessageBox.information(self, "Pointauc", f"Список сохранён:\n{path}")
+            QMessageBox.information(self, "Экспорт", f"Список сохранён:\n{path}")
         except Exception as exc:
             QMessageBox.critical(self, "Ошибка", str(exc))
 
@@ -707,6 +707,6 @@ class AuctionActionMixin:
         QApplication.clipboard().setText(pointauc_text(self.db))
         QMessageBox.information(
             self,
-            "Pointauc",
+            "Экспорт",
             "Список скопирован в буфер обмена.",
         )
