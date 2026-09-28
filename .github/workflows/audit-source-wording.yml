@@ -1,0 +1,49 @@
+name: Audit published source wording
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/audit-source-wording.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download published source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.0.4 --repo "${{ github.repository }}" --pattern "InOneLine_Source_1.0.4.zip"
+          mkdir source
+          unzip -q InOneLine_Source_1.0.4.zip -d source
+      - name: Scan comparative reference wording
+        shell: python
+        run: |
+          import pathlib, re, sys
+          patterns = [
+              re.compile(r"\bкак\s+в\s+[«\"'“]?[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё0-9_.+-]*", re.I),
+              re.compile(r"\bпо\s+аналогии\s+с\b", re.I),
+              re.compile(r"\bпо\s+образцу\b", re.I),
+              re.compile(r"\bв\s+стиле\s+[«\"'“]?[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё0-9_.+-]*", re.I),
+              re.compile(r"[A-Za-zА-Яа-яЁё0-9_.+]+[-‑–—]подобн\w*", re.I),
+              re.compile(r"[A-Za-z0-9_.+]+[-‑–—]style\b", re.I),
+              re.compile(r"\b(?:inspired\s+by|model(?:l)?ed\s+after|like\s+in)\b", re.I),
+          ]
+          suffixes={".md",".txt",".py",".html",".css",".js",".ts",".json",".yml",".yaml",".toml",".ini",".cfg",".iss",".bat",".cmd",".ps1"}
+          hits=[]
+          for path in pathlib.Path("source").rglob("*"):
+              if not path.is_file() or path.suffix.lower() not in suffixes:
+                  continue
+              try: text=path.read_text(encoding="utf-8")
+              except Exception: continue
+              for n,line in enumerate(text.splitlines(),1):
+                  if any(p.search(line) for p in patterns):
+                      hits.append(f"{path}:{n}: {line.strip()}")
+          if hits:
+              print("\n".join(hits))
+              raise SystemExit(2)
+          print("Published source wording audit: OK")
