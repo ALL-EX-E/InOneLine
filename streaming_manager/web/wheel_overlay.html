@@ -10,8 +10,9 @@ body.preview{background:radial-gradient(circle at center,#1b2228,#0b0f12)}
 #root{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
 #stage{position:relative;width:min(92vw,92vh);height:min(92vw,92vh);opacity:0;transition:opacity .15s ease}
 #stage.visible{opacity:1}
-canvas{position:absolute;inset:0;width:100%;height:100%}
-#winner{position:absolute;left:5%;right:5%;bottom:0;text-align:center;color:white;font-weight:700;font-size:clamp(18px,3.4vmin,42px);text-shadow:0 2px 10px #000;opacity:0}
+canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
+#center-image{position:absolute;display:none;object-fit:cover;border-radius:50%;pointer-events:none;z-index:1}
+#winner{position:absolute;left:5%;right:5%;bottom:0;text-align:center;color:white;font-weight:700;font-size:clamp(18px,3.4vmin,42px);text-shadow:0 2px 10px #000;opacity:0;z-index:3}
 #winner.visible{opacity:1}
 #winner-chance{margin-top:.18em;font-size:.62em;font-weight:650}
 #preview-label{position:absolute;top:2%;left:0;right:0;text-align:center;color:#aeb8c0;font-size:clamp(12px,2vmin,22px);display:none}
@@ -22,6 +23,7 @@ body.preview #preview-label{display:block}
 <div id="root">
   <div id="stage">
     <canvas id="wheel"></canvas>
+    <img id="center-image" alt="">
     <div id="preview-label">ПРЕДПРОСМОТР КОЛЕСА OBS</div>
     <div id="winner">
       <div id="winner-title"></div>
@@ -34,11 +36,12 @@ const API="/api/wheel";
 const PALETTE=["#4FC3F7","#FF8A65","#BA68C8","#81C784","#FFD54F","#64B5F6","#F06292","#4DB6AC","#A1887F","#90A4AE","#9575CD","#DCE775"];
 const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
 const stage=document.getElementById("stage"),winnerEl=document.getElementById("winner");
+const centerImageEl=document.getElementById("center-image");
 const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
 const preview=new URLSearchParams(location.search).get("preview")==="1";
 if(preview)document.body.classList.add("preview");
 let state=null,clockOffset=0,rafId=null;
-let centerImage=null,centerImageUrl="",centerImageReady=false,centerImageAnimated=false;
+let centerImageUrl="";
 
 function motionProgress(progress,durationMs){
  const t=Math.max(0,Math.min(1,Number(progress)||0));
@@ -131,28 +134,34 @@ function formatProbability(probability){
 function syncCenterImage(s){
  const center=s?.center_image||{};
  const url=center.enabled?String(center.url||""):"";
- const animated=!!(center.enabled&&center.animated);
- if(url===centerImageUrl&&animated===centerImageAnimated)return;
- centerImageUrl=url;centerImageAnimated=animated;centerImageReady=false;centerImage=null;
- if(!url)return;
- const image=new Image();
- image.onload=()=>{if(centerImage===image){centerImageReady=true;draw()}};
- image.onerror=()=>{if(centerImage===image){centerImageReady=false;draw()}};
- centerImage=image;
- image.src=url+(url.includes("?")?"&":"?")+"asset="+encodeURIComponent(center.asset_id||"");
-}
-function drawCenterImage(cx,cy,r){
- const cr=r*.12,size=cr*2;
- ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
- if(centerImageReady&&centerImage&&centerImage.naturalWidth>0&&centerImage.naturalHeight>0){
-   const sw=centerImage.naturalWidth,sh=centerImage.naturalHeight,targetRatio=1,sourceRatio=sw/sh;
-   let sx=0,sy=0,cw=sw,ch=sh;
-   if(sourceRatio>targetRatio){cw=sh*targetRatio;sx=(sw-cw)/2}
-   else if(sourceRatio<targetRatio){ch=sw/targetRatio;sy=(sh-ch)/2}
-   ctx.save();ctx.beginPath();ctx.arc(cx,cy,cr-1,0,Math.PI*2);ctx.clip();
-   ctx.drawImage(centerImage,sx,sy,cw,ch,cx-cr,cy-cr,size,size);ctx.restore();
+ if(url===centerImageUrl)return;
+ centerImageUrl=url;
+ centerImageEl.style.display="none";
+ centerImageEl.onload=null;
+ centerImageEl.onerror=null;
+ if(!url){
+   centerImageEl.removeAttribute("src");
+   return;
  }
- ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();
+ const resolved=url+(url.includes("?")?"&":"?")+"asset="+encodeURIComponent(center.asset_id||"");
+ centerImageEl.onload=()=>{if(centerImageUrl===url)centerImageEl.style.display="block"};
+ centerImageEl.onerror=()=>{if(centerImageUrl===url)centerImageEl.style.display="none"};
+ // Native <img> is intentional: Chromium/OBS advances GIF/WebP animation
+ // frames itself. Drawing an animated image into canvas can freeze on frame 1.
+ centerImageEl.src=resolved;
+}
+function positionCenterImage(cx,cy,r){
+ const cr=r*.12,inner=Math.max(1,cr-2),size=inner*2;
+ centerImageEl.style.left=(cx-inner)+"px";
+ centerImageEl.style.top=(cy-inner)+"px";
+ centerImageEl.style.width=size+"px";
+ centerImageEl.style.height=size+"px";
+}
+function drawCenterBase(cx,cy,r){
+ const cr=r*.12;
+ ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
+ ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();
+ positionCenterImage(cx,cy,r);
 }
 function draw(){
  const s=state||(preview?sampleState():null);
@@ -204,8 +213,8 @@ function draw(){
 
  // outer ring
  ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;ctx.stroke();
- // D19 center image is a stationary presentation layer, independent of wheel rotation.
- drawCenterImage(cx,cy,r);
+ // D19 center is stationary; native <img> above the canvas preserves GIF/WebP animation.
+ drawCenterBase(cx,cy,r);
  // pointer
  ctx.beginPath();ctx.moveTo(cx-20,cy-r-26);ctx.lineTo(cx+20,cy-r-26);ctx.lineTo(cx,cy-r+15);ctx.closePath();
  ctx.fillStyle="#E53935";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
@@ -228,8 +237,8 @@ function ensureAnimationLoop(){
  const s=state||(preview?sampleState():null);
  const spinId=s?.animation?.spin_id||"";
  const wheelAnimating=!!(spinId&&!rotationFor(s).complete);
- const centerAnimating=!!(s?.center_image?.enabled&&s?.center_image?.animated);
- if(!wheelAnimating&&!centerAnimating){stopAnimationLoop();return}
+ // Center GIF/WebP is a native <img>, so Chromium animates it without a canvas RAF loop.
+ if(!wheelAnimating){stopAnimationLoop();return}
  if(rafId!==null)return;
  rafId=requestAnimationFrame(animationFrame);
 }
