@@ -892,7 +892,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.refresh_integration_status()
 
         # ==========================================================
-        # POINTAUC
+        # LEGACY COMPATIBLE EXPORT
         # ==========================================================
         self.pointauc_page = QWidget()
         pointauc_layout = QVBoxLayout(self.pointauc_page)
@@ -912,7 +912,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         pointauc_layout.addLayout(pointauc_rules_row)
 
         self.pointauc_rules_label = QLabel(
-            "Для Pointauc используется текущий список ДЛЯ АУКА: только активные "
+            "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
             "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
             "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
         )
@@ -922,7 +922,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         pointauc_layout.addWidget(self.pointauc_rules_label)
 
         buttons = QHBoxLayout()
-        export_btn = QPushButton("Экспорт CSV для Pointauc")
+        export_btn = QPushButton("Экспорт CSV")
         export_btn.clicked.connect(self.export_pointauc)
         copy_btn = QPushButton("Копировать список")
         copy_btn.clicked.connect(self.copy_pointauc)
@@ -979,7 +979,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._init_shared_xlsx_sync()
 
         # R1.0.9: the former Auction -> Export page is no longer exposed as an
-        # auction subtab. Pointauc export actions live in Settings -> Export,
+        # auction subtab. Compatible export actions live in Settings -> Export,
         # while the proven shared-XLSX synchronization controls are re-hosted
         # on the main Games page by MainWindow. The sync engine remains here so
         # no accepted synchronization semantics/timers are rewritten.
