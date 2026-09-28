@@ -115,7 +115,18 @@ jobs:
             if ($health.version -ne "1.0.4") {
               throw "Wrong frozen version: $($health.version)"
             }
-            $wheel = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/wheel" -TimeoutSec 2
+            $wheel = $null
+            for ($i = 0; $i -lt 30; $i++) {
+              try {
+                $wheel = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/wheel" -TimeoutSec 5
+                break
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+            if ($null -eq $wheel) {
+              throw "Frozen /api/wheel did not answer"
+            }
             if ($null -eq $wheel.center_image) {
               throw "Frozen /api/wheel has no D19 center_image contract"
             }
