@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "In one line"
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
 SCHEMA_VERSION = 18
@@ -75,6 +75,10 @@ WHEEL_SOUNDTRACK_VOLUME_KEY = "wheel_soundtrack_volume"
 WHEEL_SOUNDTRACK_VOLUME_DEFAULT = 100
 WHEEL_SOUNDTRACK_MUTE_KEY = "wheel_soundtrack_mute"
 WHEEL_SOUNDTRACK_MUTE_DEFAULT = False
+
+# D19 — one application-owned center image shared by the local and OBS wheel.
+# Empty value preserves the historical standard center.
+WHEEL_CENTER_IMAGE_MEDIA_ID_KEY = "wheel_center_image_media_id"
 
 # Timer/Auction Music — application-owned soundtrack for the max-amount
 # auction countdown. It deliberately has separate persisted state from W3.
