@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -16,6 +17,10 @@ from PySide6.QtWidgets import (
 
 from ...audio import ApplicationAudioEngine, ApplicationPlaylistAudioEngine
 from ...constants import (
+    AUCTION_AUDIO_OUTPUT_MODE_APPLICATION,
+    AUCTION_AUDIO_OUTPUT_MODE_DEFAULT,
+    AUCTION_AUDIO_OUTPUT_MODE_KEY,
+    AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
     AUCTION_SOUNDTRACK_LOOP_ONE_DEFAULT,
     AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
     AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
@@ -77,6 +82,166 @@ class AuctionAudioMixin:
         self.auction_music_dir.mkdir(parents=True, exist_ok=True)
         self.auction_audio.set_volume_percent(self._saved_auction_soundtrack_volume())
         self.auction_audio.set_muted(self._saved_auction_soundtrack_mute())
+
+        # D43 keeps the existing Qt players as the authoritative transport even
+        # when OBS renders the sound. In OBS mode they continue tracking exact
+        # playlist/position/fade state but their local QAudioOutput is muted.
+        self._auction_audio_asset_ids: list[int] = []
+        self._wheel_audio_asset_id: int | None = None
+        self._browser_audio_snapshot: dict[str, object] = {
+            "enabled": False,
+            "owner": "idle",
+            "active": False,
+            "kind": "none",
+        }
+        self._browser_audio_snapshot_timer = QTimer(self)
+        self._browser_audio_snapshot_timer.setInterval(100)
+        self._browser_audio_snapshot_timer.timeout.connect(
+            self._refresh_browser_audio_snapshot
+        )
+        self._apply_audio_output_mode()
+        self._refresh_browser_audio_snapshot()
+        self._browser_audio_snapshot_timer.start()
+
+    def _saved_audio_output_mode(self) -> str:
+        mode = str(
+            self.db.get_setting(
+                AUCTION_AUDIO_OUTPUT_MODE_KEY,
+                AUCTION_AUDIO_OUTPUT_MODE_DEFAULT,
+            )
+            or AUCTION_AUDIO_OUTPUT_MODE_DEFAULT
+        ).strip().casefold()
+        if mode not in {
+            AUCTION_AUDIO_OUTPUT_MODE_APPLICATION,
+            AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
+        }:
+            return AUCTION_AUDIO_OUTPUT_MODE_DEFAULT
+        return mode
+
+    def _audio_output_mode_changed(self, _index: int = -1) -> None:
+        combo = getattr(self, "audio_output_mode_combo", None)
+        if combo is None:
+            return
+        mode = str(combo.currentData() or AUCTION_AUDIO_OUTPUT_MODE_DEFAULT)
+        if mode not in {
+            AUCTION_AUDIO_OUTPUT_MODE_APPLICATION,
+            AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
+        }:
+            mode = AUCTION_AUDIO_OUTPUT_MODE_DEFAULT
+        self.db.set_setting(AUCTION_AUDIO_OUTPUT_MODE_KEY, mode)
+        self._apply_audio_output_mode()
+        self._refresh_browser_audio_snapshot()
+
+    def _apply_audio_output_mode(self) -> None:
+        through_obs = self._saved_audio_output_mode() == AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER
+        self.auction_audio.set_transport_silent(through_obs)
+        self.wheel_audio.set_transport_silent(through_obs)
+
+    def _acquire_auction_audio_owner(self) -> None:
+        coordinator = getattr(self, "audio_coordinator", None)
+        if coordinator is not None:
+            coordinator.acquire_auction()
+
+    def _release_auction_audio_owner(self) -> None:
+        coordinator = getattr(self, "audio_coordinator", None)
+        if coordinator is not None:
+            coordinator.release_auction()
+
+    def _sync_audio_owner_with_session(
+        self,
+        session: dict | None,
+        *,
+        spin_running: bool | None = None,
+    ) -> None:
+        if session is None:
+            self._release_auction_audio_owner()
+            return
+        status = str(session.get("status") or "")
+        if status == "winner_selected":
+            if spin_running is None:
+                spin_running = bool(
+                    session.get("wheel_spin_id")
+                    and not self._wheel_spin_complete(session)
+                )
+            if not spin_running:
+                self._release_auction_audio_owner()
+                return
+        if status in self.db.AUCTION_OPEN_STATUSES:
+            self._acquire_auction_audio_owner()
+        else:
+            self._release_auction_audio_owner()
+
+    def _refresh_browser_audio_snapshot(self) -> None:
+        mode = self._saved_audio_output_mode()
+        coordinator = getattr(self, "audio_coordinator", None)
+        owner = str(coordinator.owner) if coordinator is not None else "idle"
+        snapshot: dict[str, object] = {
+            "enabled": mode == AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
+            "owner": owner,
+            "active": False,
+            "kind": "none",
+            "media_id": None,
+            "url": "",
+            "playing": False,
+            "paused": False,
+            "position_ms": 0,
+            "gain": 0.0,
+            "muted": False,
+            "loop": False,
+        }
+
+        if not snapshot["enabled"] or owner != "auction":
+            self._browser_audio_snapshot = snapshot
+            return
+
+        if self.wheel_audio.window_active and self._wheel_audio_asset_id is not None:
+            snapshot.update(
+                {
+                    "active": True,
+                    "kind": "wheel",
+                    "media_id": int(self._wheel_audio_asset_id),
+                    "url": f"/media/{int(self._wheel_audio_asset_id)}",
+                    "playing": bool(self.wheel_audio.playing),
+                    "paused": False,
+                    "position_ms": int(self.wheel_audio.position_ms),
+                    "gain": float(self.wheel_audio.effective_gain),
+                    "muted": bool(self.wheel_audio.muted),
+                    "loop": True,
+                }
+            )
+            self._browser_audio_snapshot = snapshot
+            return
+
+        if self.auction_audio.active and self._auction_audio_asset_ids:
+            index = max(
+                0,
+                min(
+                    len(self._auction_audio_asset_ids) - 1,
+                    int(self.auction_audio.current_index),
+                ),
+            )
+            media_id = int(self._auction_audio_asset_ids[index])
+            snapshot.update(
+                {
+                    "active": True,
+                    "kind": "auction",
+                    "media_id": media_id,
+                    "url": f"/media/{media_id}",
+                    "playing": bool(self.auction_audio.playing),
+                    "paused": bool(self.auction_audio.paused),
+                    "position_ms": int(self.auction_audio.position_ms),
+                    "gain": float(self.auction_audio.effective_gain),
+                    "muted": bool(self.auction_audio.muted),
+                    "loop": bool(self.auction_audio.loop_one),
+                }
+            )
+
+        self._browser_audio_snapshot = snapshot
+
+    def auction_browser_audio_state(self) -> dict[str, object]:
+        # HTTP runs on its own thread. Return only a copy of the primitive cache;
+        # QMediaPlayer/QAudioOutput are read exclusively by the main-thread timer.
+        return dict(self._browser_audio_snapshot)
 
     def _build_wheel_soundtrack_controls(self) -> QWidget:
         panel = QWidget()
@@ -811,11 +976,12 @@ class AuctionAudioMixin:
         self._auction_audio_runtime_error = ""
         self._refresh_auction_soundtrack_library(repaired.id)
 
-    def _resolved_auction_soundtrack_playlist(self) -> tuple[list[Path], int]:
+    def _resolved_auction_soundtrack_playlist(self) -> tuple[list[Path], list[int], int]:
         selected = self._selected_auction_soundtrack_asset()
         if selected is None or not media_asset_available(self.db.path.parent, selected):
-            return [], 0
+            return [], [], 0
         paths: list[Path] = []
+        asset_ids: list[int] = []
         start_index = 0
         for asset in self._auction_soundtrack_assets():
             if not media_asset_available(self.db.path.parent, asset):
@@ -827,7 +993,8 @@ class AuctionAudioMixin:
             if asset.id == selected.id:
                 start_index = len(paths)
             paths.append(path)
-        return paths, start_index
+            asset_ids.append(int(asset.id))
+        return paths, asset_ids, start_index
 
     def _start_auction_soundtrack_for_session(self, session: dict | None, *, restart: bool = False) -> None:
         if session is None or str(session.get("mode") or "") != "max_amount":
@@ -845,8 +1012,9 @@ class AuctionAudioMixin:
                 self._refresh_auction_soundtrack_availability()
             return
 
-        paths, start_index = self._resolved_auction_soundtrack_playlist()
+        paths, asset_ids, start_index = self._resolved_auction_soundtrack_playlist()
         self._auction_audio_session_id = session_id
+        self._auction_audio_asset_ids = list(asset_ids)
         if not paths:
             self.auction_audio.stop(immediate=True)
             self._refresh_auction_soundtrack_availability()
@@ -884,9 +1052,12 @@ class AuctionAudioMixin:
 
     def _auction_audio_track_changed(self, _source: str) -> None:
         self._auction_audio_runtime_error = ""
+        self._refresh_browser_audio_snapshot()
         self._refresh_auction_soundtrack_availability()
 
     def _auction_audio_stopped(self) -> None:
+        self._auction_audio_asset_ids = []
+        self._refresh_browser_audio_snapshot()
         self._refresh_auction_soundtrack_availability()
 
     def _auction_audio_error(self, message) -> None:
@@ -959,6 +1130,7 @@ class AuctionAudioMixin:
         try:
             source = resolve_media_asset_path(self.db.path.parent, asset)
             self._wheel_audio_runtime_error = ""
+            self._wheel_audio_asset_id = int(asset.id)
             self.wheel_audio.schedule_loop(
                 source,
                 started_at=str(started_at),
@@ -973,8 +1145,10 @@ class AuctionAudioMixin:
 
     def shutdown_audio(self) -> None:
         """Release application audio promptly during MainWindow shutdown."""
+        self._browser_audio_snapshot_timer.stop()
         self.auction_audio.stop(immediate=True)
         self.wheel_audio.stop(immediate=True)
+        self._release_auction_audio_owner()
 
     def _wheel_audio_error(self, message) -> None:
         self._wheel_audio_runtime_error = f"Ошибка воспроизведения — колесо продолжает работу: {message}"
