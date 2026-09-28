@@ -164,6 +164,12 @@ class MainWindow(QMainWindow):
             donationalerts_service=self.donationalerts_service,
             donationalerts_runtime_wake=self.donationalerts_runtime.wake,
         )
+        # D19 quick picker and Settings edit the exact same persisted center
+        # asset. Keep the Settings combo synchronized when the user picks one
+        # directly on the local wheel.
+        self.auction_tab.centerImageChanged.connect(
+            self.settings_tab._refresh_wheel_center_image_library
+        )
 
         # Одно состояние списка для вкладок «Игры» и «Публичный список».
         self._lists_visible = True
