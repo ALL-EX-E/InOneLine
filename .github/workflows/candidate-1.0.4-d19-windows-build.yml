@@ -53,7 +53,34 @@ jobs:
           assert "set_center_image_path" in wheel
           assert "QMovie" in wheel
           assert "_center_image_movie" in wheel
+          assert "centerClicked = Signal()" in wheel
+          assert "def mousePressEvent" in wheel
           assert "painter.setClipPath(clip)" in wheel
+
+          picker = Path("streaming_manager/views/wheel_center_picker.py").read_text(encoding="utf-8")
+          assert "Загрузить своё изображение" in picker
+          assert "QGridLayout" in picker
+          assert "QLineEdit" not in picker
+          assert "QComboBox" not in picker
+          assert "Поиск" not in picker
+          assert "Фильтр" not in picker
+
+          auction = Path("streaming_manager/views/auction.py").read_text(encoding="utf-8")
+          assert "_open_wheel_center_picker" in auction
+          assert "list_center_emotes" in auction
+          assert "fetch_third_party_channel_emotes" in auction
+          assert "centerImageChanged = Signal(int)" in auction
+
+          catalog = Path("streaming_manager/emote_catalog.py").read_text(encoding="utf-8")
+          assert "https://7tv.io/v3/users/twitch/" in catalog
+          assert "https://api.betterttv.net/3/cached/users/twitch/" in catalog
+          assert "https://api.frankerfacez.com/v1/room/id/" in catalog
+
+          twitch = Path("streaming_manager/twitch.py").read_text(encoding="utf-8")
+          assert "TWITCH_CHANNEL_EMOTES_URL" in twitch
+          assert "TWITCH_GLOBAL_EMOTES_URL" in twitch
+          assert "def list_center_emotes" in twitch
+
           rng = Path("streaming_manager/views/auction_parts/rng.py").read_text(encoding="utf-8")
           assert "center_image" not in rng
           print("D19 STATIC INVARIANTS: PASS")
