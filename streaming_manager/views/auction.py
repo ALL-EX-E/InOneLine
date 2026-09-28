@@ -174,7 +174,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         layout.setSpacing(9)
 
         # Внутренние вкладки разделяют подготовку лотов, управление сессией
-        # и совместимость с Pointauc. Так на одном экране больше нет ряда
+        # и совместимость с внешними форматами. Так на одном экране больше нет ряда
         # неактуальных кнопок.
         self.auction_tabs = QTabWidget()
         layout.addWidget(self.auction_tabs, 1)
