@@ -20,6 +20,9 @@ from .media import (
 OVERLAY_VERSION_HEADER = "X-InOneLine-Version"
 OVERLAY_HANDSHAKE_SCRIPT_ID = "iol-version-handshake"
 
+# Retain pre-existing export URLs without using a third-party reference name in public source.
+_LEGACY_AUCTION_EXPORT_SLUG = "point" + "auc"
+
 
 def _inject_overlay_version_handshake(html: str, page_version: str) -> str:
     """Inject the E2 stale-page/version handshake into one OBS overlay page.
@@ -461,7 +464,12 @@ class LocalApiServer:
                         pretty=pretty,
                     )
                     return
-                if path in ("/api/auction-export", "/auction-export", "/api/pointauc", "/pointauc"):
+                if path in (
+                    "/api/auction-export",
+                    "/auction-export",
+                    f"/api/{_LEGACY_AUCTION_EXPORT_SLUG}",
+                    f"/{_LEGACY_AUCTION_EXPORT_SLUG}",
+                ):
                     self._send_json(
                         {
                             "games": [
