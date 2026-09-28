@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "In one line"
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
 SCHEMA_VERSION = 18
@@ -89,6 +89,13 @@ AUCTION_SOUNDTRACK_VOLUME_KEY = "auction_soundtrack_volume"
 AUCTION_SOUNDTRACK_VOLUME_DEFAULT = 100
 AUCTION_SOUNDTRACK_MUTE_KEY = "auction_soundtrack_mute"
 AUCTION_SOUNDTRACK_MUTE_DEFAULT = False
+
+# D43 — shared output route for Auction + Wheel music. The default remains
+# application playback so updating from 1.0.4 cannot silently remove audio.
+AUCTION_AUDIO_OUTPUT_MODE_KEY = "auction_audio_output_mode"
+AUCTION_AUDIO_OUTPUT_MODE_DEFAULT = "application"
+AUCTION_AUDIO_OUTPUT_MODE_APPLICATION = "application"
+AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER = "obs_timer"
 
 # S2 — timer auto-extension. Settings live in the existing generic settings
 # table, so enabling the feature does not require a SQLite schema migration.
