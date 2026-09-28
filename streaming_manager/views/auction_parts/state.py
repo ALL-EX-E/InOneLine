@@ -205,6 +205,13 @@ class AuctionStateMixin:
             and session.get("wheel_spin_id")
             and not self._wheel_spin_complete(session)
         )
+        # Audio ownership follows the auction lifecycle rather than tab
+        # visibility. Pause/tie/awaiting-wheel keep ownership; it is released
+        # only when the winner is actually revealable or the session is gone.
+        self._sync_audio_owner_with_session(
+            session,
+            spin_running=spin_running,
+        )
 
         preparing_rng = self._auction_rng_worker is not None
         preparing_wheel_rng = self._wheel_rng_worker is not None
@@ -799,6 +806,12 @@ class AuctionStateMixin:
         self._update_session_controls(session)
 
     def _handle_local_wheel_spin_finished(self):
+        # Winner is now revealable. Release auction ownership even when the
+        # Auction tab itself is hidden; refresh() may be deferred in that case.
+        self._sync_audio_owner_with_session(
+            self._current_session(),
+            spin_running=False,
+        )
         # Здесь можно снова выполнять обычные запросы/перерисовку.
         # Обновляем ровно один раз: раскрываем победителя и кнопку подтверждения.
         self.refresh()
