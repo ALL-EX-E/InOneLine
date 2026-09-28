@@ -190,49 +190,66 @@ def fetch_third_party_channel_emotes(twitch_user_id: str) -> list[EmoteCatalogIt
     if not twitch_id.isdigit():
         return []
 
-    result: list[EmoteCatalogItem] = []
-
-    # 7TV v3: Twitch connection -> emote set. Some deployments include the
-    # emote set inline; otherwise fetch the referenced set separately.
-    try:
-        user_payload = _fetch_json(f"https://7tv.io/v3/users/twitch/{twitch_id}")
-        emote_set = user_payload.get("emote_set")
-        set_id = str(
-            user_payload.get("emote_set_id")
-            or (emote_set.get("id") if isinstance(emote_set, dict) else "")
-            or ""
-        ).strip()
-        if not (isinstance(emote_set, dict) and isinstance(emote_set.get("emotes"), list)):
-            user_payload = (
-                _fetch_json(f"https://7tv.io/v3/emote-sets/{set_id}")
-                if set_id
-                else {}
+    def load_7tv() -> list[EmoteCatalogItem]:
+        try:
+            user_payload = _fetch_json(
+                f"https://7tv.io/v3/users/twitch/{twitch_id}"
             )
-        result.extend(_parse_7tv_emotes(user_payload))
-    except Exception:
-        pass
+            emote_set = user_payload.get("emote_set")
+            set_id = str(
+                user_payload.get("emote_set_id")
+                or (
+                    emote_set.get("id")
+                    if isinstance(emote_set, dict)
+                    else ""
+                )
+                or ""
+            ).strip()
+            if not (
+                isinstance(emote_set, dict)
+                and isinstance(emote_set.get("emotes"), list)
+            ):
+                user_payload = (
+                    _fetch_json(f"https://7tv.io/v3/emote-sets/{set_id}")
+                    if set_id
+                    else {}
+                )
+            return _parse_7tv_emotes(user_payload)
+        except Exception:
+            return []
 
-    try:
-        result.extend(
-            _parse_bttv_emotes(
+    def load_bttv() -> list[EmoteCatalogItem]:
+        try:
+            return _parse_bttv_emotes(
                 _fetch_json(
                     f"https://api.betterttv.net/3/cached/users/twitch/{twitch_id}"
                 )
             )
-        )
-    except Exception:
-        pass
+        except Exception:
+            return []
 
-    try:
-        result.extend(
-            _parse_ffz_emotes(
+    def load_ffz() -> list[EmoteCatalogItem]:
+        try:
+            return _parse_ffz_emotes(
                 _fetch_json(
                     f"https://api.frankerfacez.com/v1/room/id/{twitch_id}"
                 )
             )
-        )
-    except Exception:
-        pass
+        except Exception:
+            return []
+
+    result: list[EmoteCatalogItem] = []
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [
+            pool.submit(load_7tv),
+            pool.submit(load_bttv),
+            pool.submit(load_ffz),
+        ]
+        for future in futures:
+            try:
+                result.extend(future.result())
+            except Exception:
+                continue
 
     seen: set[tuple[str, str]] = set()
     unique: list[EmoteCatalogItem] = []
