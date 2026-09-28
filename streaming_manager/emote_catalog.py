@@ -9,7 +9,7 @@ from urllib import request as urlrequest
 from .integrations import IntegrationTemporaryError
 
 
-USER_AGENT = "InOneLine/1.0.4 emote-catalog"
+USER_AGENT = "InOneLine/1.0.5 emote-catalog"
 JSON_LIMIT = 2 * 1024 * 1024
 THUMB_LIMIT = 1024 * 1024
 
