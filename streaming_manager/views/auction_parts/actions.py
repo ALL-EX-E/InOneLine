@@ -157,6 +157,9 @@ class AuctionActionMixin:
 
         self._active_auction_id = auction_id
         self._pending_tie_overtime = False
+        # Explicit Start/Spin is the point where Auction takes ownership from
+        # the future independent music player.
+        self._acquire_auction_audio_owner()
         self.auction_tabs.setCurrentWidget(self.conduct_page)
         self.refresh()
         QTimer.singleShot(0, self._reset_conduct_auto_scroll)
@@ -314,6 +317,11 @@ class AuctionActionMixin:
 
         status = result.get("status")
         self._pending_tie_overtime = False
+        if status in {"winner_selected", "finished_no_winner"}:
+            # The ordinary player may resume as soon as the winner is
+            # revealable (or the auction ended without one); confirmation is a
+            # later bookkeeping action and must not hold the music channel.
+            self._release_auction_audio_owner()
         if status == "awaiting_wheel":
             QMessageBox.information(
                 self,
@@ -416,6 +424,7 @@ class AuctionActionMixin:
             return
 
         self._pending_tie_overtime = False
+        self._acquire_auction_audio_owner()
         self._start_auction_soundtrack_for_session(
             self._current_session(),
             restart=True,
@@ -441,6 +450,7 @@ class AuctionActionMixin:
             return
 
         self._pending_tie_overtime = False
+        self._acquire_auction_audio_owner()
         self._default_wheel_duration_ms = default_ms
         self._prestart_wheel_duration_ms = default_ms
         self._timer_context = "wheel"
@@ -491,6 +501,7 @@ class AuctionActionMixin:
 
         self._stop_auction_soundtrack(immediate=False)
         self._stop_wheel_soundtrack(immediate=True)
+        self._release_auction_audio_owner()
         self._active_auction_id = None
         self._prepare_next_max_amount_timer()
         # Отмена может перевести временные auction_only-лоты в обычные игры.

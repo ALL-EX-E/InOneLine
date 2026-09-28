@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from ..app_paths import AppPaths
 from ..api_server import LocalApiServer
+from ..audio import AudioCoordinator
 from ..constants import (
     APP_NAME, APP_VERSION, AUCTION_MANUAL_BID_POINTS_MAX,
     AUCTION_MANUAL_BID_POINTS_MIN, AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
@@ -124,6 +125,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         integration_manager: IntegrationManager | None = None,
         open_integrations: Callable[[], None] | None = None,
         integration_runtime_health: Callable[[], dict[str, dict]] | None = None,
+        audio_coordinator: AudioCoordinator | None = None,
     ):
         super().__init__()
         self.db = db
@@ -131,6 +133,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.integration_manager = integration_manager or IntegrationManager(db)
         self.open_integrations = open_integrations or (lambda: None)
         self.integration_runtime_health = integration_runtime_health or (lambda: {})
+        self.audio_coordinator = audio_coordinator or AudioCoordinator(self)
         self._integration_status_dialog: QDialog | None = None
         self._active_auction_id: int | None = None
         self.thread_pool = QThreadPool.globalInstance()
@@ -520,6 +523,41 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         timer_obs_row.addWidget(self.copy_timer_overlay_btn)
         timer_obs_row.addStretch()
         timer_layout.addLayout(timer_obs_row)
+
+        audio_output_row = QHBoxLayout()
+        audio_output_row.setSpacing(6)
+        audio_output_row.addWidget(QLabel("Вывод музыки:"))
+        self.audio_output_mode_combo = ScrollSafeComboBox()
+        self.audio_output_mode_combo.addItem("В приложении", "application")
+        self.audio_output_mode_combo.addItem(
+            "Через OBS Browser Source таймера",
+            "obs_timer",
+        )
+        saved_audio_output_mode = self._saved_audio_output_mode()
+        saved_audio_output_index = self.audio_output_mode_combo.findData(
+            saved_audio_output_mode
+        )
+        self.audio_output_mode_combo.setCurrentIndex(
+            max(0, saved_audio_output_index)
+        )
+        self.audio_output_mode_combo.setToolTip(
+            "Музыка аукциона и колеса использует один маршрут. "
+            "В режиме OBS звук воспроизводит Browser Source таймера; "
+            "локальный Qt-транспорт остаётся беззвучным и хранит точную позицию."
+        )
+        self.audio_output_mode_combo.currentIndexChanged.connect(
+            self._audio_output_mode_changed
+        )
+        audio_output_row.addWidget(self.audio_output_mode_combo, 1)
+        timer_layout.addLayout(audio_output_row)
+
+        self.audio_output_hint = QLabel(
+            "OBS-режим: звук аукциона и колеса идёт через этот же источник таймера. "
+            "Не включайте в OBS отключение Browser Source, когда он не виден."
+        )
+        self.audio_output_hint.setWordWrap(True)
+        self.audio_output_hint.setProperty("muted", True)
+        timer_layout.addWidget(self.audio_output_hint)
 
         self.timer_finish_widget = QWidget()
         timer_finish_row = QHBoxLayout(self.timer_finish_widget)
@@ -1912,6 +1950,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 else "max_amount"
             ),
             "auto_scroll": bool(self._desktop_lot_auto_scroll_enabled),
+            "audio": self.auction_browser_audio_state(),
         }
 
     def set_main_tab_visible(

@@ -8,6 +8,78 @@ from PySide6.QtCore import QObject, QTimer, QUrl, Signal
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
 
+class AudioCoordinator(QObject):
+    """Single authority for which InOneLine feature owns stream music.
+
+    D43 uses the auction owner today. D26 can register a music-player snapshot,
+    pause callback and restore callback later without changing Auction logic.
+    """
+
+    ownerChanged = Signal(str)
+
+    def __init__(self, parent: QObject | None = None):
+        super().__init__(parent)
+        self._owner = "idle"
+        self._music_player_snapshot_provider = None
+        self._music_player_pause = None
+        self._music_player_restore = None
+        self._suspended_music_player_state = None
+
+    @property
+    def owner(self) -> str:
+        return str(self._owner)
+
+    def register_music_player(self, snapshot_provider, pause_callback, restore_callback) -> None:
+        self._music_player_snapshot_provider = snapshot_provider
+        self._music_player_pause = pause_callback
+        self._music_player_restore = restore_callback
+        if self._owner == "idle":
+            self._set_owner("music_player")
+
+    def unregister_music_player(self) -> None:
+        self._music_player_snapshot_provider = None
+        self._music_player_pause = None
+        self._music_player_restore = None
+        self._suspended_music_player_state = None
+        if self._owner == "music_player":
+            self._set_owner("idle")
+
+    def acquire_auction(self) -> None:
+        if self._owner == "auction":
+            return
+        if self._music_player_snapshot_provider is not None:
+            try:
+                self._suspended_music_player_state = self._music_player_snapshot_provider()
+            except Exception:
+                self._suspended_music_player_state = None
+        if self._music_player_pause is not None:
+            try:
+                self._music_player_pause()
+            except Exception:
+                pass
+        self._set_owner("auction")
+
+    def release_auction(self) -> None:
+        if self._owner != "auction":
+            return
+        next_owner = "music_player" if self._music_player_restore is not None else "idle"
+        self._set_owner(next_owner)
+        snapshot = self._suspended_music_player_state
+        self._suspended_music_player_state = None
+        if self._music_player_restore is not None and snapshot is not None:
+            try:
+                self._music_player_restore(snapshot)
+            except Exception:
+                pass
+
+    def _set_owner(self, owner: str) -> None:
+        owner = str(owner or "idle")
+        if owner == self._owner:
+            return
+        self._owner = owner
+        self.ownerChanged.emit(owner)
+
+
 class ApplicationAudioEngine(QObject):
     """Application-owned local audio playback with scheduled loop + fade.
 
@@ -29,6 +101,7 @@ class ApplicationAudioEngine(QObject):
 
         self._volume_percent = 100
         self._muted = False
+        self._transport_silent = False
         self._fade_factor = 1.0
         self._fade_started_monotonic: float | None = None
         self._fade_duration_ms = 0
@@ -70,6 +143,31 @@ class ApplicationAudioEngine(QObject):
     def muted(self) -> bool:
         return bool(self._muted)
 
+    @property
+    def transport_silent(self) -> bool:
+        return bool(self._transport_silent)
+
+    @property
+    def playing(self) -> bool:
+        return self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+
+    @property
+    def position_ms(self) -> int:
+        try:
+            return max(0, int(self.player.position()))
+        except Exception:
+            return 0
+
+    @property
+    def effective_gain(self) -> float:
+        base = max(0.0, min(1.0, self._volume_percent / 100.0))
+        return max(0.0, min(1.0, base * self._fade_factor))
+
+    def set_transport_silent(self, silent: bool) -> bool:
+        self._transport_silent = bool(silent)
+        self._apply_gain()
+        return self._transport_silent
+
     def set_volume_percent(self, value: int) -> int:
         self._volume_percent = max(0, min(100, int(value)))
         self._apply_gain()
@@ -77,7 +175,7 @@ class ApplicationAudioEngine(QObject):
 
     def set_muted(self, muted: bool) -> bool:
         self._muted = bool(muted)
-        self.audio_output.setMuted(self._muted)
+        self._apply_gain()
         return self._muted
 
     def schedule_loop(
@@ -186,9 +284,8 @@ class ApplicationAudioEngine(QObject):
             self.stop(immediate=True)
 
     def _apply_gain(self) -> None:
-        base = max(0.0, min(1.0, self._volume_percent / 100.0))
-        self.audio_output.setVolume(max(0.0, min(1.0, base * self._fade_factor)))
-        self.audio_output.setMuted(self._muted)
+        self.audio_output.setVolume(self.effective_gain)
+        self.audio_output.setMuted(self._muted or self._transport_silent)
 
     def _handle_error(self, _error, error_string: str = "") -> None:
         message = str(error_string or self.player.errorString() or "Ошибка воспроизведения аудио")
@@ -220,6 +317,7 @@ class ApplicationPlaylistAudioEngine(QObject):
 
         self._volume_percent = 100
         self._muted = False
+        self._transport_silent = False
         self._fade_factor = 1.0
         self._fade_started_monotonic: float | None = None
         self._fade_duration_ms = 0
@@ -268,6 +366,32 @@ class ApplicationPlaylistAudioEngine(QObject):
         except Exception:
             return 0
 
+    @property
+    def current_index(self) -> int:
+        return int(self._current_index)
+
+    @property
+    def transport_silent(self) -> bool:
+        return bool(self._transport_silent)
+
+    @property
+    def playing(self) -> bool:
+        return (
+            self._active
+            and not self._paused
+            and self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        )
+
+    @property
+    def effective_gain(self) -> float:
+        base = max(0.0, min(1.0, self._volume_percent / 100.0))
+        return max(0.0, min(1.0, base * self._fade_factor))
+
+    def set_transport_silent(self, silent: bool) -> bool:
+        self._transport_silent = bool(silent)
+        self._apply_gain()
+        return self._transport_silent
+
     def set_volume_percent(self, value: int) -> int:
         self._volume_percent = max(0, min(100, int(value)))
         self._apply_gain()
@@ -275,7 +399,7 @@ class ApplicationPlaylistAudioEngine(QObject):
 
     def set_muted(self, muted: bool) -> bool:
         self._muted = bool(muted)
-        self.audio_output.setMuted(self._muted)
+        self._apply_gain()
         return self._muted
 
     def start_playlist(
@@ -392,9 +516,8 @@ class ApplicationPlaylistAudioEngine(QObject):
             self.stopped.emit()
 
     def _apply_gain(self) -> None:
-        base = max(0.0, min(1.0, self._volume_percent / 100.0))
-        self.audio_output.setVolume(max(0.0, min(1.0, base * self._fade_factor)))
-        self.audio_output.setMuted(self._muted)
+        self.audio_output.setVolume(self.effective_gain)
+        self.audio_output.setMuted(self._muted or self._transport_silent)
 
     def _handle_error(self, _error, error_string: str = "") -> None:
         message = str(error_string or self.player.errorString() or "Ошибка воспроизведения аудио")

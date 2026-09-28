@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
+from ..audio import AudioCoordinator
 from ..backup_restore import read_and_clear_restore_result
 from ..constants import (
     APP_NAME, APP_VERSION, COOP_LABELS, DEFAULT_API_HOST, STATUS_ABANDONED,
@@ -119,12 +120,16 @@ class MainWindow(QMainWindow):
         self.games_tab = GamesTab(db, self.notify_game_data_changed)
         self.public_tab = PublicTab(db, self.api)
         self.stream_tab = StreamTab(db, self.api)
+        # Shared authority for current/future music sources. D43 lets Auction
+        # acquire it; D26 can register the independent music player later.
+        self.audio_coordinator = AudioCoordinator(self)
         self.auction_tab = AuctionTab(
             db,
             self.refresh_game_data_views,
             integration_manager=self.integration_manager,
             open_integrations=self.open_integrations_settings,
             integration_runtime_health=self._integration_runtime_health_snapshot,
+            audio_coordinator=self.audio_coordinator,
         )
         self.api.set_auction_lots_state_provider(
             self.auction_tab.auction_lots_overlay_state
