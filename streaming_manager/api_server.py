@@ -461,12 +461,12 @@ class LocalApiServer:
                         pretty=pretty,
                     )
                     return
-                if path in ("/api/pointauc", "/pointauc"):
+                if path in ("/api/auction-export", "/auction-export", "/api/pointauc", "/pointauc"):
                     self._send_json(
                         {
                             "games": [
                                 {"id": g.id, "title": g.title, "sm_points": g.sm_points, "sum": g.sm_points}
-                                for g in db.pointauc_games()
+                                for g in db.auction_eligible_games()
                             ]
                         },
                         pretty=pretty,
