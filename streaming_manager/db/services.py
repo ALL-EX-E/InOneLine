@@ -1418,7 +1418,6 @@ class ServicesMixin:
         audio_enabled = bool(raw_audio.get("enabled"))
         audio_active = bool(
             audio_enabled
-            and audio_owner == "auction"
             and raw_audio.get("active")
             and audio_media_id is not None
             and audio_kind in {"auction", "wheel"}
