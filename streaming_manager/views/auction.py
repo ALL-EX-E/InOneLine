@@ -1425,7 +1425,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._saved_max_amount_default_duration_ms()
         )
         self._default_wheel_duration_ms = self._saved_wheel_default_duration_ms()
-        if self._current_session() is not None:
+        session = self._current_session()
+        # Presentation-only D19 setting may change while a session exists; it
+        # must refresh local wheel immediately without touching session state.
+        if self._wheel_context_relevant(session):
+            self._update_wheel_panel(session)
+        if session is not None:
             return
         self._prestart_auction_duration_ms = self._default_auction_duration_ms
         self._prestart_wheel_duration_ms = self._default_wheel_duration_ms
