@@ -1,6 +1,6 @@
 ﻿#define MyAppName "In one line"
 #define MyAppExeName "InOneLine.exe"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.5"
 #define MyAppPublisher "Local Streaming Tools"
 #define MyAppId "{{D9AE3184-F16E-4B60-BDD9-D4B99541462E}"
 #ifndef DistRoot
