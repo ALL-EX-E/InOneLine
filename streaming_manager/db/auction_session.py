@@ -258,7 +258,7 @@ class AuctionSessionMixin:
             remaining_seconds = duration_seconds
             remaining_ms = duration_ms
 
-        games = self.pointauc_games()
+        games = self.auction_eligible_games()
         if len(games) < 2:
             raise ValueError("Для запуска аукциона нужно минимум два лота.")
 
