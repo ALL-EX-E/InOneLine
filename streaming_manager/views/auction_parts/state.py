@@ -12,7 +12,7 @@ from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
 from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
-from ...exporters import export_pointauc_csv, pointauc_text
+from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
 
@@ -490,7 +490,7 @@ class AuctionStateMixin:
         if session is None:
             total = sum(
                 max(0, int(game.sm_points))
-                for game in self.db.pointauc_games()
+                for game in self.db.auction_eligible_games()
             )
         else:
             total = self.db.auction_total_sm_points(int(session["id"]))
