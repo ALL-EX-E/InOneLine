@@ -1524,7 +1524,7 @@ class ServicesMixin:
 
             if session is None:
                 mode = runtime_mode
-                # Reuse the same canonical pre-start source as pointauc_games()
+                # Reuse the same canonical pre-start auction source
                 # instead of repeating its status/filter/order business rules.
                 game_rows = self._list_games_conn(
                     conn,
@@ -1991,7 +1991,7 @@ class ServicesMixin:
         }
 
     def import_csv(self, path: str | Path, merge: bool = True) -> dict[str, int]:
-        """Import games from a flexible CSV or legacy Pointauc CSV.
+        """Import games from a flexible CSV or legacy pipe-delimited CSV.
 
         Normal CSV requires only the ``НАЗВАНИЕ ИГРЫ`` header. Other supported
         columns are optional, may be in any order, and blank cells mean
