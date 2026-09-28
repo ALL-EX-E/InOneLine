@@ -37,8 +37,8 @@ const stage=document.getElementById("stage"),winnerEl=document.getElementById("w
 const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
 const preview=new URLSearchParams(location.search).get("preview")==="1";
 if(preview)document.body.classList.add("preview");
-let state=null,clockOffset=0,rafId=null,rafSpinId="";
-let centerImage=null,centerImageUrl="",centerImageReady=false;
+let state=null,clockOffset=0,rafId=null;
+let centerImage=null,centerImageUrl="",centerImageReady=false,centerImageAnimated=false;
 
 function motionProgress(progress,durationMs){
  const t=Math.max(0,Math.min(1,Number(progress)||0));
@@ -131,8 +131,9 @@ function formatProbability(probability){
 function syncCenterImage(s){
  const center=s?.center_image||{};
  const url=center.enabled?String(center.url||""):"";
- if(url===centerImageUrl)return;
- centerImageUrl=url;centerImageReady=false;centerImage=null;
+ const animated=!!(center.enabled&&center.animated);
+ if(url===centerImageUrl&&animated===centerImageAnimated)return;
+ centerImageUrl=url;centerImageAnimated=animated;centerImageReady=false;centerImage=null;
  if(!url)return;
  const image=new Image();
  image.onload=()=>{if(centerImage===image){centerImageReady=true;draw()}};
@@ -221,29 +222,21 @@ function draw(){
 }
 function stopAnimationLoop(){
  if(rafId!==null)cancelAnimationFrame(rafId);
- rafId=null;rafSpinId="";
+ rafId=null;
 }
 function ensureAnimationLoop(){
  const s=state||(preview?sampleState():null);
  const spinId=s?.animation?.spin_id||"";
- if(!spinId||rotationFor(s).complete){stopAnimationLoop();return}
- if(rafId!==null&&rafSpinId===spinId)return;
- if(rafId!==null)cancelAnimationFrame(rafId);
- rafSpinId=spinId;
+ const wheelAnimating=!!(spinId&&!rotationFor(s).complete);
+ const centerAnimating=!!(s?.center_image?.enabled&&s?.center_image?.animated);
+ if(!wheelAnimating&&!centerAnimating){stopAnimationLoop();return}
+ if(rafId!==null)return;
  rafId=requestAnimationFrame(animationFrame);
 }
 function animationFrame(){
  rafId=null;
- const spinId=rafSpinId;
  draw();
- const s=state||(preview?sampleState():null);
- const currentSpinId=s?.animation?.spin_id||"";
- if(!s||currentSpinId!==spinId||rotationFor(s).complete){
-   rafSpinId="";
-   ensureAnimationLoop();
-   return;
- }
- rafId=requestAnimationFrame(animationFrame);
+ ensureAnimationLoop();
 }
 async function poll(){
  try{
