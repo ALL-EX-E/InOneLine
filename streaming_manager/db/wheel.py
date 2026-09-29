@@ -759,6 +759,7 @@ class WheelMixin:
         *,
         mode: str = "weighted_wheel",
         rng_method: str = "local",
+        wheel_format: str = AUCTION_WHEEL_FORMAT_STANDARD,
     ) -> dict[str, Any]:
         """Read-only pre-spin mathematical preview. Never creates a snapshot."""
         with self.connect() as conn:
@@ -769,6 +770,10 @@ class WheelMixin:
                     raise RuntimeError("Данные проверки доступны только перед фактическим вращением.")
                 effective_mode = str(session.get("mode") or mode)
                 effective_rng = str(session.get("rng_method") or rng_method or "local")
+                effective_wheel_format = str(
+                    draw.get("wheel_format") or AUCTION_WHEEL_FORMAT_STANDARD
+                )
+                next_spin_index = int(draw.get("next_spin_index") or 1)
                 authoritative_input = True
             else:
                 rows = conn.execute(
@@ -811,12 +816,20 @@ class WheelMixin:
                     "algorithm_version": algorithm_version,
                 }
                 effective_rng = str(rng_method or "local")
+                effective_wheel_format = (
+                    AUCTION_WHEEL_FORMAT_ELIMINATION
+                    if str(wheel_format or "") == AUCTION_WHEEL_FORMAT_ELIMINATION
+                    else AUCTION_WHEEL_FORMAT_STANDARD
+                )
+                next_spin_index = 1
                 authoritative_input = False
 
         verification_rows = self._verification_participants(draw)
         return {
             "algorithm_version": str(draw["algorithm_version"]),
             "mode": effective_mode,
+            "wheel_format": effective_wheel_format,
+            "next_spin_index": next_spin_index,
             "rng_method": effective_rng,
             "draw_upper": int(draw["draw_upper"]),
             "total_weight": int(draw["total_weight"]),
