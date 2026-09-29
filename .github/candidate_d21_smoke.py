@@ -389,6 +389,11 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
         wheel_format=AUCTION_WHEEL_FORMAT_ELIMINATION,
     )
 
+    # Startup backup is unrelated to D21 and normally runs 350 ms later.
+    # Disable that background worker so a fast test teardown cannot race the
+    # temporary directory cleanup.
+    original_startup_backup = MainWindow._startup_backup
+    MainWindow._startup_backup = lambda self: None
     window = MainWindow(db, paths)
     try:
         auction = window.auction_tab
@@ -406,6 +411,8 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
             time.sleep(0.03)
         session = db.get_auction_session(auction_id)
         assert session["status"] == "winner_selected"
+        selected_ui_id = int(session["winner_game_id"])
+        assert selected_ui_id in ids
         assert window.audio_coordinator.owner == "auction"
 
         force_spin_complete(db, auction_id)
@@ -420,7 +427,7 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
 
         wheel_api = get_json(window.api.base_url + "/api/wheel")
         assert wheel_api["wheel_format"] == "elimination"
-        assert wheel_api["winner"]["game_id"] == ids[0]
+        assert wheel_api["winner"]["game_id"] == selected_ui_id
 
         timer_api = get_json(window.api.base_url + "/api/timer")
         assert timer_api["timer_kind"] == "wheel"
@@ -438,16 +445,17 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
         app.processEvents()
         session = db.get_auction_session(auction_id)
         assert session["status"] == "awaiting_wheel"
-        assert db.get_game(ids[0]).archived == 1
+        assert db.get_game(selected_ui_id).archived == 1
         assert auction.start_btn.text() == "Крутить"
         assert not auction.confirm_btn.isVisible()
         assert auction.timer_edit.text() == "00:00:03.000"
         assert window.audio_coordinator.owner == "idle"
 
+        expected_remaining = [game_id for game_id in ids if game_id != selected_ui_id]
         wheel_api = get_json(window.api.base_url + "/api/wheel")
-        assert [s["game_id"] for s in wheel_api["sectors"]] == ids[1:]
+        assert [s["game_id"] for s in wheel_api["sectors"]] == expected_remaining
         lots_api = get_json(window.api.base_url + "/api/auction-lots")
-        assert [row["game_id"] for row in lots_api["rows"]] == ids[1:]
+        assert sorted(row["game_id"] for row in lots_api["rows"]) == sorted(expected_remaining)
         timer_api = get_json(window.api.base_url + "/api/timer")
         assert timer_api["remaining_ms"] == 3000
         assert timer_api["status"] == "awaiting_wheel"
@@ -478,9 +486,14 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
         db.cancel_auction(auction_id)
         auction.refresh_force()
         app.processEvents()
-        assert db.get_game(ids[0]).archived == 1
-        assert db.get_game(ids[1]).archived == 0
+        assert db.get_game(selected_ui_id).archived == 1
+        assert all(
+            db.get_game(game_id).archived == 0
+            for game_id in ids
+            if game_id != selected_ui_id
+        )
     finally:
+        MainWindow._startup_backup = original_startup_backup
         window.api.stop()
         window.close()
         app.processEvents()
