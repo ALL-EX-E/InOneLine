@@ -123,7 +123,12 @@ class AuctionActionMixin:
                 f"Генератор: {self.RNG_LABELS.get(rng_method, rng_method)}\n"
                 + (f"Билет Random.org+: {rng_ticket_id}\n" if rng_ticket_id else "")
                 + f"Время вращения: {self._format_milliseconds(wheel_duration_ms)}\n\n"
-                "Победитель будет определён выпавшим сектором."
+                + (
+                    "Выпавший сектор будет выбран на выбывание и после остановки "
+                    "ожидать действия «В архив»."
+                    if wheel_format == "elimination"
+                    else "Победитель будет определён выпавшим сектором."
+                )
             )
             title = "Крутить колесо"
         else:
