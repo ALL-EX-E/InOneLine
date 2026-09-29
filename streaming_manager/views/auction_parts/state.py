@@ -189,6 +189,14 @@ class AuctionStateMixin:
         active = session is not None
         status = str(session["status"]) if active else ""
         mode = str(session["mode"]) if active else ""
+        wheel_format = (
+            str(session.get("wheel_format") or "standard")
+            if active
+            else str(self.wheel_format_combo.currentData() or "standard")
+        )
+        elimination = bool(
+            mode == "weighted_wheel" and wheel_format == "elimination"
+        )
 
         running = status == "running"
         paused = status == "paused"
@@ -224,7 +232,31 @@ class AuctionStateMixin:
         self._set_enabled_state(self.mode_combo, prestart_enabled)
         self._set_enabled_state(self.rng_combo, prestart_enabled)
         self._set_enabled_state(self.rng_methods_btn, prestart_enabled)
-        self._set_visible_state(self.setup_widget, not active)
+
+        weighted_context = bool(prestart_wheel or (active and mode == "weighted_wheel"))
+        self._set_visible_state(
+            self.setup_widget,
+            (not active) or weighted_context,
+        )
+        self._set_visible_state(self.wheel_format_label, weighted_context)
+        self._set_visible_state(self.wheel_format_combo, weighted_context)
+        if active and mode == "weighted_wheel":
+            fmt_index = self.wheel_format_combo.findData(wheel_format)
+            if fmt_index >= 0 and self.wheel_format_combo.currentIndex() != fmt_index:
+                self.wheel_format_combo.blockSignals(True)
+                self.wheel_format_combo.setCurrentIndex(fmt_index)
+                self.wheel_format_combo.blockSignals(False)
+        can_switch_format = bool(
+            (prestart_enabled and prestart_wheel)
+            or (
+                active
+                and mode == "weighted_wheel"
+                and awaiting_wheel
+                and not preparing_wheel_rng
+                and not session.get("wheel_spin_id")
+            )
+        )
+        self._set_enabled_state(self.wheel_format_combo, can_switch_format)
         self._set_visible_state(self.state_widget, active)
 
         if awaiting_wheel or spin_running:
@@ -316,6 +348,9 @@ class AuctionStateMixin:
         )
 
         can_confirm = winner_selected and not spin_running
+        self.confirm_btn.setText(
+            "В архив" if elimination else "Подтвердить победителя"
+        )
         self._set_visible_state(self.confirm_btn, can_confirm)
         self._set_enabled_state(self.confirm_btn, can_confirm)
 
@@ -379,12 +414,20 @@ class AuctionStateMixin:
             self.leader_label.setText("Лидер: —")
             return
 
-        self.state_label.setText(
-            f"Состояние: {self.STATUS_LABELS.get(status, status)}"
-        )
+        if elimination and winner_selected and not spin_running:
+            self.state_label.setText("Состояние: ЛОТ ВЫБРАН НА ВЫБЫВАНИЕ")
+        else:
+            self.state_label.setText(
+                f"Состояние: {self.STATUS_LABELS.get(status, status)}"
+            )
         if awaiting_wheel and mode == "max_amount":
             self.mode_label.setText(
                 "Режим: Максимальная сумма → Колесо (тай-брейк)"
+            )
+        elif mode == "weighted_wheel":
+            self.mode_label.setText(
+                "Режим: Взвешенное колесо | Формат: "
+                + self.WHEEL_FORMAT_LABELS.get(wheel_format, wheel_format)
             )
         else:
             self.mode_label.setText(
@@ -441,13 +484,18 @@ class AuctionStateMixin:
         if winner_selected:
             if spin_running:
                 self.state_label.setText("Состояние: КОЛЕСО ВРАЩАЕТСЯ")
-                self.leader_label.setText("Победитель определяется…")
+                self.leader_label.setText(
+                    "Выбывающий лот определяется…"
+                    if elimination
+                    else "Победитель определяется…"
+                )
             else:
                 winner_id = session.get("winner_game_id")
                 winner = self.db.get_game(int(winner_id)) if winner_id else None
                 if winner is not None:
+                    prefix = "Выбывает" if elimination else "Победитель"
                     self.leader_label.setText(
-                        f"Победитель: {winner.title} — "
+                        f"{prefix}: {winner.title} — "
                         f"{format_points(winner.sm_points)}"
                     )
 
@@ -476,20 +524,25 @@ class AuctionStateMixin:
             else wheel_payload
         )
         chance = ((payload or {}).get("winner") or {}).get("chance")
+        elimination = bool(
+            session
+            and str(session.get("wheel_format") or "") == "elimination"
+        )
+        chance_prefix = (
+            "Шанс в этом вращении: "
+            if elimination
+            else "Шанс победителя в этом вращении: "
+        )
         if not chance or not bool(chance.get("available")):
-            self.winner_chance_label.setText(
-                "Шанс победителя в этом вращении: недоступен"
-            )
+            self.winner_chance_label.setText(chance_prefix + "недоступен")
             return
         probability = chance.get("probability")
         if probability is None:
-            self.winner_chance_label.setText(
-                "Шанс победителя в этом вращении: недоступен"
-            )
+            self.winner_chance_label.setText(chance_prefix + "недоступен")
             return
         self.winner_chance_label.setText(
-            "Шанс победителя в этом вращении: "
-            f"{self._format_wheel_probability(float(probability))}"
+            chance_prefix
+            + self._format_wheel_probability(float(probability))
         )
 
     def _update_auction_total_display(self, session: dict | None) -> None:
@@ -813,5 +866,6 @@ class AuctionStateMixin:
             spin_running=False,
         )
         # Здесь можно снова выполнять обычные запросы/перерисовку.
-        # Обновляем ровно один раз: раскрываем победителя и кнопку подтверждения.
+        # Обновляем ровно один раз: раскрываем победителя либо выбывающий лот
+        # и соответствующее действие «Подтвердить победителя» / «В архив».
         self.refresh()
