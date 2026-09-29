@@ -320,6 +320,26 @@ def db_regression(root: Path) -> None:
     assert db.get_game(ids["E"]).archived == 1
     assert db.get_open_auction_session() is None
 
+    # If the operator previously stopped with only one active lot remaining,
+    # elimination can later be restarted for that single last lot.
+    db.archive_game(ids["E"], False)
+    one_id = db.create_auction_session(
+        "weighted_wheel",
+        0,
+        rng_method="local",
+        wheel_duration_ms=3000,
+        duration_ms=0,
+        start_in_wheel_mode=True,
+        wheel_format=AUCTION_WHEEL_FORMAT_ELIMINATION,
+    )
+    assert active_game_ids(db, one_id) == [ids["E"]]
+    assert db.run_weighted_wheel(one_id, pick=0) == ids["E"]
+    db.prepare_wheel_animation(one_id)
+    force_spin_complete(db, one_id)
+    one_result = db.archive_elimination_result(one_id)
+    assert one_result["remaining_lots"] == 0
+    assert db.get_game(ids["E"]).archived == 1
+
     # Stop Auction after a revealed result does not implicitly archive that result.
     for title, points in (("F", 60), ("G", 70), ("H", 80)):
         ids[title] = db.add_game(game(title, points))
