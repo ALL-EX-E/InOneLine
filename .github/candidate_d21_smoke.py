@@ -276,6 +276,19 @@ def db_regression(root: Path) -> None:
     snapshots = db.list_wheel_verification_snapshots(auction_id)
     assert [int(s["spin_index"]) for s in snapshots] == [1, 2, 3]
     assert snapshots[-1]["result_kind"] == "winner"
+    # Switching to ordinary weighted wheel must not rewrite historical
+    # elimination markers on already archived/inactive entries.
+    with db.connect() as conn:
+        past_results = {
+            int(row["game_id"]): str(row["result"] or "")
+            for row in conn.execute(
+                "SELECT game_id,result FROM auction_entries WHERE auction_id=?",
+                (int(auction_id),),
+            ).fetchall()
+        }
+    assert past_results[ids["A"]] == "eliminated", past_results
+    assert past_results[ids["B"]] == "eliminated", past_results
+    assert past_results[ids["C"]] == "winner", past_results
 
     # A separate D21 session can continue through the last remaining lot to zero.
     ids["E"] = db.add_game(game("E", 50))
