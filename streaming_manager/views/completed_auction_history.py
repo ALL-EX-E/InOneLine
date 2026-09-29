@@ -27,6 +27,8 @@ RESULT_LABELS = {
     "winner": "Победитель",
     "not_winner": "Не победил",
     "tie": "Ничья",
+    "elimination_selected": "Выбран на выбывание",
+    "eliminated": "Выбыл → архив",
     "": "—",
 }
 
@@ -198,6 +200,7 @@ class CompletedAuctionHistoryTab(QWidget):
         verification_layout.addStretch(1)
         self.details_tabs.addTab(self.verification_page, "Проверка результата")
         self._verification_snapshot: dict | None = None
+        self._verification_snapshots: list[dict] = []
 
         root.addWidget(self.details_tabs, 2)
 
@@ -327,6 +330,7 @@ class CompletedAuctionHistoryTab(QWidget):
 
     def _clear_verification_details(self):
         self._verification_snapshot = None
+        self._verification_snapshots = []
         for label in self.verification_labels.values():
             label.setText("—")
         self.verification_notice.setText(
@@ -337,7 +341,9 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verification_random_org_btn.setVisible(False)
 
     def _load_verification_details(self, auction_id: int):
-        snapshot = self.db.get_wheel_verification_snapshot(int(auction_id))
+        snapshots = self.db.list_wheel_verification_snapshots(int(auction_id))
+        self._verification_snapshots = snapshots
+        snapshot = snapshots[-1] if snapshots else None
         self._verification_snapshot = snapshot
         if snapshot is None:
             self.verification_notice.setText(
@@ -352,8 +358,11 @@ class CompletedAuctionHistoryTab(QWidget):
             self.verification_random_org_btn.setVisible(False)
             return
 
+        spin_index = int(snapshot.get("spin_index") or 1)
+        total_spins = len(snapshots)
         self.verification_notice.setText(
-            "Snapshot зафиксирован во время фактического вращения и не зависит от текущих данных игр."
+            "Каждое фактическое вращение хранит отдельный immutable snapshot. "
+            f"Сохранено вращений: {total_spins}. Сейчас показан раунд {spin_index}."
         )
         self.verification_labels["run_id"].setText(str(snapshot.get("run_id") or "—"))
         self.verification_labels["algorithm"].setText(str(snapshot.get("algorithm_version") or "—"))
@@ -371,7 +380,10 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verification_labels["participants"].setText(
             str(len(snapshot.get("participants") or []))
         )
+        result_kind = str(snapshot.get("result_kind") or "winner")
+        result_prefix = "Выбывает" if result_kind == "eliminated" else "Победитель"
         self.verification_labels["winner"].setText(
+            f"Раунд {spin_index}: {result_prefix} — "
             f"ID {snapshot.get('winner_game_id')} — {snapshot.get('winner_title') or '—'}"
         )
         verification = self.db.verify_wheel_result(int(auction_id))
@@ -418,12 +430,15 @@ class CompletedAuctionHistoryTab(QWidget):
             )
 
     def _show_verification_details(self):
-        if not self._verification_snapshot:
+        if not self._verification_snapshots:
             return
+        sections = []
+        for snapshot in self._verification_snapshots:
+            sections.append(format_verification_snapshot(snapshot))
         show_readonly_text_dialog(
             self,
             "Подробные данные проверки результата",
-            format_verification_snapshot(self._verification_snapshot),
+            ("\n\n" + "=" * 88 + "\n\n").join(sections),
         )
 
     def _open_verification_random_org(self):
