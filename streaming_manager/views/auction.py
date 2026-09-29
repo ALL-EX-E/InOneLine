@@ -25,6 +25,8 @@ from ..audio import AudioCoordinator
 from ..constants import (
     APP_NAME, APP_VERSION, AUCTION_MANUAL_BID_POINTS_MAX,
     AUCTION_MANUAL_BID_POINTS_MIN, AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
+    AUCTION_WHEEL_FORMAT_DEFAULT, AUCTION_WHEEL_FORMAT_ELIMINATION,
+    AUCTION_WHEEL_FORMAT_KEY, AUCTION_WHEEL_FORMAT_STANDARD,
     COOP_LABELS, DEFAULT_API_HOST,
     SHARED_XLSX_ENABLED_KEY, SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS,
     SHARED_XLSX_PATH_KEY, SHARED_XLSX_POLL_INTERVAL_MS,
@@ -108,6 +110,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         "random_org": "Random.org",
         "random_org_plus": "Random.org+",
     }
+    WHEEL_FORMAT_LABELS = {
+        AUCTION_WHEEL_FORMAT_STANDARD: "Обычное",
+        AUCTION_WHEEL_FORMAT_ELIMINATION: "Выбывание",
+    }
     STATUS_LABELS = {
         "running": "ИДЁТ",
         "paused": "ПАУЗА",
@@ -151,6 +157,18 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._default_wheel_duration_ms = self._saved_wheel_default_duration_ms()
         self._prestart_wheel_duration_ms = self._default_wheel_duration_ms
         self._pending_tie_overtime = False
+        saved_wheel_format = str(
+            self.db.get_setting(
+                AUCTION_WHEEL_FORMAT_KEY,
+                AUCTION_WHEEL_FORMAT_DEFAULT,
+            )
+            or AUCTION_WHEEL_FORMAT_DEFAULT
+        )
+        self._prestart_wheel_format = (
+            saved_wheel_format
+            if saved_wheel_format in self.WHEEL_FORMAT_LABELS
+            else AUCTION_WHEEL_FORMAT_DEFAULT
+        )
         # MainWindow переключает это состояние вместе с основной вкладкой.
         # До привязки к MainWindow сохраняем прежнее standalone-поведение.
         self._main_tab_visible = True
@@ -394,6 +412,31 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         setup.addWidget(self.verification_data_btn, 0, 5)
         setup.setColumnStretch(6, 1)
 
+        self.wheel_format_label = QLabel("Формат колеса:")
+        setup.addWidget(self.wheel_format_label, 1, 0)
+        self.wheel_format_combo = ScrollSafeComboBox()
+        self.wheel_format_combo.addItem(
+            "Обычное",
+            AUCTION_WHEEL_FORMAT_STANDARD,
+        )
+        self.wheel_format_combo.addItem(
+            "Выбывание",
+            AUCTION_WHEEL_FORMAT_ELIMINATION,
+        )
+        format_index = self.wheel_format_combo.findData(
+            self._prestart_wheel_format
+        )
+        self.wheel_format_combo.setCurrentIndex(max(0, format_index))
+        self.wheel_format_combo.setToolTip(
+            "Обычное — одно вращение с итоговым победителем. "
+            "Выбывание — каждый выпавший лот подтверждается кнопкой «В архив», "
+            "после чего можно продолжить или переключиться обратно."
+        )
+        self.wheel_format_combo.currentIndexChanged.connect(
+            self._handle_wheel_format_changed
+        )
+        setup.addWidget(self.wheel_format_combo, 1, 1)
+
         conduct_layout.addWidget(self.setup_widget)
 
         self.wheel_obs_widget = QWidget()
@@ -585,7 +628,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.confirm_btn = QPushButton("Подтвердить победителя")
         self.confirm_btn.setProperty("primary", True)
-        self.confirm_btn.clicked.connect(self.confirm_winner)
+        self.confirm_btn.clicked.connect(self.handle_wheel_result_action)
 
         self.tie_overtime_btn = QPushButton("Дополнительное время")
         self.tie_overtime_btn.clicked.connect(self.start_tie_overtime)
@@ -1941,6 +1984,44 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._update_session_controls(None)
         self._refresh_conduct_wheel_chances_in_place(None)
 
+    def _handle_wheel_format_changed(self, _index: int = -1) -> None:
+        combo = getattr(self, "wheel_format_combo", None)
+        if combo is None:
+            return
+        wheel_format = str(combo.currentData() or AUCTION_WHEEL_FORMAT_DEFAULT)
+        if wheel_format not in self.WHEEL_FORMAT_LABELS:
+            wheel_format = AUCTION_WHEEL_FORMAT_DEFAULT
+
+        session = self._current_session()
+        if session is None:
+            self._prestart_wheel_format = wheel_format
+            self.db.set_setting(AUCTION_WHEEL_FORMAT_KEY, wheel_format)
+            self._update_session_controls(None)
+            self._refresh_conduct_wheel_chances_in_place(None)
+            return
+
+        if str(session.get("mode") or "") != "weighted_wheel":
+            return
+        try:
+            self.db.set_auction_wheel_format(int(session["id"]), wheel_format)
+        except Exception as exc:
+            # Restore the persisted active-session value if a race crossed a
+            # spin/result boundary between UI enablement and this signal.
+            current = self._current_session() or session
+            persisted = str(
+                current.get("wheel_format") or AUCTION_WHEEL_FORMAT_DEFAULT
+            )
+            index = combo.findData(persisted)
+            combo.blockSignals(True)
+            combo.setCurrentIndex(max(0, index))
+            combo.blockSignals(False)
+            QMessageBox.warning(self, "Формат колеса", str(exc))
+            return
+
+        self._prestart_wheel_format = wheel_format
+        self.db.set_setting(AUCTION_WHEEL_FORMAT_KEY, wheel_format)
+        self.refresh()
+
     def auction_lots_overlay_state(self) -> dict[str, object]:
         """Expose existing Auction-owned transient state without duplicating it."""
         return {
@@ -1948,6 +2029,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 "weighted_wheel"
                 if self._timer_context == "wheel"
                 else "max_amount"
+            ),
+            "wheel_format": str(
+                self.wheel_format_combo.currentData()
+                if hasattr(self, "wheel_format_combo")
+                else self._prestart_wheel_format
             ),
             "auto_scroll": bool(self._desktop_lot_auto_scroll_enabled),
             "audio": self.auction_browser_audio_state(),
