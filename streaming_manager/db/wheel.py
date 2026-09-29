@@ -357,7 +357,7 @@ class WheelMixin:
                     """
                     UPDATE auction_entries
                     SET result=CASE WHEN game_id=? THEN 'winner' ELSE 'not_winner' END
-                    WHERE auction_id=?
+                    WHERE auction_id=? AND active=1
                     """,
                     (winner_game_id, int(auction_id)),
                 )
