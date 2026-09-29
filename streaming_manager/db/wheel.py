@@ -573,6 +573,34 @@ class WheelMixin:
                 result.append(snapshot)
         return result
 
+    def get_wheel_verification_snapshot_by_run_id(
+        self,
+        run_id: str,
+    ) -> dict[str, Any] | None:
+        run_id = str(run_id or "").strip()
+        if not run_id:
+            return None
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM wheel_verification_snapshots WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            snapshot = dict(row)
+            participants = conn.execute(
+                """
+                SELECT position, game_id, snapshot_title, source_weight,
+                       effective_weight, interval_start, interval_end
+                FROM wheel_verification_participants
+                WHERE snapshot_id=?
+                ORDER BY position ASC
+                """,
+                (int(snapshot["id"]),),
+            ).fetchall()
+        snapshot["participants"] = [dict(item) for item in participants]
+        return snapshot
+
     def get_wheel_verification_snapshot(self, auction_id: int) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute(
@@ -658,9 +686,18 @@ class WheelMixin:
             "source": "verification_snapshot",
         }
 
-    def verify_wheel_result(self, auction_id: int) -> dict[str, Any]:
-        """Deterministically verify the frozen snapshot without RNG/network/writes."""
-        snapshot = self.get_wheel_verification_snapshot(int(auction_id))
+    def verify_wheel_result(
+        self,
+        auction_id: int,
+        *,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Deterministically verify one frozen spin without RNG/network/writes."""
+        snapshot = (
+            self.get_wheel_verification_snapshot_by_run_id(run_id)
+            if run_id
+            else self.get_wheel_verification_snapshot(int(auction_id))
+        )
         if snapshot is None:
             return {
                 "status": "unavailable",
@@ -741,14 +778,20 @@ class WheelMixin:
             return {
                 "status": "match",
                 "label": "Совпадает",
-                "reason": "Сохранённый победитель совпадает с детерминированным пересчётом snapshot.",
+                "reason": (
+                    "Сохранённый результат совпадает с детерминированным "
+                    "пересчётом snapshot."
+                ),
                 "expected_winner_game_id": expected_id,
                 "expected_winner_title": expected_title,
             }
         return {
             "status": "mismatch",
             "label": "НЕ СОВПАДАЕТ",
-            "reason": "Сохранённый победитель не совпадает с детерминированным пересчётом snapshot.",
+            "reason": (
+                "Сохранённый результат не совпадает с детерминированным "
+                "пересчётом snapshot."
+            ),
             "expected_winner_game_id": expected_id,
             "expected_winner_title": expected_title,
         }
