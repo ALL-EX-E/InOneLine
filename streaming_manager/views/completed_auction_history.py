@@ -183,7 +183,7 @@ class CompletedAuctionHistoryTab(QWidget):
             ("created", "Время snapshot:"),
             ("value", "Случайное значение:"),
             ("participants", "Участников:"),
-            ("winner", "Сохранённый победитель:"),
+            ("winner", "Сохранённый результат:"),
             ("result", "Проверка результата:"),
             ("random_org", "Random.org+:"),
         )):
@@ -485,7 +485,7 @@ class CompletedAuctionHistoryTab(QWidget):
             QMessageBox.warning(
                 self,
                 "Проверка результата",
-                f"{result['label']}\n\nОжидаемый победитель: "
+                f"{result['label']}\n\nОжидаемый результат: "
                 f"ID {result.get('expected_winner_game_id')} — {result.get('expected_winner_title') or '—'}",
             )
         else:
