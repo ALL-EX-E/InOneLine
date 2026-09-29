@@ -313,6 +313,12 @@ class SchemaMixin:
                 18,
                 self._migrate_auction_rules_templates_and_session_snapshot,
             )
+            self._run_migration(
+                conn,
+                "weighted_wheel_multi_spin_elimination",
+                19,
+                self._migrate_weighted_wheel_multi_spin_elimination,
+            )
             conn.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
                 (str(SCHEMA_VERSION),),
@@ -362,6 +368,7 @@ class SchemaMixin:
                 "auction_auto_extend_external_ms": "60000",
                 "auction_auto_extend_threshold_enabled": "1",
                 "auction_auto_extend_threshold_ms": "120000",
+                "auction_wheel_format": "standard",
             }
             for key, value in defaults.items():
                 conn.execute(
@@ -853,6 +860,130 @@ class SchemaMixin:
 
             CREATE INDEX IF NOT EXISTS idx_wheel_verification_auction
                 ON wheel_verification_snapshots(auction_id);
+            CREATE INDEX IF NOT EXISTS idx_wheel_verification_participants_game
+                ON wheel_verification_participants(snapshot_id, game_id);
+            """
+        )
+
+    def _migrate_weighted_wheel_multi_spin_elimination(
+        self,
+        conn: sqlite3.Connection,
+    ) -> None:
+        """Schema 19: D21 multi-spin weighted wheel + persisted wheel format.
+
+        Schema 15 intentionally allowed one immutable verification snapshot per
+        auction. D21 can perform many real spins inside one session, so preserve
+        every historical snapshot and make (auction_id, spin_index) unique
+        instead. Existing rows become spin 1 / standard winner results.
+        """
+        session_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(auction_sessions)"
+            ).fetchall()
+        }
+        if "wheel_format" not in session_columns:
+            conn.execute(
+                "ALTER TABLE auction_sessions "
+                "ADD COLUMN wheel_format TEXT NOT NULL DEFAULT 'standard'"
+            )
+
+        snapshot_columns = {
+            row["name"]
+            for row in conn.execute(
+                "PRAGMA table_info(wheel_verification_snapshots)"
+            ).fetchall()
+        }
+        if "spin_index" in snapshot_columns and "result_kind" in snapshot_columns:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "idx_wheel_verification_auction_spin "
+                "ON wheel_verification_snapshots(auction_id, spin_index)"
+            )
+            return
+
+        conn.executescript(
+            """
+            CREATE TABLE wheel_verification_snapshots_v19 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL UNIQUE,
+                auction_id INTEGER NOT NULL
+                    REFERENCES auction_sessions(id) ON DELETE CASCADE,
+                spin_index INTEGER NOT NULL CHECK(spin_index >= 1),
+                result_kind TEXT NOT NULL DEFAULT 'winner'
+                    CHECK(result_kind IN ('winner','eliminated')),
+                algorithm_version TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                rng_method TEXT NOT NULL,
+                rng_value INTEGER NOT NULL,
+                draw_upper INTEGER NOT NULL CHECK(draw_upper > 0),
+                total_weight INTEGER NOT NULL CHECK(total_weight >= 0),
+                equal_fallback INTEGER NOT NULL DEFAULT 0
+                    CHECK(equal_fallback IN (0,1)),
+                winner_game_id INTEGER NOT NULL,
+                winner_title TEXT NOT NULL,
+                rng_ticket_id TEXT,
+                rng_serial_number INTEGER,
+                rng_random_json TEXT,
+                rng_signature TEXT,
+                rng_verified INTEGER
+                    CHECK(rng_verified IN (0,1) OR rng_verified IS NULL),
+                created_at TEXT NOT NULL,
+                UNIQUE(auction_id, spin_index)
+            );
+
+            INSERT INTO wheel_verification_snapshots_v19(
+                id, run_id, auction_id, spin_index, result_kind,
+                algorithm_version, mode, rng_method, rng_value, draw_upper,
+                total_weight, equal_fallback, winner_game_id, winner_title,
+                rng_ticket_id, rng_serial_number, rng_random_json,
+                rng_signature, rng_verified, created_at
+            )
+            SELECT
+                id, run_id, auction_id, 1, 'winner',
+                algorithm_version, mode, rng_method, rng_value, draw_upper,
+                total_weight, equal_fallback, winner_game_id, winner_title,
+                rng_ticket_id, rng_serial_number, rng_random_json,
+                rng_signature, rng_verified, created_at
+            FROM wheel_verification_snapshots;
+
+            CREATE TABLE wheel_verification_participants_v19 (
+                snapshot_id INTEGER NOT NULL
+                    REFERENCES wheel_verification_snapshots_v19(id)
+                    ON DELETE CASCADE,
+                position INTEGER NOT NULL CHECK(position >= 1),
+                game_id INTEGER NOT NULL,
+                snapshot_title TEXT NOT NULL,
+                source_weight INTEGER NOT NULL CHECK(source_weight >= 0),
+                effective_weight INTEGER NOT NULL CHECK(effective_weight >= 0),
+                interval_start INTEGER NOT NULL CHECK(interval_start >= 0),
+                interval_end INTEGER NOT NULL
+                    CHECK(interval_end >= interval_start),
+                PRIMARY KEY(snapshot_id, position),
+                UNIQUE(snapshot_id, game_id)
+            );
+
+            INSERT INTO wheel_verification_participants_v19(
+                snapshot_id, position, game_id, snapshot_title,
+                source_weight, effective_weight, interval_start, interval_end
+            )
+            SELECT
+                snapshot_id, position, game_id, snapshot_title,
+                source_weight, effective_weight, interval_start, interval_end
+            FROM wheel_verification_participants;
+
+            DROP TABLE wheel_verification_participants;
+            DROP TABLE wheel_verification_snapshots;
+
+            ALTER TABLE wheel_verification_snapshots_v19
+                RENAME TO wheel_verification_snapshots;
+            ALTER TABLE wheel_verification_participants_v19
+                RENAME TO wheel_verification_participants;
+
+            CREATE INDEX IF NOT EXISTS idx_wheel_verification_auction
+                ON wheel_verification_snapshots(auction_id, spin_index DESC);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_wheel_verification_auction_spin
+                ON wheel_verification_snapshots(auction_id, spin_index);
             CREATE INDEX IF NOT EXISTS idx_wheel_verification_participants_game
                 ON wheel_verification_participants(snapshot_id, game_id);
             """
