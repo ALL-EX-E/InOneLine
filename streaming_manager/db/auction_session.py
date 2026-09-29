@@ -272,7 +272,19 @@ class AuctionSessionMixin:
             remaining_ms = duration_ms
 
         games = self.auction_eligible_games()
-        if len(games) < 2:
+        minimum_lots = (
+            1
+            if (
+                mode == "weighted_wheel"
+                and wheel_format == AUCTION_WHEEL_FORMAT_ELIMINATION
+            )
+            else 2
+        )
+        if len(games) < minimum_lots:
+            if minimum_lots == 1:
+                raise ValueError(
+                    "Для запуска режима «Выбывание» нужен минимум один лот."
+                )
             raise ValueError("Для запуска аукциона нужно минимум два лота.")
 
         now_dt = datetime.now(timezone.utc)
