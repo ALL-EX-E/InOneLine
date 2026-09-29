@@ -2624,6 +2624,14 @@ class AuctionSessionMixin:
                 raise KeyError(auction_id)
             if session["status"] != "winner_selected":
                 raise RuntimeError("В этой сессии ещё нет выбранного победителя.")
+            if (
+                str(session["mode"] or "") == "weighted_wheel"
+                and str(session["wheel_format"] or "") == AUCTION_WHEEL_FORMAT_ELIMINATION
+            ):
+                raise RuntimeError(
+                    "В формате «Выбывание» результат отправляется в архив, "
+                    "а не подтверждается как победитель."
+                )
 
             winner_game_id = int(session["winner_game_id"])
             game = conn.execute(
