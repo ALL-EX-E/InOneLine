@@ -25,9 +25,12 @@ def _percent(numerator: int, denominator: int) -> str:
 
 def format_verification_snapshot(snapshot: dict[str, Any]) -> str:
     participants = list(snapshot.get("participants") or [])
+    result_kind = str(snapshot.get("result_kind") or "winner")
+    result_label = "Выбывает" if result_kind == "eliminated" else "Победитель"
     lines = [
         "IMMUTABLE VERIFICATION SNAPSHOT",
         "",
+        f"Раунд: {int(snapshot.get('spin_index') or 1)}",
         f"Run ID: {snapshot.get('run_id') or '—'}",
         f"Алгоритм: {snapshot.get('algorithm_version') or '—'}",
         f"Режим: {MODE_LABELS.get(str(snapshot.get('mode') or ''), str(snapshot.get('mode') or '—'))}",
@@ -38,7 +41,7 @@ def format_verification_snapshot(snapshot: dict[str, Any]) -> str:
         f"Диапазон RNG: 0..{max(0, int(snapshot.get('draw_upper') or 0) - 1)}",
         f"Суммарный исходный вес: {format_points(snapshot.get('total_weight') or 0)}",
         f"Equal fallback: {'ДА' if snapshot.get('equal_fallback') else 'НЕТ'}",
-        f"Сохранённый победитель: ID {snapshot.get('winner_game_id')} — {snapshot.get('winner_title') or '—'}",
+        f"{result_label}: ID {snapshot.get('winner_game_id')} — {snapshot.get('winner_title') or '—'}",
         f"Участников: {len(participants)}",
     ]
     if str(snapshot.get("rng_method") or "") == "random_org_plus":
@@ -80,6 +83,8 @@ def format_verification_preview(preview: dict[str, Any]) -> str:
         f"Состав: {'зафиксированные участники текущей awaiting_wheel-сессии' if exact else 'текущий предварительный состав Conduct'}",
         f"Алгоритм: {preview.get('algorithm_version') or '—'}",
         f"Режим: {MODE_LABELS.get(str(preview.get('mode') or ''), str(preview.get('mode') or '—'))}",
+        f"Формат: {'Выбывание' if str(preview.get('wheel_format') or '') == 'elimination' else 'Обычное'}",
+        f"Следующий раунд: {int(preview.get('next_spin_index') or 1)}",
         f"RNG: {RNG_LABELS.get(str(preview.get('rng_method') or ''), str(preview.get('rng_method') or '—'))}",
         f"Диапазон будущего RNG: 0..{max(0, int(preview.get('draw_upper') or 0) - 1)}",
         f"Суммарный исходный вес: {format_points(preview.get('total_weight') or 0)}",
