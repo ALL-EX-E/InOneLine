@@ -159,6 +159,17 @@ class AuctionRngMixin:
         self.thread_pool.start(worker)
 
     def _apply_wheel_draw(self, auction_id: int, draw: RandomDraw | None):
+        # A remote RNG request may finish after the operator used
+        # «Остановить аукцион». In that case the result belongs to a closed
+        # session and must be ignored instead of surfacing a stale-state error.
+        current = self._current_session()
+        if (
+            current is None
+            or int(current.get("id") or 0) != int(auction_id)
+            or str(current.get("status") or "") != "awaiting_wheel"
+        ):
+            self._release_auction_audio_owner()
+            return
         try:
             if draw is None:
                 self.db.run_weighted_wheel(auction_id)
@@ -186,6 +197,9 @@ class AuctionRngMixin:
 
     def _wheel_rng_failed(self, exc):
         self._release_auction_audio_owner()
+        session = self._current_session()
+        if session is None or str(session.get("status") or "") != "awaiting_wheel":
+            return
         QMessageBox.critical(self, "Колесо", str(exc))
 
     def _wheel_rng_finished(self):
