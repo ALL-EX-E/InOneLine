@@ -27,6 +27,9 @@ from ..constants import (
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT,
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
     AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
+    AUCTION_WHEEL_FORMAT_DEFAULT,
+    AUCTION_WHEEL_FORMAT_ELIMINATION,
+    AUCTION_WHEEL_FORMAT_STANDARD,
     STATUS_NOT_PLAYED, STATUS_PLAYED, STATUS_PLAYING,
 )
 from .common import normalize_title_key, utc_now
@@ -202,6 +205,7 @@ class AuctionSessionMixin:
         *,
         duration_ms: int | None = None,
         start_in_wheel_mode: bool = False,
+        wheel_format: str = AUCTION_WHEEL_FORMAT_DEFAULT,
     ) -> int:
         """Создаёт локальную сессию из текущего ДЛЯ АУКА.
 
@@ -215,6 +219,15 @@ class AuctionSessionMixin:
             raise ValueError("Неизвестный метод генерации случайных чисел.")
         if rng_method == "random_org_plus" and not rng_ticket_id:
             raise ValueError("Для Random.org+ требуется заранее созданный билет.")
+
+        wheel_format = str(wheel_format or AUCTION_WHEEL_FORMAT_DEFAULT)
+        if wheel_format not in {
+            AUCTION_WHEEL_FORMAT_STANDARD,
+            AUCTION_WHEEL_FORMAT_ELIMINATION,
+        }:
+            raise ValueError("Неизвестный формат взвешенного колеса.")
+        if mode != "weighted_wheel":
+            wheel_format = AUCTION_WHEEL_FORMAT_STANDARD
 
         start_in_wheel_mode = bool(start_in_wheel_mode)
         if start_in_wheel_mode and mode != "weighted_wheel":
@@ -293,10 +306,10 @@ class AuctionSessionMixin:
                     name, mode, provider, started_at, created_at,
                     status, duration_seconds, remaining_seconds,
                     duration_ms, remaining_ms, deadline_at, updated_at,
-                    rng_method, rng_ticket_id, wheel_duration_ms,
+                    rng_method, rng_ticket_id, wheel_duration_ms, wheel_format,
                     rules_template_id, rules_template_name, rules_html
                 )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     "Новый аукцион",
@@ -314,6 +327,7 @@ class AuctionSessionMixin:
                     rng_method,
                     rng_ticket_id,
                     wheel_duration_ms,
+                    wheel_format,
                     rules_snapshot["template_id"],
                     rules_snapshot["template_name"],
                     rules_snapshot["content_html"],
@@ -371,10 +385,57 @@ class AuctionSessionMixin:
                     "rng_method": rng_method,
                     "rng_ticket_id": rng_ticket_id,
                     "wheel_duration_ms": wheel_duration_ms,
+                    "wheel_format": wheel_format,
                 },
             )
 
         return auction_id
+
+    def set_auction_wheel_format(self, auction_id: int, wheel_format: str) -> str:
+        """Switch weighted-wheel format only at a clean boundary between spins."""
+        wheel_format = str(wheel_format or AUCTION_WHEEL_FORMAT_DEFAULT)
+        if wheel_format not in {
+            AUCTION_WHEEL_FORMAT_STANDARD,
+            AUCTION_WHEEL_FORMAT_ELIMINATION,
+        }:
+            raise ValueError("Неизвестный формат взвешенного колеса.")
+
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT * FROM auction_sessions WHERE id=?",
+                (int(auction_id),),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if str(session["mode"] or "") != "weighted_wheel":
+                raise RuntimeError(
+                    "Формат колеса можно менять только в режиме «Взвешенное колесо»."
+                )
+            if str(session["status"] or "") != "awaiting_wheel":
+                raise RuntimeError(
+                    "Формат колеса можно менять только между завершёнными вращениями."
+                )
+            if session["wheel_spin_id"]:
+                raise RuntimeError(
+                    "Нельзя менять формат, пока текущее вращение не завершено."
+                )
+            before = str(session["wheel_format"] or AUCTION_WHEEL_FORMAT_DEFAULT)
+            if before == wheel_format:
+                return wheel_format
+            conn.execute(
+                "UPDATE auction_sessions SET wheel_format=?, updated_at=? WHERE id=?",
+                (wheel_format, now, int(auction_id)),
+            )
+            self._log_conn(
+                conn,
+                "auction_session",
+                int(auction_id),
+                "wheel_format",
+                {"wheel_format": before},
+                {"wheel_format": wheel_format},
+            )
+        return wheel_format
 
     def auction_total_sm_points(self, auction_id: int) -> int:
         """Return the full point total of one auction session.
