@@ -55,6 +55,11 @@ class AuctionActionMixin:
             "wheel_duration_ms": wheel_duration_ms,
             "duration_ms": duration_ms,
             "lot_count": len(self.db.auction_eligible_games()),
+            "wheel_format": (
+                str(self.wheel_format_combo.currentData())
+                if mode == "weighted_wheel"
+                else "standard"
+            ),
         }
 
         if params["rng_method"] not in ("random_org", "random_org_plus"):
@@ -106,6 +111,7 @@ class AuctionActionMixin:
         wheel_duration_ms = int(params["wheel_duration_ms"])
         duration_ms = int(params["duration_ms"])
         lot_count = int(params["lot_count"])
+        wheel_format = str(params.get("wheel_format") or "standard")
         direct_wheel = mode == "weighted_wheel"
 
         if direct_wheel:
@@ -113,10 +119,16 @@ class AuctionActionMixin:
                 "Запустить взвешенное колесо?\n\n"
                 f"Лотов: {lot_count}\n"
                 f"Режим: {self.MODE_LABELS.get(mode, mode)}\n"
+                f"Формат: {self.WHEEL_FORMAT_LABELS.get(wheel_format, wheel_format)}\n"
                 f"Генератор: {self.RNG_LABELS.get(rng_method, rng_method)}\n"
                 + (f"Билет Random.org+: {rng_ticket_id}\n" if rng_ticket_id else "")
                 + f"Время вращения: {self._format_milliseconds(wheel_duration_ms)}\n\n"
-                "Победитель будет определён выпавшим сектором."
+                + (
+                    "Выпавший сектор будет выбран на выбывание и после остановки "
+                    "ожидать действия «В архив»."
+                    if wheel_format == "elimination"
+                    else "Победитель будет определён выпавшим сектором."
+                )
             )
             title = "Крутить колесо"
         else:
@@ -150,6 +162,7 @@ class AuctionActionMixin:
                 wheel_duration_ms=wheel_duration_ms,
                 duration_ms=0 if direct_wheel else duration_ms,
                 start_in_wheel_mode=direct_wheel,
+                wheel_format=wheel_format,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Аукцион", str(exc))
@@ -466,7 +479,12 @@ class AuctionActionMixin:
             return
 
         winner_selected = str(session.get("status") or "") == "winner_selected"
-        if winner_selected:
+        elimination_pending = bool(
+            winner_selected
+            and str(session.get("mode") or "") == "weighted_wheel"
+            and str(session.get("wheel_format") or "") == "elimination"
+        )
+        if winner_selected and not elimination_pending:
             title = "Отменить аукцион"
             message = (
                 "Победитель уже определён. Отменить текущую сессию и считать "
@@ -474,6 +492,15 @@ class AuctionActionMixin:
                 "История определения победителя останется в журнале.\n"
                 "Уже добавленные ставки останутся в баллах SM игр и не будут откатаны.\n"
                 "Новые временные лоты этой сессии будут перенесены в основной список."
+            )
+        elif elimination_pending:
+            title = "Остановить аукцион"
+            message = (
+                "Остановить режим выбывания?\n\n"
+                "Лот, который сейчас показан как выбывающий, НЕ будет отправлен "
+                "в архив, пока не нажата кнопка «В архив».\n"
+                "Лоты, уже отправленные в архив в предыдущих раундах, останутся там.\n"
+                "Остальные активные лоты и их баллы сохранятся."
             )
         else:
             title = "Остановить аукцион"

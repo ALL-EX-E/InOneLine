@@ -18,7 +18,7 @@ MAX_REMOTE_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_REMOTE_JSON_BYTES = 1024 * 1024
 MAX_IMAGE_DIMENSION = 8192
 MAX_IMAGE_PIXELS = 40_000_000
-USER_AGENT = "InOneLine/1.0.5 wheel-center-image"
+USER_AGENT = "InOneLine/1.0.6 wheel-center-image"
 
 
 @dataclass(frozen=True)

@@ -179,8 +179,30 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
             details = f"Вращение: {_duration(after.get('wheel_duration_ms'))}"
         elif action == "wheel":
             icon = "★"
-            kind = "ПОБЕДИТЕЛЬ КОЛЕСА"
-            details = "Победитель выбран"
+            if str(after.get("wheel_format") or "") == "elimination":
+                kind = "ВЫБЫВАНИЕ: ЛОТ ВЫБРАН"
+                details = (
+                    f"Раунд {int(after.get('spin_index') or 1)}; "
+                    "ожидает действия «В архив»"
+                )
+            else:
+                kind = "ПОБЕДИТЕЛЬ КОЛЕСА"
+                details = "Победитель выбран"
+        elif action == "wheel_format":
+            icon = "⇄"
+            kind = "ФОРМАТ КОЛЕСА"
+            label = {
+                "standard": "Обычное",
+                "elimination": "Выбывание",
+            }.get(str(after.get("wheel_format") or ""), str(after.get("wheel_format") or ""))
+            details = f"Выбран формат: {label}"
+        elif action == "elimination_archive":
+            icon = "→"
+            kind = "ЛОТ ВЫБЫЛ"
+            details = (
+                "Отправлен в архив; осталось активных лотов: "
+                f"{int(after.get('remaining_lots') or 0)}"
+            )
         elif action == "confirm_winner":
             icon = "✓"
             kind = "ПОБЕДИТЕЛЬ ПОДТВЕРЖДЁН"

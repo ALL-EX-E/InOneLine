@@ -5,7 +5,14 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from ..constants import STATUS_NOT_PLAYED, STATUS_PLAYED, WHEEL_CENTER_IMAGE_MEDIA_ID_KEY
+from ..constants import (
+    AUCTION_WHEEL_FORMAT_DEFAULT,
+    AUCTION_WHEEL_FORMAT_ELIMINATION,
+    AUCTION_WHEEL_FORMAT_STANDARD,
+    STATUS_NOT_PLAYED,
+    STATUS_PLAYED,
+    WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
+)
 from ..media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available
 from .common import utc_now
 
@@ -76,6 +83,12 @@ class WheelMixin:
             for row in participants
         ]
         draw_upper = sum(effective_weights)
+        spin_row = conn.execute(
+            "SELECT COALESCE(MAX(spin_index), 0) + 1 AS next_spin_index "
+            "FROM wheel_verification_snapshots WHERE auction_id=?",
+            (int(auction_id),),
+        ).fetchone()
+        next_spin_index = max(1, int(spin_row["next_spin_index"] or 1))
         return {
             "session": dict(session),
             "participants": participants,
@@ -92,6 +105,10 @@ class WheelMixin:
             "draw_upper": draw_upper,
             "equal_fallback": equal_fallback,
             "algorithm_version": algorithm_version,
+            "next_spin_index": next_spin_index,
+            "wheel_format": str(
+                session["wheel_format"] or AUCTION_WHEEL_FORMAT_DEFAULT
+            ),
         }
 
     def get_wheel_draw_info(self, auction_id: int) -> dict[str, Any]:
@@ -101,6 +118,8 @@ class WheelMixin:
             "weighted": draw["weighted"],
             "total_weight": int(draw["total_weight"]),
             "draw_upper": int(draw["draw_upper"]),
+            "next_spin_index": int(draw["next_spin_index"]),
+            "wheel_format": str(draw["wheel_format"]),
         }
 
     @classmethod
@@ -157,19 +176,31 @@ class WheelMixin:
             ),
             "",
         )
+        wheel_format = str(
+            session.get("wheel_format") or AUCTION_WHEEL_FORMAT_DEFAULT
+        )
+        result_kind = (
+            "eliminated"
+            if wheel_format == AUCTION_WHEEL_FORMAT_ELIMINATION
+            else "winner"
+        )
+        spin_index = int(draw.get("next_spin_index") or 1)
         run_id = secrets.token_hex(16)
         cursor = conn.execute(
             """
             INSERT INTO wheel_verification_snapshots(
-                run_id, auction_id, algorithm_version, mode, rng_method,
+                run_id, auction_id, spin_index, result_kind,
+                algorithm_version, mode, rng_method,
                 rng_value, draw_upper, total_weight, equal_fallback,
                 winner_game_id, winner_title, rng_ticket_id, rng_serial_number,
                 rng_random_json, rng_signature, rng_verified, created_at
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 run_id,
                 int(auction_id),
+                spin_index,
+                result_kind,
                 str(draw["algorithm_version"]),
                 str(session.get("mode") or "weighted_wheel"),
                 str(rng_method or "local"),
@@ -306,14 +337,30 @@ class WheelMixin:
                     int(auction_id),
                 ),
             )
-            conn.execute(
-                """
-                UPDATE auction_entries
-                SET result=CASE WHEN game_id=? THEN 'winner' ELSE 'not_winner' END
-                WHERE auction_id=?
-                """,
-                (winner_game_id, int(auction_id)),
+            wheel_format = str(
+                session.get("wheel_format") or AUCTION_WHEEL_FORMAT_DEFAULT
             )
+            if wheel_format == AUCTION_WHEEL_FORMAT_ELIMINATION:
+                conn.execute(
+                    """
+                    UPDATE auction_entries
+                    SET result=CASE
+                        WHEN game_id=? THEN 'elimination_selected'
+                        ELSE NULL
+                    END
+                    WHERE auction_id=? AND active=1
+                    """,
+                    (winner_game_id, int(auction_id)),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE auction_entries
+                    SET result=CASE WHEN game_id=? THEN 'winner' ELSE 'not_winner' END
+                    WHERE auction_id=? AND active=1
+                    """,
+                    (winner_game_id, int(auction_id)),
+                )
             self._log_conn(
                 conn,
                 "auction_session",
@@ -331,14 +378,234 @@ class WheelMixin:
                     "rng_verified": rng_verified,
                     "verification_run_id": run_id,
                     "verification_algorithm": str(draw["algorithm_version"]),
+                    "spin_index": int(draw.get("next_spin_index") or 1),
+                    "wheel_format": str(
+                        session.get("wheel_format") or AUCTION_WHEEL_FORMAT_DEFAULT
+                    ),
                 },
             )
             return winner_game_id
 
+    def set_auction_rng_ticket_id(self, auction_id: int, ticket_id: str) -> None:
+        """Persist a fresh Random.org+ ticket before that ticket is consumed."""
+        ticket_id = str(ticket_id or "").strip()
+        if not ticket_id:
+            raise ValueError("Пустой Random.org+ ticket.")
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT * FROM auction_sessions WHERE id=?",
+                (int(auction_id),),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if str(session["status"] or "") != "awaiting_wheel":
+                raise RuntimeError("Новый билет можно назначить только перед вращением.")
+            if str(session["rng_method"] or "") != "random_org_plus":
+                raise RuntimeError("Новый билет нужен только для Random.org+.")
+            conn.execute(
+                """
+                UPDATE auction_sessions
+                SET rng_ticket_id=?, rng_value=NULL, rng_serial_number=NULL,
+                    rng_random_json=NULL, rng_signature=NULL, rng_verified=NULL,
+                    updated_at=?
+                WHERE id=?
+                """,
+                (ticket_id, utc_now(), int(auction_id)),
+            )
+
+    def archive_elimination_result(self, auction_id: int) -> dict[str, Any]:
+        """Atomically archive the selected lot and prepare the next D21 spin."""
+        now = utc_now()
+        with self.connect() as conn:
+            session_row = conn.execute(
+                "SELECT * FROM auction_sessions WHERE id=?",
+                (int(auction_id),),
+            ).fetchone()
+            if session_row is None:
+                raise KeyError(auction_id)
+            session = dict(session_row)
+            if str(session.get("mode") or "") != "weighted_wheel":
+                raise RuntimeError("Выбывание доступно только для взвешенного колеса.")
+            if str(session.get("wheel_format") or "") != AUCTION_WHEEL_FORMAT_ELIMINATION:
+                raise RuntimeError("Текущий формат колеса — не «Выбывание».")
+            if str(session.get("status") or "") != "winner_selected":
+                raise RuntimeError("Сейчас нет лота, ожидающего отправки в архив.")
+            if not self._wheel_animation_complete(session):
+                raise RuntimeError("Дождитесь полной остановки колеса.")
+
+            game_id = int(session.get("winner_game_id") or 0)
+            if game_id <= 0:
+                raise RuntimeError("Не удалось определить выбранный лот.")
+            entry = conn.execute(
+                """
+                SELECT ae.*, COALESCE(g.title, ae.snapshot_title) AS title
+                FROM auction_entries ae
+                LEFT JOIN games g ON g.id=ae.game_id
+                WHERE ae.auction_id=? AND ae.game_id=? AND ae.active=1
+                LIMIT 1
+                """,
+                (int(auction_id), game_id),
+            ).fetchone()
+            if entry is None:
+                raise RuntimeError("Выбранный лот уже не участвует в аукционе.")
+            game = conn.execute(
+                "SELECT * FROM games WHERE id=?",
+                (game_id,),
+            ).fetchone()
+            if game is None:
+                raise RuntimeError("Выбранная игра больше не существует.")
+
+            conn.execute(
+                """
+                UPDATE auction_entries
+                SET active=0, result='eliminated'
+                WHERE auction_id=? AND game_id=? AND active=1
+                """,
+                (int(auction_id), game_id),
+            )
+            conn.execute(
+                """
+                UPDATE games
+                SET archived=1, auction_only=0, updated_at=?
+                WHERE id=?
+                """,
+                (now, game_id),
+            )
+            conn.execute(
+                """
+                UPDATE auction_entries
+                SET result=NULL
+                WHERE auction_id=? AND active=1
+                """,
+                (int(auction_id),),
+            )
+            remaining = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM auction_entries "
+                    "WHERE auction_id=? AND active=1",
+                    (int(auction_id),),
+                ).fetchone()[0]
+            )
+            next_status = "awaiting_wheel" if remaining > 0 else "finished_no_winner"
+            finished_at = now if remaining <= 0 else None
+            conn.execute(
+                """
+                UPDATE auction_sessions
+                SET status=?,
+                    winner_game_id=NULL,
+                    rng_ticket_id=NULL,
+                    rng_value=NULL,
+                    rng_serial_number=NULL,
+                    rng_random_json=NULL,
+                    rng_signature=NULL,
+                    rng_verified=NULL,
+                    wheel_spin_id=NULL,
+                    wheel_started_at=NULL,
+                    wheel_target_rotation=NULL,
+                    finished_at=CASE WHEN ? IS NULL THEN finished_at ELSE ? END,
+                    updated_at=?
+                WHERE id=?
+                """,
+                (
+                    next_status,
+                    finished_at,
+                    finished_at,
+                    now,
+                    int(auction_id),
+                ),
+            )
+            title = str(entry["title"] or "")
+            self._log_conn(
+                conn,
+                "auction_session",
+                int(auction_id),
+                "elimination_archive",
+                {
+                    "status": "winner_selected",
+                    "winner_game_id": game_id,
+                },
+                {
+                    "status": next_status,
+                    "game_id": game_id,
+                    "title": title,
+                    "remaining_lots": remaining,
+                },
+            )
+            self._log_conn(
+                conn,
+                "game",
+                game_id,
+                "archive",
+                {"archived": int(game["archived"] or 0)},
+                {"archived": 1, "source": "auction_elimination"},
+            )
+            return {
+                "game_id": game_id,
+                "title": title,
+                "remaining_lots": remaining,
+                "status": next_status,
+            }
+
+    def list_wheel_verification_snapshots(
+        self,
+        auction_id: int,
+    ) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wheel_verification_snapshots "
+                "WHERE auction_id=? ORDER BY spin_index ASC",
+                (int(auction_id),),
+            ).fetchall()
+            result: list[dict[str, Any]] = []
+            for row in rows:
+                snapshot = dict(row)
+                participants = conn.execute(
+                    """
+                    SELECT position, game_id, snapshot_title, source_weight,
+                           effective_weight, interval_start, interval_end
+                    FROM wheel_verification_participants
+                    WHERE snapshot_id=?
+                    ORDER BY position ASC
+                    """,
+                    (int(snapshot["id"]),),
+                ).fetchall()
+                snapshot["participants"] = [dict(item) for item in participants]
+                result.append(snapshot)
+        return result
+
+    def get_wheel_verification_snapshot_by_run_id(
+        self,
+        run_id: str,
+    ) -> dict[str, Any] | None:
+        run_id = str(run_id or "").strip()
+        if not run_id:
+            return None
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM wheel_verification_snapshots WHERE run_id=?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            snapshot = dict(row)
+            participants = conn.execute(
+                """
+                SELECT position, game_id, snapshot_title, source_weight,
+                       effective_weight, interval_start, interval_end
+                FROM wheel_verification_participants
+                WHERE snapshot_id=?
+                ORDER BY position ASC
+                """,
+                (int(snapshot["id"]),),
+            ).fetchall()
+        snapshot["participants"] = [dict(item) for item in participants]
+        return snapshot
+
     def get_wheel_verification_snapshot(self, auction_id: int) -> dict[str, Any] | None:
         with self.connect() as conn:
             row = conn.execute(
-                "SELECT * FROM wheel_verification_snapshots WHERE auction_id=?",
+                "SELECT * FROM wheel_verification_snapshots "
+                "WHERE auction_id=? ORDER BY spin_index DESC LIMIT 1",
                 (int(auction_id),),
             ).fetchone()
             if row is None:
@@ -378,6 +645,7 @@ class WheelMixin:
             WHERE s.auction_id=?
               AND s.winner_game_id=?
               AND p.game_id=?
+            ORDER BY s.spin_index DESC
             LIMIT 1
             """,
             (
@@ -418,9 +686,18 @@ class WheelMixin:
             "source": "verification_snapshot",
         }
 
-    def verify_wheel_result(self, auction_id: int) -> dict[str, Any]:
-        """Deterministically verify the frozen snapshot without RNG/network/writes."""
-        snapshot = self.get_wheel_verification_snapshot(int(auction_id))
+    def verify_wheel_result(
+        self,
+        auction_id: int,
+        *,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Deterministically verify one frozen spin without RNG/network/writes."""
+        snapshot = (
+            self.get_wheel_verification_snapshot_by_run_id(run_id)
+            if run_id
+            else self.get_wheel_verification_snapshot(int(auction_id))
+        )
         if snapshot is None:
             return {
                 "status": "unavailable",
@@ -501,14 +778,20 @@ class WheelMixin:
             return {
                 "status": "match",
                 "label": "Совпадает",
-                "reason": "Сохранённый победитель совпадает с детерминированным пересчётом snapshot.",
+                "reason": (
+                    "Сохранённый результат совпадает с детерминированным "
+                    "пересчётом snapshot."
+                ),
                 "expected_winner_game_id": expected_id,
                 "expected_winner_title": expected_title,
             }
         return {
             "status": "mismatch",
             "label": "НЕ СОВПАДАЕТ",
-            "reason": "Сохранённый победитель не совпадает с детерминированным пересчётом snapshot.",
+            "reason": (
+                "Сохранённый результат не совпадает с детерминированным "
+                "пересчётом snapshot."
+            ),
             "expected_winner_game_id": expected_id,
             "expected_winner_title": expected_title,
         }
@@ -519,6 +802,7 @@ class WheelMixin:
         *,
         mode: str = "weighted_wheel",
         rng_method: str = "local",
+        wheel_format: str = AUCTION_WHEEL_FORMAT_STANDARD,
     ) -> dict[str, Any]:
         """Read-only pre-spin mathematical preview. Never creates a snapshot."""
         with self.connect() as conn:
@@ -529,6 +813,10 @@ class WheelMixin:
                     raise RuntimeError("Данные проверки доступны только перед фактическим вращением.")
                 effective_mode = str(session.get("mode") or mode)
                 effective_rng = str(session.get("rng_method") or rng_method or "local")
+                effective_wheel_format = str(
+                    draw.get("wheel_format") or AUCTION_WHEEL_FORMAT_STANDARD
+                )
+                next_spin_index = int(draw.get("next_spin_index") or 1)
                 authoritative_input = True
             else:
                 rows = conn.execute(
@@ -571,12 +859,20 @@ class WheelMixin:
                     "algorithm_version": algorithm_version,
                 }
                 effective_rng = str(rng_method or "local")
+                effective_wheel_format = (
+                    AUCTION_WHEEL_FORMAT_ELIMINATION
+                    if str(wheel_format or "") == AUCTION_WHEEL_FORMAT_ELIMINATION
+                    else AUCTION_WHEEL_FORMAT_STANDARD
+                )
+                next_spin_index = 1
                 authoritative_input = False
 
         verification_rows = self._verification_participants(draw)
         return {
             "algorithm_version": str(draw["algorithm_version"]),
             "mode": effective_mode,
+            "wheel_format": effective_wheel_format,
+            "next_spin_index": next_spin_index,
             "rng_method": effective_rng,
             "draw_upper": int(draw["draw_upper"]),
             "total_weight": int(draw["total_weight"]),
@@ -836,6 +1132,9 @@ class WheelMixin:
             "auction_id": auction_id,
             "status": str(session.get("status") or ""),
             "mode": str(session.get("mode") or ""),
+            "wheel_format": str(
+                session.get("wheel_format") or AUCTION_WHEEL_FORMAT_DEFAULT
+            ),
             "rng_method": str(session.get("rng_method") or "local"),
             "ready": str(session.get("status") or "") == "awaiting_wheel",
             "visible": visible,
@@ -929,6 +1228,7 @@ class WheelMixin:
             "auction_id": None,
             "status": "preview",
             "mode": "weighted_wheel",
+            "wheel_format": AUCTION_WHEEL_FORMAT_STANDARD,
             "rng_method": "local",
             "ready": False,
             "visible": True,

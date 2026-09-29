@@ -162,6 +162,18 @@ class AuctionAudioMixin:
             self._release_auction_audio_owner()
             return
         status = str(session.get("status") or "")
+        mode = str(session.get("mode") or "")
+        # Direct weighted-wheel sessions own audio only while a spin is being
+        # prepared/played. Between D21 rounds (awaiting_wheel), the future
+        # independent Music Player is allowed to resume until the next
+        # explicit «Крутить». Max-amount tie-breaks keep the historical
+        # continuous auction ownership semantics.
+        if status == "awaiting_wheel" and mode == "weighted_wheel":
+            if getattr(self, "_wheel_rng_worker", None) is not None:
+                self._acquire_auction_audio_owner()
+            else:
+                self._release_auction_audio_owner()
+            return
         if status == "winner_selected":
             if spin_running is None:
                 spin_running = bool(

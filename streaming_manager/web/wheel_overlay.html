@@ -221,7 +221,8 @@ function draw(){
 
  const winner=s.winner;
  const reveal=anim.complete&&winner;
- winnerTitleEl.textContent=reveal?`Победитель: ${winner.title}`:"";
+ const resultPrefix=s?.wheel_format==="elimination"?"Выбывает":"Победитель";
+ winnerTitleEl.textContent=reveal?`${resultPrefix}: ${winner.title}`:"";
  const chance=reveal?winner.chance:null;
  if(chance){
    const formatted=chance.available?formatProbability(chance.probability):null;

@@ -6,6 +6,9 @@ from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
 
+from ...constants import (
+    AUCTION_WHEEL_FORMAT_ELIMINATION,
+)
 from ...database import format_points
 from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomDraw, RandomOrgClient
@@ -28,6 +31,8 @@ class AuctionRngMixin:
         return {
             "streamingManagerAuctionId": int(auction_id),
             "drawUpper": int(draw_info["draw_upper"]),
+            "spinIndex": int(draw_info.get("next_spin_index") or 1),
+            "wheelFormat": str(draw_info.get("wheel_format") or "standard"),
             "lotCount": len(draw_info["weighted"]),
             "lotWeightsSha256": hashlib.sha256(
                 snapshot.encode("utf-8")
@@ -64,9 +69,17 @@ class AuctionRngMixin:
                 "максимальным количеством баллов?\n\nВсе оставшиеся лоты имеют равный шанс."
             )
         else:
+            elimination = (
+                str(session.get("wheel_format") or "")
+                == AUCTION_WHEEL_FORMAT_ELIMINATION
+            )
             wheel_text = (
-                "Определить победителя взвешенным случайным выбором?\n\n"
-                "Шанс каждого лота пропорционален его текущим баллам SM; "
+                (
+                    "Определить выбывающий лот взвешенным случайным выбором?\n\n"
+                    if elimination
+                    else "Определить победителя взвешенным случайным выбором?\n\n"
+                )
+                + "Шанс каждого лота пропорционален его текущим баллам SM; "
                 "лот с 0 баллов участвует с минимальным весом 1."
             )
         wheel_text += (
@@ -95,6 +108,7 @@ class AuctionRngMixin:
             return
 
         if rng_method == "local":
+            self._acquire_auction_audio_owner()
             self._apply_wheel_draw(auction_id, None)
             return
 
@@ -111,14 +125,26 @@ class AuctionRngMixin:
         ticket_id = str(session.get("rng_ticket_id") or "") if signed else None
         user_data = self._rng_user_data(auction_id, draw_info) if signed else None
 
+        self._acquire_auction_audio_owner()
         self.start_btn.setEnabled(False)
         self.start_btn.setText("Получение случайного числа…")
 
         def request_draw():
-            return RandomOrgClient(api_key).draw_below(
+            client = RandomOrgClient(api_key)
+            effective_ticket = ticket_id
+            if signed and not effective_ticket:
+                # D21 needs a fresh one-use signed ticket for every new spin.
+                # Persist it before consuming it so a lost response can recover
+                # the exact RANDOM.ORG result through showResult=true.
+                effective_ticket = str(client.create_ticket()["ticketId"])
+                self.db.set_auction_rng_ticket_id(
+                    auction_id,
+                    effective_ticket,
+                )
+            return client.draw_below(
                 int(draw_info["draw_upper"]),
                 signed=signed,
-                ticket_id=ticket_id,
+                ticket_id=effective_ticket,
                 user_data=user_data,
             )
 
@@ -133,6 +159,17 @@ class AuctionRngMixin:
         self.thread_pool.start(worker)
 
     def _apply_wheel_draw(self, auction_id: int, draw: RandomDraw | None):
+        # A remote RNG request may finish after the operator used
+        # «Остановить аукцион». In that case the result belongs to a closed
+        # session and must be ignored instead of surfacing a stale-state error.
+        current = self._current_session()
+        if (
+            current is None
+            or int(current.get("id") or 0) != int(auction_id)
+            or str(current.get("status") or "") != "awaiting_wheel"
+        ):
+            self._release_auction_audio_owner()
+            return
         try:
             if draw is None:
                 self.db.run_weighted_wheel(auction_id)
@@ -152,12 +189,17 @@ class AuctionRngMixin:
         # never alter the already-fixed winner/RNG lifecycle.
         self._schedule_wheel_soundtrack(wheel_payload)
 
-        # Победитель уже математически зафиксирован, но интерфейс и OBS
-        # раскрывают его только после завершения синхронной анимации.
+        # Результат уже математически зафиксирован, но интерфейс и OBS
+        # раскрывают победителя/выбывающий лот только после завершения
+        # синхронной анимации.
         self.refresh()
         self.auction_tabs.setCurrentWidget(self.conduct_page)
 
     def _wheel_rng_failed(self, exc):
+        self._release_auction_audio_owner()
+        session = self._current_session()
+        if session is None or str(session.get("status") or "") != "awaiting_wheel":
+            return
         QMessageBox.critical(self, "Колесо", str(exc))
 
     def _wheel_rng_finished(self):
@@ -216,6 +258,9 @@ class AuctionRngMixin:
                     None,
                     mode="weighted_wheel",
                     rng_method=str(self.rng_combo.currentData() or "local"),
+                    wheel_format=str(
+                        self.wheel_format_combo.currentData() or "standard"
+                    ),
                 )
             else:
                 QMessageBox.information(
@@ -258,12 +303,13 @@ class AuctionRngMixin:
             ),
             (
                 "Random.org+",
-                "До старта сессии создаётся билет RANDOM.ORG с showResult=true. "
-                "Его ID сохраняется заранее. При запуске колеса используется Signed API "
-                "с этим билетом. Подписанный random-объект, серийный номер и подпись "
-                "сохраняются в базе и могут быть проверены через RANDOM.ORG.\n\n"
-                "Если сеть оборвалась после генерации, программа проверяет билет и "
-                "восстанавливает уже созданный результат вместо новой генерации.",
+                "Для каждого фактического вращения используется отдельный билет "
+                "RANDOM.ORG с showResult=true. Первый билет подготавливается при запуске "
+                "сессии; в многораундовом режиме следующие создаются перед соответствующим "
+                "вращением и сохраняются до использования. Подписанный random-объект, "
+                "серийный номер и подпись сохраняются в immutable snapshot каждого раунда.\n\n"
+                "Если сеть оборвалась после генерации, программа проверяет сохранённый "
+                "билет и восстанавливает уже созданный результат вместо новой генерации.",
             ),
         ]
         for title, text in descriptions:
@@ -278,6 +324,37 @@ class AuctionRngMixin:
         buttons.rejected.connect(dialog.reject)
         root.addWidget(buttons)
         dialog.exec()
+
+    def handle_wheel_result_action(self):
+        session = self._current_session()
+        if session is None or session.get("status") != "winner_selected":
+            return
+        if (
+            str(session.get("mode") or "") == "weighted_wheel"
+            and str(session.get("wheel_format") or "")
+            == AUCTION_WHEEL_FORMAT_ELIMINATION
+        ):
+            self.archive_elimination_result()
+            return
+        self.confirm_winner()
+
+    def archive_elimination_result(self):
+        session = self._current_session()
+        if session is None or session.get("status") != "winner_selected":
+            return
+        try:
+            result = self.db.archive_elimination_result(int(session["id"]))
+        except Exception as exc:
+            QMessageBox.critical(self, "Выбывание", str(exc))
+            return
+
+        # One user action owns the whole transition: DB archive, active-entry
+        # removal, RNG-state reset and the next awaiting_wheel boundary.
+        self._stop_wheel_soundtrack(immediate=True)
+        if int(result.get("remaining_lots") or 0) <= 0:
+            self._active_auction_id = None
+        self.changed()
+        self.refresh()
 
     def confirm_winner(self):
         session = self._current_session()

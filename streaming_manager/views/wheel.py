@@ -495,7 +495,12 @@ class AuctionWheelWidget(QOpenGLWidget):
         if animation.get("spin_id") and not complete:
             caption = "Колесо вращается…"
         elif winner:
-            caption = f"Победитель: {winner.get('title', '')}"
+            prefix = (
+                "Выбывает"
+                if str(self._payload.get("wheel_format") or "") == "elimination"
+                else "Победитель"
+            )
+            caption = f"{prefix}: {winner.get('title', '')}"
         elif sectors:
             caption = (
                 "Готово к вращению"
