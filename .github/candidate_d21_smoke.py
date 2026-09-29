@@ -442,6 +442,7 @@ def ui_api_regression(root: Path, app: QApplication) -> None:
 
         # Explicit archive removes exactly one lot from both wheel and lots overlay.
         auction.archive_elimination_result()
+        auction.refresh_force()
         app.processEvents()
         session = db.get_auction_session(auction_id)
         assert session["status"] == "awaiting_wheel"
