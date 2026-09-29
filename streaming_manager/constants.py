@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 APP_NAME = "In one line"
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 SHARED_XLSX_ENABLED_KEY = "shared_xlsx_enabled"
 SHARED_XLSX_PATH_KEY = "shared_xlsx_path"
@@ -67,6 +67,14 @@ AUCTION_MANUAL_BID_POINTS_MIN = 1
 AUCTION_MANUAL_BID_POINTS_MAX = 10_000_000
 AUCTION_WHEEL_CHANCE_VISIBLE_KEY = "auction_wheel_chance_visible"
 AUCTION_WHEEL_CHANCE_VISIBLE_DEFAULT = True
+
+# D21 — presentation/processing format of the existing weighted wheel.
+# The format may change only between completed spins. The active session keeps
+# its own persisted value; this setting is only the pre-start/default choice.
+AUCTION_WHEEL_FORMAT_KEY = "auction_wheel_format"
+AUCTION_WHEEL_FORMAT_STANDARD = "standard"
+AUCTION_WHEEL_FORMAT_ELIMINATION = "elimination"
+AUCTION_WHEEL_FORMAT_DEFAULT = AUCTION_WHEEL_FORMAT_STANDARD
 
 # W3 — application-owned wheel soundtrack.  Values live in the existing
 # generic settings table; B1 later raises the global schema to 17 for integration infrastructure.
