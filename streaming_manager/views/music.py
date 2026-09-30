@@ -276,6 +276,31 @@ class MusicTab(QWidget):
         if media_id is not None:
             self.controller.select_media(int(media_id), play=True)
 
+    @staticmethod
+    def _asset_filename(asset) -> str:
+        if asset.storage_mode == MEDIA_STORAGE_MANAGED:
+            return Path(asset.managed_name).name
+        if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
+            return Path(asset.external_path).name
+        return str(asset.display_name or "")
+
+    def _existing_asset_by_filename(self, filename: str):
+        wanted = Path(str(filename)).name.casefold()
+        for asset in self.db.list_media_assets(MEDIA_CATEGORY_MUSIC):
+            if self._asset_filename(asset).casefold() == wanted:
+                return asset
+        return None
+
+    def _select_library_asset(self, media_id: int) -> None:
+        if self.search.text():
+            self.search.clear()
+        for index in range(self.list_widget.count()):
+            row = self.list_widget.item(index)
+            if int(row.data(Qt.UserRole)) == int(media_id):
+                self.list_widget.setCurrentItem(row)
+                self.list_widget.scrollToItem(row)
+                return
+
     def _choose_storage_mode(self, sources: list[Path]) -> str | None:
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Как использовать музыку?")
@@ -365,10 +390,48 @@ class MusicTab(QWidget):
             )
             return
 
-        mode = self._choose_storage_mode(sources)
+        duplicates: list[tuple[str, int]] = []
+        import_sources: list[Path] = []
+        for source in sources:
+            existing = self._existing_asset_by_filename(source.name)
+            if existing is None:
+                import_sources.append(source)
+            else:
+                duplicates.append((source.name, int(existing.id)))
+
+        if duplicates:
+            # Filename is the canonical duplicate rule for the Music Player.
+            # Managed copies and external references intentionally share this
+            # namespace: same basename means "already in the library".
+            self._select_library_asset(duplicates[-1][1])
+            if len(duplicates) == 1:
+                duplicate_message = (
+                    f"Трек «{duplicates[0][0]}» уже есть в музыкальной библиотеке.\n\n"
+                    "Существующая запись выбрана в списке."
+                )
+            else:
+                preview = "\n".join(f"• {name}" for name, _ in duplicates[:10])
+                if len(duplicates) > 10:
+                    preview += f"\n• … и ещё {len(duplicates) - 10}"
+                duplicate_message = (
+                    "Эти треки уже есть в музыкальной библиотеке:\n\n"
+                    + preview
+                    + "\n\nСуществующая запись одного из совпадений выбрана в списке."
+                )
+            QMessageBox.information(
+                self,
+                "Трек уже есть",
+                duplicate_message,
+            )
+
+        if not import_sources:
+            return
+
+        mode = self._choose_storage_mode(import_sources)
         if mode is None:
             return
 
+        sources = import_sources
         added_ids: list[int] = []
         skipped: list[str] = []
         errors: list[str] = list(invalid)
