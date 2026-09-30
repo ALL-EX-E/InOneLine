@@ -386,18 +386,27 @@ class MusicPlayerController(QObject):
 
         if self._desired_state == PLAYER_PLAY:
             self._desired_state = PLAYER_PAUSE
+            self._mark_user_change()
+            self._apply_transport_intent()
         else:
             from_stop = self._desired_state == PLAYER_STOP
-            if from_stop:
-                self.player.setPosition(0)
             self._desired_state = PLAYER_PLAY
-            if from_stop or self._pending_new_track_event:
-                if self._suppressed:
-                    self._pending_new_track_event = True
-                else:
+            self._mark_user_change()
+            if from_stop:
+                # STOP deliberately unloads QMediaPlayer so Windows releases
+                # the file handle. Re-create the authoritative transport only
+                # when the user actually starts the track again.
+                self._pending_new_track_event = bool(self._suppressed)
+                self._load_current(position_ms=0, play=not self._suppressed)
+                if not self._suppressed:
                     self._trigger_new_track_event()
-        self._mark_user_change()
-        self._apply_transport_intent()
+            else:
+                if self._pending_new_track_event:
+                    if self._suppressed:
+                        self._pending_new_track_event = True
+                    else:
+                        self._trigger_new_track_event()
+                self._apply_transport_intent()
         self._persist_state()
 
     def stop(self) -> None:
@@ -407,7 +416,8 @@ class MusicPlayerController(QObject):
         self._pending_new_track_event = True
         self._mark_user_change()
         self.player.stop()
-        self.player.setPosition(0)
+        self.player.setSource(QUrl())
+        self._pending_seek_ms = None
         self._apply_local_audio_route()
         self._persist_state()
         self.stateChanged.emit()
