@@ -411,12 +411,35 @@ class AuctionAudioMixin:
             label = asset.display_name
         return label if available else f"⚠ файл недоступен: {label}"
 
+    def _soundtrack_assets_for_setting(self, setting_key: str):
+        """Managed soundtrack files are the reusable shared catalog.
+
+        An external reference is intentionally context-local: it is visible
+        only while that exact asset is the saved selection for this selector.
+        Re-selecting an old external source therefore goes through
+        «Добавить soundtrack…» again instead of turning the DB into a hidden
+        reusable external library.
+        """
+        assets = self.db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
+        raw = str(self.db.get_setting(setting_key, "") or "")
+        selected_id = int(raw) if raw.isdigit() else None
+        visible = []
+        for asset in assets:
+            if not media_asset_available(self.db.path.parent, asset):
+                continue
+            if asset.storage_mode == MEDIA_STORAGE_MANAGED:
+                visible.append(asset)
+            elif selected_id is not None and int(asset.id) == selected_id:
+                visible.append(asset)
+        return sorted(
+            visible,
+            key=lambda item: (item.display_name.casefold(), int(item.id)),
+        )
+
     def _wheel_soundtrack_assets(self):
-        return [
-            asset
-            for asset in self.db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
-            if media_asset_available(self.db.path.parent, asset)
-        ]
+        return self._soundtrack_assets_for_setting(
+            WHEEL_SOUNDTRACK_MEDIA_ID_KEY
+        )
 
     def _selected_wheel_soundtrack_asset(self):
         raw = self.wheel_soundtrack_combo.currentData()
@@ -853,13 +876,9 @@ class AuctionAudioMixin:
         return label if available else f"⚠ файл недоступен: {label}"
 
     def _auction_soundtrack_assets(self):
-        # media_assets ORDER BY id is the existing deterministic library order.
-        # The selected item is the starting point; sequential playback then wraps.
-        return [
-            asset
-            for asset in self.db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
-            if media_asset_available(self.db.path.parent, asset)
-        ]
+        return self._soundtrack_assets_for_setting(
+            AUCTION_SOUNDTRACK_MEDIA_ID_KEY
+        )
 
     def _selected_auction_soundtrack_asset(self):
         raw = self.auction_soundtrack_combo.currentData()
