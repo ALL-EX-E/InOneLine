@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>InOneLine Music Player</title>
+<style>
+:root {
+  --text:#fff; --bg:rgba(0,0,0,0); --frame:#52d7ff; --spectrum:#fff;
+  --font:"Segoe UI",sans-serif; --font-size:4.25vw;
+  --outline:#000; --spectrum-outline:#000;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
+body { font-family:var(--font); }
+#stage { position:fixed; inset:0; overflow:hidden; pointer-events:none; }
+#card {
+  position:absolute; left:0; top:50%;
+  width:100vw; height:22.5vw;
+  transform:translateY(-50%);
+  opacity:0;
+  display:flex; align-items:center;
+  padding:3.125vw;
+  gap:3.75vw;
+  background:var(--bg);
+  border:0.22vw solid var(--frame);
+  box-shadow:0 0 0.55vw color-mix(in srgb,var(--frame) 88%,transparent),
+             0 0 1.65vw color-mix(in srgb,var(--frame) 55%,transparent),
+             inset 0 0 0.65vw color-mix(in srgb,var(--frame) 35%,transparent);
+  transition:opacity .45s ease, transform .45s cubic-bezier(.2,.8,.2,1),
+             background-color .7s ease, border-color .7s ease, box-shadow .7s ease;
+}
+#card.visible { opacity:1; transform:translateY(-50%) translate(0,0); }
+#card.hidden.fade { opacity:0; transform:translateY(-50%); }
+#card.hidden.slide-left { opacity:0; transform:translate(-102vw,-50%); }
+#card.hidden.slide-right { opacity:0; transform:translate(102vw,-50%); }
+#card.hidden.slide-top { opacity:0; transform:translateY(calc(-50% - 30vw)); }
+#card.hidden.slide-bottom { opacity:0; transform:translateY(calc(-50% + 30vw)); }
+
+#coverFrame {
+  flex:0 0 16.25vw; width:16.25vw; height:16.25vw;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+  border:0.22vw solid var(--frame);
+  box-shadow:0 0 0.45vw color-mix(in srgb,var(--frame) 88%,transparent),
+             0 0 1.15vw color-mix(in srgb,var(--frame) 48%,transparent),
+             inset 0 0 0.55vw color-mix(in srgb,var(--frame) 30%,transparent);
+  transition:border-color .7s ease, box-shadow .7s ease;
+}
+#cover { width:100%; height:100%; display:block; object-fit:cover; object-position:center; }
+#cover.placeholder { object-fit:contain; padding:8%; }
+
+#right { flex:1 1 auto; min-width:0; height:100%; display:flex; flex-direction:column; }
+#titleViewport {
+  flex:0 0 48%; min-width:0; overflow:hidden; display:flex; align-items:center;
+  color:var(--text); font-size:var(--font-size); font-weight:650; white-space:nowrap;
+  text-shadow:-.08em -.08em .09em var(--outline), .08em -.08em .09em var(--outline),
+              -.08em .08em .09em var(--outline), .08em .08em .09em var(--outline);
+}
+#titleInner { display:inline-block; white-space:nowrap; will-change:transform; }
+#titleInner.marquee {
+  animation:marquee var(--marquee-duration,12s) linear infinite;
+}
+@keyframes marquee {
+  0%,13% { transform:translateX(0); }
+  82%,95% { transform:translateX(calc(-1 * var(--marquee-distance,0px))); }
+  100% { transform:translateX(0); }
+}
+#spectrumWrap { flex:1 1 auto; min-height:0; display:flex; align-items:flex-end; padding-top:1.2vw; }
+#spectrum { width:100%; height:100%; display:block; }
+
+@media (prefers-reduced-motion: reduce) {
+  #card { transition-duration:.15s; }
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="card" class="hidden fade">
+    <div id="coverFrame"><img id="cover" class="placeholder" src="/music-placeholder" alt=""></div>
+    <div id="right">
+      <div id="titleViewport"><span id="titleInner">Исполнитель - Название трека</span></div>
+      <div id="spectrumWrap"><canvas id="spectrum"></canvas></div>
+    </div>
+  </div>
+</div>
+<audio id="audio" preload="auto"></audio>
+<script>
+(() => {
+"use strict";
+const params = new URLSearchParams(location.search);
+const preview = ["1","true","yes","on"].includes((params.get("preview")||"").toLowerCase());
+const card = document.getElementById("card");
+const cover = document.getElementById("cover");
+const coverFrame = document.getElementById("coverFrame");
+const titleViewport = document.getElementById("titleViewport");
+const titleInner = document.getElementById("titleInner");
+const canvas = document.getElementById("spectrum");
+const ctx = canvas.getContext("2d");
+const audio = document.getElementById("audio");
+
+let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
+let frequencyData = null;
+let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
+let hideTimer = 0, demoPhase = 0, currentVisible = false, lastCoverUrl = "";
+let pollBusy = false;
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function hexRgb(hex){
+  const m=String(hex||"").trim().match(/^#([0-9a-f]{6})$/i);
+  return m ? [parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)] : [255,255,255];
+}
+function rgbHex(rgb){ return "#"+rgb.map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join(""); }
+function luminance(rgb){ return .299*rgb[0]+.587*rgb[1]+.114*rgb[2]; }
+function mix(rgb, target, amount){ return rgb.map((v,i)=>v+(target[i]-v)*amount); }
+
+function ensureAudioGraph(){
+  if(audioContext) return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return;
+  try {
+    audioContext=new AC();
+    analyser=audioContext.createAnalyser();
+    analyser.fftSize=512;
+    analyser.smoothingTimeConstant=.72;
+    gainNode=audioContext.createGain();
+    mediaNode=audioContext.createMediaElementSource(audio);
+    mediaNode.connect(analyser);
+    analyser.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    frequencyData=new Uint8Array(analyser.frequencyBinCount);
+  } catch(_e){}
+}
+function setAudioGain(state){
+  ensureAudioGraph();
+  if(audioContext && audioContext.state==="suspended") audioContext.resume().catch(()=>{});
+  if(gainNode) gainNode.gain.value=(state.browser_audible && !preview) ? clamp(Number(state.gain)||0,0,1) : 0;
+  else audio.muted=preview || !state.browser_audible;
+}
+async function syncAudio(state){
+  if(!state || !state.media_id || !state.url){
+    if(!audio.paused) audio.pause();
+    return;
+  }
+  const wanted=new URL(state.url,location.href).href;
+  if(audio.src!==wanted){
+    audio.src=wanted;
+    audio.load();
+    lastMediaId=state.media_id;
+  }
+  setAudioGain(state);
+  const target=Math.max(0,Number(state.position_ms)||0)/1000;
+  if(Number.isFinite(audio.duration) && Math.abs((audio.currentTime||0)-target)>.75){
+    try { audio.currentTime=target; } catch(_e){}
+  }
+  if(state.playing){
+    ensureAudioGraph();
+    try { await audio.play(); } catch(_e){}
+  } else if(!audio.paused) {
+    audio.pause();
+  }
+}
+
+function setManualColors(a){
+  const bg=a.background==="color" ? (a.background_color||"#10151D") : "rgba(0,0,0,0)";
+  document.documentElement.style.setProperty("--bg",bg);
+  document.documentElement.style.setProperty("--frame",a.frame_color||"#52D7FF");
+}
+function contrastColors(a,bgRgb=null){
+  const text=hexRgb(a.text_color||"#FFFFFF");
+  const spec=hexRgb(a.spectrum_color||"#FFFFFF");
+  let textOutline, specOutline;
+  if(a.background==="transparent" || !bgRgb){
+    textOutline=luminance(text)>145?"#000000":"#FFFFFF";
+    specOutline=luminance(spec)>145?"#000000":"#FFFFFF";
+  } else {
+    textOutline=luminance(bgRgb)>145?"#000000":"#FFFFFF";
+    specOutline=luminance(bgRgb)>145?"#000000":"#FFFFFF";
+  }
+  document.documentElement.style.setProperty("--outline",textOutline);
+  document.documentElement.style.setProperty("--spectrum-outline",specOutline);
+}
+function applyAppearance(a){
+  appearance=a||{};
+  document.documentElement.style.setProperty("--font",JSON.stringify(a.font_family||"Segoe UI")+", sans-serif");
+  const designPx=clamp(Number(a.font_size)||34,8,200);
+  document.documentElement.style.setProperty("--font-size",(designPx/8)+"vw");
+  document.documentElement.style.setProperty("--text",a.text_color||"#FFFFFF");
+  document.documentElement.style.setProperty("--spectrum",a.spectrum_color||"#FFFFFF");
+  setManualColors(a);
+  contrastColors(a,a.background==="color"?hexRgb(a.background_color):null);
+}
+
+function paletteFromImage(img){
+  const c=document.createElement("canvas"), x=c.getContext("2d",{willReadFrequently:true});
+  c.width=48; c.height=48;
+  x.drawImage(img,0,0,c.width,c.height);
+  const data=x.getImageData(0,0,c.width,c.height).data;
+  const buckets=new Map();
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3]<100) continue;
+    const r=data[i],g=data[i+1],b=data[i+2];
+    const max=Math.max(r,g,b),min=Math.min(r,g,b);
+    if(max<18 || (max-min)<10) continue;
+    const key=[r>>5,g>>5,b>>5].join(",");
+    const prev=buckets.get(key)||{n:0,r:0,g:0,b:0,s:0};
+    prev.n++; prev.r+=r; prev.g+=g; prev.b+=b; prev.s+=(max-min);
+    buckets.set(key,prev);
+  }
+  const rows=[...buckets.values()].map(v=>({
+    n:v.n, rgb:[v.r/v.n,v.g/v.n,v.b/v.n], saturation:v.s/v.n
+  }));
+  if(!rows.length) return null;
+  rows.sort((p,q)=>q.n-p.n);
+  const dominant=rows[0].rgb;
+  rows.sort((p,q)=>(q.saturation*q.n)-(p.saturation*p.n));
+  const accent=rows[0].rgb;
+  return {background:mix(dominant,[0,0,0],.58),accent:mix(accent,[255,255,255],.08)};
+}
+function applyAutoColorsIfPossible(){
+  if(!appearance.auto_colors || !currentState.has_cover || !cover.complete || !cover.naturalWidth){
+    setManualColors(appearance);
+    contrastColors(appearance,appearance.background==="color"?hexRgb(appearance.background_color):null);
+    return;
+  }
+  try {
+    const palette=paletteFromImage(cover);
+    if(!palette) throw new Error("no palette");
+    const frame=rgbHex(palette.accent);
+    document.documentElement.style.setProperty("--frame",frame);
+    if(appearance.background==="color"){
+      document.documentElement.style.setProperty("--bg",rgbHex(palette.background));
+      contrastColors(appearance,palette.background);
+    } else {
+      document.documentElement.style.setProperty("--bg","rgba(0,0,0,0)");
+      contrastColors(appearance,null);
+    }
+  } catch(_e){
+    setManualColors(appearance);
+    contrastColors(appearance,appearance.background==="color"?hexRgb(appearance.background_color):null);
+  }
+}
+
+function updateCover(state, demo=false){
+  const url=demo?"/music-placeholder":(state.cover_url||"/music-placeholder");
+  const placeholder=demo || !state.has_cover;
+  if(lastCoverUrl!==url){
+    lastCoverUrl=url;
+    cover.onload=()=>{ applyAutoColorsIfPossible(); };
+    cover.src=url;
+  }
+  cover.classList.toggle("placeholder",placeholder);
+  if(placeholder) setManualColors(appearance);
+}
+function updateTitle(text){
+  const value=text||"Исполнитель - Название трека";
+  if(titleInner.textContent!==value) titleInner.textContent=value;
+  requestAnimationFrame(()=>{
+    titleInner.classList.remove("marquee");
+    titleInner.style.removeProperty("--marquee-distance");
+    titleInner.style.removeProperty("--marquee-duration");
+    const overflow=Math.max(0,titleInner.scrollWidth-titleViewport.clientWidth);
+    if(overflow>2){
+      const seconds=clamp(7+overflow/70,9,24);
+      titleInner.style.setProperty("--marquee-distance",overflow+"px");
+      titleInner.style.setProperty("--marquee-duration",seconds+"s");
+      void titleInner.offsetWidth;
+      titleInner.classList.add("marquee");
+    }
+  });
+}
+
+function hiddenClass(){
+  if((appearance.animation||"fade")==="slide"){
+    const d=["left","right","top","bottom"].includes(appearance.direction)?appearance.direction:"left";
+    return "hidden slide-"+d;
+  }
+  return "hidden fade";
+}
+function showCard(){
+  clearTimeout(hideTimer);
+  card.className="visible";
+  currentVisible=true;
+}
+function hideCard(){
+  clearTimeout(hideTimer);
+  card.className=hiddenClass();
+  currentVisible=false;
+}
+function scheduleHide(seconds){
+  clearTimeout(hideTimer);
+  hideTimer=setTimeout(hideCard,Math.max(1,Number(seconds)||8)*1000);
+}
+function evaluateVisibility(state, isInitial=false){
+  if(preview && (!state || !state.playing)){
+    showCard();
+    return;
+  }
+  const mode=appearance.show_mode||"track_change";
+  if(mode==="hidden" || !state || state.stopped || state.suppressed){
+    hideCard();
+    return;
+  }
+  if(mode==="always"){
+    showCard();
+    return;
+  }
+  const serial=Number(state.event_serial)||0;
+  const started=Number(state.event_started_at_ms)||0;
+  const duration=Math.max(1,Number(appearance.duration_seconds)||8);
+  const remaining=duration*1000-(Date.now()-started);
+  if(serial>0 && remaining>0 && (serial!==lastEventSerial || isInitial)){
+    showCard();
+    clearTimeout(hideTimer);
+    hideTimer=setTimeout(hideCard,remaining);
+  } else if(serial!==lastEventSerial && state.playing) {
+    // Event is already older than its configured lifetime; reload must not retrigger it.
+    hideCard();
+  }
+  lastEventSerial=serial;
+}
+
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const dpr=Math.max(1,window.devicePixelRatio||1);
+  const w=Math.max(1,Math.round(rect.width*dpr)), h=Math.max(1,Math.round(rect.height*dpr));
+  if(canvas.width!==w || canvas.height!==h){ canvas.width=w; canvas.height=h; }
+}
+function drawSpectrum(){
+  resizeCanvas();
+  const w=canvas.width,h=canvas.height,dpr=Math.max(1,window.devicePixelRatio||1);
+  ctx.clearRect(0,0,w,h);
+  const cssBar=Math.max(3,6*dpr);
+  const cssGap=Math.max(2,4*dpr);
+  const count=Math.max(8,Math.floor(w/(cssBar+cssGap)));
+  let values=[];
+  const demo=preview && (!currentState || !currentState.playing);
+  if(!demo && analyser && frequencyData){
+    analyser.getByteFrequencyData(frequencyData);
+    const usable=Math.max(1,Math.floor(frequencyData.length*.72));
+    for(let i=0;i<count;i++){
+      const start=Math.floor(i*usable/count), end=Math.max(start+1,Math.floor((i+1)*usable/count));
+      let total=0;
+      for(let j=start;j<end;j++) total+=frequencyData[j];
+      values.push((total/(end-start))/255);
+    }
+  } else if(demo) {
+    demoPhase+=.035;
+    for(let i=0;i<count;i++) values.push(.12+.78*Math.abs(Math.sin(demoPhase+i*.42))* (.65+.35*Math.sin(demoPhase*.6+i*.13)));
+  } else {
+    values=new Array(count).fill(.035);
+  }
+  const fill=getComputedStyle(document.documentElement).getPropertyValue("--spectrum").trim()||"#fff";
+  const stroke=getComputedStyle(document.documentElement).getPropertyValue("--spectrum-outline").trim()||"#000";
+  const gap=cssGap, bar=Math.max(1,(w-gap*(count-1))/count);
+  ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=Math.max(1,dpr);
+  for(let i=0;i<count;i++){
+    const bh=Math.max(2*dpr,values[i]*h*.94);
+    const x=i*(bar+gap), y=h-bh;
+    ctx.fillRect(x,y,bar,bh);
+    ctx.strokeRect(x+.5*dpr,y+.5*dpr,Math.max(0,bar-dpr),Math.max(0,bh-dpr));
+  }
+  requestAnimationFrame(drawSpectrum);
+}
+
+async function poll(){
+  if(pollBusy) return;
+  pollBusy=true;
+  try {
+    const response=await fetch("/api/music-player",{cache:"no-store"});
+    if(!response.ok) return;
+    const payload=await response.json();
+    appearance=payload.appearance||{};
+    currentState=payload.state||{};
+    applyAppearance(appearance);
+
+    const demo=preview && !currentState.playing;
+    updateCover(currentState,demo);
+    updateTitle(demo ? "Исполнитель - Название трека" : (currentState.display_title||currentState.filename||"Исполнитель - Название трека"));
+    await syncAudio(currentState);
+    evaluateVisibility(currentState,lastEventSerial<0);
+    if(!demo) lastEventSerial=Number(currentState.event_serial)||0;
+  } catch(_e) {
+    if(!preview) hideCard();
+  } finally { pollBusy=false; }
+}
+window.addEventListener("resize",()=>{ resizeCanvas(); updateTitle(titleInner.textContent); });
+cover.addEventListener("load",applyAutoColorsIfPossible);
+drawSpectrum();
+poll();
+setInterval(poll,100);
+})();
+</script>
+</body>
+</html>
