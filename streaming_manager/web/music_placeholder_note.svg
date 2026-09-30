@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Music note">
+  <g fill="none" stroke="#52d7ff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 181V67l92-20v110"/>
+    <path d="M104 96l92-20"/>
+  </g>
+  <ellipse cx="76" cy="184" rx="31" ry="23" transform="rotate(-12 76 184)" fill="#52d7ff"/>
+  <ellipse cx="168" cy="160" rx="31" ry="23" transform="rotate(-12 168 160)" fill="#52d7ff"/>
+</svg>

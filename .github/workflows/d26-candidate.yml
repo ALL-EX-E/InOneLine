@@ -594,15 +594,16 @@ jobs:
                   assert "marquee" in overlay
                   assert 'left:1.2vw' in overlay
                   assert 'border-radius:1.1vw' in overlay
-                  assert 'id="vinylFallback"' in overlay
+                  assert 'id="musicFallback"' in overlay
                   assert 'const demo=preview ||' in overlay
                   assert 'padding:.08em .30em .10em' in overlay
                   assert '-webkit-text-stroke:.034em' in overlay
-                  assert 'demoSpectrumValues' in overlay
+                  assert 'await syncAudio(currentState)' in overlay
+                  assert 'if(!audible && gainNode) audio.muted=false' in overlay
 
                   with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
                       placeholder = response.read()
-                  assert b"<svg" in placeholder and b"Vinyl record" in placeholder
+                  assert b"<svg" in placeholder and b"Music note" in placeholder
               finally:
                   api.stop()
 
@@ -730,17 +731,17 @@ jobs:
           assert "marquee" in overlay
           assert "width:97.6vw; height:21.96vw" in overlay
           assert "border-radius:1.1vw" in overlay
-          assert 'id="vinylFallback"' in overlay
+          assert 'id="musicFallback"' in overlay
           assert "const demo=preview ||" in overlay
           assert "-webkit-text-stroke:.034em" in overlay
-          assert "demoSpectrumValues" in overlay
+          assert "await syncAudio(currentState)" in overlay
+          assert "if(!audible && gainNode) audio.muted=false" in overlay
 
-          placeholder = Path("streaming_manager/web/music_placeholder_vinyl.svg")
+          placeholder = Path("streaming_manager/web/music_placeholder_note.svg")
           assert placeholder.is_file()
           placeholder_text = placeholder.read_text(encoding="utf-8")
-          assert "<svg" in placeholder_text and "Vinyl record" in placeholder_text
-          assert "r=\"72\"" in placeholder_text
-          assert "stroke-opacity=\".72\"" in placeholder_text
+          assert "<svg" in placeholder_text and "Music note" in placeholder_text
+          assert 'd="M104 181V67l92-20v110"' in placeholder_text
 
           notes = Path("RELEASE_NOTES_1.0.7.md").read_text(encoding="utf-8")
           assert "D26" in notes and "Музыкальный плеер" in notes
@@ -764,7 +765,7 @@ jobs:
           }
 
           $web = "dist\InOneLine\_internal\streaming_manager\web"
-          foreach ($name in @("music_player_overlay.html", "music_placeholder_vinyl.svg")) {
+          foreach ($name in @("music_player_overlay.html", "music_placeholder_note.svg")) {
             if (!(Test-Path (Join-Path $web $name))) {
               throw "Missing packaged D26 resource: $name"
             }
@@ -863,8 +864,8 @@ jobs:
             }
 
             $placeholder = Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-placeholder" -TimeoutSec 2
-            if ($placeholder.Content -notmatch '<svg' -or $placeholder.Content -notmatch 'Vinyl record') {
-              throw "Frozen vinyl placeholder missing/invalid"
+            if ($placeholder.Content -notmatch '<svg' -or $placeholder.Content -notmatch 'Music note') {
+              throw "Frozen music-note placeholder missing/invalid"
             }
 
             $timer = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/timer-overlay" -TimeoutSec 2).Content

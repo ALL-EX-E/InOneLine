@@ -147,7 +147,7 @@ class LocalApiServer:
             Path(__file__).resolve().parent / "web" / "music_player_overlay.html"
         )
         music_placeholder_path = (
-            Path(__file__).resolve().parent / "web" / "music_placeholder_vinyl.svg"
+            Path(__file__).resolve().parent / "web" / "music_placeholder_note.svg"
         )
         auction_lots_overlay_path = (
             Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"

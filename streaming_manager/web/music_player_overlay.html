@@ -56,17 +56,25 @@ body { font-family:var(--font); }
   object-fit:cover; object-position:center;
   border-radius:0.72vw;
 }
-#vinylFallback {
-  position:absolute; inset:8%;
+#musicFallback {
+  position:absolute; inset:17%;
   display:none;
-  border-radius:50%;
-  background-image:url("/music-placeholder");
-  background-position:center;
-  background-repeat:no-repeat;
-  background-size:contain;
-  filter:drop-shadow(0 0 .24vw rgba(255,255,255,.10));
+  align-items:center; justify-content:center;
+  color:var(--frame);
+  filter:drop-shadow(0 0 .24vw color-mix(in srgb,var(--frame) 92%,transparent))
+         drop-shadow(0 0 .58vw color-mix(in srgb,var(--frame) 52%,transparent));
+  transition:color .7s ease, filter .7s ease;
 }
-#coverFrame.placeholder #vinylFallback { display:block; }
+#musicFallback svg { width:100%; height:100%; display:block; overflow:visible; }
+#musicFallback .note-main {
+  fill:none;
+  stroke:currentColor;
+  stroke-width:22;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+#musicFallback .note-head { fill:currentColor; }
+#coverFrame.placeholder #musicFallback { display:flex; }
 #coverFrame.placeholder #cover { display:none; }
 
 #right { flex:1 1 auto; min-width:0; height:100%; display:flex; flex-direction:column; }
@@ -99,7 +107,17 @@ body { font-family:var(--font); }
 <body>
 <div id="stage">
   <div id="card" class="hidden fade">
-    <div id="coverFrame" class="placeholder"><div id="vinylFallback" aria-hidden="true"></div><img id="cover" alt=""></div>
+    <div id="coverFrame" class="placeholder">
+      <div id="musicFallback" aria-hidden="true">
+        <svg viewBox="0 0 256 256" focusable="false">
+          <path class="note-main" d="M104 181V67l92-20v110"/>
+          <path class="note-main" d="M104 96l92-20"/>
+          <ellipse class="note-head" cx="76" cy="184" rx="31" ry="23" transform="rotate(-12 76 184)"/>
+          <ellipse class="note-head" cx="168" cy="160" rx="31" ry="23" transform="rotate(-12 168 160)"/>
+        </svg>
+      </div>
+      <img id="cover" alt="">
+    </div>
     <div id="right">
       <div id="titleViewport"><span id="titleInner">Исполнитель - Название трека</span></div>
       <div id="spectrumWrap"><canvas id="spectrum"></canvas></div>
@@ -124,8 +142,7 @@ const audio = document.getElementById("audio");
 let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
 let frequencyData = null;
 let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
-let hideTimer = 0, demoPhase = 0, currentVisible = false, lastCoverUrl = "";
-let demoSpectrumValues = [];
+let hideTimer = 0, currentVisible = false, lastCoverUrl = "";
 let autoPalette = null, autoPaletteUrl = "";
 let pollBusy = false;
 
@@ -159,11 +176,13 @@ function setAudioGain(state){
   ensureAudioGraph();
   if(audioContext && audioContext.state==="suspended") audioContext.resume().catch(()=>{});
   const audible=Boolean(state.browser_audible && !preview);
-  // Mark analysis-only playback as muted at the media-element level too. This
-  // keeps ordinary browser previews eligible for autoplay while the analyser
-  // still receives the synchronized track.
+  // Start preview/analysis playback muted so browsers can autoplay it, then
+  // unmute the media element only after play() succeeds. The WebAudio gain
+  // remains zero in preview, so the analyser receives the real signal while
+  // the preview itself stays completely silent.
   audio.muted=!audible;
   if(gainNode) gainNode.gain.value=audible ? clamp(Number(state.gain)||0,0,1) : 0;
+  return audible;
 }
 async function syncAudio(state){
   if(!state || state.stopped || !state.media_id || !state.url){
@@ -181,7 +200,7 @@ async function syncAudio(state){
     audio.load();
     lastMediaId=state.media_id;
   }
-  setAudioGain(state);
+  const audible=setAudioGain(state);
   const target=Math.max(0,Number(state.position_ms)||0)/1000;
   if(Number.isFinite(audio.duration) && Math.abs((audio.currentTime||0)-target)>.75){
     try { audio.currentTime=target; } catch(_e){}
@@ -191,9 +210,10 @@ async function syncAudio(state){
     try {
       await audio.play();
       // A muted start is permitted by normal browsers. Once playback is live,
-      // route analysis-only audio through the zero-gain WebAudio branch so
-      // AnalyserNode still receives the real signal without audible output.
-      if(!state.browser_audible && gainNode) audio.muted=false;
+      // analysis-only playback is unmuted at the media element but still
+      // routed through a zero-gain WebAudio branch. This keeps preview silent
+      // while AnalyserNode sees the same real audio as the OBS overlay.
+      if(!audible && gainNode) audio.muted=false;
     } catch(_e){}
   } else if(!audio.paused) {
     audio.pause();
@@ -414,8 +434,7 @@ function drawSpectrum(){
   const cssGap=Math.max(2,4*dpr);
   const count=Math.max(8,Math.floor(w/(cssBar+cssGap)));
   let values=[];
-  const demo=preview || (!currentState || !currentState.playing);
-  if(!demo && analyser && frequencyData){
+  if(analyser && frequencyData && currentState && currentState.playing){
     analyser.getByteFrequencyData(frequencyData);
     const usable=Math.max(1,Math.floor(frequencyData.length*.72));
     for(let i=0;i<count;i++){
@@ -423,27 +442,6 @@ function drawSpectrum(){
       let total=0;
       for(let j=start;j<end;j++) total+=frequencyData[j];
       values.push((total/(end-start))/255);
-    }
-  } else if(demo) {
-    // Preview has no audible audio transport. Draw a deliberately smooth,
-    // spectrum-like demonstration instead of pretending random bars are the
-    // real track analysis. The actual OBS source still uses AnalyserNode.
-    demoPhase+=.018;
-    if(demoSpectrumValues.length!==count){
-      demoSpectrumValues=new Array(count).fill(.18);
-    }
-    for(let i=0;i<count;i++){
-      const x=i/Math.max(1,count-1);
-      const envelope=.50*Math.exp(-x*1.75)+.10;
-      const bass=.12*Math.exp(-Math.pow((x-.07)/.10,2))
-                 *(.72+.28*Math.sin(demoPhase*2.1));
-      const mids=.08*Math.exp(-Math.pow((x-.38)/.24,2))
-                 *(.70+.30*Math.sin(demoPhase*1.15+.9));
-      const ripple=.032*Math.sin(demoPhase*1.35+i*.16)
-                  +.018*Math.sin(demoPhase*.72+i*.31);
-      const target=clamp(envelope+bass+mids+ripple,.065,.72);
-      demoSpectrumValues[i]+=(target-demoSpectrumValues[i])*.10;
-      values.push(demoSpectrumValues[i]);
     }
   } else {
     values=new Array(count).fill(.035);
@@ -479,11 +477,7 @@ async function poll(){
       : (currentState.display_title||currentState.filename||"Исполнитель - Название трека");
     const mediaChanged=String(currentState.media_id??"")!==String(lastMediaId??"");
     updateTitle(displayText,mediaChanged);
-    if(preview){
-      if(!audio.paused) audio.pause();
-    } else {
-      await syncAudio(currentState);
-    }
+    await syncAudio(currentState);
     evaluateVisibility(currentState,lastEventSerial<0);
     if(!demo) lastEventSerial=Number(currentState.event_serial)||0;
   } catch(_e) {
