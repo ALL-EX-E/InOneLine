@@ -183,10 +183,17 @@ jobs:
               finally:
                   api.stop()
 
-              # Managed D26 audio folders are authoritative; removing a managed
-              # file removes its media row on the next explicit refresh.
-              removed_id = first.id
-              (music_dir / first.managed_name).unlink()
+              # STOP keeps the logical current track but must unload the
+              # native media source so the normal Windows event loop can release
+              # its filesystem handle.
+              assert player.player.source().isEmpty()
+
+              # Managed D26 audio folders are authoritative; verify pruning on
+              # a different never-loaded track so the filesystem assertion is
+              # independent from multimedia-backend release timing.
+              removable = next(a for a in music_assets if a.id != first.id)
+              removed_id = removable.id
+              (music_dir / removable.managed_name).unlink()
               player.refresh_library()
               assert db.get_media_asset(removed_id) is None
 
