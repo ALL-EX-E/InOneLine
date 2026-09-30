@@ -279,6 +279,8 @@ jobs:
               # STOP keeps the logical current track but must unload the
               # native media source so the normal Windows event loop can release
               # its filesystem handle.
+              player.stop()
+              app.processEvents()
               assert player.player.source().isEmpty()
 
               # Managed D26 audio folders are authoritative; verify pruning on
