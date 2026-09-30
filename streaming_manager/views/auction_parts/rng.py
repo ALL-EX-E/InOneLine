@@ -108,6 +108,10 @@ class AuctionRngMixin:
             return
 
         if rng_method == "local":
+            # The explicit «Крутить» action is the D26 ownership boundary.
+            # Only a configured, unmuted wheel soundtrack actually suppresses
+            # Music Player; the visual spin itself never does.
+            self._sync_audio_owner_with_session(session, spin_running=True)
             self._apply_wheel_draw(auction_id, None)
             return
 
@@ -124,6 +128,7 @@ class AuctionRngMixin:
         ticket_id = str(session.get("rng_ticket_id") or "") if signed else None
         user_data = self._rng_user_data(auction_id, draw_info) if signed else None
 
+        self._sync_audio_owner_with_session(session, spin_running=True)
         self.start_btn.setEnabled(False)
         self.start_btn.setText("Получение случайного числа…")
 
