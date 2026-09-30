@@ -235,6 +235,9 @@ jobs:
               finally:
                   api.stop()
 
+              player.stop()
+              app.processEvents()
+
               # STOP keeps the logical current track but must unload the
               # native media source so the normal Windows event loop can release
               # its filesystem handle.
