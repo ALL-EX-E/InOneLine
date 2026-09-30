@@ -170,9 +170,8 @@ class AuctionActionMixin:
 
         self._active_auction_id = auction_id
         self._pending_tie_overtime = False
-        # Explicit Start/Spin is the point where Auction takes ownership from
-        # the future independent music player.
-        self._acquire_auction_audio_owner()
+        # D26 ownership is acquired by the soundtrack engine only when a
+        # configured soundtrack is actually audible.
         self.auction_tabs.setCurrentWidget(self.conduct_page)
         self.refresh()
         QTimer.singleShot(0, self._reset_conduct_auto_scroll)
@@ -324,17 +323,12 @@ class AuctionActionMixin:
             QMessageBox.critical(self, "Аукцион", str(exc))
             return
 
-        # Timer/Auction Music belongs to the authoritative bid-intake timer.
-        # Finish/expiry always fades and stops it before tie/winner handling.
-        self._stop_auction_soundtrack(immediate=False)
-
-        status = result.get("status")
+        status = str(result.get("status") or "")
         self._pending_tie_overtime = False
-        if status in {"winner_selected", "finished_no_winner"}:
-            # The ordinary player may resume as soon as the winner is
-            # revealable (or the auction ended without one); confirmation is a
-            # later bookkeeping action and must not hold the music channel.
-            self._release_auction_audio_owner()
+        # The main timer ending always gives Music Player audible ownership
+        # back immediately. For a tie we retain the auction soundtrack
+        # transport position so overtime can continue the same timeline.
+        self._finish_auction_soundtrack_phase(status)
         if status == "awaiting_wheel":
             QMessageBox.information(
                 self,
@@ -437,11 +431,11 @@ class AuctionActionMixin:
             return
 
         self._pending_tie_overtime = False
-        self._acquire_auction_audio_owner()
         self._start_auction_soundtrack_for_session(
             self._current_session(),
-            restart=True,
+            restart=False,
         )
+        self._sync_audio_owner_with_session(self._current_session())
         self.conduct_search.clear()
         self.changed()
         self.auction_tabs.setCurrentWidget(self.conduct_page)
@@ -463,7 +457,11 @@ class AuctionActionMixin:
             return
 
         self._pending_tie_overtime = False
-        self._acquire_auction_audio_owner()
+        # Choosing Wheel is configuration only. The paused max-amount
+        # soundtrack is no longer needed, and Music Player continues until
+        # the actual «Крутить» spin begins.
+        self._stop_auction_soundtrack(immediate=True)
+        self._release_auction_audio_owner()
         self._default_wheel_duration_ms = default_ms
         self._prestart_wheel_duration_ms = default_ms
         self._timer_context = "wheel"
