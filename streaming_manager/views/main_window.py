@@ -375,6 +375,11 @@ class MainWindow(QMainWindow):
             # Stream/OBS must re-check the selected reference every time the
             # operator returns to this tab instead of waiting for restart/F5.
             self.stream_tab._refresh_selected_background_availability()
+        elif current is self.music_tab:
+            # The managed music directory is the library source of truth.
+            # Returning to the tab is an explicit refresh point for files
+            # copied/removed outside InOneLine.
+            self.music_tab.refresh()
 
         # После смены основной вкладки держим focus на контейнере вкладок,
         # а не на первом поле ввода новой страницы.
