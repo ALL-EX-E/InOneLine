@@ -251,13 +251,17 @@ class MusicPlayerController(QObject):
                 self._queue = list(ids)
                 random.shuffle(self._queue)
 
+        current_changed = False
         if self._current_media_id is not None and self._current_media_id not in self._assets:
             replacement = self._queue[0] if self._queue else None
             self._current_media_id = replacement
             self._desired_state = PLAYER_PAUSE
-            self._pending_new_track_event = bool(replacement)
+            self._pending_new_track_event = False
             self._load_current(position_ms=0, play=False)
+            current_changed = True
         self._persist_queue()
+        if current_changed:
+            self._persist_state()
         if emit and (old_ids != set(self._assets) or True):
             self.libraryChanged.emit()
             self.stateChanged.emit()
