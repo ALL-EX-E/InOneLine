@@ -19,6 +19,8 @@ hiddenimports = [
     "mutagen.mp3",
     "mutagen.wave",
     "mutagen.oggvorbis",
+    "mutagen.oggopus",
+    "mutagen.oggflac",
     "mutagen.flac",
 ]
 
