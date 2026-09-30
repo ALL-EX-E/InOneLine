@@ -37,6 +37,21 @@ from ..constants import (
     TIMER_OVERLAY_FONT_COLOR_DEFAULT, TIMER_OVERLAY_FONT_COLOR_KEY,
     TIMER_OVERLAY_FONT_FAMILY_DEFAULT, TIMER_OVERLAY_FONT_FAMILY_KEY,
     TIMER_OVERLAY_FONT_SIZE_DEFAULT, TIMER_OVERLAY_FONT_SIZE_KEY,
+    MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT, MUSIC_PLAYER_OVERLAY_ANIMATION_FADE,
+    MUSIC_PLAYER_OVERLAY_ANIMATION_KEY, MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE,
+    MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT, MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT, MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_DEFAULT, MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY,
+    MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT, MUSIC_PLAYER_OVERLAY_DIRECTION_KEY,
+    MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT, MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
+    MUSIC_PLAYER_OVERLAY_FONT_FAMILY_DEFAULT, MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY,
+    MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT, MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
+    MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT, MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_SHOW_ALWAYS, MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN,
+    MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT, MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
+    MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE, MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY, MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
     STATUS_ABANDONED, STATUS_COMPLETED, STATUS_LABELS, STATUS_NOT_PLAYED, STATUS_PLAYED,
     STATUS_PLAYING, STREAM_FORMATS,
 )
@@ -558,6 +573,186 @@ class StreamTab(QWidget):
         timer_actions.addStretch()
         layout.addLayout(timer_actions)
 
+        music_line = QFrame()
+        music_line.setProperty("line", True)
+        layout.addWidget(music_line)
+        music_heading = QLabel("Виджет музыкального плеера")
+        music_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(music_heading)
+
+        music_form = QFormLayout()
+        music_form.setVerticalSpacing(10)
+        music_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        music_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        self.music_player_overlay_font = ScrollSafeFontComboBox()
+        self.music_player_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        music_form.addRow("Шрифт:", self.music_player_overlay_font)
+
+        self.music_player_overlay_font_size = ScrollSafeSpinBox()
+        self.music_player_overlay_font_size.setRange(8, 200)
+        self.music_player_overlay_font_size.setSuffix(" px")
+        self.music_player_overlay_font_size_control = make_wide_step_control(
+            self.music_player_overlay_font_size,
+            up_tooltip="Увеличить размер текста плеера",
+            down_tooltip="Уменьшить размер текста плеера",
+        )
+        music_form.addRow("Размер:", self.music_player_overlay_font_size_control)
+
+        def music_color_row(button_attr: str, picker_attr: str, tooltip: str):
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            button = QPushButton()
+            picker = QPushButton("⌖")
+            picker.setToolTip(tooltip)
+            setattr(self, button_attr, button)
+            setattr(self, picker_attr, picker)
+            row_layout.addWidget(button)
+            row_layout.addWidget(picker)
+            row_layout.addStretch()
+            return row, button, picker
+
+        row, self.music_player_overlay_text_color_btn, self.music_player_overlay_text_color_pick_btn = music_color_row(
+            "music_player_overlay_text_color_btn",
+            "music_player_overlay_text_color_pick_btn",
+            "Выбрать цвет текста плеера с экрана",
+        )
+        self.music_player_overlay_text_color_btn.clicked.connect(
+            lambda: self._choose_music_overlay_color(
+                self.music_player_overlay_text_color_btn,
+                "Выберите цвет текста плеера",
+                MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
+            )
+        )
+        self.music_player_overlay_text_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.music_player_overlay_text_color_btn)
+        )
+        music_form.addRow("Цвет текста:", row)
+
+        bg_mode_row = QWidget()
+        bg_mode_layout = QHBoxLayout(bg_mode_row)
+        bg_mode_layout.setContentsMargins(0, 0, 0, 0)
+        bg_mode_layout.setSpacing(12)
+        self.music_player_background_transparent = QRadioButton("Прозрачный")
+        self.music_player_background_color_mode = QRadioButton("Цвет")
+        self.music_player_background_transparent.toggled.connect(
+            self._update_music_player_overlay_enabled_state
+        )
+        self.music_player_background_color_mode.toggled.connect(
+            self._update_music_player_overlay_enabled_state
+        )
+        bg_mode_layout.addWidget(self.music_player_background_transparent)
+        bg_mode_layout.addWidget(self.music_player_background_color_mode)
+        bg_mode_layout.addStretch()
+        music_form.addRow("Фон:", bg_mode_row)
+
+        row, self.music_player_background_color_btn, self.music_player_background_color_pick_btn = music_color_row(
+            "music_player_background_color_btn",
+            "music_player_background_color_pick_btn",
+            "Выбрать цвет фона плеера с экрана",
+        )
+        self.music_player_background_color_btn.clicked.connect(
+            lambda: self._choose_music_overlay_color(
+                self.music_player_background_color_btn,
+                "Выберите цвет фона плеера",
+                MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+            )
+        )
+        self.music_player_background_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.music_player_background_color_btn)
+        )
+        music_form.addRow("Цвет фона:", row)
+
+        row, self.music_player_frame_color_btn, self.music_player_frame_color_pick_btn = music_color_row(
+            "music_player_frame_color_btn",
+            "music_player_frame_color_pick_btn",
+            "Выбрать цвет рамок плеера с экрана",
+        )
+        self.music_player_frame_color_btn.clicked.connect(
+            lambda: self._choose_music_overlay_color(
+                self.music_player_frame_color_btn,
+                "Выберите цвет рамок плеера",
+                MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
+            )
+        )
+        self.music_player_frame_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.music_player_frame_color_btn)
+        )
+        music_form.addRow("Цвет рамки:", row)
+
+        row, self.music_player_spectrum_color_btn, self.music_player_spectrum_color_pick_btn = music_color_row(
+            "music_player_spectrum_color_btn",
+            "music_player_spectrum_color_pick_btn",
+            "Выбрать цвет спектра с экрана",
+        )
+        self.music_player_spectrum_color_btn.clicked.connect(
+            lambda: self._choose_music_overlay_color(
+                self.music_player_spectrum_color_btn,
+                "Выберите цвет спектра",
+                MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
+            )
+        )
+        self.music_player_spectrum_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.music_player_spectrum_color_btn)
+        )
+        music_form.addRow("Цвет спектра:", row)
+
+        self.music_player_auto_colors = QCheckBox("Подбирать цвета по обложке")
+        music_form.addRow("", self.music_player_auto_colors)
+
+        self.music_player_show_mode = ScrollSafeComboBox()
+        self.music_player_show_mode.addItem("Не показывать", MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN)
+        self.music_player_show_mode.addItem("При смене трека", MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE)
+        self.music_player_show_mode.addItem("Показывать постоянно", MUSIC_PLAYER_OVERLAY_SHOW_ALWAYS)
+        self.music_player_show_mode.currentIndexChanged.connect(
+            self._update_music_player_overlay_enabled_state
+        )
+        music_form.addRow("Показ плашки:", self.music_player_show_mode)
+
+        self.music_player_duration_seconds = ScrollSafeSpinBox()
+        self.music_player_duration_seconds.setRange(1, 120)
+        self.music_player_duration_seconds.setSuffix(" сек.")
+        self.music_player_duration_seconds_control = make_wide_step_control(
+            self.music_player_duration_seconds,
+            up_tooltip="Увеличить время показа",
+            down_tooltip="Уменьшить время показа",
+        )
+        music_form.addRow("Время показа:", self.music_player_duration_seconds_control)
+
+        self.music_player_animation = ScrollSafeComboBox()
+        self.music_player_animation.addItem("Проявление", MUSIC_PLAYER_OVERLAY_ANIMATION_FADE)
+        self.music_player_animation.addItem("Выезд", MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE)
+        self.music_player_animation.currentIndexChanged.connect(
+            self._update_music_player_overlay_enabled_state
+        )
+        music_form.addRow("Анимация:", self.music_player_animation)
+
+        self.music_player_direction = ScrollSafeComboBox()
+        self.music_player_direction.addItem("Слева", "left")
+        self.music_player_direction.addItem("Справа", "right")
+        self.music_player_direction.addItem("Сверху", "top")
+        self.music_player_direction.addItem("Снизу", "bottom")
+        music_form.addRow("Направление:", self.music_player_direction)
+
+        layout.addLayout(music_form)
+
+        music_actions = QHBoxLayout()
+        music_actions.setSpacing(8)
+        save_music = QPushButton("Сохранить виджет плеера")
+        save_music.setProperty("primary", True)
+        save_music.clicked.connect(self._save_music_player_overlay_settings)
+        copy_music = QPushButton("Копировать URL плеера")
+        copy_music.clicked.connect(self.copy_music_player_overlay_url)
+        open_music = QPushButton("Открыть предпросмотр")
+        open_music.clicked.connect(self.open_music_player_overlay_preview)
+        music_actions.addWidget(save_music)
+        music_actions.addWidget(copy_music)
+        music_actions.addWidget(open_music)
+        music_actions.addStretch()
+        layout.addLayout(music_actions)
+
         auction_lots_line = QFrame()
         auction_lots_line.setProperty("line", True)
         layout.addWidget(auction_lots_line)
@@ -791,6 +986,90 @@ class StreamTab(QWidget):
             self,
             "OBS Timer",
             "Настройки виджета таймера сохранены. Открытый Browser Source обновится автоматически.",
+        )
+
+    def _choose_music_overlay_color(
+        self,
+        button: QPushButton,
+        title: str,
+        default: str,
+    ) -> None:
+        current = QColor(str(button.property("fontColor") or default))
+        selected = QColorDialog.getColor(current, self, title)
+        if selected.isValid():
+            self._set_color_button(button, selected.name())
+
+    def _update_music_player_overlay_enabled_state(self) -> None:
+        color_enabled = self.music_player_background_color_mode.isChecked()
+        self.music_player_background_color_btn.setEnabled(color_enabled)
+        self.music_player_background_color_pick_btn.setEnabled(color_enabled)
+        self.music_player_duration_seconds_control.setEnabled(
+            str(self.music_player_show_mode.currentData() or "")
+            == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE
+        )
+        self.music_player_direction.setEnabled(
+            str(self.music_player_animation.currentData() or "")
+            == MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE
+        )
+
+    def _save_music_player_overlay_settings(self) -> None:
+        background = (
+            "color"
+            if self.music_player_background_color_mode.isChecked()
+            else "transparent"
+        )
+        self.db.set_settings_bulk({
+            MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY: self.music_player_overlay_font.currentFont().family(),
+            MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY: str(self.music_player_overlay_font_size.value()),
+            MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY: str(
+                self.music_player_overlay_text_color_btn.property("fontColor")
+                or MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY: background,
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY: str(
+                self.music_player_background_color_btn.property("fontColor")
+                or MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY: str(
+                self.music_player_frame_color_btn.property("fontColor")
+                or MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY: str(
+                self.music_player_spectrum_color_btn.property("fontColor")
+                or MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY: "1" if self.music_player_auto_colors.isChecked() else "0",
+            MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY: str(
+                self.music_player_show_mode.currentData()
+                or MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY: str(
+                self.music_player_duration_seconds.value()
+            ),
+            MUSIC_PLAYER_OVERLAY_ANIMATION_KEY: str(
+                self.music_player_animation.currentData()
+                or MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT
+            ),
+            MUSIC_PLAYER_OVERLAY_DIRECTION_KEY: str(
+                self.music_player_direction.currentData()
+                or MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT
+            ),
+        })
+        QMessageBox.information(
+            self,
+            "OBS Music Player",
+            "Настройки виджета музыкального плеера сохранены. "
+            "Открытый Browser Source обновится автоматически.",
+        )
+
+    def copy_music_player_overlay_url(self) -> None:
+        QApplication.clipboard().setText(
+            f"{self.api.base_url}/music-player-overlay"
+        )
+
+    def open_music_player_overlay_preview(self) -> None:
+        QDesktopServices.openUrl(
+            QUrl(f"{self.api.base_url}/music-player-overlay?preview=1")
         )
 
     def _show_obs_widget_help(self) -> None:
@@ -1635,6 +1914,99 @@ class StreamTab(QWidget):
         )
         self._update_timer_background_enabled_state()
 
+        self.music_player_overlay_font.setCurrentFont(QFont(
+            setting(
+                MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY,
+                MUSIC_PLAYER_OVERLAY_FONT_FAMILY_DEFAULT,
+            )
+        ))
+        try:
+            music_font_size = int(setting(
+                MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
+                str(MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT),
+            ))
+        except ValueError:
+            music_font_size = MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT
+        self.music_player_overlay_font_size.setValue(
+            max(8, min(200, music_font_size))
+        )
+        self._set_color_button(
+            self.music_player_overlay_text_color_btn,
+            setting(
+                MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
+                MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
+            ),
+        )
+        music_background = setting(
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY,
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_DEFAULT,
+        )
+        self.music_player_background_color_mode.setChecked(
+            music_background == "color"
+        )
+        self.music_player_background_transparent.setChecked(
+            music_background != "color"
+        )
+        self._set_color_button(
+            self.music_player_background_color_btn,
+            setting(
+                MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY,
+                MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+            ),
+        )
+        self._set_color_button(
+            self.music_player_frame_color_btn,
+            setting(
+                MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+                MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
+            ),
+        )
+        self._set_color_button(
+            self.music_player_spectrum_color_btn,
+            setting(
+                MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
+                MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
+            ),
+        )
+        self.music_player_auto_colors.setChecked(
+            setting(
+                MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
+                "1" if MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT else "0",
+            ) == "1"
+        )
+        self._set_combo_by_data(
+            self.music_player_show_mode,
+            setting(
+                MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
+                MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
+            ),
+        )
+        try:
+            music_duration = int(setting(
+                MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
+                str(MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT),
+            ))
+        except ValueError:
+            music_duration = MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT
+        self.music_player_duration_seconds.setValue(
+            max(1, min(120, music_duration))
+        )
+        self._set_combo_by_data(
+            self.music_player_animation,
+            setting(
+                MUSIC_PLAYER_OVERLAY_ANIMATION_KEY,
+                MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT,
+            ),
+        )
+        self._set_combo_by_data(
+            self.music_player_direction,
+            setting(
+                MUSIC_PLAYER_OVERLAY_DIRECTION_KEY,
+                MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT,
+            ),
+        )
+        self._update_music_player_overlay_enabled_state()
+
         self.auction_lots_overlay_font.setCurrentFont(QFont(
             setting(
                 AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
@@ -1717,6 +2089,7 @@ class StreamTab(QWidget):
             f"Оверлей OBS: {self.api.base_url}/overlay\n"
             f"Отдельный список OBS: {self.api.base_url}/list-overlay\n"
             f"Таймер OBS: {self.api.base_url}/timer-overlay\n"
+            f"Музыкальный плеер OBS: {self.api.base_url}/music-player-overlay\n"
             f"Список лотов OBS: {self.api.base_url}/auction-lots-overlay\n"
             f"Правила OBS: {self.api.base_url}/rules-overlay\n"
             f"OBS JSON: {self.api.base_url}/api/data\n"
