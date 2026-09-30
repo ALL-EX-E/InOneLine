@@ -48,7 +48,7 @@ jobs:
           from pathlib import Path
           from types import SimpleNamespace
 
-          from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QFileDialog
+          from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QFileDialog, QMessageBox
 
           from streaming_manager.api_server import LocalApiServer
           from streaming_manager.app_paths import AppPaths
@@ -384,6 +384,51 @@ jobs:
               batch_names = {Path(asset.external_path).name for asset in external_music}
               assert {"batch-a.wav", "batch-b.wav"}.issubset(batch_names)
               assert player.current_media_id == current_before_batch
+
+              # Filename-only duplicate rule: a managed track blocks an
+              # external registration with the same basename, regardless of
+              # path or contents. The existing row is revealed/selected and
+              # playback is not switched.
+              managed_a = next(
+                  asset for asset in db.list_media_assets(MEDIA_CATEGORY_MUSIC)
+                  if asset.storage_mode != MEDIA_STORAGE_EXTERNAL
+                  and asset.managed_name.casefold() == "a track.wav"
+              )
+              same_name_dir = root / "same-name-source"
+              same_name_source = same_name_dir / "A track.wav"
+              make_wav(same_name_source, seconds=0.25)
+              count_before_duplicate = len(db.list_media_assets(MEDIA_CATEGORY_MUSIC))
+              current_before_duplicate = player.current_media_id
+              music_tab.search.setText("no-visible-results")
+              original_get_open_names = QFileDialog.getOpenFileNames
+              original_choose_storage = music_tab._choose_storage_mode
+              original_information = QMessageBox.information
+              try:
+                  QFileDialog.getOpenFileNames = staticmethod(
+                      lambda *args, **kwargs: (
+                          [str(same_name_source)],
+                          "Аудио (*.mp3 *.wav *.ogg)",
+                      )
+                  )
+                  music_tab._choose_storage_mode = (
+                      lambda sources: (_ for _ in ()).throw(
+                          AssertionError("duplicate import must stop before storage choice")
+                      )
+                  )
+                  QMessageBox.information = staticmethod(
+                      lambda *args, **kwargs: QMessageBox.StandardButton.Ok
+                  )
+                  music_tab._import_music()
+              finally:
+                  QFileDialog.getOpenFileNames = original_get_open_names
+                  music_tab._choose_storage_mode = original_choose_storage
+                  QMessageBox.information = original_information
+              assert len(db.list_media_assets(MEDIA_CATEGORY_MUSIC)) == count_before_duplicate
+              assert music_tab.search.text() == ""
+              selected_row = music_tab.list_widget.currentItem()
+              assert selected_row is not None
+              assert int(selected_row.data(Qt.UserRole)) == int(managed_a.id)
+              assert player.current_media_id == current_before_duplicate
 
               assert stream_tab.music_player_show_mode.count() == 3
               assert stream_tab.music_player_animation.count() == 2
