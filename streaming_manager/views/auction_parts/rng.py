@@ -108,7 +108,6 @@ class AuctionRngMixin:
             return
 
         if rng_method == "local":
-            self._acquire_auction_audio_owner()
             self._apply_wheel_draw(auction_id, None)
             return
 
@@ -125,7 +124,6 @@ class AuctionRngMixin:
         ticket_id = str(session.get("rng_ticket_id") or "") if signed else None
         user_data = self._rng_user_data(auction_id, draw_info) if signed else None
 
-        self._acquire_auction_audio_owner()
         self.start_btn.setEnabled(False)
         self.start_btn.setText("Получение случайного числа…")
 
