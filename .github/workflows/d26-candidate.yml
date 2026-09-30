@@ -1,0 +1,95 @@
+name: D26 candidate gate
+
+on:
+  push:
+    branches:
+      - d26-music-player-1.0.7-candidate
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Compile Python sources
+        shell: pwsh
+        run: |
+          python -m compileall -q app.py streaming_manager
+          if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
+
+      - name: D26 controller and UI smoke
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          from PySide6.QtWidgets import QApplication
+
+          from streaming_manager.api_server import LocalApiServer
+          from streaming_manager.audio import AudioCoordinator
+          from streaming_manager.database import Database
+          from streaming_manager.music_player import MusicPlayerController
+          from streaming_manager.views.music import MusicTab
+          from streaming_manager.views.stream import StreamTab
+
+          app = QApplication.instance() or QApplication([])
+          with TemporaryDirectory() as tmp:
+              db = Database(Path(tmp) / "streaming.db")
+              coordinator = AudioCoordinator()
+              player = MusicPlayerController(db, coordinator)
+              api = LocalApiServer(db, "127.0.0.1", 8765)
+              music = MusicTab(db, player)
+              stream = StreamTab(db, api)
+
+              state = player.browser_state()
+              assert state["desired_state"] == "pause"
+              assert player.output_mode in {"application", "obs"}
+              assert music.mode_combo.count() == 2
+              assert stream.music_player_show_mode.count() == 3
+              assert stream.music_player_animation.count() == 2
+              assert coordinator.owner == "music_player"
+
+              player.shutdown()
+              music.deleteLater()
+              stream.deleteLater()
+          print("D26_SMOKE=PASS")
+          '@ | Set-Content -Encoding utf8 d26_smoke.py
+          python d26_smoke.py
+
+      - name: Build frozen application
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm installer/InOneLine.spec
+          if (!(Test-Path "dist\InOneLine\InOneLine.exe")) {
+            throw "Frozen InOneLine.exe missing"
+          }
+          Write-Host "PYINSTALLER_BUILD=PASS"
+
+      - name: Verify packaged D26 web resources
+        shell: pwsh
+        run: |
+          $root = "dist\InOneLine\_internal\streaming_manager\web"
+          foreach ($name in @("music_player_overlay.html", "music_placeholder_vinyl.png")) {
+            if (!(Test-Path (Join-Path $root $name))) {
+              throw "Missing packaged D26 resource: $name"
+            }
+          }
+          Write-Host "D26_WEB_RESOURCES=PASS"
