@@ -102,6 +102,7 @@ let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
 let frequencyData = null;
 let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
 let hideTimer = 0, demoPhase = 0, currentVisible = false, lastCoverUrl = "";
+let autoPalette = null, autoPaletteUrl = "";
 let pollBusy = false;
 
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
@@ -191,8 +192,12 @@ function applyAppearance(a){
   document.documentElement.style.setProperty("--font-size",(designPx/8)+"vw");
   document.documentElement.style.setProperty("--text",a.text_color||"#FFFFFF");
   document.documentElement.style.setProperty("--spectrum",a.spectrum_color||"#FFFFFF");
-  setManualColors(a);
-  contrastColors(a,a.background==="color"?hexRgb(a.background_color):null);
+  if(a.auto_colors && currentState.has_cover && cover.complete && cover.naturalWidth){
+    applyAutoColorsIfPossible();
+  } else {
+    setManualColors(a);
+    contrastColors(a,a.background==="color"?hexRgb(a.background_color):null);
+  }
 }
 
 function paletteFromImage(img){
@@ -228,8 +233,13 @@ function applyAutoColorsIfPossible(){
     return;
   }
   try {
-    const palette=paletteFromImage(cover);
-    if(!palette) throw new Error("no palette");
+    let palette=autoPalette;
+    if(!palette || autoPaletteUrl!==lastCoverUrl){
+      palette=paletteFromImage(cover);
+      if(!palette) throw new Error("no palette");
+      autoPalette=palette;
+      autoPaletteUrl=lastCoverUrl;
+    }
     const frame=rgbHex(palette.accent);
     document.documentElement.style.setProperty("--frame",frame);
     if(appearance.background==="color"){
@@ -250,6 +260,8 @@ function updateCover(state, demo=false){
   const placeholder=demo || !state.has_cover;
   if(lastCoverUrl!==url){
     lastCoverUrl=url;
+    autoPalette=null;
+    autoPaletteUrl="";
     cover.onload=()=>{ applyAutoColorsIfPossible(); };
     cover.src=url;
   }
@@ -376,10 +388,10 @@ async function poll(){
     const payload=await response.json();
     appearance=payload.appearance||{};
     currentState=payload.state||{};
-    applyAppearance(appearance);
 
     const demo=preview && !currentState.playing;
     updateCover(currentState,demo);
+    applyAppearance(appearance);
     updateTitle(demo ? "Исполнитель - Название трека" : (currentState.display_title||currentState.filename||"Исполнитель - Название трека"));
     await syncAudio(currentState);
     evaluateVisibility(currentState,lastEventSerial<0);
