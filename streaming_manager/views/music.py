@@ -227,12 +227,7 @@ class MusicTab(QWidget):
         else:
             metadata = self.controller.metadata_for_asset(asset.id)
             display = str(metadata.get("display_title") or asset.display_name)
-            prefix = "Сейчас играет"
-            if self.controller.desired_state == PLAYER_PAUSE:
-                prefix = "Пауза"
-            elif self.controller.desired_state == PLAYER_STOP:
-                prefix = "Остановлено"
-            self.now_playing.setText(f"{prefix}: {display}")
+            self.now_playing.setText(f"Сейчас играет: {display}")
 
         self.play_pause_btn.setText(
             "Пауза" if self.controller.desired_state == PLAYER_PLAY else "Play"
