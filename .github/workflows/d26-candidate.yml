@@ -596,7 +596,9 @@ jobs:
                   assert 'border-radius:1.1vw' in overlay
                   assert 'id="vinylFallback"' in overlay
                   assert 'const demo=preview ||' in overlay
-                  assert 'padding:0 .24em' in overlay
+                  assert 'padding:.08em .30em .10em' in overlay
+                  assert '-webkit-text-stroke:.034em' in overlay
+                  assert 'demoSpectrumValues' in overlay
 
                   with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
                       placeholder = response.read()
@@ -730,11 +732,15 @@ jobs:
           assert "border-radius:1.1vw" in overlay
           assert 'id="vinylFallback"' in overlay
           assert "const demo=preview ||" in overlay
+          assert "-webkit-text-stroke:.034em" in overlay
+          assert "demoSpectrumValues" in overlay
 
           placeholder = Path("streaming_manager/web/music_placeholder_vinyl.svg")
           assert placeholder.is_file()
           placeholder_text = placeholder.read_text(encoding="utf-8")
           assert "<svg" in placeholder_text and "Vinyl record" in placeholder_text
+          assert "r=\"72\"" in placeholder_text
+          assert "stroke-opacity=\".72\"" in placeholder_text
 
           notes = Path("RELEASE_NOTES_1.0.7.md").read_text(encoding="utf-8")
           assert "D26" in notes and "Музыкальный плеер" in notes

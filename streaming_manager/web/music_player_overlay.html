@@ -60,21 +60,11 @@ body { font-family:var(--font); }
   position:absolute; inset:8%;
   display:none;
   border-radius:50%;
-  background-image:
-    url("/music-placeholder"),
-    repeating-radial-gradient(circle at center,
-      rgba(255,255,255,.065) 0 .10vw,
-      rgba(0,0,0,0) .12vw .42vw),
-    radial-gradient(circle at 50% 50%,
-      #050608 0 7%,
-      #262a30 7.4% 8.5%,
-      #101216 9% 27%,
-      #2b3036 27.4% 28.4%,
-      #0b0d10 29% 100%);
+  background-image:url("/music-placeholder");
   background-position:center;
   background-repeat:no-repeat;
-  background-size:contain,100% 100%,100% 100%;
-  filter:drop-shadow(0 0 .28vw rgba(255,255,255,.12));
+  background-size:contain;
+  filter:drop-shadow(0 0 .24vw rgba(255,255,255,.10));
 }
 #coverFrame.placeholder #vinylFallback { display:block; }
 #coverFrame.placeholder #cover { display:none; }
@@ -82,13 +72,15 @@ body { font-family:var(--font); }
 #right { flex:1 1 auto; min-width:0; height:100%; display:flex; flex-direction:column; }
 #titleViewport {
   flex:0 0 48%; min-width:0; overflow:hidden; display:flex; align-items:center;
-  padding:0 .24em;
+  padding:.08em .30em .10em;
   color:var(--text); font-size:var(--font-size); font-weight:650; white-space:nowrap;
-  text-shadow:-.052em -.052em .018em var(--outline), .052em -.052em .018em var(--outline),
-              -.052em .052em .018em var(--outline), .052em .052em .018em var(--outline),
-              0 0 .045em var(--outline);
 }
-#titleInner { display:inline-block; white-space:nowrap; will-change:transform; }
+#titleInner {
+  display:inline-block; white-space:nowrap; will-change:transform;
+  -webkit-text-stroke:.034em var(--outline);
+  text-shadow:0 .035em .055em rgba(0,0,0,.48);
+  text-rendering:geometricPrecision;
+}
 #titleInner.marquee {
   animation:marquee var(--marquee-duration,12s) linear infinite;
 }
@@ -133,6 +125,7 @@ let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
 let frequencyData = null;
 let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
 let hideTimer = 0, demoPhase = 0, currentVisible = false, lastCoverUrl = "";
+let demoSpectrumValues = [];
 let autoPalette = null, autoPaletteUrl = "";
 let pollBusy = false;
 
@@ -432,8 +425,26 @@ function drawSpectrum(){
       values.push((total/(end-start))/255);
     }
   } else if(demo) {
-    demoPhase+=.035;
-    for(let i=0;i<count;i++) values.push(.12+.78*Math.abs(Math.sin(demoPhase+i*.42))* (.65+.35*Math.sin(demoPhase*.6+i*.13)));
+    // Preview has no audible audio transport. Draw a deliberately smooth,
+    // spectrum-like demonstration instead of pretending random bars are the
+    // real track analysis. The actual OBS source still uses AnalyserNode.
+    demoPhase+=.018;
+    if(demoSpectrumValues.length!==count){
+      demoSpectrumValues=new Array(count).fill(.18);
+    }
+    for(let i=0;i<count;i++){
+      const x=i/Math.max(1,count-1);
+      const envelope=.50*Math.exp(-x*1.75)+.10;
+      const bass=.12*Math.exp(-Math.pow((x-.07)/.10,2))
+                 *(.72+.28*Math.sin(demoPhase*2.1));
+      const mids=.08*Math.exp(-Math.pow((x-.38)/.24,2))
+                 *(.70+.30*Math.sin(demoPhase*1.15+.9));
+      const ripple=.032*Math.sin(demoPhase*1.35+i*.16)
+                  +.018*Math.sin(demoPhase*.72+i*.31);
+      const target=clamp(envelope+bass+mids+ripple,.065,.72);
+      demoSpectrumValues[i]+=(target-demoSpectrumValues[i])*.10;
+      values.push(demoSpectrumValues[i]);
+    }
   } else {
     values=new Array(count).fill(.035);
   }
