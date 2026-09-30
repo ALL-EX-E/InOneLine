@@ -38,6 +38,15 @@ _REQUIRED_GAME_COLUMNS = {
 FULL_BACKUP_FORMAT = "InOneLineFullBackup"
 FULL_BACKUP_FORMAT_VERSION = 1
 FULL_BACKUP_EXTENSION = ".iolbackup"
+# Full-backup format 1 existed before D26. Keep the exact legacy directory
+# declaration readable so 1.0.7 can restore a full backup created by 1.0.6.
+LEGACY_FULL_BACKUP_MANAGED_DIRS = (
+    "credentials",
+    "overlay_backgrounds",
+    "music",
+    "wheel_jingles",
+    "wheel_center_icons",
+)
 FULL_BACKUP_MANAGED_DIRS = (
     "credentials",
     "overlay_backgrounds",
@@ -137,8 +146,14 @@ def _full_backup_manifest_and_infos(
         )
     if manifest.get("database") != _FULL_BACKUP_DATABASE:
         raise RestoreValidationError("manifest.json содержит неверный путь рабочей базы.")
-    if manifest.get("managed_directories") != list(FULL_BACKUP_MANAGED_DIRS):
-        raise RestoreValidationError("manifest.json содержит неизвестный набор managed-каталогов.")
+    managed_directories = manifest.get("managed_directories")
+    if managed_directories not in (
+        list(FULL_BACKUP_MANAGED_DIRS),
+        list(LEGACY_FULL_BACKUP_MANAGED_DIRS),
+    ):
+        raise RestoreValidationError(
+            "manifest.json содержит неизвестный набор managed-каталогов."
+        )
 
     raw_files = manifest.get("files")
     if not isinstance(raw_files, list):
