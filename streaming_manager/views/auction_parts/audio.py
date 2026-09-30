@@ -420,8 +420,11 @@ class AuctionAudioMixin:
                 asset.id,
             )
         index = self.wheel_soundtrack_combo.findData(selected_id) if selected_id else 0
-        self.wheel_soundtrack_combo.setCurrentIndex(index if index >= 0 else 0)
+        valid_index = index if index >= 0 else 0
+        self.wheel_soundtrack_combo.setCurrentIndex(valid_index)
         self.wheel_soundtrack_combo.blockSignals(False)
+        if selected_id is not None and index < 0:
+            self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "")
         self._refresh_wheel_soundtrack_availability()
 
     def _refresh_wheel_soundtrack_availability(self) -> None:
@@ -849,8 +852,11 @@ class AuctionAudioMixin:
                 asset.id,
             )
         index = self.auction_soundtrack_combo.findData(selected_id) if selected_id else 0
-        self.auction_soundtrack_combo.setCurrentIndex(index if index >= 0 else 0)
+        valid_index = index if index >= 0 else 0
+        self.auction_soundtrack_combo.setCurrentIndex(valid_index)
         self.auction_soundtrack_combo.blockSignals(False)
+        if selected_id is not None and index < 0:
+            self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, "")
         self._refresh_auction_soundtrack_availability()
 
     def _refresh_auction_soundtrack_availability(self) -> None:
