@@ -4,14 +4,13 @@
 
 ## CURRENT
 
-- Released: **1.0.7 / D26 Music Player**
+- Released: **1.0.8 / Global Conditional UI Visibility**
 - Новый implementation scope после релиза автоматически не выбран.
 
 ## Ближайшие eligible items
 
-1. **Global Conditional UI Visibility** — отдельный post-D26 patch. Перед реализацией нужен полный UI-аудит; логически неприменимые controls должны скрываться вместо постоянного disabled/серого состояния. Tracking: **#3**.
-2. **Global Multi-File Import** — отдельный post-D26 patch. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…». Music Player уже поддерживает это в D26. Tracking: **#4**.
-3. **D22 — Battle Royale** — approved post-completion item, отложен и требует fresh design/review перед реализацией. Tracking: **#5**.
+1. **Global Multi-File Import** — отдельный post-D26 patch. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…». Music Player уже поддерживает это в D26. Tracking: **#4**.
+2. **D22 — Battle Royale** — approved post-completion item, отложен и требует fresh design/review перед реализацией. Tracking: **#5**.
 
 Ни один из этих пунктов не выбран автоматически.
 
@@ -21,6 +20,7 @@
 - **D43** — OBS Browser Audio Transport — RELEASED in 1.0.5.
 - **D21** — Elimination wheel — RELEASED in 1.0.6.
 - **D26** — Music Player + OBS overlay — RELEASED in 1.0.7.
+- **Global Conditional UI Visibility / #3** — RELEASED in 1.0.8.
 
 ## Правило для оставшегося legacy backlog
 
