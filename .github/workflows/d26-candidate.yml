@@ -44,6 +44,7 @@ jobs:
           import urllib.request
           import wave
           from pathlib import Path
+          from types import SimpleNamespace
 
           from PySide6.QtWidgets import QApplication
 
@@ -56,6 +57,8 @@ jobs:
               MUSIC_PLAYER_ORDER_SHUFFLE,
               MUSIC_PLAYER_OUTPUT_MODE_APPLICATION,
               MUSIC_PLAYER_OUTPUT_MODE_OBS,
+              AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
+              WHEEL_SOUNDTRACK_MEDIA_ID_KEY,
               SCHEMA_VERSION,
           )
           from streaming_manager.database import Database
@@ -70,6 +73,7 @@ jobs:
               PLAYER_STOP,
               MusicPlayerController,
           )
+          from streaming_manager.views.auction_parts.audio import AuctionAudioMixin
           from streaming_manager.views.music import MusicTab
           from streaming_manager.views.stream import StreamTab
 
@@ -146,6 +150,54 @@ jobs:
               assert player.volume_percent == 73
               assert player.muted is True
               player.set_muted(False)
+
+              class FakeAuction(AuctionAudioMixin):
+                  def __init__(self, coord):
+                      self.audio_coordinator = coord
+                      self.auction_audio = SimpleNamespace(muted=False)
+                      self.wheel_audio = SimpleNamespace(muted=False)
+                      self.auction_available = True
+                      self.wheel_available = True
+
+                  def _configured_soundtrack_asset(self, setting_key):
+                      if setting_key == AUCTION_SOUNDTRACK_MEDIA_ID_KEY:
+                          return object() if self.auction_available else None
+                      if setting_key == WHEEL_SOUNDTRACK_MEDIA_ID_KEY:
+                          return object() if self.wheel_available else None
+                      return None
+
+                  @staticmethod
+                  def _wheel_spin_complete(_session):
+                      return False
+
+              player.select_media(first.id, play=True)
+              auction = FakeAuction(coordinator)
+              max_running = {"status": "running", "mode": "max_amount"}
+              auction._sync_audio_owner_with_session(max_running)
+              assert coordinator.owner == "auction" and player.suppressed is True
+
+              auction.auction_audio.muted = True
+              auction._sync_audio_owner_with_session(max_running)
+              assert coordinator.owner == "music_player" and player.suppressed is False
+
+              auction.auction_audio.muted = False
+              auction._sync_audio_owner_with_session(max_running)
+              assert coordinator.owner == "auction" and player.suppressed is True
+              auction._sync_audio_owner_with_session(
+                  {"status": "tie_break_required", "mode": "max_amount"}
+              )
+              assert coordinator.owner == "music_player" and player.suppressed is False
+
+              wheel_spin = {
+                  "status": "winner_selected",
+                  "mode": "weighted_wheel",
+                  "wheel_spin_id": 1,
+              }
+              auction._sync_audio_owner_with_session(wheel_spin, spin_running=True)
+              assert coordinator.owner == "auction" and player.suppressed is True
+              auction.wheel_audio.muted = True
+              auction._sync_audio_owner_with_session(wheel_spin, spin_running=True)
+              assert coordinator.owner == "music_player" and player.suppressed is False
 
               api_socket = socket.socket()
               api_socket.bind(("127.0.0.1", 0))
@@ -259,6 +311,12 @@ jobs:
           assert "Зациклить выбранный трек" not in audio
           assert "def _finish_auction_soundtrack_phase" in audio
           assert "tie_break_required" in audio
+          assert "WHEEL_SOUNDTRACK_FADE_MS = 0" in audio
+          assert "AUCTION_SOUNDTRACK_FADE_MS = 0" in audio
+
+          state = Path("streaming_manager/views/auction_parts/state.py").read_text(encoding="utf-8")
+          wheel_finish = state.split("def _handle_local_wheel_spin_finished", 1)[1]
+          assert "_stop_wheel_soundtrack(immediate=True)" in wheel_finish[:900]
 
           actions = Path("streaming_manager/views/auction_parts/actions.py").read_text(encoding="utf-8")
           assert "restart=False" in actions
