@@ -174,6 +174,7 @@ let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {}
 let hideTimer = 0, currentVisible = false, lastCoverUrl = "";
 let autoPalette = null, autoPaletteUrl = "";
 let pollBusy = false, audioSyncBusy = false, unlockBusy = false, unlockHintTimer = 0;
+let previousAppearance = null;
 
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function hexRgb(hex){
@@ -500,6 +501,57 @@ function hiddenClass(){
   }
   return "hidden fade";
 }
+function syncHiddenPoseInstantly(){
+  if(currentVisible) return;
+  const priorTransition=card.style.transition;
+  card.style.transition="none";
+  card.className=hiddenClass();
+  void card.offsetWidth;
+  card.style.transition=priorTransition;
+}
+function appearanceMotionChanged(previous,next){
+  if(!previous) return true;
+  return String(previous.animation||"fade")!==String(next.animation||"fade")
+    || String(previous.direction||"left")!==String(next.direction||"left");
+}
+function applyAppearanceStateTransition(previous,next,state){
+  const nextMode=String(next.show_mode||"track_change");
+  const previousMode=previous ? String(previous.show_mode||"track_change") : null;
+  const modeChanged=previousMode!==null && previousMode!==nextMode;
+  const motionChanged=appearanceMotionChanged(previous,next);
+
+  // A hidden card retains the CSS class that defines where it will animate
+  // from. Keep that pose synchronized with the newly saved animation so the
+  // very next appearance never reuses the previous animation/direction.
+  if(!currentVisible && motionChanged) syncHiddenPoseInstantly();
+
+  if(previousMode===null) return false;
+  if(!modeChanged) return false;
+
+  clearTimeout(hideTimer);
+
+  if(nextMode==="hidden"){
+    if(currentVisible) hideCard();
+    else syncHiddenPoseInstantly();
+    return true;
+  }
+
+  if(nextMode==="always"){
+    if(!currentVisible && motionChanged) syncHiddenPoseInstantly();
+    showCard();
+    return true;
+  }
+
+  // "При смене трека" begins waiting from the moment the setting is applied;
+  // changing the mode itself is not a synthetic track-change event.
+  if(nextMode==="track_change"){
+    if(currentVisible) hideCard();
+    else syncHiddenPoseInstantly();
+    if(state) lastEventSerial=Number(state.event_serial)||0;
+    return true;
+  }
+  return false;
+}
 function showCard(){
   clearTimeout(hideTimer);
   card.className="visible";
@@ -589,8 +641,9 @@ async function poll(){
     const response=await fetch("/api/music-player",{cache:"no-store"});
     if(!response.ok) return;
     const payload=await response.json();
-    appearance=payload.appearance||{};
+    const nextAppearance=payload.appearance||{};
     currentState=payload.state||{};
+    appearance=nextAppearance;
 
     const demo=preview && !currentState.playing;
     updateCover(currentState,demo);
@@ -604,7 +657,17 @@ async function poll(){
     // Rendering/visibility must never wait for browser autoplay/WebAudio
     // permission. Chrome/Edge may leave play()/resume() pending until a user
     // gesture; the preview still has to be visible so that gesture is possible.
-    evaluateVisibility(currentState,lastEventSerial<0);
+    const appearanceTransitionHandled=applyAppearanceStateTransition(
+      previousAppearance,
+      nextAppearance,
+      currentState
+    );
+    if(!appearanceTransitionHandled){
+      if(previousAppearance===null && !currentVisible) syncHiddenPoseInstantly();
+      evaluateVisibility(currentState,lastEventSerial<0);
+    }
+    previousAppearance={...nextAppearance};
+
     scheduleSpectrumUnlockCheck();
     startAudioSync(currentState);
 

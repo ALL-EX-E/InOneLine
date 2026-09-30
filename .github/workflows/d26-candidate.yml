@@ -601,6 +601,9 @@ jobs:
                   assert 'startAudioSync(currentState)' in overlay
                   assert 'withTimeout(audio.play(),1000)' in overlay
                   assert overlay.index('evaluateVisibility(currentState,lastEventSerial<0)') < overlay.index('startAudioSync(currentState)')
+                  assert 'applyAppearanceStateTransition' in overlay
+                  assert 'syncHiddenPoseInstantly' in overlay
+                  assert 'changing the mode itself is not a synthetic track-change event' in overlay
                   assert 'if(!audible && gainNode) audio.muted=false' in overlay
                   assert 'Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию.' in overlay
                   assert 'analysisTransportReady' in overlay
@@ -744,6 +747,9 @@ jobs:
           assert "startAudioSync(currentState)" in overlay
           assert "withTimeout(audio.play(),1000)" in overlay
           assert overlay.index("evaluateVisibility(currentState,lastEventSerial<0)") < overlay.index("startAudioSync(currentState)")
+          assert "applyAppearanceStateTransition" in overlay
+          assert "syncHiddenPoseInstantly" in overlay
+          assert "changing the mode itself is not a synthetic track-change event" in overlay
           assert "if(!audible && gainNode) audio.muted=false" in overlay
           assert "Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию." in overlay
           assert "analysisTransportReady" in overlay
