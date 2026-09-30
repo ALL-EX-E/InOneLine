@@ -269,6 +269,23 @@ jobs:
                   root / "Оформление Канала" / "ZVUK" / "DONAT.mp3"
               )
               make_wav(windows_like_external)
+              # Managed-copy regression: calling through the mixin instance
+              # must not accidentally bind self as a third positional
+              # argument. This is the exact Windows error reported during the
+              # manual gate.
+              managed_copy_target = (
+                  managed_media_directory(
+                      db.path.parent, MEDIA_CATEGORY_SOUNDTRACK
+                  )
+                  / "COPIED_DONAT.mp3"
+              )
+              copied = auction._copy_auction_soundtrack(
+                  windows_like_external,
+                  managed_copy_target,
+              )
+              assert copied == managed_copy_target
+              assert managed_copy_target.exists()
+
               chosen_external = db.register_external_media_asset(
                   MEDIA_CATEGORY_SOUNDTRACK,
                   windows_like_external,
@@ -540,6 +557,7 @@ jobs:
           assert "tie_break_required" in audio
           assert "def _soundtrack_assets_for_setting" in audio
           assert "def _force_select_soundtrack_asset" in audio
+          assert "@staticmethod\n    def _copy_auction_soundtrack" in audio
           assert "asset.storage_mode == MEDIA_STORAGE_MANAGED" in audio
           assert "WHEEL_SOUNDTRACK_FADE_MS = 0" in audio
           assert "AUCTION_SOUNDTRACK_FADE_MS = 0" in audio
