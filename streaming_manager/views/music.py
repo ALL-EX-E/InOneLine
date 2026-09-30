@@ -358,7 +358,7 @@ class MusicTab(QWidget):
                 asset = self.db.ensure_managed_media_asset(
                     MEDIA_CATEGORY_MUSIC,
                     target.name,
-                    source.name,
+                    target.name,
                 )
         except Exception as exc:
             QMessageBox.critical(self, "Добавление музыки", f"Не удалось добавить файл:\n{exc}")
