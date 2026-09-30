@@ -917,7 +917,11 @@ class AuctionAudioMixin:
         if (
             session is not None
             and str(session.get("mode") or "") == "max_amount"
-            and str(session.get("status") or "") in ("running", "paused")
+            and str(session.get("status") or "") in (
+                "running",
+                "paused",
+                "tie_break_required",
+            )
         ):
             if asset is None:
                 self._stop_auction_soundtrack(immediate=True)
@@ -1126,12 +1130,12 @@ class AuctionAudioMixin:
         if session is None or str(session.get("mode") or "") != "max_amount":
             return
         status = str(session.get("status") or "")
-        if status not in ("running", "paused"):
+        if status not in ("running", "paused", "tie_break_required"):
             return
         session_id = int(session["id"])
         if not restart and self._auction_audio_session_id == session_id:
             if self.auction_audio.active:
-                if status == "paused":
+                if status in ("paused", "tie_break_required"):
                     self.auction_audio.pause()
                 else:
                     self.auction_audio.resume()
@@ -1152,7 +1156,7 @@ class AuctionAudioMixin:
                 paths,
                 start_index=start_index,
                 loop_one=True,
-                start_paused=status == "paused",
+                start_paused=status in ("paused", "tie_break_required"),
             )
             # start_playlist() first resets the old transport and can emit
             # stopped(), so align IDs only after the new transport is live.
