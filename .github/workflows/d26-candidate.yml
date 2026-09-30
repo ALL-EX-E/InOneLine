@@ -48,7 +48,7 @@ jobs:
           from pathlib import Path
           from types import SimpleNamespace
 
-          from PySide6.QtWidgets import QApplication
+          from PySide6.QtWidgets import QApplication, QComboBox, QLabel
 
           from streaming_manager.api_server import LocalApiServer
           from streaming_manager.app_paths import AppPaths
@@ -204,10 +204,21 @@ jobs:
                   def __init__(self, coord):
                       self.db = db
                       self.audio_coordinator = coord
-                      self.auction_audio = SimpleNamespace(muted=False)
+                      self.auction_audio = SimpleNamespace(
+                          muted=False,
+                          active=False,
+                          paused=False,
+                          current_source=None,
+                      )
                       self.wheel_audio = SimpleNamespace(muted=False)
                       self.auction_available = True
                       self.wheel_available = True
+                      self.auction_soundtrack_combo = QComboBox()
+                      self.auction_soundtrack_status = QLabel()
+                      self._auction_audio_runtime_error = ""
+
+                  def _current_session(self):
+                      return None
 
                   def _configured_soundtrack_asset(self, setting_key):
                       if setting_key == AUCTION_SOUNDTRACK_MEDIA_ID_KEY:
@@ -248,6 +259,25 @@ jobs:
               auction.wheel_audio.muted = True
               auction._sync_audio_owner_with_session(wheel_spin, spin_running=True)
               assert coordinator.owner == "music_player" and player.suppressed is False
+
+              # Regression for the manual Windows gate: selecting
+              # "Использовать исходный файл" must immediately become the
+              # visible/current auction soundtrack instead of snapping back
+              # to "— без soundtrack —".
+              windows_like_external = (
+                  root / "Оформление Канала" / "ZVUK" / "DONAT.mp3"
+              )
+              make_wav(windows_like_external)
+              chosen_external = db.register_external_media_asset(
+                  MEDIA_CATEGORY_SOUNDTRACK,
+                  windows_like_external,
+              )
+              auction._adopt_auction_soundtrack_asset(chosen_external.id)
+              assert int(auction.auction_soundtrack_combo.currentData()) == chosen_external.id
+              assert db.get_setting(
+                  AUCTION_SOUNDTRACK_MEDIA_ID_KEY, ""
+              ) == str(chosen_external.id)
+              assert "DONAT.mp3" in auction.auction_soundtrack_combo.currentText()
 
               # Shared managed soundtrack catalog must not turn external
               # references into reusable library entries. Each selector sees
@@ -424,6 +454,7 @@ jobs:
           assert "def _finish_auction_soundtrack_phase" in audio
           assert "tie_break_required" in audio
           assert "def _soundtrack_assets_for_setting" in audio
+          assert "def _force_select_soundtrack_asset" in audio
           assert "asset.storage_mode == MEDIA_STORAGE_MANAGED" in audio
           assert "WHEEL_SOUNDTRACK_FADE_MS = 0" in audio
           assert "AUCTION_SOUNDTRACK_FADE_MS = 0" in audio
