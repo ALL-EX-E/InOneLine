@@ -144,6 +144,7 @@ class MusicTab(QWidget):
 
         self.search = QLineEdit()
         self.search.setPlaceholderText("Поиск по библиотеке…")
+        self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self._apply_filter)
         root.addWidget(self.search)
 
