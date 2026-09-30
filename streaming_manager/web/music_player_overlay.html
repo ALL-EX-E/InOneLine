@@ -32,8 +32,8 @@ body { font-family:var(--font); }
 }
 #card.visible { opacity:1; transform:translateY(-50%) translate(0,0); }
 #card.hidden.fade { opacity:0; transform:translateY(-50%); }
-#card.hidden.slide-left { opacity:0; transform:translate(-102vw,-50%); }
-#card.hidden.slide-right { opacity:0; transform:translate(102vw,-50%); }
+#card.hidden.slide-left { opacity:0; transform:translate(-110vw,-50%); }
+#card.hidden.slide-right { opacity:0; transform:translate(110vw,-50%); }
 #card.hidden.slide-top { opacity:0; transform:translateY(calc(-50% - 100vh - 22.5vw)); }
 #card.hidden.slide-bottom { opacity:0; transform:translateY(calc(-50% + 100vh + 22.5vw)); }
 
@@ -62,8 +62,7 @@ body { font-family:var(--font); }
 }
 @keyframes marquee {
   0%,13% { transform:translateX(0); }
-  82%,95% { transform:translateX(calc(-1 * var(--marquee-distance,0px))); }
-  100% { transform:translateX(0); }
+  82%,100% { transform:translateX(calc(-1 * var(--marquee-distance,0px))); }
 }
 #spectrumWrap { flex:1 1 auto; min-height:0; display:flex; align-items:flex-end; padding-top:1.2vw; }
 #spectrum { width:100%; height:100%; display:block; }
@@ -279,9 +278,11 @@ function updateCover(state, demo=false){
   cover.classList.toggle("placeholder",placeholder);
   if(placeholder) setManualColors(appearance);
 }
-function updateTitle(text){
+function updateTitle(text, force=false){
   const value=text||"Исполнитель - Название трека";
-  if(titleInner.textContent!==value) titleInner.textContent=value;
+  const changed=titleInner.textContent!==value;
+  if(changed) titleInner.textContent=value;
+  if(!changed && !force) return;
   requestAnimationFrame(()=>{
     titleInner.classList.remove("marquee");
     titleInner.style.removeProperty("--marquee-distance");
@@ -411,7 +412,7 @@ async function poll(){
     if(!preview) hideCard();
   } finally { pollBusy=false; }
 }
-window.addEventListener("resize",()=>{ resizeCanvas(); updateTitle(titleInner.textContent); });
+window.addEventListener("resize",()=>{ resizeCanvas(); updateTitle(titleInner.textContent,true); });
 cover.addEventListener("load",applyAutoColorsIfPossible);
 drawSpectrum();
 poll();
