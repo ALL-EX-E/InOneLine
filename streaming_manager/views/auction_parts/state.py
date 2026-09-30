@@ -867,8 +867,9 @@ class AuctionStateMixin:
         self._update_session_controls(session)
 
     def _handle_local_wheel_spin_finished(self):
-        # Winner is now revealable. Release auction ownership even when the
-        # Auction tab itself is hidden; refresh() may be deferred in that case.
+        # At the exact visual boundary the wheel soundtrack must already be
+        # inaudible before Music Player is restored.
+        self._stop_wheel_soundtrack(immediate=True)
         self._sync_audio_owner_with_session(
             self._current_session(),
             spin_running=False,
