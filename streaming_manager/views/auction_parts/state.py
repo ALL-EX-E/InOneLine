@@ -25,7 +25,11 @@ class AuctionStateMixin:
         self._refresh_visible_state()
 
     def refresh_force(self):
-        """Explicit user refresh may rebuild Auction even while its tab is hidden."""
+        """Explicit user refresh also re-scans the D26 soundtrack directory."""
+        if hasattr(self, "wheel_soundtrack_combo"):
+            self._refresh_wheel_soundtrack_library()
+        if hasattr(self, "auction_soundtrack_combo"):
+            self._refresh_auction_soundtrack_library()
         self._refresh_visible_state()
 
     @staticmethod
