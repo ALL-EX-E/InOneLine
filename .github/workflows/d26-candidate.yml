@@ -38,11 +38,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
 
           @'
+          import hashlib
           import json
           import socket
           import tempfile
           import urllib.request
           import wave
+          import zipfile
           from pathlib import Path
           from types import SimpleNamespace
 
@@ -57,11 +59,19 @@ jobs:
               MUSIC_PLAYER_ORDER_SHUFFLE,
               MUSIC_PLAYER_OUTPUT_MODE_APPLICATION,
               MUSIC_PLAYER_OUTPUT_MODE_OBS,
+              MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY,
+              MUSIC_PLAYER_POSITION_MS_KEY,
               AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
               WHEEL_SOUNDTRACK_MEDIA_ID_KEY,
               SCHEMA_VERSION,
           )
           from streaming_manager.database import Database
+          from streaming_manager.backup_restore import (
+              FULL_BACKUP_FORMAT,
+              FULL_BACKUP_FORMAT_VERSION,
+              LEGACY_FULL_BACKUP_MANAGED_DIRS,
+              validate_full_backup_archive,
+          )
           from streaming_manager.media import (
               MEDIA_CATEGORY_MUSIC,
               MEDIA_CATEGORY_SOUNDTRACK,
@@ -96,6 +106,34 @@ jobs:
               paths = AppPaths.from_root(root)
               paths.ensure_runtime_dirs()
               db = Database(paths.database_path)
+
+              # D26 extends full backups with data\\soundtrack, but 1.0.7 must
+              # continue accepting the exact format-1 directory declaration
+              # written by released 1.0.6 backups.
+              database_bytes = paths.database_path.read_bytes()
+              legacy_backup = root / "legacy_1_0_6.iolbackup"
+              legacy_manifest = {
+                  "format": FULL_BACKUP_FORMAT,
+                  "format_version": FULL_BACKUP_FORMAT_VERSION,
+                  "app_version": "1.0.6",
+                  "schema_version": 19,
+                  "created_at_utc": "2026-09-29T00:00:00+00:00",
+                  "database": "data/streaming.db",
+                  "managed_directories": list(LEGACY_FULL_BACKUP_MANAGED_DIRS),
+                  "credentials_protection": "windows-dpapi-current-user",
+                  "files": [{
+                      "path": "data/streaming.db",
+                      "size": len(database_bytes),
+                      "sha256": hashlib.sha256(database_bytes).hexdigest(),
+                  }],
+              }
+              with zipfile.ZipFile(legacy_backup, "w", zipfile.ZIP_DEFLATED) as archive:
+                  archive.writestr(
+                      "manifest.json",
+                      json.dumps(legacy_manifest, ensure_ascii=False),
+                  )
+                  archive.writestr("data/streaming.db", database_bytes)
+              assert validate_full_backup_archive(legacy_backup)["app_version"] == "1.0.6"
 
               music_dir = managed_media_directory(paths.data_dir, MEDIA_CATEGORY_MUSIC)
               soundtrack_dir = managed_media_directory(paths.data_dir, MEDIA_CATEGORY_SOUNDTRACK)
@@ -256,12 +294,28 @@ jobs:
               music_tab.deleteLater()
               stream_tab.deleteLater()
 
-              # Re-open persisted player settings: track/queue may restore, but
-              # application startup must never emit audio automatically.
+              # Re-open a real saved position: startup must restore the
+              # pending seek without overwriting it with QMediaPlayer's
+              # temporary 0 ms and must never auto-play.
+              db.set_setting(MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY, str(first.id))
+              db.set_setting(MUSIC_PLAYER_POSITION_MS_KEY, "73")
               second = MusicPlayerController(db, AudioCoordinator())
               assert second.desired_state == PLAYER_PAUSE
+              assert db.get_setting(MUSIC_PLAYER_POSITION_MS_KEY, "") == "73"
               second.shutdown()
               second.deleteLater()
+              app.processEvents()
+
+              # A missing saved track is skipped to the next available file at
+              # 00:00 rather than inheriting the missing track's old position.
+              db.set_setting(MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY, str(removed_id))
+              db.set_setting(MUSIC_PLAYER_POSITION_MS_KEY, "99")
+              third = MusicPlayerController(db, AudioCoordinator())
+              assert third.desired_state == PLAYER_PAUSE
+              assert third.current_media_id == first.id
+              assert db.get_setting(MUSIC_PLAYER_POSITION_MS_KEY, "") == "0"
+              third.shutdown()
+              third.deleteLater()
               app.processEvents()
 
           print("D26 SEMANTIC SMOKE: PASS")
