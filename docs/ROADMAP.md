@@ -9,9 +9,9 @@
 
 ## Ближайшие eligible items
 
-1. **Global Conditional UI Visibility** — отдельный post-D26 patch. Перед реализацией нужен полный UI-аудит; логически неприменимые controls должны скрываться вместо постоянного disabled/серого состояния.
-2. **Global Multi-File Import** — отдельный post-D26 patch. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…». Music Player уже поддерживает это в D26.
-3. **D22 — Battle Royale** — approved post-completion item, отложен и требует fresh design/review перед реализацией.
+1. **Global Conditional UI Visibility** — отдельный post-D26 patch. Перед реализацией нужен полный UI-аудит; логически неприменимые controls должны скрываться вместо постоянного disabled/серого состояния. Tracking: **#3**.
+2. **Global Multi-File Import** — отдельный post-D26 patch. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…». Music Player уже поддерживает это в D26. Tracking: **#4**.
+3. **D22 — Battle Royale** — approved post-completion item, отложен и требует fresh design/review перед реализацией. Tracking: **#5**.
 
 Ни один из этих пунктов не выбран автоматически.
 
