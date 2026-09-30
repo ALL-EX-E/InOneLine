@@ -620,9 +620,24 @@ jobs:
               throw "Wrong frozen version: $($health.version)"
             }
 
-            $music = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/music-player" -TimeoutSec 2
-            if ($null -eq $music.state -or $null -eq $music.appearance) {
-              throw "Frozen Music Player API contract missing"
+            # Health can answer before MainWindow finishes wiring the
+            # runtime Music Player provider. Wait for that provider instead of
+            # treating a normal startup race as a product failure.
+            $music = $null
+            for ($i = 0; $i -lt 40; $i++) {
+              try {
+                $candidate = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/music-player" -TimeoutSec 2
+                if ($null -ne $candidate.state -and
+                    $null -ne $candidate.appearance -and
+                    -not [string]::IsNullOrWhiteSpace([string]$candidate.state.desired_state)) {
+                  $music = $candidate
+                  break
+                }
+              } catch {}
+              Start-Sleep -Milliseconds 250
+            }
+            if ($null -eq $music) {
+              throw "Frozen Music Player API provider did not become ready"
             }
             if ($music.state.desired_state -ne "pause") {
               throw "Music Player fresh startup state was '$($music.state.desired_state)', expected 'pause'"
