@@ -21,8 +21,6 @@ from ...constants import (
     AUCTION_AUDIO_OUTPUT_MODE_DEFAULT,
     AUCTION_AUDIO_OUTPUT_MODE_KEY,
     AUCTION_AUDIO_OUTPUT_MODE_OBS_TIMER,
-    AUCTION_SOUNDTRACK_LOOP_ONE_DEFAULT,
-    AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
     AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
     AUCTION_SOUNDTRACK_MUTE_DEFAULT,
     AUCTION_SOUNDTRACK_MUTE_KEY,
@@ -309,19 +307,6 @@ class AuctionAudioMixin:
         self.wheel_soundtrack_status.setWordWrap(True)
         root.addWidget(self.wheel_soundtrack_status)
 
-        repair_row = QHBoxLayout()
-        repair_row.setSpacing(5)
-        self.repair_wheel_soundtrack_btn = QPushButton("Восстановить ссылку…")
-        self.repair_wheel_soundtrack_btn.clicked.connect(
-            self._repair_wheel_soundtrack_reference
-        )
-        self.repair_wheel_soundtrack_btn.setVisible(False)
-        self.repair_wheel_soundtrack_btn.setEnabled(False)
-        repair_row.addWidget(self.repair_wheel_soundtrack_btn)
-        repair_row.addStretch()
-        self.repair_wheel_soundtrack_btn.setVisible(False)
-        repair_row.setContentsMargins(0, 0, 0, 0)
-
         gain_row = QHBoxLayout()
         gain_row.setSpacing(5)
         gain_row.addWidget(QLabel("Громкость:"))
@@ -482,8 +467,6 @@ class AuctionAudioMixin:
         if asset is None:
             self.wheel_soundtrack_status.setText("Soundtrack не выбран")
             self.wheel_soundtrack_status.setToolTip("")
-            self.repair_wheel_soundtrack_btn.setVisible(False)
-            self.repair_wheel_soundtrack_btn.setEnabled(False)
             return
 
         available = media_asset_available(self.db.path.parent, asset)
@@ -500,21 +483,16 @@ class AuctionAudioMixin:
             path_text = str(asset.external_path or asset.managed_name)
         self.wheel_soundtrack_status.setToolTip(path_text)
 
-        needs_repair = False
         if available:
             self.wheel_soundtrack_status.setText(
-                "Доступен" if not self._wheel_audio_runtime_error else self._wheel_audio_runtime_error
-            )
-        elif needs_repair:
-            self.wheel_soundtrack_status.setText(
-                "Файл недоступен — восстановите ссылку или выберите другой soundtrack"
+                "Доступен"
+                if not self._wheel_audio_runtime_error
+                else self._wheel_audio_runtime_error
             )
         else:
-            self.wheel_soundtrack_status.setText(
-                "Файл недоступен — добавьте soundtrack заново или выберите другой"
-            )
-        self.repair_wheel_soundtrack_btn.setVisible(False)
-        self.repair_wheel_soundtrack_btn.setEnabled(False)
+            # Unavailable external/managed entries are normally filtered from
+            # the selector. This branch is only a defensive race fallback.
+            self.wheel_soundtrack_status.setText("Soundtrack недоступен")
 
     def _wheel_soundtrack_selection_changed(self, _index: int = -1) -> None:
         asset = self._selected_wheel_soundtrack_asset()
@@ -593,19 +571,6 @@ class AuctionAudioMixin:
         if clicked is external_button:
             return MEDIA_STORAGE_EXTERNAL
         return None
-
-    def _unique_wheel_soundtrack_target(self, source: Path) -> Path:
-        existing = {
-            item.name.casefold()
-            for item in self.wheel_jingles_dir.iterdir()
-            if item.is_file()
-        }
-        candidate = self.wheel_jingles_dir / source.name
-        counter = 2
-        while candidate.name.casefold() in existing:
-            candidate = self.wheel_jingles_dir / f"{source.stem} ({counter}){source.suffix}"
-            counter += 1
-        return candidate
 
     def _resolve_soundtrack_copy_target(self, source: Path) -> tuple[str, Path | None]:
         target = self.soundtrack_dir / source.name
@@ -742,34 +707,6 @@ class AuctionAudioMixin:
             return
         self._start_wheel_soundtrack_copy(source, target)
 
-    def _repair_wheel_soundtrack_reference(self) -> None:
-        asset = self._selected_wheel_soundtrack_asset()
-        if asset is None or asset.storage_mode != MEDIA_STORAGE_EXTERNAL:
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Восстановить ссылку на soundtrack",
-            "",
-            "Аудио (*.mp3 *.wav *.ogg);;Все файлы (*.*)",
-        )
-        if not path:
-            return
-        source = Path(path)
-        if not source.is_file():
-            QMessageBox.critical(self, "Ошибка", "Выбранный аудиофайл не найден.")
-            return
-        try:
-            repaired = self.db.update_external_media_asset(asset.id, source)
-        except (OSError, ValueError) as exc:
-            QMessageBox.critical(
-                self,
-                "Ошибка восстановления ссылки",
-                f"Не удалось обновить ссылку на soundtrack:\n{exc}",
-            )
-            return
-        self._wheel_audio_runtime_error = ""
-        self._refresh_wheel_soundtrack_library(repaired.id)
-
     def _build_auction_soundtrack_controls(self) -> QWidget:
         panel = QWidget()
         root = QVBoxLayout(panel)
@@ -795,19 +732,6 @@ class AuctionAudioMixin:
         self.auction_soundtrack_status.setProperty("muted", True)
         self.auction_soundtrack_status.setWordWrap(True)
         root.addWidget(self.auction_soundtrack_status)
-
-        repair_row = QHBoxLayout()
-        repair_row.setSpacing(5)
-        self.repair_auction_soundtrack_btn = QPushButton("Восстановить ссылку…")
-        self.repair_auction_soundtrack_btn.clicked.connect(
-            self._repair_auction_soundtrack_reference
-        )
-        self.repair_auction_soundtrack_btn.setVisible(False)
-        self.repair_auction_soundtrack_btn.setEnabled(False)
-        repair_row.addWidget(self.repair_auction_soundtrack_btn)
-        repair_row.addStretch()
-        self.repair_auction_soundtrack_btn.setVisible(False)
-        repair_row.setContentsMargins(0, 0, 0, 0)
 
         gain_row = QHBoxLayout()
         gain_row.setSpacing(5)
@@ -861,13 +785,6 @@ class AuctionAudioMixin:
             "1" if AUCTION_SOUNDTRACK_MUTE_DEFAULT else "0",
         ) == "1"
 
-    def _saved_auction_soundtrack_loop_one(self) -> bool:
-        return self.db.get_setting(
-            AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
-            "1" if AUCTION_SOUNDTRACK_LOOP_ONE_DEFAULT else "0",
-        ) == "1"
-
-    @staticmethod
     def _auction_soundtrack_asset_label(asset, available: bool) -> str:
         if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
             label = f"{asset.display_name} — исходный файл"
@@ -922,8 +839,6 @@ class AuctionAudioMixin:
         if asset is None:
             self.auction_soundtrack_status.setText("Soundtrack не выбран")
             self.auction_soundtrack_status.setToolTip("")
-            self.repair_auction_soundtrack_btn.setVisible(False)
-            self.repair_auction_soundtrack_btn.setEnabled(False)
             return
 
         available = media_asset_available(self.db.path.parent, asset)
@@ -940,7 +855,6 @@ class AuctionAudioMixin:
             path_text = str(asset.external_path or asset.managed_name)
         self.auction_soundtrack_status.setToolTip(path_text)
 
-        needs_repair = False
         if self._auction_audio_runtime_error:
             self.auction_soundtrack_status.setText(self._auction_audio_runtime_error)
         elif self.auction_audio.active:
@@ -951,16 +865,8 @@ class AuctionAudioMixin:
             )
         elif available:
             self.auction_soundtrack_status.setText("Доступен")
-        elif needs_repair:
-            self.auction_soundtrack_status.setText(
-                "Файл недоступен — восстановите ссылку или выберите другой soundtrack"
-            )
         else:
-            self.auction_soundtrack_status.setText(
-                "Файл недоступен — добавьте soundtrack заново или выберите другой"
-            )
-        self.repair_auction_soundtrack_btn.setVisible(False)
-        self.repair_auction_soundtrack_btn.setEnabled(False)
+            self.auction_soundtrack_status.setText("Soundtrack недоступен")
 
     def _auction_soundtrack_selection_changed(self, _index: int = -1) -> None:
         asset = self._selected_auction_soundtrack_asset()
@@ -989,9 +895,6 @@ class AuctionAudioMixin:
                     )
                 self._sync_audio_owner_with_session(session)
         self._refresh_auction_soundtrack_availability()
-
-    def _auction_soundtrack_loop_one_changed(self, enabled: bool) -> None:
-        self.db.set_setting(AUCTION_SOUNDTRACK_LOOP_ONE_KEY, "1" if enabled else "0")
 
     def _auction_soundtrack_volume_changed(self, value: int) -> None:
         normalized = self.auction_audio.set_volume_percent(value)
@@ -1043,20 +946,6 @@ class AuctionAudioMixin:
             return MEDIA_STORAGE_EXTERNAL
         return None
 
-    def _unique_auction_soundtrack_target(self, source: Path) -> Path:
-        existing = {
-            item.name.casefold()
-            for item in self.auction_music_dir.iterdir()
-            if item.is_file()
-        }
-        candidate = self.auction_music_dir / source.name
-        counter = 2
-        while candidate.name.casefold() in existing:
-            candidate = self.auction_music_dir / f"{source.stem} ({counter}){source.suffix}"
-            counter += 1
-        return candidate
-
-    @staticmethod
     def _copy_auction_soundtrack(source: Path, target: Path) -> Path:
         try:
             shutil.copy2(source, target)
@@ -1153,34 +1042,6 @@ class AuctionAudioMixin:
             self._adopt_auction_soundtrack_asset(asset.id)
             return
         self._start_auction_soundtrack_copy(source, target)
-
-    def _repair_auction_soundtrack_reference(self) -> None:
-        asset = self._selected_auction_soundtrack_asset()
-        if asset is None or asset.storage_mode != MEDIA_STORAGE_EXTERNAL:
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Восстановить ссылку на музыку аукциона",
-            "",
-            "Аудио (*.mp3 *.wav *.ogg);;Все файлы (*.*)",
-        )
-        if not path:
-            return
-        source = Path(path)
-        if not source.is_file():
-            QMessageBox.critical(self, "Ошибка", "Выбранный аудиофайл не найден.")
-            return
-        try:
-            repaired = self.db.update_external_media_asset(asset.id, source)
-        except (OSError, ValueError) as exc:
-            QMessageBox.critical(
-                self,
-                "Ошибка восстановления ссылки",
-                f"Не удалось обновить ссылку на soundtrack:\n{exc}",
-            )
-            return
-        self._auction_audio_runtime_error = ""
-        self._refresh_auction_soundtrack_library(repaired.id)
 
     def _resolved_auction_soundtrack_playlist(self) -> tuple[list[Path], list[int], int]:
         selected = self._selected_auction_soundtrack_asset()
@@ -1286,12 +1147,11 @@ class AuctionAudioMixin:
     def _set_auction_soundtrack_edit_enabled(self, enabled: bool) -> None:
         if not hasattr(self, "auction_soundtrack_combo"):
             return
+        # D26 explicitly allows changing the selected soundtrack live.
         self.auction_soundtrack_combo.setEnabled(True)
         self.add_auction_soundtrack_btn.setEnabled(
             self._auction_soundtrack_copy_worker is None
         )
-        self.repair_auction_soundtrack_btn.setVisible(False)
-        self.repair_auction_soundtrack_btn.setEnabled(False)
 
     def _update_auction_soundtrack_panel(self, session: dict | None) -> None:
         if not hasattr(self, "auction_soundtrack_widget"):
@@ -1380,5 +1240,3 @@ class AuctionAudioMixin:
         self.add_wheel_soundtrack_btn.setEnabled(
             self._wheel_soundtrack_copy_worker is None
         )
-        self.repair_wheel_soundtrack_btn.setVisible(False)
-        self.repair_wheel_soundtrack_btn.setEnabled(False)
