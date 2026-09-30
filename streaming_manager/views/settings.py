@@ -2351,8 +2351,8 @@ class SettingsTab(QWidget):
             self,
             "Восстановить полную резервную копию?",
             "Будут заменены рабочая база In one line, protected credentials и все managed-media "
-            "из папок data\\overlay_backgrounds, data\\music, data\\wheel_jingles и "
-            "data\\wheel_center_icons.\n\n"
+            "из папок data\\overlay_backgrounds, data\\music, data\\soundtrack, "
+            "data\\wheel_jingles и data\\wheel_center_icons.\n\n"
             "Внешние файлы, на которые In one line только ссылается, изменяться не будут. "
             "Перед заменой программа создаст полную safety-копию текущих данных в backups.\n\n"
             "После проверки In one line закроется, выполнит восстановление и автоматически запустится снова.\n\n"
