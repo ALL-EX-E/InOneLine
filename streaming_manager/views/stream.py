@@ -251,6 +251,7 @@ class StreamTab(QWidget):
         layout.addWidget(overlay_heading)
 
         overlay_form = QFormLayout()
+        self.overlay_form = overlay_form
         overlay_form.setVerticalSpacing(10)
         overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -263,7 +264,7 @@ class StreamTab(QWidget):
         self.webcam_position.addItem("Слева снизу", "bottom_left")
         self.webcam_position.setMinimumWidth(190)
         self.webcam_enabled.toggled.connect(
-            self.webcam_position.setEnabled
+            self._update_main_overlay_conditional_visibility
         )
 
         webcam_row = QWidget()
@@ -282,7 +283,7 @@ class StreamTab(QWidget):
         self.overlay_list_side.addItem("Слева", "left")
         self.overlay_list_side.setMinimumWidth(190)
         self.overlay_list_enabled.toggled.connect(
-            self.overlay_list_side.setEnabled
+            self._update_main_overlay_conditional_visibility
         )
 
         list_row = QWidget()
@@ -312,6 +313,7 @@ class StreamTab(QWidget):
         overlay_form.addRow("", glow_heading)
 
         self.frame_color_buttons: dict[str, QPushButton] = {}
+        self.frame_color_row_widgets: dict[str, QWidget] = {}
         frame_color_rows = (
             ("game", "Игровая рамка:"),
             ("webcam", "Рамка веб-камеры:"),
@@ -351,6 +353,7 @@ class StreamTab(QWidget):
             color_row_layout.addWidget(pipette_btn)
             color_row_layout.addStretch()
             self.frame_color_buttons[color_key] = color_btn
+            self.frame_color_row_widgets[color_key] = color_row
             overlay_form.addRow(color_label, color_row)
 
         overlay_help = QLabel(
@@ -380,6 +383,7 @@ class StreamTab(QWidget):
         layout.addWidget(typography_help)
 
         self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
+        self.typography_row_widgets: dict[str, tuple[QLabel, QWidget]] = {}
         typography_layout = QVBoxLayout()
         typography_layout.setSpacing(10)
 
@@ -489,6 +493,7 @@ class StreamTab(QWidget):
         layout.addWidget(timer_heading)
 
         timer_form = QFormLayout()
+        self.timer_overlay_form = timer_form
         timer_form.setVerticalSpacing(10)
         timer_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         timer_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -551,7 +556,8 @@ class StreamTab(QWidget):
         timer_bg_color_layout.addWidget(self.timer_background_color_btn)
         timer_bg_color_layout.addWidget(self.timer_background_color_pick_btn)
         timer_bg_color_layout.addStretch()
-        timer_form.addRow("Цвет фона:", timer_bg_color_row)
+        self.timer_background_color_row = timer_bg_color_row
+        timer_form.addRow("Цвет фона:", self.timer_background_color_row)
         layout.addLayout(timer_form)
 
         timer_actions = QHBoxLayout()
@@ -768,6 +774,7 @@ class StreamTab(QWidget):
         layout.addWidget(auction_lots_heading)
 
         auction_lots_form = QFormLayout()
+        self.auction_lots_overlay_form = auction_lots_form
         auction_lots_form.setVerticalSpacing(10)
         auction_lots_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         auction_lots_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -831,7 +838,8 @@ class StreamTab(QWidget):
         bg_color_layout.addWidget(self.auction_lots_background_color_btn)
         bg_color_layout.addWidget(self.auction_lots_background_color_pick_btn)
         bg_color_layout.addStretch()
-        auction_lots_form.addRow("Цвет фона:", bg_color_row)
+        self.auction_lots_background_color_row = bg_color_row
+        auction_lots_form.addRow("Цвет фона:", self.auction_lots_background_color_row)
 
         media_row = QWidget()
         media_layout = QHBoxLayout(media_row)
@@ -843,7 +851,8 @@ class StreamTab(QWidget):
         self.auction_lots_choose_background_btn.clicked.connect(self._import_auction_lots_background_media)
         media_layout.addWidget(self.auction_lots_background_combo, 1)
         media_layout.addWidget(self.auction_lots_choose_background_btn)
-        auction_lots_form.addRow("Свой фон:", media_row)
+        self.auction_lots_background_media_row = media_row
+        auction_lots_form.addRow("Свой фон:", self.auction_lots_background_media_row)
         layout.addLayout(auction_lots_form)
 
         auction_lots_actions = QHBoxLayout()
@@ -869,6 +878,7 @@ class StreamTab(QWidget):
         layout.addWidget(rules_heading)
 
         rules_form = QFormLayout()
+        self.rules_overlay_form = rules_form
         rules_form.setVerticalSpacing(10)
         rules_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         rules_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -910,7 +920,8 @@ class StreamTab(QWidget):
         rules_color_layout.addWidget(self.rules_background_color_btn)
         rules_color_layout.addWidget(self.rules_background_color_pick_btn)
         rules_color_layout.addStretch()
-        rules_form.addRow("Цвет фона:", rules_color_row)
+        self.rules_background_color_row = rules_color_row
+        rules_form.addRow("Цвет фона:", self.rules_background_color_row)
 
         self.rules_background_opacity = ScrollSafeSpinBox()
         self.rules_background_opacity.setRange(0, 100)
@@ -959,10 +970,23 @@ class StreamTab(QWidget):
         layout.addStretch()
         self.refresh()
 
+    @staticmethod
+    def _set_form_row_visible(
+        form: QFormLayout,
+        field_widget: QWidget,
+        visible: bool,
+    ) -> None:
+        field_widget.setVisible(bool(visible))
+        label = form.labelForField(field_widget)
+        if label is not None:
+            label.setVisible(bool(visible))
+
     def _update_timer_background_enabled_state(self) -> None:
-        enabled = self.timer_background_color_mode.isChecked()
-        self.timer_background_color_btn.setEnabled(enabled)
-        self.timer_background_color_pick_btn.setEnabled(enabled)
+        self._set_form_row_visible(
+            self.timer_overlay_form,
+            self.timer_background_color_row,
+            self.timer_background_color_mode.isChecked(),
+        )
 
     def _choose_timer_font_color(self) -> None:
         current = QColor(str(self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT))
@@ -1012,10 +1036,11 @@ class StreamTab(QWidget):
         visible: bool,
     ) -> None:
         """Show/hide both parts of one Music Player QFormLayout row."""
-        field_widget.setVisible(bool(visible))
-        label = self.music_player_overlay_form.labelForField(field_widget)
-        if label is not None:
-            label.setVisible(bool(visible))
+        self._set_form_row_visible(
+            self.music_player_overlay_form,
+            field_widget,
+            visible,
+        )
 
     def _update_music_player_overlay_enabled_state(self) -> None:
         show_mode = str(self.music_player_show_mode.currentData() or "")
@@ -1129,11 +1154,18 @@ class StreamTab(QWidget):
     def _update_auction_lots_background_enabled_state(self) -> None:
         color_enabled = self.auction_lots_background_color_mode.isChecked()
         media_enabled = self.auction_lots_background_media_mode.isChecked()
-        self.auction_lots_background_color_btn.setEnabled(color_enabled)
-        self.auction_lots_background_color_pick_btn.setEnabled(color_enabled)
-        self.auction_lots_background_combo.setEnabled(media_enabled)
+        self._set_form_row_visible(
+            self.auction_lots_overlay_form,
+            self.auction_lots_background_color_row,
+            color_enabled,
+        )
+        self._set_form_row_visible(
+            self.auction_lots_overlay_form,
+            self.auction_lots_background_media_row,
+            media_enabled,
+        )
         self.auction_lots_choose_background_btn.setEnabled(
-            media_enabled and self._background_copy_worker is None
+            self._background_copy_worker is None
         )
 
     def _choose_auction_lots_font_color(self) -> None:
@@ -1202,9 +1234,16 @@ class StreamTab(QWidget):
 
     def _update_rules_background_enabled_state(self) -> None:
         enabled = self.rules_background_color_mode.isChecked()
-        self.rules_background_color_btn.setEnabled(enabled)
-        self.rules_background_color_pick_btn.setEnabled(enabled)
-        self.rules_background_opacity.setEnabled(enabled)
+        self._set_form_row_visible(
+            self.rules_overlay_form,
+            self.rules_background_color_row,
+            enabled,
+        )
+        self._set_form_row_visible(
+            self.rules_overlay_form,
+            self.rules_background_opacity_control,
+            enabled,
+        )
 
     def _choose_rules_background_color(self) -> None:
         current = QColor(str(self.rules_background_color_btn.property("fontColor") or "#000000"))
@@ -1733,6 +1772,7 @@ class StreamTab(QWidget):
         )
 
         self.typography_controls[key] = (font_combo, size_spin, color_btn)
+        self.typography_row_widgets[key] = (item_label, row)
         parent_layout.addWidget(row)
 
     @staticmethod
@@ -1833,13 +1873,53 @@ class StreamTab(QWidget):
     def _update_info_enabled_state(self):
         enabled = self.info_enabled.isChecked()
         self.info_field.setEnabled(enabled)
-        if hasattr(self, "info_position"):
-            self.info_position.setEnabled(enabled)
         self.info_field.setToolTip(
             ""
             if enabled
             else "Информационный блок отключён. Сохранённый текст не удаляется."
         )
+        self._update_main_overlay_conditional_visibility()
+
+    def _update_main_overlay_conditional_visibility(self, *_args) -> None:
+        if not hasattr(self, "overlay_form"):
+            return
+        webcam_enabled = bool(self.webcam_enabled.isChecked())
+        list_enabled = bool(self.overlay_list_enabled.isChecked())
+        info_enabled = bool(self.info_enabled.isChecked())
+
+        # Keep the enable/disable switch itself visible. Only controls that
+        # have no meaning while that block is disabled disappear.
+        if hasattr(self, "webcam_position"):
+            self.webcam_position.setVisible(webcam_enabled)
+        if hasattr(self, "overlay_list_side"):
+            self.overlay_list_side.setVisible(list_enabled)
+        if hasattr(self, "info_position"):
+            self._set_form_row_visible(
+                self.overlay_form,
+                self.info_position,
+                info_enabled,
+            )
+
+        if hasattr(self, "frame_color_row_widgets"):
+            for key, visible in (
+                ("webcam", webcam_enabled),
+                ("list", list_enabled),
+                ("info", info_enabled),
+            ):
+                row = self.frame_color_row_widgets.get(key)
+                if row is not None:
+                    self._set_form_row_visible(self.overlay_form, row, visible)
+
+        if hasattr(self, "typography_row_widgets"):
+            for key in ("top1", "top2", "top3", "list"):
+                pair = self.typography_row_widgets.get(key)
+                if pair is not None:
+                    pair[0].setVisible(list_enabled)
+                    pair[1].setVisible(list_enabled)
+            pair = self.typography_row_widgets.get("info")
+            if pair is not None:
+                pair[0].setVisible(info_enabled)
+                pair[1].setVisible(info_enabled)
 
     @staticmethod
     def _set_combo_by_data(combo: QComboBox, value: str, fallback: int = 0):
@@ -1899,7 +1979,6 @@ class StreamTab(QWidget):
 
         webcam_enabled = setting("overlay_webcam_enabled", "1") == "1"
         self.webcam_enabled.setChecked(webcam_enabled)
-        self.webcam_position.setEnabled(webcam_enabled)
         self._set_combo_by_data(
             self.webcam_position,
             setting("overlay_webcam_position", "top_right"),
@@ -1907,7 +1986,6 @@ class StreamTab(QWidget):
 
         list_enabled = setting("overlay_list_enabled", "1") == "1"
         self.overlay_list_enabled.setChecked(list_enabled)
-        self.overlay_list_side.setEnabled(list_enabled)
         self._set_combo_by_data(
             self.overlay_list_side,
             setting("overlay_list_side", "auto"),
@@ -1928,6 +2006,7 @@ class StreamTab(QWidget):
             )
         self._update_info_enabled_state()
         self._load_typography_settings(settings)
+        self._update_main_overlay_conditional_visibility()
 
         self.timer_overlay_font.setCurrentFont(QFont(
             setting(TIMER_OVERLAY_FONT_FAMILY_KEY, TIMER_OVERLAY_FONT_FAMILY_DEFAULT)
