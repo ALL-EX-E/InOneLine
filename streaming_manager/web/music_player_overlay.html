@@ -133,8 +133,12 @@ function ensureAudioGraph(){
 function setAudioGain(state){
   ensureAudioGraph();
   if(audioContext && audioContext.state==="suspended") audioContext.resume().catch(()=>{});
-  if(gainNode) gainNode.gain.value=(state.browser_audible && !preview) ? clamp(Number(state.gain)||0,0,1) : 0;
-  else audio.muted=preview || !state.browser_audible;
+  const audible=Boolean(state.browser_audible && !preview);
+  // Mark analysis-only playback as muted at the media-element level too. This
+  // keeps ordinary browser previews eligible for autoplay while the analyser
+  // still receives the synchronized track.
+  audio.muted=!audible;
+  if(gainNode) gainNode.gain.value=audible ? clamp(Number(state.gain)||0,0,1) : 0;
 }
 async function syncAudio(state){
   if(!state || !state.media_id || !state.url){
