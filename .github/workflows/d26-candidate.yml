@@ -545,11 +545,17 @@ jobs:
         run: |
           $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.7.exe").Path
           $install = "$env:RUNNER_TEMP\InOneLineInstalled"
+          Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Candidate install failed: $($p.ExitCode)" }
 
           $exe = "$install\InOneLine.exe"
           if (!(Test-Path $exe)) { throw "Installed InOneLine.exe missing" }
+
+          # This step is a deterministic fresh-start smoke, not an upgrade-data
+          # test. Remove any unexpected database residue before first launch;
+          # upgrade persistence is covered by the dedicated semantic checks.
+          Remove-Item "$install\data\streaming.db" -Force -ErrorAction SilentlyContinue
 
           $proc = Start-Process -FilePath $exe -WorkingDirectory $install -PassThru
           try {
@@ -571,7 +577,7 @@ jobs:
               throw "Frozen Music Player API contract missing"
             }
             if ($music.state.desired_state -ne "pause") {
-              throw "Music Player auto-played after fresh startup"
+              throw "Music Player fresh startup state was '$($music.state.desired_state)', expected 'pause'"
             }
 
             $overlay = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-player-overlay?preview=1" -TimeoutSec 2).Content
