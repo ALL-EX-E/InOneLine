@@ -1201,6 +1201,7 @@ class AuctionAudioMixin:
         self._auction_audio_runtime_error = (
             f"Ошибка воспроизведения — аукцион продолжает работу: {message}"
         )
+        self._release_auction_audio_owner()
         if hasattr(self, "auction_soundtrack_status"):
             self.auction_soundtrack_status.setText(self._auction_audio_runtime_error)
 
@@ -1288,6 +1289,7 @@ class AuctionAudioMixin:
 
     def _wheel_audio_error(self, message) -> None:
         self._wheel_audio_runtime_error = f"Ошибка воспроизведения — колесо продолжает работу: {message}"
+        self._release_auction_audio_owner()
         if hasattr(self, "wheel_soundtrack_status"):
             self.wheel_soundtrack_status.setText(self._wheel_audio_runtime_error)
 
