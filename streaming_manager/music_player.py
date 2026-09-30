@@ -737,15 +737,21 @@ class MusicPlayerController(QObject):
     def _persist_position(self) -> None:
         if self._shutdown:
             return
-        self.db.set_setting(MUSIC_PLAYER_POSITION_MS_KEY, str(self.position_ms))
+        position = (
+            int(self._pending_seek_ms)
+            if self._pending_seek_ms is not None
+            else self.position_ms
+        )
+        self.db.set_setting(MUSIC_PLAYER_POSITION_MS_KEY, str(max(0, position)))
         self._refresh_browser_snapshot()
 
     def _persist_state(self, *, position_override: int | None = None) -> None:
-        persisted_position = (
-            self.position_ms
-            if position_override is None
-            else max(0, int(position_override))
-        )
+        if position_override is not None:
+            persisted_position = max(0, int(position_override))
+        elif self._pending_seek_ms is not None:
+            persisted_position = max(0, int(self._pending_seek_ms))
+        else:
+            persisted_position = self.position_ms
         self.db.set_settings_bulk(
             {
                 MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY: (
