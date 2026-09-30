@@ -431,11 +431,13 @@ class AuctionActionMixin:
             return
 
         self._pending_tie_overtime = False
+        resumed_session = self._current_session()
+        # Pause Music Player before the retained soundtrack becomes audible.
+        self._sync_audio_owner_with_session(resumed_session)
         self._start_auction_soundtrack_for_session(
-            self._current_session(),
+            resumed_session,
             restart=False,
         )
-        self._sync_audio_owner_with_session(self._current_session())
         self.conduct_search.clear()
         self.changed()
         self.auction_tabs.setCurrentWidget(self.conduct_page)
@@ -524,7 +526,7 @@ class AuctionActionMixin:
             QMessageBox.critical(self, "Аукцион", str(exc))
             return
 
-        self._stop_auction_soundtrack(immediate=False)
+        self._stop_auction_soundtrack(immediate=True)
         self._stop_wheel_soundtrack(immediate=True)
         self._release_auction_audio_owner()
         self._active_auction_id = None
