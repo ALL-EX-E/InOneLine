@@ -222,7 +222,6 @@ class MusicPlayerController(QObject):
         ]
 
     def refresh_library(self, *, emit: bool = True) -> None:
-        old_ids = set(self._assets)
         assets = self._available_assets()
         self._assets = {int(asset.id): asset for asset in assets}
         ids = list(self._assets)
@@ -262,7 +261,7 @@ class MusicPlayerController(QObject):
         self._persist_queue()
         if current_changed:
             self._persist_state()
-        if emit and (old_ids != set(self._assets) or True):
+        if emit:
             self.libraryChanged.emit()
             self.stateChanged.emit()
         self._refresh_browser_snapshot()
@@ -383,7 +382,11 @@ class MusicPlayerController(QObject):
         changed = media_id != self._current_media_id
         self._current_media_id = media_id
         self._desired_state = PLAYER_PLAY if play else PLAYER_PAUSE
-        self._pending_new_track_event = bool(play and self._suppressed)
+        # A manually prepared paused track has not started yet. Remember that
+        # its first later Play is a genuine new-track event. If playback was
+        # requested while Auction owns audio, defer the same event until
+        # ownership returns.
+        self._pending_new_track_event = bool((not play) or self._suppressed)
         self._mark_user_change()
         self._load_current(position_ms=0, play=play)
         if play and not self._suppressed:
@@ -486,7 +489,9 @@ class MusicPlayerController(QObject):
         self._current_media_id = int(media_id)
         self._desired_state = desired
         should_play = desired == PLAYER_PLAY
-        self._pending_new_track_event = bool(should_play and self._suppressed)
+        self._pending_new_track_event = bool(
+            (not should_play) or self._suppressed
+        )
         if not automatic:
             self._mark_user_change()
 
