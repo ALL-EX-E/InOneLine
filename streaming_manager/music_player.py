@@ -280,11 +280,25 @@ class MusicPlayerController(QObject):
 
     def _restore_saved_current(self) -> None:
         raw_id = str(self.db.get_setting(MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY, "") or "")
-        media_id = int(raw_id) if raw_id.isdigit() and int(raw_id) in self._assets else None
+        saved_media_id = (
+            int(raw_id)
+            if raw_id.isdigit() and int(raw_id) in self._assets
+            else None
+        )
+        media_id = saved_media_id
         if media_id is None and self._queue:
             media_id = self._queue[0]
         self._current_media_id = media_id
-        position = self._saved_int(MUSIC_PLAYER_POSITION_MS_KEY, 0, 0, 2_147_483_647)
+        position = (
+            self._saved_int(
+                MUSIC_PLAYER_POSITION_MS_KEY,
+                0,
+                0,
+                2_147_483_647,
+            )
+            if saved_media_id is not None
+            else 0
+        )
         # Never auto-play on application launch.
         self._desired_state = PLAYER_PAUSE
         self._pending_new_track_event = False
