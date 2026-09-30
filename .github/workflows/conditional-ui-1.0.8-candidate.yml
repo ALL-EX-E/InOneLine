@@ -231,7 +231,8 @@ jobs:
 
           notes = Path("RELEASE_NOTES_1.0.8.md").read_text(encoding="utf-8")
           assert "Conditional UI Visibility" in notes
-          assert "1.0.7 remains CURRENT" in notes
+          assert "Manual Windows QA" in notes
+          assert "af29d033d5d8cf6bcb774355771121c1bdc7d10f" in notes
 
           print("CONDITIONAL UI STATIC INVARIANTS: PASS")
           '@ | python -
