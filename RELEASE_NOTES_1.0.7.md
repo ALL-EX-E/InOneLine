@@ -1,5 +1,7 @@
 # InOneLine 1.0.7
 
+Функциональный релиз после принятой 1.0.6. D26 candidate вручную проверен и принят перед публикацией.
+
 ## D26 — Музыкальный плеер
 
 - Добавлена отдельная вкладка «Музыка» с независимым музыкальным плеером.
@@ -53,4 +55,85 @@
 - SQLite schema остаётся 19.
 - Количество named migrations остаётся 15.
 - Обновление не требует миграции старых soundtrack-файлов D26.
-- Текущий релиз 1.0.6 не заменяется до ручной проверки и явного принятия candidate 1.0.7.
+- Обновление с 1.0.6 не требует изменения SQLite schema: остаётся schema 19 / 15 named migrations.
+
+## Проверка
+
+Точный принятый candidate commit:
+
+`8f58f8561ecd9832cf575a2bc0fdaf102375f298`
+
+прошёл:
+
+- Python compile и D26 semantic smoke;
+- static D26 invariants;
+- protected RNG source unchanged;
+- PyInstaller build;
+- Inno Setup build;
+- silent install;
+- frozen startup/API smoke;
+- publication wording gate;
+- ручную Windows-проверку пользователем: **PASS**.
+
+Ручная проверка включала:
+
+- managed/external импорт Music Player, дедупликацию и promotion external → managed;
+- восстановление текущего трека, позиции и Pause после перезапуска;
+- Alphabetical / Shuffle / Previous / Next / Repeat current;
+- поиск без изменения очереди;
+- MP3 / WAV / OGG;
+- потерю внешнего файла Music Player;
+- общий managed-каталог `data\soundtrack` и независимый выбор для аукциона/колеса;
+- все четыре варианта коллизии имён soundtrack;
+- потерю внешнего soundtrack;
+- AudioCoordinator для максимальной суммы, ничьей/дополнительного времени, обычного колеса и D21 «Выбывание»;
+- mute/unmute event soundtrack и немедленную передачу ownership;
+- Stop Auction и возврат Music Player с сохранённой позиции;
+- вывод Music Player через приложение и через OBS Browser Source;
+- громкость/mute Music Player в OBS-маршруте без сброса позиции;
+- Preview/WebAudio unlock и реальный Spectrum;
+- режимы «Не показывать / При смене трека / Показывать постоянно»;
+- проявление и выезд во всех направлениях;
+- немедленное применение смены режима/анимации FIX11;
+- прозрачный/цветной фон, ручные и автоматические цвета;
+- обложки cover + center, fallback-значок ноты и marquee длинного текста;
+- адаптивность плашки при разных размерах Browser Source;
+- полную резервную копию/восстановление `data\music`, `data\soundtrack` и D26-настроек;
+- быстрые кнопки URL/preview на вкладке «Музыка».
+
+Финальный Windows gate: `36715896504`.
+
+Publication wording gate: `36715896462`.
+
+Accepted artifact: `11097065150`.
+
+После ручной приёмки installer и SOURCE не пересобирались. Финальный release-коммит изменяет только release-документацию и publication workflow; официальные бинарные артефакты остаются точными байтами принятого candidate.
+
+## Официальные артефакты
+
+### Installer
+
+`InOneLine_Setup_1.0.7.exe`
+
+- Размер: `47618359` байт
+- SHA-256: `f89e0e713ca53354cda603c1e4748c064c96570edfeef5aa28fbfe1548106dc1`
+- FileVersion: `1.0.7.0`
+
+### Exact accepted source snapshot
+
+`InOneLine_Source_1.0.7.zip`
+
+- Размер: `13802881` байт
+- Файлов: `182`
+- SHA-256: `33e11f6590089d479eb9e9a64bde49dfef2858d4caefeab858a000a3e22ee20b`
+- ZIP CRC: PASS
+
+SOURCE — это exact source ZIP из принятого Windows artifact run `36715896504`. При публикации файл только переименовывается из `InOneLine_CANDIDATE_1.0.7_D26_SOURCE.zip` в `InOneLine_Source_1.0.7.zip`; его байты не меняются.
+
+## Разработка с использованием ИИ
+
+InOneLine разрабатывался автором при помощи **ChatGPT от OpenAI** для проектирования, написания и проверки кода, отладки, тестов и документации. Окончательные решения, сборка, ручная проверка и приёмка релиза выполнялись автором проекта.
+
+## Лицензия
+
+Полные условия находятся в файле [LICENSE](./LICENSE).
