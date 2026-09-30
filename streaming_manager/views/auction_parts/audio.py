@@ -999,6 +999,7 @@ class AuctionAudioMixin:
             return MEDIA_STORAGE_EXTERNAL
         return None
 
+    @staticmethod
     def _copy_auction_soundtrack(source: Path, target: Path) -> Path:
         try:
             shutil.copy2(source, target)
