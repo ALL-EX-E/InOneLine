@@ -12,7 +12,7 @@
 
 ## QA
 
-- [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
+- [qa/1.0.8-conditional-ui.md](./qa/1.0.8-conditional-ui.md) — полный ручной gate 1.0.8 / Global Conditional UI Visibility.\n- [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
 
 ## История
 
