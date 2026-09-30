@@ -415,10 +415,7 @@ class SettingsTab(QWidget):
             AUCTION_AUTO_EXTEND_LEADER_MS_DEFAULT,
         )
         self.auto_extend_leader_enabled.toggled.connect(
-            self.auto_extend_leader_duration.setEnabled
-        )
-        self.auto_extend_leader_duration.setEnabled(
-            self.auto_extend_leader_enabled.isChecked()
+            self._update_auto_extend_conditional_visibility
         )
         auto_grid.addWidget(self.auto_extend_leader_enabled, 1, 0)
         auto_grid.addWidget(self.auto_extend_leader_duration, 1, 1)
@@ -435,10 +432,7 @@ class SettingsTab(QWidget):
             AUCTION_AUTO_EXTEND_NEW_LOT_MS_DEFAULT,
         )
         self.auto_extend_new_lot_enabled.toggled.connect(
-            self.auto_extend_new_lot_duration.setEnabled
-        )
-        self.auto_extend_new_lot_duration.setEnabled(
-            self.auto_extend_new_lot_enabled.isChecked()
+            self._update_auto_extend_conditional_visibility
         )
         auto_grid.addWidget(self.auto_extend_new_lot_enabled, 2, 0)
         auto_grid.addWidget(self.auto_extend_new_lot_duration, 2, 1)
@@ -471,16 +465,7 @@ class SettingsTab(QWidget):
             "margin-left: 20px;"
         )
         self.auto_extend_external_enabled.toggled.connect(
-            self.auto_extend_external_duration.setEnabled
-        )
-        self.auto_extend_external_enabled.toggled.connect(
-            self.auto_extend_external_service_units_enabled.setEnabled
-        )
-        self.auto_extend_external_duration.setEnabled(
-            self.auto_extend_external_enabled.isChecked()
-        )
-        self.auto_extend_external_service_units_enabled.setEnabled(
-            self.auto_extend_external_enabled.isChecked()
+            self._update_auto_extend_conditional_visibility
         )
         auto_grid.addWidget(self.auto_extend_external_enabled, 3, 0)
         auto_grid.addWidget(self.auto_extend_external_duration, 3, 1)
@@ -502,16 +487,14 @@ class SettingsTab(QWidget):
             AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT,
         )
         self.auto_extend_threshold_enabled.toggled.connect(
-            self.auto_extend_threshold_duration.setEnabled
-        )
-        self.auto_extend_threshold_duration.setEnabled(
-            self.auto_extend_threshold_enabled.isChecked()
+            self._update_auto_extend_conditional_visibility
         )
         threshold_row = QHBoxLayout()
         threshold_row.addWidget(self.auto_extend_threshold_enabled)
         threshold_row.addWidget(self.auto_extend_threshold_duration)
         threshold_row.addStretch()
         auction_layout.addLayout(threshold_row)
+        self._update_auto_extend_conditional_visibility()
 
         auto_extend_range = QLabel(
             "Формат времени: ЧЧ:ММ:СС.мс. Значения продления и порога — от "
@@ -884,6 +867,26 @@ class SettingsTab(QWidget):
             "Экспорт",
             "Список скопирован в буфер обмена.",
         )
+
+    def _update_auto_extend_conditional_visibility(self, *_args) -> None:
+        if hasattr(self, "auto_extend_leader_duration"):
+            self.auto_extend_leader_duration.setVisible(
+                self.auto_extend_leader_enabled.isChecked()
+            )
+        if hasattr(self, "auto_extend_new_lot_duration"):
+            self.auto_extend_new_lot_duration.setVisible(
+                self.auto_extend_new_lot_enabled.isChecked()
+            )
+        if hasattr(self, "auto_extend_external_duration"):
+            external_enabled = self.auto_extend_external_enabled.isChecked()
+            self.auto_extend_external_duration.setVisible(external_enabled)
+            self.auto_extend_external_service_units_enabled.setVisible(
+                external_enabled
+            )
+        if hasattr(self, "auto_extend_threshold_duration"):
+            self.auto_extend_threshold_duration.setVisible(
+                self.auto_extend_threshold_enabled.isChecked()
+            )
 
     def _make_auto_extend_duration_editor(self, key: str, default: int) -> QLineEdit:
         editor = QLineEdit()
