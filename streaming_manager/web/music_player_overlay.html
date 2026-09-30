@@ -172,16 +172,17 @@ function setManualColors(a){
 function contrastColors(a,bgRgb=null){
   const text=hexRgb(a.text_color||"#FFFFFF");
   const spec=hexRgb(a.spectrum_color||"#FFFFFF");
-  let textOutline, specOutline;
-  if(a.background==="transparent" || !bgRgb){
-    textOutline=luminance(text)>145?"#000000":"#FFFFFF";
-    specOutline=luminance(spec)>145?"#000000":"#FFFFFF";
-  } else {
-    textOutline=luminance(bgRgb)>145?"#000000":"#FFFFFF";
-    specOutline=luminance(bgRgb)>145?"#000000":"#FFFFFF";
-  }
-  document.documentElement.style.setProperty("--outline",textOutline);
-  document.documentElement.style.setProperty("--spectrum-outline",specOutline);
+  const unknown=a.background==="transparent" || !bgRgb;
+  const outlineFor=(base)=>{
+    const lightBase=luminance(base)>145;
+    const target=unknown ? (lightBase?[0,0,0]:[255,255,255])
+                         : (luminance(bgRgb)>145?[0,0,0]:[255,255,255]);
+    const difference=unknown ? 0 : Math.abs(luminance(base)-luminance(bgRgb));
+    const alpha=unknown ? .95 : (difference>=115 ? .32 : difference>=75 ? .58 : .95);
+    return `rgba(${target[0]},${target[1]},${target[2]},${alpha})`;
+  };
+  document.documentElement.style.setProperty("--outline",outlineFor(text));
+  document.documentElement.style.setProperty("--spectrum-outline",outlineFor(spec));
 }
 function applyAppearance(a){
   appearance=a||{};
