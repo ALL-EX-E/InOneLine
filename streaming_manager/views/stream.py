@@ -584,6 +584,7 @@ class StreamTab(QWidget):
         music_form.setVerticalSpacing(10)
         music_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         music_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.music_player_overlay_form = music_form
 
         self.music_player_overlay_font = ScrollSafeFontComboBox()
         self.music_player_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -663,7 +664,8 @@ class StreamTab(QWidget):
         self.music_player_background_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.music_player_background_color_btn)
         )
-        music_form.addRow("Цвет фона:", row)
+        self.music_player_background_color_row = row
+        music_form.addRow("Цвет фона:", self.music_player_background_color_row)
 
         row, self.music_player_frame_color_btn, self.music_player_frame_color_pick_btn = music_color_row(
             "music_player_frame_color_btn",
@@ -680,7 +682,8 @@ class StreamTab(QWidget):
         self.music_player_frame_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.music_player_frame_color_btn)
         )
-        music_form.addRow("Цвет рамки:", row)
+        self.music_player_frame_color_row = row
+        music_form.addRow("Цвет рамки:", self.music_player_frame_color_row)
 
         row, self.music_player_spectrum_color_btn, self.music_player_spectrum_color_pick_btn = music_color_row(
             "music_player_spectrum_color_btn",
@@ -697,9 +700,13 @@ class StreamTab(QWidget):
         self.music_player_spectrum_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.music_player_spectrum_color_btn)
         )
-        music_form.addRow("Цвет спектра:", row)
+        self.music_player_spectrum_color_row = row
+        music_form.addRow("Цвет спектра:", self.music_player_spectrum_color_row)
 
         self.music_player_auto_colors = QCheckBox("Подбирать цвета по обложке")
+        self.music_player_auto_colors.toggled.connect(
+            self._update_music_player_overlay_enabled_state
+        )
         music_form.addRow("", self.music_player_auto_colors)
 
         self.music_player_show_mode = ScrollSafeComboBox()
@@ -999,17 +1006,48 @@ class StreamTab(QWidget):
         if selected.isValid():
             self._set_color_button(button, selected.name())
 
+    def _set_music_player_form_row_visible(
+        self,
+        field_widget: QWidget,
+        visible: bool,
+    ) -> None:
+        """Show/hide both parts of one Music Player QFormLayout row."""
+        field_widget.setVisible(bool(visible))
+        label = self.music_player_overlay_form.labelForField(field_widget)
+        if label is not None:
+            label.setVisible(bool(visible))
+
     def _update_music_player_overlay_enabled_state(self) -> None:
-        color_enabled = self.music_player_background_color_mode.isChecked()
-        self.music_player_background_color_btn.setEnabled(color_enabled)
-        self.music_player_background_color_pick_btn.setEnabled(color_enabled)
-        self.music_player_duration_seconds_control.setEnabled(
-            str(self.music_player_show_mode.currentData() or "")
-            == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE
+        show_mode = str(self.music_player_show_mode.currentData() or "")
+        animation = str(self.music_player_animation.currentData() or "")
+        auto_colors = self.music_player_auto_colors.isChecked()
+        background_is_color = self.music_player_background_color_mode.isChecked()
+
+        # Manual colors that are actually overridden by artwork automation are
+        # hidden, not merely disabled. Text and Spectrum stay visible because
+        # D26 deliberately keeps those two colors user-controlled.
+        self._set_music_player_form_row_visible(
+            self.music_player_background_color_row,
+            background_is_color and not auto_colors,
         )
-        self.music_player_direction.setEnabled(
-            str(self.music_player_animation.currentData() or "")
-            == MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE
+        self._set_music_player_form_row_visible(
+            self.music_player_frame_color_row,
+            not auto_colors,
+        )
+
+        visual_is_enabled = show_mode != MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN
+        self._set_music_player_form_row_visible(
+            self.music_player_duration_seconds_control,
+            show_mode == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE,
+        )
+        self._set_music_player_form_row_visible(
+            self.music_player_animation,
+            visual_is_enabled,
+        )
+        self._set_music_player_form_row_visible(
+            self.music_player_direction,
+            visual_is_enabled
+            and animation == MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE,
         )
 
     def _save_music_player_overlay_settings(self) -> None:
