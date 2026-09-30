@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .constants import APP_VERSION
 from .database import Database
+from .music_player import music_player_overlay_appearance
 from .media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     is_supported_media_name,
@@ -82,6 +83,8 @@ class LocalApiServer:
         # stores only the provider reference, never a second copy of mode or
         # auto-scroll values.
         self._auction_lots_state_provider = None
+        self._music_player_state_provider = None
+        self._music_player_cover_provider = None
 
     @property
     def running(self) -> bool:
@@ -105,6 +108,31 @@ class LocalApiServer:
             return {}
         return dict(state) if isinstance(state, dict) else {}
 
+    def set_music_player_state_provider(self, provider) -> None:
+        self._music_player_state_provider = provider
+
+    def set_music_player_cover_provider(self, provider) -> None:
+        self._music_player_cover_provider = provider
+
+    def music_player_state(self) -> dict[str, object]:
+        provider = self._music_player_state_provider
+        if provider is None:
+            return {}
+        try:
+            state = provider()
+        except Exception:
+            return {}
+        return dict(state) if isinstance(state, dict) else {}
+
+    def music_player_cover(self, media_id: int):
+        provider = self._music_player_cover_provider
+        if provider is None:
+            return None
+        try:
+            return provider(int(media_id))
+        except Exception:
+            return None
+
     def start(self) -> None:
         if self.running:
             return
@@ -115,6 +143,12 @@ class LocalApiServer:
         wheel_overlay_path = Path(__file__).resolve().parent / "web" / "wheel_overlay.html"
         rules_overlay_path = Path(__file__).resolve().parent / "web" / "rules_overlay.html"
         timer_overlay_path = Path(__file__).resolve().parent / "web" / "timer_overlay.html"
+        music_player_overlay_path = (
+            Path(__file__).resolve().parent / "web" / "music_player_overlay.html"
+        )
+        music_placeholder_path = (
+            Path(__file__).resolve().parent / "web" / "music_placeholder_vinyl.png"
+        )
         auction_lots_overlay_path = (
             Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"
         )
@@ -134,6 +168,9 @@ class LocalApiServer:
         )
         timer_overlay_html = _inject_overlay_version_handshake(
             timer_overlay_path.read_text(encoding="utf-8"), APP_VERSION
+        )
+        music_player_overlay_html = _inject_overlay_version_handshake(
+            music_player_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
         auction_lots_overlay_html = _inject_overlay_version_handshake(
             auction_lots_overlay_path.read_text(encoding="utf-8"), APP_VERSION
@@ -323,8 +360,55 @@ class LocalApiServer:
                     head_only=head_only,
                 )
 
+            def _send_music_cover(
+                self,
+                asset_id_text: str,
+                head_only: bool = False,
+            ) -> None:
+                if not asset_id_text.isdigit():
+                    self._send_json({"error": "invalid_media_id"}, 400)
+                    return
+                cover = api_server.music_player_cover(int(asset_id_text))
+                if not cover or not isinstance(cover, tuple) or len(cover) != 2:
+                    self._send_json({"error": "cover_not_found"}, 404)
+                    return
+                mime, payload = cover
+                body = bytes(payload)
+                self.send_response(200)
+                self.send_header("Content-Type", str(mime or "image/jpeg"))
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                if not head_only:
+                    self.wfile.write(body)
+
+            def _send_music_placeholder(self, head_only: bool = False) -> None:
+                try:
+                    body = music_placeholder_path.read_bytes()
+                except OSError:
+                    self._send_json({"error": "placeholder_unavailable"}, 404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                if not head_only:
+                    self.wfile.write(body)
+
             def do_HEAD(self):
                 parsed = urlparse(self.path)
+                cover_prefix = "/music-cover/"
+                if parsed.path.startswith(cover_prefix):
+                    self._send_music_cover(
+                        parsed.path[len(cover_prefix):],
+                        head_only=True,
+                    )
+                    return
+                if parsed.path.rstrip("/") == "/music-placeholder":
+                    self._send_music_placeholder(head_only=True)
+                    return
                 media_prefix = "/media/"
                 if parsed.path.startswith(media_prefix):
                     self._send_registered_media(
@@ -433,6 +517,30 @@ class LocalApiServer:
                         )
                     return
 
+                if path in (
+                    "/music-player-overlay",
+                    "/obs-music-player",
+                    "/overlay/music-player",
+                ):
+                    try:
+                        self._send_html(music_player_overlay_html)
+                    except OSError as exc:
+                        self._send_html(
+                            "<h1>Music Player overlay unavailable</h1><pre>"
+                            + str(exc)
+                            + "</pre>",
+                            status=500,
+                        )
+                    return
+
+                cover_prefix = "/music-cover/"
+                if parsed.path.startswith(cover_prefix):
+                    self._send_music_cover(parsed.path[len(cover_prefix):])
+                    return
+                if path == "/music-placeholder":
+                    self._send_music_placeholder()
+                    return
+
                 media_prefix = "/media/"
                 if parsed.path.startswith(media_prefix):
                     self._send_registered_media(parsed.path[len(media_prefix):])
@@ -501,6 +609,16 @@ class LocalApiServer:
                         db.current_timer_payload(
                             api_server.auction_lots_state()
                         ),
+                        pretty=pretty,
+                    )
+                    return
+
+                if path in ("/api/music-player", "/music-player"):
+                    self._send_json(
+                        {
+                            "state": api_server.music_player_state(),
+                            "appearance": music_player_overlay_appearance(db),
+                        },
                         pretty=pretty,
                     )
                     return
