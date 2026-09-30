@@ -176,10 +176,38 @@ class MediaMixin:
         return self._media_asset_from_row(row)
 
     def sync_managed_media_category(self, category: str) -> list[MediaAsset]:
+        """Mirror one managed category to the files physically present on disk.
+
+        D26 makes the managed directory the source of truth: supported files
+        copied in manually appear on refresh, while missing managed files no
+        longer survive as dead library rows. External references remain
+        registered but callers decide whether an unavailable path should be
+        exposed in their UI.
+        """
         directory = managed_media_directory(self.path.parent, category)
         directory.mkdir(parents=True, exist_ok=True)
         allowed = supported_media_extensions(category)
+        present: dict[str, Path] = {}
         for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
             if path.is_file() and path.suffix.lower() in allowed:
+                present[path.name.casefold()] = path
                 self.ensure_managed_media_asset(category, path.name, path.name)
+
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT id, managed_name FROM media_assets "
+                "WHERE category=? AND storage_mode=?",
+                (str(category), MEDIA_STORAGE_MANAGED),
+            ).fetchall()
+            stale_ids = [
+                int(row["id"])
+                for row in rows
+                if str(row["managed_name"] or "").casefold() not in present
+            ]
+            if stale_ids:
+                placeholders = ",".join("?" for _ in stale_ids)
+                conn.execute(
+                    f"DELETE FROM media_assets WHERE id IN ({placeholders})",
+                    tuple(stale_ids),
+                )
         return self.list_media_assets(category)
