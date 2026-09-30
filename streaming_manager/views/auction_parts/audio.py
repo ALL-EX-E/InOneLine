@@ -48,8 +48,8 @@ from ..common import ScrollSafeComboBox, ScrollSafeSpinBox, make_wide_step_contr
 
 
 class AuctionAudioMixin:
-    WHEEL_SOUNDTRACK_FADE_MS = 600
-    AUCTION_SOUNDTRACK_FADE_MS = 600
+    WHEEL_SOUNDTRACK_FADE_MS = 0
+    AUCTION_SOUNDTRACK_FADE_MS = 0
 
     def _init_wheel_audio(self) -> None:
         # W3 remains unchanged and owns the wheel-spin jingle. Timer/Auction
@@ -497,10 +497,26 @@ class AuctionAudioMixin:
         self.db.set_setting(WHEEL_SOUNDTRACK_VOLUME_KEY, str(normalized))
 
     def _wheel_soundtrack_mute_changed(self, muted: bool) -> None:
+        session = self._current_session()
+        spin_running = bool(
+            session
+            and str(session.get("status") or "") == "winner_selected"
+            and session.get("wheel_spin_id")
+            and not self._wheel_spin_complete(session)
+        )
+        # When making the soundtrack audible, pause Music Player first so
+        # there is never a short overlap. When muting, silence soundtrack
+        # first and then restore Music Player.
+        if (
+            not muted
+            and spin_running
+            and self._configured_soundtrack_asset(WHEEL_SOUNDTRACK_MEDIA_ID_KEY)
+            is not None
+        ):
+            self._acquire_auction_audio_owner()
         normalized = self.wheel_audio.set_muted(muted)
         self.db.set_setting(WHEEL_SOUNDTRACK_MUTE_KEY, "1" if normalized else "0")
-        session = self._current_session()
-        self._sync_audio_owner_with_session(session)
+        self._sync_audio_owner_with_session(session, spin_running=spin_running)
         self._refresh_browser_audio_snapshot()
 
     def _choose_wheel_soundtrack_storage_mode(self, source: Path) -> str | None:
@@ -914,23 +930,24 @@ class AuctionAudioMixin:
             str(asset.id) if asset is not None else "",
         )
         session = self._current_session()
-        if (
-            session is not None
-            and str(session.get("mode") or "") == "max_amount"
-            and str(session.get("status") or "") in (
-                "running",
-                "paused",
-                "tie_break_required",
-            )
-        ):
-            if asset is None:
+        if session is not None and str(session.get("mode") or "") == "max_amount":
+            status = str(session.get("status") or "")
+            if status == "tie_break_required":
+                # Changing the selected soundtrack during tie configuration
+                # intentionally discards the retained old-track position.
                 self._stop_auction_soundtrack(immediate=True)
-            else:
-                self._start_auction_soundtrack_for_session(
-                    session,
-                    restart=True,
-                )
-            self._sync_audio_owner_with_session(session)
+                self._release_auction_audio_owner()
+            elif status in ("running", "paused"):
+                if asset is None:
+                    self._stop_auction_soundtrack(immediate=True)
+                else:
+                    if not self.auction_audio.muted:
+                        self._acquire_auction_audio_owner()
+                    self._start_auction_soundtrack_for_session(
+                        session,
+                        restart=True,
+                    )
+                self._sync_audio_owner_with_session(session)
         self._refresh_auction_soundtrack_availability()
 
     def _auction_soundtrack_loop_one_changed(self, enabled: bool) -> None:
@@ -941,9 +958,22 @@ class AuctionAudioMixin:
         self.db.set_setting(AUCTION_SOUNDTRACK_VOLUME_KEY, str(normalized))
 
     def _auction_soundtrack_mute_changed(self, muted: bool) -> None:
+        session = self._current_session()
+        audible_phase = bool(
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in ("running", "paused")
+        )
+        if (
+            not muted
+            and audible_phase
+            and self._configured_soundtrack_asset(AUCTION_SOUNDTRACK_MEDIA_ID_KEY)
+            is not None
+        ):
+            self._acquire_auction_audio_owner()
         normalized = self.auction_audio.set_muted(muted)
         self.db.set_setting(AUCTION_SOUNDTRACK_MUTE_KEY, "1" if normalized else "0")
-        self._sync_audio_owner_with_session(self._current_session())
+        self._sync_audio_owner_with_session(session)
         self._refresh_browser_audio_snapshot()
 
     def _choose_auction_soundtrack_storage_mode(self, source: Path) -> str | None:
@@ -1189,7 +1219,9 @@ class AuctionAudioMixin:
             self._refresh_browser_audio_snapshot()
             self._refresh_auction_soundtrack_availability()
         else:
-            self._stop_auction_soundtrack(immediate=False)
+            # D26 restores Music Player immediately at the phase boundary, so
+            # the auction soundtrack must already be inaudible before release.
+            self._stop_auction_soundtrack(immediate=True)
         self._release_auction_audio_owner()
 
     def _stop_auction_soundtrack(self, *, immediate: bool = False) -> None:
@@ -1269,6 +1301,8 @@ class AuctionAudioMixin:
             source = resolve_media_asset_path(self.db.path.parent, asset)
             self._wheel_audio_runtime_error = ""
             self._wheel_audio_asset_id = int(asset.id)
+            if not self.wheel_audio.muted:
+                self._acquire_auction_audio_owner()
             self.wheel_audio.schedule_loop(
                 source,
                 started_at=str(started_at),
