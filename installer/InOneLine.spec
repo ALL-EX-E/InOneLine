@@ -15,6 +15,11 @@ hiddenimports = [
     "PySide6.QtMultimedia",
     "websocket",
     "mutagen",
+    "mutagen.id3",
+    "mutagen.mp3",
+    "mutagen.wave",
+    "mutagen.oggvorbis",
+    "mutagen.flac",
 ]
 
 a = Analysis(
