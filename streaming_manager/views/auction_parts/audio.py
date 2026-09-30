@@ -361,6 +361,18 @@ class AuctionAudioMixin:
         self._refresh_wheel_soundtrack_library()
         return panel
 
+    def _refresh_shared_soundtrack_catalogs(
+        self,
+        *,
+        wheel_selected=None,
+        auction_selected=None,
+    ) -> None:
+        """Refresh both selectors backed by the single D26 soundtrack folder."""
+        if hasattr(self, "wheel_soundtrack_combo"):
+            self._refresh_wheel_soundtrack_library(wheel_selected)
+        if hasattr(self, "auction_soundtrack_combo"):
+            self._refresh_auction_soundtrack_library(auction_selected)
+
     def _saved_wheel_soundtrack_volume(self) -> int:
         raw = self.db.get_setting(
             WHEEL_SOUNDTRACK_VOLUME_KEY,
@@ -624,7 +636,7 @@ class AuctionAudioMixin:
             target.name,
         )
         self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-        self._refresh_wheel_soundtrack_library(asset.id)
+        self._refresh_shared_soundtrack_catalogs(wheel_selected=asset.id)
 
     def _wheel_soundtrack_copy_failed(self, exc) -> None:
         QMessageBox.critical(
@@ -1047,7 +1059,7 @@ class AuctionAudioMixin:
             target.name,
         )
         self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-        self._refresh_auction_soundtrack_library(asset.id)
+        self._refresh_shared_soundtrack_catalogs(auction_selected=asset.id)
 
     def _auction_soundtrack_copy_failed(self, exc) -> None:
         QMessageBox.critical(
