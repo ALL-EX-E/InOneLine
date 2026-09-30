@@ -595,7 +595,7 @@ jobs:
                   assert 'left:1.2vw' in overlay
                   assert 'border-radius:1.1vw' in overlay
                   assert 'id="musicFallback"' in overlay
-                  assert 'const demo=preview ||' in overlay
+                  assert 'const demo=preview && !currentState.playing' in overlay
                   assert 'padding:.08em .30em .10em' in overlay
                   assert '-webkit-text-stroke:.034em' in overlay
                   assert 'await syncAudio(currentState)' in overlay
@@ -732,7 +732,7 @@ jobs:
           assert "width:97.6vw; height:21.96vw" in overlay
           assert "border-radius:1.1vw" in overlay
           assert 'id="musicFallback"' in overlay
-          assert "const demo=preview ||" in overlay
+          assert "const demo=preview && !currentState.playing" in overlay
           assert "-webkit-text-stroke:.034em" in overlay
           assert "await syncAudio(currentState)" in overlay
           assert "if(!audible && gainNode) audio.muted=false" in overlay
