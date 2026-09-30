@@ -77,10 +77,18 @@ def _safe_archive_name(name: str) -> PurePosixPath:
     return path
 
 
-def _is_allowed_full_backup_member(name: str) -> bool:
+def _is_allowed_full_backup_member(
+    name: str,
+    managed_directories: tuple[str, ...] | list[str] | None = None,
+) -> bool:
     if name == _FULL_BACKUP_DATABASE:
         return True
-    return any(name.startswith(f"data/{directory}/") for directory in FULL_BACKUP_MANAGED_DIRS)
+    directories = (
+        tuple(FULL_BACKUP_MANAGED_DIRS)
+        if managed_directories is None
+        else tuple(str(value) for value in managed_directories)
+    )
+    return any(name.startswith(f"data/{directory}/") for directory in directories)
 
 
 def _path_is_inside(path: Path, root: Path) -> bool:
@@ -164,7 +172,7 @@ def _full_backup_manifest_and_infos(
             raise RestoreValidationError("Некорректная запись файла в manifest.json.")
         name = str(item.get("path", ""))
         _safe_archive_name(name)
-        if not _is_allowed_full_backup_member(name):
+        if not _is_allowed_full_backup_member(name, managed_directories):
             raise RestoreValidationError(f"Недопустимый файл в полной резервной копии: {name}")
         if name in manifest_files:
             raise RestoreValidationError(f"Дублирующийся файл в manifest.json: {name}")
