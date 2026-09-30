@@ -68,8 +68,11 @@ class AudioCoordinator(QObject):
         self._set_owner(next_owner)
         snapshot = self._suspended_music_player_state
         self._suspended_music_player_state = None
-        if self._music_player_restore is not None and snapshot is not None:
+        if self._music_player_restore is not None:
             try:
+                # Even a failed snapshot must release the controller's
+                # suppression flag; the restore callback treats None as
+                # "keep the latest local intent".
                 self._music_player_restore(snapshot)
             except Exception:
                 pass
