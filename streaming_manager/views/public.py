@@ -223,6 +223,7 @@ class PublicTab(QWidget):
         )
         self.public_xlsx_create_btn.setEnabled(not busy)
         self.public_xlsx_connect_btn.setEnabled(not busy)
+        self.public_xlsx_disconnect_btn.setVisible(connected)
         self.public_xlsx_disconnect_btn.setEnabled(connected and not busy)
         if not connected:
             self.public_xlsx_modified_label.setText("—")
