@@ -350,8 +350,8 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verification_notice.setText(
             "Для результатов колеса версии 0.3.41+ здесь хранится immutable snapshot."
         )
-        self.verify_result_btn.setEnabled(False)
-        self.verification_details_btn.setEnabled(False)
+        self.verify_result_btn.setVisible(False)
+        self.verification_details_btn.setVisible(False)
         self.verification_random_org_btn.setVisible(False)
 
     def _load_verification_details(self, auction_id: int):
@@ -380,8 +380,8 @@ class CompletedAuctionHistoryTab(QWidget):
             for label in self.verification_labels.values():
                 label.setText("—")
             self.verification_labels["result"].setText("Невозможно проверить")
-            self.verify_result_btn.setEnabled(False)
-            self.verification_details_btn.setEnabled(False)
+            self.verify_result_btn.setVisible(False)
+            self.verification_details_btn.setVisible(False)
             self.verification_random_org_btn.setVisible(False)
             return
 
@@ -456,8 +456,8 @@ class CompletedAuctionHistoryTab(QWidget):
             )
         else:
             self.verification_labels["random_org"].setText("—")
-        self.verify_result_btn.setEnabled(True)
-        self.verification_details_btn.setEnabled(True)
+        self.verify_result_btn.setVisible(True)
+        self.verification_details_btn.setVisible(True)
         self.verification_random_org_btn.setVisible(
             rng_method == "random_org_plus"
             and bool(snapshot.get("rng_random_json"))
