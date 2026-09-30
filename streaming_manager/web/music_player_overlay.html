@@ -173,7 +173,7 @@ let frequencyData = null;
 let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
 let hideTimer = 0, currentVisible = false, lastCoverUrl = "";
 let autoPalette = null, autoPaletteUrl = "";
-let pollBusy = false;
+let pollBusy = false, audioSyncBusy = false, unlockBusy = false, unlockHintTimer = 0;
 
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 function hexRgb(hex){
@@ -185,6 +185,7 @@ function luminance(rgb){ return .299*rgb[0]+.587*rgb[1]+.114*rgb[2]; }
 function mix(rgb, target, amount){ return rgb.map((v,i)=>v+(target[i]-v)*amount); }
 
 function setSpectrumUnlockRequired(required){
+  clearTimeout(unlockHintTimer);
   const playing=Boolean(currentState && currentState.playing);
   const show=Boolean(preview ? (!playing || required) : (playing && required));
   spectrumUnlock.textContent=preview
@@ -192,6 +193,31 @@ function setSpectrumUnlockRequired(required){
     : "Включите музыку в плеере и нажмите на окно, чтобы увидеть анимацию.";
   spectrumUnlock.classList.toggle("visible",show);
   spectrumUnlock.setAttribute("aria-hidden",show?"false":"true");
+}
+
+function withTimeout(promise, milliseconds){
+  let timer=0;
+  const timeout=new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(new Error("media-timeout")),milliseconds);
+  });
+  return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+}
+
+function scheduleSpectrumUnlockCheck(){
+  clearTimeout(unlockHintTimer);
+  const playing=Boolean(currentState && currentState.playing);
+  if(!playing){
+    setSpectrumUnlockRequired(false);
+    return;
+  }
+  if(analysisTransportReady(!audio.paused && !audio.ended)){
+    setSpectrumUnlockRequired(false);
+    return;
+  }
+  unlockHintTimer=setTimeout(()=>{
+    const playOk=!audio.paused && !audio.ended;
+    setSpectrumUnlockRequired(!analysisTransportReady(playOk));
+  },450);
 }
 
 function analysisTransportReady(playOk){
@@ -260,9 +286,9 @@ async function syncAudio(state){
     let playOk=false;
     try {
       if(audioContext && audioContext.state==="suspended"){
-        try { await audioContext.resume(); } catch(_e){}
+        try { await withTimeout(audioContext.resume(),700); } catch(_e){}
       }
-      await audio.play();
+      await withTimeout(audio.play(),1000);
       playOk=true;
       // A muted start is permitted by normal browsers. Once playback is live,
       // analysis-only playback is unmuted at the media element but still
@@ -280,10 +306,12 @@ async function syncAudio(state){
 }
 
 async function unlockSpectrum(){
+  if(unlockBusy) return;
   if(!currentState || !currentState.playing){
     setSpectrumUnlockRequired(false);
     return;
   }
+  unlockBusy=true;
   try {
     ensureAudioGraph();
     if(!audioContext || !analyser || !frequencyData){
@@ -291,15 +319,28 @@ async function unlockSpectrum(){
       return;
     }
     if(audioContext.state!=="running"){
-      await audioContext.resume();
+      await withTimeout(audioContext.resume(),1500);
     }
     const audible=setAudioGain(currentState);
-    await audio.play();
+    await withTimeout(audio.play(),1500);
     if(!audible && gainNode) audio.muted=false;
     setSpectrumUnlockRequired(!analysisTransportReady(true));
   } catch(_e){
     setSpectrumUnlockRequired(true);
+  } finally {
+    unlockBusy=false;
   }
+}
+
+function startAudioSync(state){
+  if(audioSyncBusy) return;
+  audioSyncBusy=true;
+  syncAudio(state)
+    .catch(()=>setSpectrumUnlockRequired(true))
+    .finally(()=>{
+      audioSyncBusy=false;
+      scheduleSpectrumUnlockCheck();
+    });
 }
 
 function setManualColors(a){
@@ -559,15 +600,28 @@ async function poll(){
       : (currentState.display_title||currentState.filename||"Исполнитель - Название трека");
     const mediaChanged=String(currentState.media_id??"")!==String(lastMediaId??"");
     updateTitle(displayText,mediaChanged);
-    await syncAudio(currentState);
+
+    // Rendering/visibility must never wait for browser autoplay/WebAudio
+    // permission. Chrome/Edge may leave play()/resume() pending until a user
+    // gesture; the preview still has to be visible so that gesture is possible.
     evaluateVisibility(currentState,lastEventSerial<0);
+    scheduleSpectrumUnlockCheck();
+    startAudioSync(currentState);
+
     if(!demo) lastEventSerial=Number(currentState.event_serial)||0;
   } catch(_e) {
     if(!preview) hideCard();
   } finally { pollBusy=false; }
 }
 window.addEventListener("resize",()=>{ resizeCanvas(); updateTitle(titleInner.textContent,true); });
-spectrumUnlock.addEventListener("click",unlockSpectrum);
+spectrumUnlock.addEventListener("click",(event)=>{
+  event.stopPropagation();
+  unlockSpectrum();
+});
+card.addEventListener("click",()=>{
+  if(spectrumUnlock.classList.contains("visible")) unlockSpectrum();
+});
+if(preview) card.style.pointerEvents="auto";
 cover.addEventListener("load",applyAutoColorsIfPossible);
 drawSpectrum();
 poll();

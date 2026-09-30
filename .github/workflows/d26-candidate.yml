@@ -598,12 +598,15 @@ jobs:
                   assert 'const demo=preview && !currentState.playing' in overlay
                   assert 'padding:.08em .30em .10em' in overlay
                   assert '-webkit-text-stroke:.034em' in overlay
-                  assert 'await syncAudio(currentState)' in overlay
+                  assert 'startAudioSync(currentState)' in overlay
+                  assert 'withTimeout(audio.play(),1000)' in overlay
+                  assert overlay.index('evaluateVisibility(currentState,lastEventSerial<0)') < overlay.index('startAudioSync(currentState)')
                   assert 'if(!audible && gainNode) audio.muted=false' in overlay
                   assert 'Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию.' in overlay
                   assert 'analysisTransportReady' in overlay
                   assert 'preview ? (!playing || required) : (playing && required)' in overlay
-                  assert 'spectrumUnlock.addEventListener("click",unlockSpectrum)' in overlay
+                  assert 'spectrumUnlock.addEventListener("click",(event)=>' in overlay
+                  assert 'if(preview) card.style.pointerEvents="auto"' in overlay
 
                   with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
                       placeholder = response.read()
@@ -738,12 +741,15 @@ jobs:
           assert 'id="musicFallback"' in overlay
           assert "const demo=preview && !currentState.playing" in overlay
           assert "-webkit-text-stroke:.034em" in overlay
-          assert "await syncAudio(currentState)" in overlay
+          assert "startAudioSync(currentState)" in overlay
+          assert "withTimeout(audio.play(),1000)" in overlay
+          assert overlay.index("evaluateVisibility(currentState,lastEventSerial<0)") < overlay.index("startAudioSync(currentState)")
           assert "if(!audible && gainNode) audio.muted=false" in overlay
           assert "Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию." in overlay
           assert "analysisTransportReady" in overlay
           assert "preview ? (!playing || required) : (playing && required)" in overlay
-          assert 'spectrumUnlock.addEventListener("click",unlockSpectrum)' in overlay
+          assert 'spectrumUnlock.addEventListener("click",(event)=>' in overlay
+          assert 'if(preview) card.style.pointerEvents="auto"' in overlay
 
           placeholder = Path("streaming_manager/web/music_placeholder_note.svg")
           assert placeholder.is_file()
