@@ -11,8 +11,10 @@ from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 class AudioCoordinator(QObject):
     """Single authority for which InOneLine feature owns stream music.
 
-    D43 uses the auction owner today. D26 can register a music-player snapshot,
-    pause callback and restore callback later without changing Auction logic.
+    D43 introduced the owner hand-off contract; D26 registers the independent
+    Music Player through the snapshot/pause/restore callbacks below. Auction
+    and Wheel remain callers of the same coordinator rather than maintaining a
+    parallel audio-ownership state.
     """
 
     ownerChanged = Signal(str)
