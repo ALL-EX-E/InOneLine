@@ -150,7 +150,7 @@ body { font-family:var(--font); }
       <div id="spectrumWrap"><canvas id="spectrum"></canvas></div>
     </div>
   </div>
-  <button id="spectrumUnlock" type="button">Нажмите для активации Spectrum</button>
+  <button id="spectrumUnlock" type="button">Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию.</button>
 </div>
 <audio id="audio" preload="auto"></audio>
 <script>
@@ -185,7 +185,11 @@ function luminance(rgb){ return .299*rgb[0]+.587*rgb[1]+.114*rgb[2]; }
 function mix(rgb, target, amount){ return rgb.map((v,i)=>v+(target[i]-v)*amount); }
 
 function setSpectrumUnlockRequired(required){
-  const show=Boolean(required && currentState && currentState.playing);
+  const playing=Boolean(currentState && currentState.playing);
+  const show=Boolean(preview ? (!playing || required) : (playing && required));
+  spectrumUnlock.textContent=preview
+    ? "Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию."
+    : "Включите музыку в плеере и нажмите на окно, чтобы увидеть анимацию.";
   spectrumUnlock.classList.toggle("visible",show);
   spectrumUnlock.setAttribute("aria-hidden",show?"false":"true");
 }

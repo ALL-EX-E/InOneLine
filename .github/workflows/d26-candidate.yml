@@ -600,8 +600,9 @@ jobs:
                   assert '-webkit-text-stroke:.034em' in overlay
                   assert 'await syncAudio(currentState)' in overlay
                   assert 'if(!audible && gainNode) audio.muted=false' in overlay
-                  assert 'Нажмите для активации Spectrum' in overlay
+                  assert 'Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию.' in overlay
                   assert 'analysisTransportReady' in overlay
+                  assert 'preview ? (!playing || required) : (playing && required)' in overlay
                   assert 'spectrumUnlock.addEventListener("click",unlockSpectrum)' in overlay
 
                   with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
@@ -739,8 +740,9 @@ jobs:
           assert "-webkit-text-stroke:.034em" in overlay
           assert "await syncAudio(currentState)" in overlay
           assert "if(!audible && gainNode) audio.muted=false" in overlay
-          assert "Нажмите для активации Spectrum" in overlay
+          assert "Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию." in overlay
           assert "analysisTransportReady" in overlay
+          assert "preview ? (!playing || required) : (playing && required)" in overlay
           assert 'spectrumUnlock.addEventListener("click",unlockSpectrum)' in overlay
 
           placeholder = Path("streaming_manager/web/music_placeholder_note.svg")
@@ -867,7 +869,7 @@ jobs:
             $overlay = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-player-overlay?preview=1" -TimeoutSec 2).Content
             if ($overlay -notmatch 'createAnalyser' -or
                 $overlay -notmatch 'marquee' -or
-                $overlay -notmatch 'Нажмите для активации Spectrum' -or
+                $overlay -notmatch 'Включите музыку в плеере и нажмите на предпросмотр, чтобы увидеть анимацию.' -or
                 $overlay -notmatch 'analysisTransportReady') {
               throw "Frozen Music Player overlay missing D26 visualizer/unlock support"
             }
