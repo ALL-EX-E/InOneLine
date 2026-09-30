@@ -171,6 +171,17 @@ jobs:
               coordinator.release_auction()
               assert player.desired_state == PLAYER_STOP
 
+              # Preparing a different track while paused must defer, not lose,
+              # the transient "new track" event until that track actually starts.
+              second_asset = player.assets_in_queue()[1]
+              before_event = int(player.browser_state()["event_serial"])
+              player.select_media(second_asset.id, play=False)
+              assert int(player.browser_state()["event_serial"]) == before_event
+              player.play_pause()
+              assert int(player.browser_state()["event_serial"]) == before_event + 1
+              player.stop()
+              player.select_media(first.id, play=False)
+
               player.set_order_mode(MUSIC_PLAYER_ORDER_SHUFFLE)
               assert player.order_mode == MUSIC_PLAYER_ORDER_SHUFFLE
               assert sorted(player.queue) == sorted(a.id for a in music_assets)
