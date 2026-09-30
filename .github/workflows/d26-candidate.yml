@@ -1,4 +1,4 @@
-name: D26 candidate gate
+name: Candidate 1.0.7 D26 Music Player
 
 on:
   push:
@@ -9,87 +9,420 @@ permissions:
   contents: read
 
 jobs:
-  gate:
+  windows-build:
     runs-on: windows-2025
-    timeout-minutes: 30
+    timeout-minutes: 55
     env:
       QT_QPA_PLATFORM: offscreen
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
-      - name: Install dependencies
+      - name: Install Python build dependencies
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller==6.22.2
 
-      - name: Compile Python sources
+      - name: Compile and D26 semantic smoke
         shell: pwsh
         run: |
-          python -m compileall -q app.py streaming_manager
+          python -m compileall -q streaming_manager app.py
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
 
-      - name: D26 controller and UI smoke
-        shell: pwsh
-        run: |
           @'
+          import json
+          import socket
+          import tempfile
+          import urllib.request
+          import wave
           from pathlib import Path
-          from tempfile import TemporaryDirectory
 
           from PySide6.QtWidgets import QApplication
 
           from streaming_manager.api_server import LocalApiServer
+          from streaming_manager.app_paths import AppPaths
           from streaming_manager.audio import AudioCoordinator
+          from streaming_manager.constants import (
+              APP_VERSION,
+              MUSIC_PLAYER_ORDER_ALPHABETICAL,
+              MUSIC_PLAYER_ORDER_SHUFFLE,
+              MUSIC_PLAYER_OUTPUT_MODE_APPLICATION,
+              MUSIC_PLAYER_OUTPUT_MODE_OBS,
+              SCHEMA_VERSION,
+          )
           from streaming_manager.database import Database
-          from streaming_manager.music_player import MusicPlayerController
+          from streaming_manager.media import (
+              MEDIA_CATEGORY_MUSIC,
+              MEDIA_CATEGORY_SOUNDTRACK,
+              managed_media_directory,
+          )
+          from streaming_manager.music_player import (
+              PLAYER_PAUSE,
+              PLAYER_PLAY,
+              PLAYER_STOP,
+              MusicPlayerController,
+          )
           from streaming_manager.views.music import MusicTab
           from streaming_manager.views.stream import StreamTab
 
+          assert APP_VERSION == "1.0.7"
+          assert SCHEMA_VERSION == 19
+
+          def make_wav(path: Path, seconds: float = 0.15):
+              path.parent.mkdir(parents=True, exist_ok=True)
+              frames = int(8000 * seconds)
+              with wave.open(str(path), "wb") as out:
+                  out.setnchannels(1)
+                  out.setsampwidth(2)
+                  out.setframerate(8000)
+                  out.writeframes(b"\x00\x00" * frames)
+
           app = QApplication.instance() or QApplication([])
-          with TemporaryDirectory() as tmp:
-              db = Database(Path(tmp) / "streaming.db")
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root = Path(tmp)
+              paths = AppPaths.from_root(root)
+              paths.ensure_runtime_dirs()
+              db = Database(paths.database_path)
+
+              music_dir = managed_media_directory(paths.data_dir, MEDIA_CATEGORY_MUSIC)
+              soundtrack_dir = managed_media_directory(paths.data_dir, MEDIA_CATEGORY_SOUNDTRACK)
+              make_wav(music_dir / "B track.wav")
+              make_wav(music_dir / "A track.wav")
+              make_wav(soundtrack_dir / "auction.wav")
+
+              music_assets = db.sync_managed_media_category(MEDIA_CATEGORY_MUSIC)
+              soundtrack_assets = db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
+              assert [a.display_name for a in music_assets] == ["A track.wav", "B track.wav"]
+              assert [a.display_name for a in soundtrack_assets] == ["auction.wav"]
+
               coordinator = AudioCoordinator()
               player = MusicPlayerController(db, coordinator)
-              api = LocalApiServer(db, "127.0.0.1", 8765)
-              music = MusicTab(db, player)
-              stream = StreamTab(db, api)
 
-              state = player.browser_state()
-              assert state["desired_state"] == "pause"
-              assert player.output_mode in {"application", "obs"}
-              assert music.mode_combo.count() == 2
-              assert stream.music_player_show_mode.count() == 3
-              assert stream.music_player_animation.count() == 2
+              assert player.desired_state == PLAYER_PAUSE
               assert coordinator.owner == "music_player"
+              assert player.order_mode == MUSIC_PLAYER_ORDER_ALPHABETICAL
+              assert [a.display_name for a in player.assets_in_queue()] == ["A track.wav", "B track.wav"]
+
+              first = player.assets_in_queue()[0]
+              player.select_media(first.id, play=True)
+              assert player.desired_state == PLAYER_PLAY
+              coordinator.acquire_auction()
+              assert coordinator.owner == "auction"
+              assert player.suppressed is True
+              coordinator.release_auction()
+              assert coordinator.owner == "music_player"
+              assert player.suppressed is False
+              assert player.desired_state == PLAYER_PLAY
+
+              coordinator.acquire_auction()
+              player.stop()
+              assert player.desired_state == PLAYER_STOP
+              coordinator.release_auction()
+              assert player.desired_state == PLAYER_STOP
+
+              player.set_order_mode(MUSIC_PLAYER_ORDER_SHUFFLE)
+              assert player.order_mode == MUSIC_PLAYER_ORDER_SHUFFLE
+              assert sorted(player.queue) == sorted(a.id for a in music_assets)
+              player.set_order_mode(MUSIC_PLAYER_ORDER_ALPHABETICAL)
+              assert player.order_mode == MUSIC_PLAYER_ORDER_ALPHABETICAL
+
+              player.set_repeat_current(True)
+              assert player.repeat_current is True
+              player.set_output_mode(MUSIC_PLAYER_OUTPUT_MODE_OBS)
+              assert player.output_mode == MUSIC_PLAYER_OUTPUT_MODE_OBS
+              player.set_output_mode(MUSIC_PLAYER_OUTPUT_MODE_APPLICATION)
+              assert player.output_mode == MUSIC_PLAYER_OUTPUT_MODE_APPLICATION
+              player.set_volume_percent(73)
+              player.set_muted(True)
+              assert player.volume_percent == 73
+              assert player.muted is True
+              player.set_muted(False)
+
+              api_socket = socket.socket()
+              api_socket.bind(("127.0.0.1", 0))
+              port = api_socket.getsockname()[1]
+              api_socket.close()
+              api = LocalApiServer(db, "127.0.0.1", port)
+              api.set_music_player_state_provider(player.browser_state)
+              api.set_music_player_cover_provider(player.cover_bytes)
+
+              music_tab = MusicTab(db, player)
+              stream_tab = StreamTab(db, api)
+              assert music_tab.mode_combo.count() == 2
+              assert music_tab.output_combo.count() == 2
+              assert stream_tab.music_player_show_mode.count() == 3
+              assert stream_tab.music_player_animation.count() == 2
+
+              api.start()
+              try:
+                  base = f"http://127.0.0.1:{port}"
+                  with urllib.request.urlopen(base + "/api/music-player", timeout=5) as response:
+                      payload = json.loads(response.read().decode("utf-8"))
+                  assert "state" in payload and "appearance" in payload
+                  assert payload["appearance"]["show_mode"] in {"hidden", "track_change", "always"}
+
+                  with urllib.request.urlopen(base + "/music-player-overlay", timeout=5) as response:
+                      overlay = response.read().decode("utf-8")
+                  assert "createAnalyser" in overlay
+                  assert "object-fit:cover" in overlay
+                  assert "marquee" in overlay
+                  assert "22.5vw" in overlay
+
+                  with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
+                      placeholder = response.read()
+                  assert placeholder.startswith(b"\x89PNG\r\n\x1a\n")
+              finally:
+                  api.stop()
+
+              # Managed D26 audio folders are authoritative; removing a managed
+              # file removes its media row on the next explicit refresh.
+              removed_id = first.id
+              (music_dir / first.managed_name).unlink()
+              player.refresh_library()
+              assert db.get_media_asset(removed_id) is None
 
               player.shutdown()
-              music.deleteLater()
-              stream.deleteLater()
-          print("D26_SMOKE=PASS")
-          '@ | Set-Content -Encoding utf8 d26_smoke.py
-          python d26_smoke.py
+              music_tab.deleteLater()
+              stream_tab.deleteLater()
 
-      - name: Build frozen application
+              # Re-open persisted player settings: track/queue may restore, but
+              # application startup must never emit audio automatically.
+              second = MusicPlayerController(db, AudioCoordinator())
+              assert second.desired_state == PLAYER_PAUSE
+              second.shutdown()
+
+          print("D26 SEMANTIC SMOKE: PASS")
+          '@ | Set-Content -Encoding utf8 d26_semantic_smoke.py
+          python d26_semantic_smoke.py
+
+      - name: Static D26 invariants
         shell: pwsh
         run: |
-          pyinstaller --noconfirm installer/InOneLine.spec
+          @'
+          from pathlib import Path
+          from streaming_manager.constants import APP_VERSION, SCHEMA_VERSION
+
+          assert APP_VERSION == "1.0.7"
+          assert SCHEMA_VERSION == 19
+
+          schema = Path("streaming_manager/db/schema.py").read_text(encoding="utf-8")
+          assert schema.count("self._run_migration(") == 15
+
+          constants = Path("streaming_manager/constants.py").read_text(encoding="utf-8")
+          assert "MUSIC_PLAYER_OUTPUT_MODE_OBS" in constants
+          assert "MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE" in constants
+
+          media = Path("streaming_manager/media.py").read_text(encoding="utf-8")
+          assert 'MEDIA_CATEGORY_SOUNDTRACK = "soundtrack"' in media
+          assert 'MEDIA_CATEGORY_MUSIC = "music"' in media
+
+          player = Path("streaming_manager/music_player.py").read_text(encoding="utf-8")
+          assert "class MusicPlayerController" in player
+          assert "register_music_player" in player
+          assert "event_started_at_ms" in player
+
+          music_ui = Path("streaming_manager/views/music.py").read_text(encoding="utf-8")
+          assert 'QCheckBox("Повторять текущий трек")' in music_ui
+          assert '"По алфавиту"' in music_ui
+          assert '"Перемешать"' in music_ui
+
+          main = Path("streaming_manager/views/main_window.py").read_text(encoding="utf-8")
+          assert 'self.tabs.addTab(self.music_tab, "Музыка")' in main
+          assert "set_music_player_state_provider" in main
+
+          stream = Path("streaming_manager/views/stream.py").read_text(encoding="utf-8")
+          assert "copy_music_player_overlay_url" in stream
+          assert "open_music_player_overlay_preview" in stream
+          assert "MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY" in stream
+
+          audio = Path("streaming_manager/views/auction_parts/audio.py").read_text(encoding="utf-8")
+          assert "MEDIA_CATEGORY_SOUNDTRACK" in audio
+          assert "loop_one=True" in audio
+          assert "Зациклить выбранный трек" not in audio
+          assert "def _finish_auction_soundtrack_phase" in audio
+          assert "tie_break_required" in audio
+
+          actions = Path("streaming_manager/views/auction_parts/actions.py").read_text(encoding="utf-8")
+          assert "restart=False" in actions
+          assert "_stop_auction_soundtrack(immediate=True)" in actions
+
+          rng = Path("streaming_manager/views/auction_parts/rng.py").read_text(encoding="utf-8")
+          assert "_acquire_auction_audio_owner()" not in rng
+
+          overlay = Path("streaming_manager/web/music_player_overlay.html").read_text(encoding="utf-8")
+          assert "createAnalyser" in overlay
+          assert "object-fit:cover" in overlay
+          assert "slide-left" in overlay
+          assert "marquee" in overlay
+          assert "width:100vw; height:22.5vw" in overlay
+
+          placeholder = Path("streaming_manager/web/music_placeholder_vinyl.png")
+          assert placeholder.is_file() and placeholder.stat().st_size > 1000
+
+          notes = Path("RELEASE_NOTES_1.0.7.md").read_text(encoding="utf-8")
+          assert "D26" in notes and "Музыкальный плеер" in notes
+
+          print("D26 STATIC INVARIANTS: PASS")
+          '@ | python -
+
+      - name: Confirm protected RNG source remains unchanged
+        shell: pwsh
+        run: |
+          git diff --exit-code e28eed8bb704b4843ff1013e8c1e9bead37b6433 -- streaming_manager/random_sources.py
+          if ($LASTEXITCODE -ne 0) { throw "Random source implementation changed" }
+          Write-Host "RANDOM SOURCE PROTECTED DIFF: PASS"
+
+      - name: Build PyInstaller application
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --noconfirm installer/InOneLine.spec
           if (!(Test-Path "dist\InOneLine\InOneLine.exe")) {
-            throw "Frozen InOneLine.exe missing"
+            throw "PyInstaller output missing"
           }
-          Write-Host "PYINSTALLER_BUILD=PASS"
 
-      - name: Verify packaged D26 web resources
-        shell: pwsh
-        run: |
-          $root = "dist\InOneLine\_internal\streaming_manager\web"
+          $web = "dist\InOneLine\_internal\streaming_manager\web"
           foreach ($name in @("music_player_overlay.html", "music_placeholder_vinyl.png")) {
-            if (!(Test-Path (Join-Path $root $name))) {
+            if (!(Test-Path (Join-Path $web $name))) {
               throw "Missing packaged D26 resource: $name"
             }
           }
-          Write-Host "D26_WEB_RESOURCES=PASS"
+          Write-Host "PYINSTALLER_D26_RESOURCES=PASS"
+
+      - name: Install Inno Setup 7.1.0
+        shell: pwsh
+        run: |
+          $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
+          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $inno = "$env:RUNNER_TEMP\InnoSetup710"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          if (!(Test-Path "$inno\ISCC.exe")) { throw "ISCC.exe missing" }
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $inno = "$env:RUNNER_TEMP\InnoSetup710\ISCC.exe"
+          $dist = (Resolve-Path "dist\InOneLine").Path
+          & $inno "/DDistRoot=$dist" "installer\InOneLine.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+
+          $setup = "installer\output\InOneLine_Setup_1.0.7.exe"
+          if (!(Test-Path $setup)) { throw "Installer output missing" }
+          $item = Get-Item $setup
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sig = (Get-AuthenticodeSignature $setup).Status
+          Write-Host "SETUP_BYTES=$($item.Length)"
+          Write-Host "SETUP_SHA256=$hash"
+          Write-Host "SETUP_FILEVERSION=$($item.VersionInfo.FileVersion)"
+          Write-Host "SETUP_AUTHENTICODE=$sig"
+          if ($item.VersionInfo.FileVersion -notlike "1.0.7*") {
+            throw "Wrong installer FileVersion: $($item.VersionInfo.FileVersion)"
+          }
+
+      - name: Silent install and frozen startup/API smoke
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.7.exe").Path
+          $install = "$env:RUNNER_TEMP\InOneLineInstalled"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Candidate install failed: $($p.ExitCode)" }
+
+          $exe = "$install\InOneLine.exe"
+          if (!(Test-Path $exe)) { throw "Installed InOneLine.exe missing" }
+
+          $proc = Start-Process -FilePath $exe -WorkingDirectory $install -PassThru
+          try {
+            $health = $null
+            for ($i = 0; $i -lt 60; $i++) {
+              Start-Sleep -Milliseconds 500
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health" -TimeoutSec 2
+                break
+              } catch {}
+            }
+            if ($null -eq $health) { throw "Installed app API did not start" }
+            if ($health.version -ne "1.0.7") {
+              throw "Wrong frozen version: $($health.version)"
+            }
+
+            $music = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/music-player" -TimeoutSec 2
+            if ($null -eq $music.state -or $null -eq $music.appearance) {
+              throw "Frozen Music Player API contract missing"
+            }
+            if ($music.state.desired_state -ne "pause") {
+              throw "Music Player auto-played after fresh startup"
+            }
+
+            $overlay = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-player-overlay?preview=1" -TimeoutSec 2).Content
+            if ($overlay -notmatch 'createAnalyser' -or $overlay -notmatch 'marquee') {
+              throw "Frozen Music Player overlay missing D26 visualizer/marquee"
+            }
+
+            $placeholder = Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-placeholder" -TimeoutSec 2
+            if ($placeholder.RawContentLength -lt 1000) {
+              throw "Frozen vinyl placeholder missing/empty"
+            }
+
+            $timer = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/timer-overlay" -TimeoutSec 2).Content
+            if ($timer -notmatch 'auction-audio') {
+              throw "Existing D43 timer audio regression"
+            }
+
+            Write-Host "FROZEN INSTALL/START/API D26 SMOKE: PASS"
+          } finally {
+            if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+
+      - name: Create candidate source snapshot
+        shell: pwsh
+        run: |
+          $stage = "$env:RUNNER_TEMP\source"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Get-ChildItem -Force | Where-Object { $_.Name -notin @('.git','.github','dist') } | ForEach-Object {
+            Copy-Item $_.FullName -Destination $stage -Recurse -Force
+          }
+          Remove-Item "$stage\installer\output" -Recurse -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$stage\*" -DestinationPath "installer\output\InOneLine_CANDIDATE_1.0.7_D26_SOURCE.zip" -CompressionLevel Optimal
+
+      - name: Write candidate build info
+        shell: pwsh
+        run: |
+          $setup = "installer\output\InOneLine_Setup_1.0.7.exe"
+          $source = "installer\output\InOneLine_CANDIDATE_1.0.7_D26_SOURCE.zip"
+          $setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceHash = (Get-FileHash $source -Algorithm SHA256).Hash.ToLowerInvariant()
+          $setupSize = (Get-Item $setup).Length
+          $sourceSize = (Get-Item $source).Length
+          @"
+          InOneLine 1.0.7 D26 Music Player candidate
+          Branch: d26-music-player-1.0.7-candidate
+          Commit: $env:GITHUB_SHA
+          Schema: 19
+          Named migrations: 15
+          Installer: InOneLine_Setup_1.0.7.exe
+          Installer bytes: $setupSize
+          Installer SHA-256: $setupHash
+          Source: InOneLine_CANDIDATE_1.0.7_D26_SOURCE.zip
+          Source bytes: $sourceSize
+          Source SHA-256: $sourceHash
+          CURRENT 1.0.6 remains untouched pending manual acceptance.
+          "@ | Set-Content -Encoding UTF8 "installer\output\CANDIDATE_BUILD_INFO.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InOneLine_1.0.7_D26_WINDOWS
+          path: |
+            installer/output/InOneLine_Setup_1.0.7.exe
+            installer/output/InOneLine_CANDIDATE_1.0.7_D26_SOURCE.zip
+            installer/output/CANDIDATE_BUILD_INFO.txt
+          if-no-files-found: error
+          retention-days: 7
