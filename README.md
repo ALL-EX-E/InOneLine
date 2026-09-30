@@ -5,7 +5,7 @@
 ## Скачать и установить
 
 1. Откройте страницу [Releases](../../releases).
-2. Скачайте **`InOneLine_Setup_1.0.7.exe`**.
+2. Скачайте **`InOneLine_Setup_1.0.8.exe`**.
 3. Запустите установщик и следуйте его подсказкам.
 4. После установки запустите InOneLine через ярлык или меню «Пуск».
 
@@ -28,7 +28,7 @@
 - интеграции Twitch и DonationAlerts;
 - семь встроенных OBS Browser Sources;
 - экспорт CSV / JSON / Excel;
-- резервное копирование и полное восстановление данных.
+- резервное копирование и полное восстановление данных;\n- условное скрытие логически неприменимых настроек без скрытия временно заблокированных действий.
 
 ## OBS
 
@@ -36,37 +36,37 @@
 
 ## Проверка установщика
 
-Официальный installer 1.0.7:
+Официальный installer 1.0.8:
 
-`InOneLine_Setup_1.0.7.exe`
+`InOneLine_Setup_1.0.8.exe`
 
 SHA-256:
 
 ```text
-f89e0e713ca53354cda603c1e4748c064c96570edfeef5aa28fbfe1548106dc1
+b960ece03364788941dacec0723cf4664ea4fb11461ec4322a2c03fb79ca66e4
 ```
 
 PowerShell:
 
 ```powershell
-Get-FileHash .\InOneLine_Setup_1.0.7.exe -Algorithm SHA256
+Get-FileHash .\InOneLine_Setup_1.0.8.exe -Algorithm SHA256
 ```
 
 ## Исходный код и лицензия
 
 Исходный код опубликован в этом репозитории. Полные условия находятся в [LICENSE](./LICENSE).
 
-Exact accepted source snapshot релиза 1.0.7:
+Exact accepted source snapshot релиза 1.0.8:
 
-`InOneLine_Source_1.0.7.zip`
+`InOneLine_Source_1.0.8.zip`
 
 SHA-256:
 
 ```text
-33e11f6590089d479eb9e9a64bde49dfef2858d4caefeab858a000a3e22ee20b
+babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15
 ```
 
-GitHub автоматически создаёт собственные Source code archives для тега; они не обязаны быть byte-identical файлу `InOneLine_Source_1.0.7.zip`.
+GitHub автоматически создаёт собственные Source code archives для тега; они не обязаны быть byte-identical файлу `InOneLine_Source_1.0.8.zip`.
 
 ## Для разработчиков
 
@@ -95,7 +95,7 @@ InOneLine разрабатывался автором при помощи **Chat
 
 ## Дополнительная информация
 
-- [Release notes 1.0.7](./RELEASE_NOTES_1.0.7.md)
+- [Release notes 1.0.8](./RELEASE_NOTES_1.0.8.md)
 - [SHA256SUMS.txt](./SHA256SUMS.txt)
 
 ## Автор
