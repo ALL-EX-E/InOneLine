@@ -877,14 +877,18 @@ class GamesTab(QWidget):
 
         if self.table.isHidden():
             self.edit_btn.setEnabled(False)
-            self.archive_btn.setEnabled(False)
-            self.restore_btn.setEnabled(False)
+            self.archive_btn.setVisible(False)
+            self.restore_btn.setVisible(False)
             self.delete_btn.setEnabled(False)
             return
 
         self.edit_btn.setEnabled(bool(game) and not worker_busy)
-        self.archive_btn.setEnabled(bool(game and not game.archived) and not worker_busy)
-        self.restore_btn.setEnabled(bool(game and game.archived) and not worker_busy)
+        archive_visible = bool(game and not game.archived)
+        restore_visible = bool(game and game.archived)
+        self.archive_btn.setVisible(archive_visible)
+        self.restore_btn.setVisible(restore_visible)
+        self.archive_btn.setEnabled(archive_visible and not worker_busy)
+        self.restore_btn.setEnabled(restore_visible and not worker_busy)
         self.delete_btn.setEnabled(bool(game) and not worker_busy)
 
     def _update_action_state(self):
