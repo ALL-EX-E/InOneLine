@@ -834,6 +834,7 @@ class AuctionAudioMixin:
             "1" if AUCTION_SOUNDTRACK_MUTE_DEFAULT else "0",
         ) == "1"
 
+    @staticmethod
     def _auction_soundtrack_asset_label(asset, available: bool) -> str:
         if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
             label = f"{asset.display_name} — исходный файл"
