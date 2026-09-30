@@ -191,6 +191,7 @@ jobs:
 
               class FakeAuction(AuctionAudioMixin):
                   def __init__(self, coord):
+                      self.db = db
                       self.audio_coordinator = coord
                       self.auction_audio = SimpleNamespace(muted=False)
                       self.wheel_audio = SimpleNamespace(muted=False)
@@ -236,6 +237,47 @@ jobs:
               auction.wheel_audio.muted = True
               auction._sync_audio_owner_with_session(wheel_spin, spin_running=True)
               assert coordinator.owner == "music_player" and player.suppressed is False
+
+              # Shared managed soundtrack catalog must not turn external
+              # references into reusable library entries. Each selector sees
+              # only its own currently selected external reference.
+              external_wheel_path = root / "external-wheel.wav"
+              external_auction_path = root / "external-auction.wav"
+              make_wav(external_wheel_path)
+              make_wav(external_auction_path)
+              external_wheel = db.register_external_media_asset(
+                  MEDIA_CATEGORY_SOUNDTRACK, external_wheel_path
+              )
+              external_auction = db.register_external_media_asset(
+                  MEDIA_CATEGORY_SOUNDTRACK, external_auction_path
+              )
+              db.set_setting(
+                  WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(external_wheel.id)
+              )
+              db.set_setting(
+                  AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(external_auction.id)
+              )
+              wheel_visible = auction._soundtrack_assets_for_setting(
+                  WHEEL_SOUNDTRACK_MEDIA_ID_KEY
+              )
+              auction_visible = auction._soundtrack_assets_for_setting(
+                  AUCTION_SOUNDTRACK_MEDIA_ID_KEY
+              )
+              assert external_wheel.id in {a.id for a in wheel_visible}
+              assert external_auction.id not in {a.id for a in wheel_visible}
+              assert external_auction.id in {a.id for a in auction_visible}
+              assert external_wheel.id not in {a.id for a in auction_visible}
+              assert soundtrack_assets[0].id in {a.id for a in wheel_visible}
+              assert soundtrack_assets[0].id in {a.id for a in auction_visible}
+
+              db.set_setting(
+                  WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(soundtrack_assets[0].id)
+              )
+              wheel_visible = auction._soundtrack_assets_for_setting(
+                  WHEEL_SOUNDTRACK_MEDIA_ID_KEY
+              )
+              assert external_wheel.id not in {a.id for a in wheel_visible}
+              assert external_auction.id not in {a.id for a in wheel_visible}
 
               api_socket = socket.socket()
               api_socket.bind(("127.0.0.1", 0))
@@ -370,6 +412,8 @@ jobs:
           assert "Зациклить выбранный трек" not in audio
           assert "def _finish_auction_soundtrack_phase" in audio
           assert "tie_break_required" in audio
+          assert "def _soundtrack_assets_for_setting" in audio
+          assert "asset.storage_mode == MEDIA_STORAGE_MANAGED" in audio
           assert "WHEEL_SOUNDTRACK_FADE_MS = 0" in audio
           assert "AUCTION_SOUNDTRACK_FADE_MS = 0" in audio
 
