@@ -489,12 +489,24 @@ class MusicPlayerController(QObject):
         self._pending_new_track_event = bool(should_play and self._suppressed)
         if not automatic:
             self._mark_user_change()
-        self._load_current(position_ms=0, play=should_play)
-        if should_play and not self._suppressed:
-            self._trigger_new_track_event()
-        self._persist_state()
+
+        if desired == PLAYER_STOP:
+            # Prev/Next while stopped changes only the prepared current track.
+            # Keep STOP a genuinely unloaded transport rather than turning it
+            # into an implementation-level Pause with a locked file.
+            self.player.stop()
+            self.player.setSource(QUrl())
+            self._pending_seek_ms = None
+            self._apply_local_audio_route()
+        else:
+            self._load_current(position_ms=0, play=should_play)
+            if should_play and not self._suppressed:
+                self._trigger_new_track_event()
+
+        self._persist_state(position_override=0)
         self.trackChanged.emit()
         self.stateChanged.emit()
+        self._refresh_browser_snapshot()
 
     def set_order_mode(self, mode: str) -> None:
         mode = str(mode)
