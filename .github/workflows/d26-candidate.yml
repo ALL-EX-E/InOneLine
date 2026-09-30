@@ -48,6 +48,7 @@ jobs:
           from pathlib import Path
           from types import SimpleNamespace
 
+          from PySide6.QtCore import Qt
           from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QFileDialog, QMessageBox
 
           from streaming_manager.api_server import LocalApiServer
