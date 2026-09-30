@@ -14,6 +14,7 @@ hiddenimports = [
     "PySide6.QtOpenGLWidgets",
     "PySide6.QtMultimedia",
     "websocket",
+    "mutagen",
 ]
 
 a = Analysis(
