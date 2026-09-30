@@ -705,8 +705,10 @@ class MainWindow(QMainWindow):
         self._save_ui_state()
         self.public_tab.shutdown_public_xlsx()
         self.auction_tab.shutdown_shared_xlsx()
-        self.auction_tab.shutdown_audio()
+        # Unregister Music Player first: Auction shutdown can then release its
+        # owner without briefly restoring audible playback while the app exits.
         self.music_player.shutdown()
+        self.auction_tab.shutdown_audio()
         self.api.stop()
         super().closeEvent(event)
 
