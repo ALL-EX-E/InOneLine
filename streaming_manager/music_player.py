@@ -362,10 +362,10 @@ class MusicPlayerController(QObject):
         changed = media_id != self._current_media_id
         self._current_media_id = media_id
         self._desired_state = PLAYER_PLAY if play else PLAYER_PAUSE
-        self._pending_new_track_event = not play
+        self._pending_new_track_event = bool(play and self._suppressed)
         self._mark_user_change()
         self._load_current(position_ms=0, play=play)
-        if play:
+        if play and not self._suppressed:
             self._trigger_new_track_event()
         self._persist_state()
         if changed:
@@ -388,7 +388,10 @@ class MusicPlayerController(QObject):
                 self.player.setPosition(0)
             self._desired_state = PLAYER_PLAY
             if from_stop or self._pending_new_track_event:
-                self._trigger_new_track_event()
+                if self._suppressed:
+                    self._pending_new_track_event = True
+                else:
+                    self._trigger_new_track_event()
         self._mark_user_change()
         self._apply_transport_intent()
         self._persist_state()
@@ -452,11 +455,11 @@ class MusicPlayerController(QObject):
         self._current_media_id = int(media_id)
         self._desired_state = desired
         should_play = desired == PLAYER_PLAY
-        self._pending_new_track_event = not should_play
+        self._pending_new_track_event = bool(should_play and self._suppressed)
         if not automatic:
             self._mark_user_change()
         self._load_current(position_ms=0, play=should_play)
-        if should_play:
+        if should_play and not self._suppressed:
             self._trigger_new_track_event()
         self._persist_state()
         self.trackChanged.emit()
@@ -561,6 +564,8 @@ class MusicPlayerController(QObject):
                     play=False,
                 )
         self._apply_local_audio_route()
+        if self._desired_state == PLAYER_PLAY and self._pending_new_track_event:
+            self._trigger_new_track_event()
         self._apply_transport_intent()
         self.stateChanged.emit()
         self._refresh_browser_snapshot()
@@ -575,7 +580,8 @@ class MusicPlayerController(QObject):
             key = (int(asset.id), int(stat.st_mtime_ns), int(stat.st_size))
         except OSError:
             return {"title": "", "artist": "", "display_title": asset.display_name, "has_cover": False}
-        cached = self._metadata_cache.get(key)
+        with self._cache_lock:
+            cached = self._metadata_cache.get(key)
         if cached is not None:
             return dict(cached)
 
@@ -603,7 +609,8 @@ class MusicPlayerController(QObject):
             "display_title": display_title,
             "has_cover": cover is not None,
         }
-        self._metadata_cache[key] = dict(result)
+        with self._cache_lock:
+            self._metadata_cache[key] = dict(result)
         return result
 
     def _extract_cover(self, path: Path) -> tuple[str, bytes] | None:
