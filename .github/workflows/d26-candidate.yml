@@ -48,7 +48,7 @@ jobs:
           from pathlib import Path
           from types import SimpleNamespace
 
-          from PySide6.QtWidgets import QApplication, QComboBox, QLabel
+          from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QFileDialog
 
           from streaming_manager.api_server import LocalApiServer
           from streaming_manager.app_paths import AppPaths
@@ -333,6 +333,40 @@ jobs:
               assert music_tab.mode_combo.count() == 2
               assert music_tab.output_combo.count() == 2
               assert music_tab.search.isClearButtonEnabled()
+
+              # Multi-select import: Ctrl/Shift native selection returns several
+              # paths and one action adds them in one batch without changing
+              # the currently prepared track.
+              batch_a = root / "batch-a.wav"
+              batch_b = root / "batch-b.wav"
+              make_wav(batch_a)
+              make_wav(batch_b)
+              current_before_batch = player.current_media_id
+              original_get_open_names = QFileDialog.getOpenFileNames
+              original_choose_storage = music_tab._choose_storage_mode
+              try:
+                  QFileDialog.getOpenFileNames = staticmethod(
+                      lambda *args, **kwargs: (
+                          [str(batch_a), str(batch_b)],
+                          "Аудио (*.mp3 *.wav *.ogg)",
+                      )
+                  )
+                  music_tab._choose_storage_mode = (
+                      lambda sources: MEDIA_STORAGE_EXTERNAL
+                  )
+                  music_tab._import_music()
+              finally:
+                  QFileDialog.getOpenFileNames = original_get_open_names
+                  music_tab._choose_storage_mode = original_choose_storage
+              external_music = [
+                  asset
+                  for asset in db.list_media_assets(MEDIA_CATEGORY_MUSIC)
+                  if asset.storage_mode == MEDIA_STORAGE_EXTERNAL
+              ]
+              batch_names = {Path(asset.external_path).name for asset in external_music}
+              assert {"batch-a.wav", "batch-b.wav"}.issubset(batch_names)
+              assert player.current_media_id == current_before_batch
+
               assert stream_tab.music_player_show_mode.count() == 3
               assert stream_tab.music_player_animation.count() == 2
 
@@ -485,6 +519,8 @@ jobs:
           assert 'QCheckBox("Повторять текущий трек")' in music_ui
           assert '"По алфавиту"' in music_ui
           assert '"Перемешать"' in music_ui
+          assert "getOpenFileNames" in music_ui
+          assert "setClearButtonEnabled(True)" in music_ui
 
           main = Path("streaming_manager/views/main_window.py").read_text(encoding="utf-8")
           assert 'self.tabs.addTab(self.music_tab, "Музыка")' in main
