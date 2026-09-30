@@ -42,6 +42,7 @@ FULL_BACKUP_MANAGED_DIRS = (
     "credentials",
     "overlay_backgrounds",
     "music",
+    "soundtrack",
     "wheel_jingles",
     "wheel_center_icons",
 )
