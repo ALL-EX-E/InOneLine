@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
+from ..music_player import MusicPlayerController
 from ..backup_restore import read_and_clear_restore_result
 from ..constants import (
     APP_NAME, APP_VERSION, COOP_LABELS, DEFAULT_API_HOST, STATUS_ABANDONED,
@@ -49,6 +50,7 @@ from .common import (
 from .games import GamesTab
 from .public import PublicTab
 from .stream import StreamTab
+from .music import MusicTab
 from .auction import AuctionTab
 from .completed_auction_history import CompletedAuctionHistoryTab
 from .log import LogTab
@@ -120,9 +122,15 @@ class MainWindow(QMainWindow):
         self.games_tab = GamesTab(db, self.notify_game_data_changed)
         self.public_tab = PublicTab(db, self.api)
         self.stream_tab = StreamTab(db, self.api)
-        # Shared authority for current/future music sources. D43 lets Auction
-        # acquire it; D26 can register the independent music player later.
         self.audio_coordinator = AudioCoordinator(self)
+        self.music_player = MusicPlayerController(
+            db,
+            self.audio_coordinator,
+            self,
+        )
+        self.music_tab = MusicTab(db, self.music_player)
+        self.api.set_music_player_state_provider(self.music_player.browser_state)
+        self.api.set_music_player_cover_provider(self.music_player.cover_bytes)
         self.auction_tab = AuctionTab(
             db,
             self.refresh_game_data_views,
@@ -133,6 +141,12 @@ class MainWindow(QMainWindow):
         )
         self.api.set_auction_lots_state_provider(
             self.auction_tab.auction_lots_overlay_state
+        )
+        self.music_tab.copy_player_overlay_url_btn.clicked.connect(
+            self.stream_tab.copy_music_player_overlay_url
+        )
+        self.music_tab.open_player_overlay_preview_btn.clicked.connect(
+            self.stream_tab.open_music_player_overlay_preview
         )
         # Duplicate navigation controls call the exact same Stream/OBS actions.
         # No second URL or preview logic is maintained in Games/Auction.
@@ -198,6 +212,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.games_tab, "Игры")
         self.tabs.addTab(self.public_tab, "Публичный список")
         self.tabs.addTab(self.stream_tab, "Стрим / OBS")
+        self.tabs.addTab(self.music_tab, "Музыка")
         self.tabs.addTab(self.auction_tab, "Аукцион")
         self.tabs.addTab(self.completed_history_tab, "История аукционов")
         self.tabs.addTab(self.log_tab, "Журнал")
@@ -667,6 +682,7 @@ class MainWindow(QMainWindow):
             self.games_tab,
             self.public_tab,
             self.stream_tab,
+            self.music_tab,
             self.completed_history_tab,
             self.log_tab,
         ):
@@ -685,6 +701,7 @@ class MainWindow(QMainWindow):
         self.public_tab.shutdown_public_xlsx()
         self.auction_tab.shutdown_shared_xlsx()
         self.auction_tab.shutdown_audio()
+        self.music_player.shutdown()
         self.api.stop()
         super().closeEvent(event)
 
