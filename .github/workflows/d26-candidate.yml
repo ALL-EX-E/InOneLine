@@ -206,6 +206,8 @@ jobs:
               second = MusicPlayerController(db, AudioCoordinator())
               assert second.desired_state == PLAYER_PAUSE
               second.shutdown()
+              second.deleteLater()
+              app.processEvents()
 
           print("D26 SEMANTIC SMOKE: PASS")
           '@ | Set-Content -Encoding utf8 d26_semantic_smoke.py
