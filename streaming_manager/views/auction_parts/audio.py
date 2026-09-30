@@ -458,6 +458,16 @@ class AuctionAudioMixin:
         self.wheel_soundtrack_combo.blockSignals(False)
         if selected_id is not None and index < 0:
             self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "")
+            # A file can disappear between refreshes. Combo signals are
+            # intentionally blocked while rebuilding, so perform the live
+            # transport cleanup explicitly.
+            self._wheel_audio_asset_id = None
+            self._stop_wheel_soundtrack(immediate=True)
+            self._sync_audio_owner_with_session(
+                self._current_session(),
+                spin_running=False,
+            )
+            self._refresh_browser_audio_snapshot()
         self._refresh_wheel_soundtrack_availability()
 
     def _refresh_wheel_soundtrack_availability(self) -> None:
@@ -830,6 +840,9 @@ class AuctionAudioMixin:
         self.auction_soundtrack_combo.blockSignals(False)
         if selected_id is not None and index < 0:
             self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, "")
+            self._stop_auction_soundtrack(immediate=True)
+            self._release_auction_audio_owner()
+            self._refresh_browser_audio_snapshot()
         self._refresh_auction_soundtrack_availability()
 
     def _refresh_auction_soundtrack_availability(self) -> None:
