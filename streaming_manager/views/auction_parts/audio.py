@@ -35,8 +35,7 @@ from ...constants import (
     WHEEL_SOUNDTRACK_VOLUME_KEY,
 )
 from ...media import (
-    MEDIA_CATEGORY_MUSIC,
-    MEDIA_CATEGORY_WHEEL_JINGLES,
+    MEDIA_CATEGORY_SOUNDTRACK,
     MEDIA_STORAGE_EXTERNAL,
     MEDIA_STORAGE_MANAGED,
     media_asset_available,
@@ -60,11 +59,13 @@ class AuctionAudioMixin:
         self.wheel_audio.playbackError.connect(self._wheel_audio_error)
         self._wheel_soundtrack_copy_worker: FunctionWorker | None = None
         self._wheel_audio_runtime_error = ""
-        self.wheel_jingles_dir = managed_media_directory(
+        self.soundtrack_dir = managed_media_directory(
             self.db.path.parent,
-            MEDIA_CATEGORY_WHEEL_JINGLES,
+            MEDIA_CATEGORY_SOUNDTRACK,
         )
-        self.wheel_jingles_dir.mkdir(parents=True, exist_ok=True)
+        self.soundtrack_dir.mkdir(parents=True, exist_ok=True)
+        # Auction and Wheel deliberately share one D26 soundtrack catalog.
+        self.wheel_jingles_dir = self.soundtrack_dir
         self.wheel_audio.set_volume_percent(self._saved_wheel_soundtrack_volume())
         self.wheel_audio.set_muted(self._saved_wheel_soundtrack_mute())
 
@@ -75,11 +76,7 @@ class AuctionAudioMixin:
         self._auction_soundtrack_copy_worker: FunctionWorker | None = None
         self._auction_audio_runtime_error = ""
         self._auction_audio_session_id: int | None = None
-        self.auction_music_dir = managed_media_directory(
-            self.db.path.parent,
-            MEDIA_CATEGORY_MUSIC,
-        )
-        self.auction_music_dir.mkdir(parents=True, exist_ok=True)
+        self.auction_music_dir = self.soundtrack_dir
         self.auction_audio.set_volume_percent(self._saved_auction_soundtrack_volume())
         self.auction_audio.set_muted(self._saved_auction_soundtrack_mute())
 
@@ -152,41 +149,62 @@ class AuctionAudioMixin:
         if coordinator is not None:
             coordinator.release_auction()
 
+    def _configured_soundtrack_asset(self, setting_key: str):
+        raw = str(self.db.get_setting(setting_key, "") or "")
+        if not raw.isdigit():
+            return None
+        asset = self.db.get_media_asset(int(raw))
+        if (
+            asset is None
+            or asset.category != MEDIA_CATEGORY_SOUNDTRACK
+            or not media_asset_available(self.db.path.parent, asset)
+        ):
+            return None
+        return asset
+
     def _sync_audio_owner_with_session(
         self,
         session: dict | None,
         *,
         spin_running: bool | None = None,
     ) -> None:
+        """D26 ownership follows an actually audible configured soundtrack."""
         if session is None:
             self._release_auction_audio_owner()
             return
+
         status = str(session.get("status") or "")
         mode = str(session.get("mode") or "")
-        # Direct weighted-wheel sessions own audio only while a spin is being
-        # prepared/played. Between D21 rounds (awaiting_wheel), the future
-        # independent Music Player is allowed to resume until the next
-        # explicit «Крутить». Max-amount tie-breaks keep the historical
-        # continuous auction ownership semantics.
-        if status == "awaiting_wheel" and mode == "weighted_wheel":
-            if getattr(self, "_wheel_rng_worker", None) is not None:
+        if spin_running is None:
+            spin_running = bool(
+                status == "winner_selected"
+                and session.get("wheel_spin_id")
+                and not self._wheel_spin_complete(session)
+            )
+
+        if spin_running:
+            wheel_asset = self._configured_soundtrack_asset(
+                WHEEL_SOUNDTRACK_MEDIA_ID_KEY
+            )
+            if wheel_asset is not None and not self.wheel_audio.muted:
                 self._acquire_auction_audio_owner()
             else:
                 self._release_auction_audio_owner()
             return
-        if status == "winner_selected":
-            if spin_running is None:
-                spin_running = bool(
-                    session.get("wheel_spin_id")
-                    and not self._wheel_spin_complete(session)
-                )
-            if not spin_running:
+
+        if status in ("running", "paused") and mode == "max_amount":
+            auction_asset = self._configured_soundtrack_asset(
+                AUCTION_SOUNDTRACK_MEDIA_ID_KEY
+            )
+            if auction_asset is not None and not self.auction_audio.muted:
+                self._acquire_auction_audio_owner()
+            else:
                 self._release_auction_audio_owner()
-                return
-        if status in self.db.AUCTION_OPEN_STATUSES:
-            self._acquire_auction_audio_owner()
-        else:
-            self._release_auction_audio_owner()
+            return
+
+        # Tie setup, awaiting wheel, revealed result and idle states all return
+        # audible ownership to the independent Music Player.
+        self._release_auction_audio_owner()
 
     def _refresh_browser_audio_snapshot(self) -> None:
         mode = str(
@@ -301,7 +319,8 @@ class AuctionAudioMixin:
         self.repair_wheel_soundtrack_btn.setEnabled(False)
         repair_row.addWidget(self.repair_wheel_soundtrack_btn)
         repair_row.addStretch()
-        root.addLayout(repair_row)
+        self.repair_wheel_soundtrack_btn.setVisible(False)
+        repair_row.setContentsMargins(0, 0, 0, 0)
 
         gain_row = QHBoxLayout()
         gain_row.setSpacing(5)
@@ -368,14 +387,18 @@ class AuctionAudioMixin:
         return label if available else f"⚠ файл недоступен: {label}"
 
     def _wheel_soundtrack_assets(self):
-        return self.db.sync_managed_media_category(MEDIA_CATEGORY_WHEEL_JINGLES)
+        return [
+            asset
+            for asset in self.db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
+            if media_asset_available(self.db.path.parent, asset)
+        ]
 
     def _selected_wheel_soundtrack_asset(self):
         raw = self.wheel_soundtrack_combo.currentData()
         if not str(raw or "").isdigit():
             return None
         asset = self.db.get_media_asset(int(raw))
-        if asset is None or asset.category != MEDIA_CATEGORY_WHEEL_JINGLES:
+        if asset is None or asset.category != MEDIA_CATEGORY_SOUNDTRACK:
             return None
         return asset
 
@@ -426,7 +449,7 @@ class AuctionAudioMixin:
             path_text = str(asset.external_path or asset.managed_name)
         self.wheel_soundtrack_status.setToolTip(path_text)
 
-        needs_repair = asset.storage_mode == MEDIA_STORAGE_EXTERNAL and not available
+        needs_repair = False
         if available:
             self.wheel_soundtrack_status.setText(
                 "Доступен" if not self._wheel_audio_runtime_error else self._wheel_audio_runtime_error
@@ -439,8 +462,8 @@ class AuctionAudioMixin:
             self.wheel_soundtrack_status.setText(
                 "Файл недоступен — добавьте soundtrack заново или выберите другой"
             )
-        self.repair_wheel_soundtrack_btn.setVisible(needs_repair)
-        self.repair_wheel_soundtrack_btn.setEnabled(needs_repair)
+        self.repair_wheel_soundtrack_btn.setVisible(False)
+        self.repair_wheel_soundtrack_btn.setEnabled(False)
 
     def _wheel_soundtrack_selection_changed(self, _index: int = -1) -> None:
         asset = self._selected_wheel_soundtrack_asset()
@@ -449,6 +472,21 @@ class AuctionAudioMixin:
             WHEEL_SOUNDTRACK_MEDIA_ID_KEY,
             str(asset.id) if asset is not None else "",
         )
+        session = self._current_session()
+        spin_running = bool(
+            session
+            and str(session.get("status") or "") == "winner_selected"
+            and session.get("wheel_spin_id")
+            and not self._wheel_spin_complete(session)
+        )
+        if spin_running:
+            if asset is None:
+                self._stop_wheel_soundtrack(immediate=True)
+                self._sync_audio_owner_with_session(session, spin_running=False)
+            else:
+                self._schedule_wheel_soundtrack(
+                    self._load_wheel_payload(session)
+                )
         self._refresh_wheel_soundtrack_availability()
 
     def _wheel_soundtrack_volume_changed(self, value: int) -> None:
@@ -458,6 +496,9 @@ class AuctionAudioMixin:
     def _wheel_soundtrack_mute_changed(self, muted: bool) -> None:
         normalized = self.wheel_audio.set_muted(muted)
         self.db.set_setting(WHEEL_SOUNDTRACK_MUTE_KEY, "1" if normalized else "0")
+        session = self._current_session()
+        self._sync_audio_owner_with_session(session)
+        self._refresh_browser_audio_snapshot()
 
     def _choose_wheel_soundtrack_storage_mode(self, source: Path) -> str | None:
         dialog = QMessageBox(self)
@@ -468,7 +509,7 @@ class AuctionAudioMixin:
         )
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в отдельной папке "
-            "data\\wheel_jingles. «Использовать исходный файл» сохранит ссылку "
+            "data\\soundtrack. «Использовать исходный файл» сохранит ссылку "
             "на оригинал; сам оригинал программа не изменяет и не удаляет."
         )
         copy_button = dialog.addButton(
@@ -499,6 +540,40 @@ class AuctionAudioMixin:
             counter += 1
         return candidate
 
+    def _resolve_soundtrack_copy_target(self, source: Path) -> tuple[str, Path | None]:
+        target = self.soundtrack_dir / source.name
+        if not target.exists():
+            return "copy", target
+
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Soundtrack уже существует")
+        dialog.setIcon(QMessageBox.Icon.Question)
+        dialog.setText(f"В каталоге soundtrack уже есть файл «{target.name}».")
+        use_button = dialog.addButton(
+            "Использовать существующий", QMessageBox.ButtonRole.AcceptRole
+        )
+        replace_button = dialog.addButton(
+            "Заменить", QMessageBox.ButtonRole.DestructiveRole
+        )
+        separate_button = dialog.addButton(
+            "Сохранить отдельную копию", QMessageBox.ButtonRole.ActionRole
+        )
+        dialog.addButton(QMessageBox.StandardButton.Cancel)
+        dialog.exec()
+        clicked = dialog.clickedButton()
+        if clicked is use_button:
+            return "use", target
+        if clicked is replace_button:
+            return "copy", target
+        if clicked is separate_button:
+            counter = 2
+            candidate = self.soundtrack_dir / f"{source.stem} ({counter}){source.suffix}"
+            while candidate.exists():
+                counter += 1
+                candidate = self.soundtrack_dir / f"{source.stem} ({counter}){source.suffix}"
+            return "copy", candidate
+        return "cancel", None
+
     @staticmethod
     def _copy_wheel_soundtrack(source: Path, target: Path) -> Path:
         try:
@@ -525,7 +600,7 @@ class AuctionAudioMixin:
 
     def _wheel_soundtrack_copy_ready(self, target: Path) -> None:
         asset = self.db.ensure_managed_media_asset(
-            MEDIA_CATEGORY_WHEEL_JINGLES,
+            MEDIA_CATEGORY_SOUNDTRACK,
             target.name,
             target.name,
         )
@@ -556,7 +631,7 @@ class AuctionAudioMixin:
         if not path:
             return
         source = Path(path)
-        if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_WHEEL_JINGLES):
+        if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK):
             QMessageBox.warning(
                 self,
                 "Неподдерживаемый формат",
@@ -573,7 +648,7 @@ class AuctionAudioMixin:
             return
         if storage_mode == MEDIA_STORAGE_EXTERNAL:
             asset = self.db.register_external_media_asset(
-                MEDIA_CATEGORY_WHEEL_JINGLES,
+                MEDIA_CATEGORY_SOUNDTRACK,
                 source,
             )
             self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
@@ -582,7 +657,7 @@ class AuctionAudioMixin:
 
         if source.resolve().parent == self.wheel_jingles_dir.resolve():
             asset = self.db.ensure_managed_media_asset(
-                MEDIA_CATEGORY_WHEEL_JINGLES,
+                MEDIA_CATEGORY_SOUNDTRACK,
                 source.name,
                 source.name,
             )
@@ -590,7 +665,18 @@ class AuctionAudioMixin:
             self._refresh_wheel_soundtrack_library(asset.id)
             return
 
-        target = self._unique_wheel_soundtrack_target(source)
+        action, target = self._resolve_soundtrack_copy_target(source)
+        if action == "cancel" or target is None:
+            return
+        if action == "use":
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_SOUNDTRACK,
+                target.name,
+                target.name,
+            )
+            self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
+            self._refresh_wheel_soundtrack_library(asset.id)
+            return
         self._start_wheel_soundtrack_copy(source, target)
 
     def _repair_wheel_soundtrack_reference(self) -> None:
@@ -657,14 +743,8 @@ class AuctionAudioMixin:
         self.repair_auction_soundtrack_btn.setEnabled(False)
         repair_row.addWidget(self.repair_auction_soundtrack_btn)
         repair_row.addStretch()
-        root.addLayout(repair_row)
-
-        self.auction_soundtrack_loop_one = QCheckBox("Зациклить выбранный трек")
-        self.auction_soundtrack_loop_one.setChecked(self._saved_auction_soundtrack_loop_one())
-        self.auction_soundtrack_loop_one.toggled.connect(
-            self._auction_soundtrack_loop_one_changed
-        )
-        root.addWidget(self.auction_soundtrack_loop_one)
+        self.repair_auction_soundtrack_btn.setVisible(False)
+        repair_row.setContentsMargins(0, 0, 0, 0)
 
         gain_row = QHBoxLayout()
         gain_row.setSpacing(5)
@@ -735,14 +815,18 @@ class AuctionAudioMixin:
     def _auction_soundtrack_assets(self):
         # media_assets ORDER BY id is the existing deterministic library order.
         # The selected item is the starting point; sequential playback then wraps.
-        return self.db.sync_managed_media_category(MEDIA_CATEGORY_MUSIC)
+        return [
+            asset
+            for asset in self.db.sync_managed_media_category(MEDIA_CATEGORY_SOUNDTRACK)
+            if media_asset_available(self.db.path.parent, asset)
+        ]
 
     def _selected_auction_soundtrack_asset(self):
         raw = self.auction_soundtrack_combo.currentData()
         if not str(raw or "").isdigit():
             return None
         asset = self.db.get_media_asset(int(raw))
-        if asset is None or asset.category != MEDIA_CATEGORY_MUSIC:
+        if asset is None or asset.category != MEDIA_CATEGORY_SOUNDTRACK:
             return None
         return asset
 
@@ -794,7 +878,7 @@ class AuctionAudioMixin:
             path_text = str(asset.external_path or asset.managed_name)
         self.auction_soundtrack_status.setToolTip(path_text)
 
-        needs_repair = asset.storage_mode == MEDIA_STORAGE_EXTERNAL and not available
+        needs_repair = False
         if self._auction_audio_runtime_error:
             self.auction_soundtrack_status.setText(self._auction_audio_runtime_error)
         elif self.auction_audio.active:
@@ -813,8 +897,8 @@ class AuctionAudioMixin:
             self.auction_soundtrack_status.setText(
                 "Файл недоступен — добавьте soundtrack заново или выберите другой"
             )
-        self.repair_auction_soundtrack_btn.setVisible(needs_repair)
-        self.repair_auction_soundtrack_btn.setEnabled(needs_repair)
+        self.repair_auction_soundtrack_btn.setVisible(False)
+        self.repair_auction_soundtrack_btn.setEnabled(False)
 
     def _auction_soundtrack_selection_changed(self, _index: int = -1) -> None:
         asset = self._selected_auction_soundtrack_asset()
@@ -823,6 +907,20 @@ class AuctionAudioMixin:
             AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
             str(asset.id) if asset is not None else "",
         )
+        session = self._current_session()
+        if (
+            session is not None
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in ("running", "paused")
+        ):
+            if asset is None:
+                self._stop_auction_soundtrack(immediate=True)
+            else:
+                self._start_auction_soundtrack_for_session(
+                    session,
+                    restart=True,
+                )
+            self._sync_audio_owner_with_session(session)
         self._refresh_auction_soundtrack_availability()
 
     def _auction_soundtrack_loop_one_changed(self, enabled: bool) -> None:
@@ -835,6 +933,8 @@ class AuctionAudioMixin:
     def _auction_soundtrack_mute_changed(self, muted: bool) -> None:
         normalized = self.auction_audio.set_muted(muted)
         self.db.set_setting(AUCTION_SOUNDTRACK_MUTE_KEY, "1" if normalized else "0")
+        self._sync_audio_owner_with_session(self._current_session())
+        self._refresh_browser_audio_snapshot()
 
     def _choose_auction_soundtrack_storage_mode(self, source: Path) -> str | None:
         dialog = QMessageBox(self)
@@ -845,7 +945,7 @@ class AuctionAudioMixin:
         )
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в папке "
-            "data\\music. «Использовать исходный файл» сохранит ссылку на "
+            "data\\soundtrack. «Использовать исходный файл» сохранит ссылку на "
             "оригинал; сам оригинал программа не изменяет и не удаляет."
         )
         copy_button = dialog.addButton(
@@ -902,7 +1002,7 @@ class AuctionAudioMixin:
 
     def _auction_soundtrack_copy_ready(self, target: Path) -> None:
         asset = self.db.ensure_managed_media_asset(
-            MEDIA_CATEGORY_MUSIC,
+            MEDIA_CATEGORY_SOUNDTRACK,
             target.name,
             target.name,
         )
@@ -933,7 +1033,7 @@ class AuctionAudioMixin:
         if not path:
             return
         source = Path(path)
-        if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_MUSIC):
+        if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK):
             QMessageBox.warning(
                 self,
                 "Неподдерживаемый формат",
@@ -949,14 +1049,14 @@ class AuctionAudioMixin:
         if storage_mode is None:
             return
         if storage_mode == MEDIA_STORAGE_EXTERNAL:
-            asset = self.db.register_external_media_asset(MEDIA_CATEGORY_MUSIC, source)
+            asset = self.db.register_external_media_asset(MEDIA_CATEGORY_SOUNDTRACK, source)
             self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
             self._refresh_auction_soundtrack_library(asset.id)
             return
 
         if source.resolve().parent == self.auction_music_dir.resolve():
             asset = self.db.ensure_managed_media_asset(
-                MEDIA_CATEGORY_MUSIC,
+                MEDIA_CATEGORY_SOUNDTRACK,
                 source.name,
                 source.name,
             )
@@ -964,7 +1064,18 @@ class AuctionAudioMixin:
             self._refresh_auction_soundtrack_library(asset.id)
             return
 
-        target = self._unique_auction_soundtrack_target(source)
+        action, target = self._resolve_soundtrack_copy_target(source)
+        if action == "cancel" or target is None:
+            return
+        if action == "use":
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_SOUNDTRACK,
+                target.name,
+                target.name,
+            )
+            self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
+            self._refresh_auction_soundtrack_library(asset.id)
+            return
         self._start_auction_soundtrack_copy(source, target)
 
     def _repair_auction_soundtrack_reference(self) -> None:
@@ -999,21 +1110,11 @@ class AuctionAudioMixin:
         selected = self._selected_auction_soundtrack_asset()
         if selected is None or not media_asset_available(self.db.path.parent, selected):
             return [], [], 0
-        paths: list[Path] = []
-        asset_ids: list[int] = []
-        start_index = 0
-        for asset in self._auction_soundtrack_assets():
-            if not media_asset_available(self.db.path.parent, asset):
-                continue
-            try:
-                path = resolve_media_asset_path(self.db.path.parent, asset)
-            except (OSError, ValueError):
-                continue
-            if asset.id == selected.id:
-                start_index = len(paths)
-            paths.append(path)
-            asset_ids.append(int(asset.id))
-        return paths, asset_ids, start_index
+        try:
+            path = resolve_media_asset_path(self.db.path.parent, selected)
+        except (OSError, ValueError):
+            return [], [], 0
+        return [path], [int(selected.id)], 0
 
     def _start_auction_soundtrack_for_session(self, session: dict | None, *, restart: bool = False) -> None:
         if session is None or str(session.get("mode") or "") != "max_amount":
@@ -1044,7 +1145,7 @@ class AuctionAudioMixin:
             self.auction_audio.start_playlist(
                 paths,
                 start_index=start_index,
-                loop_one=self._saved_auction_soundtrack_loop_one(),
+                loop_one=True,
                 start_paused=status == "paused",
             )
             # start_playlist() first resets the old transport and can emit
@@ -1069,6 +1170,17 @@ class AuctionAudioMixin:
         status = str(session.get("status") or "")
         if status in ("running", "paused"):
             self._start_auction_soundtrack_for_session(session)
+
+    def _finish_auction_soundtrack_phase(self, result_status: str) -> None:
+        """Release audible ownership at timer end while retaining tie position."""
+        if str(result_status or "") == "tie_break_required":
+            if self.auction_audio.active and not self.auction_audio.paused:
+                self.auction_audio.pause()
+            self._refresh_browser_audio_snapshot()
+            self._refresh_auction_soundtrack_availability()
+        else:
+            self._stop_auction_soundtrack(immediate=False)
+        self._release_auction_audio_owner()
 
     def _stop_auction_soundtrack(self, *, immediate: bool = False) -> None:
         self.auction_audio.stop(immediate=immediate, fade_ms=self.AUCTION_SOUNDTRACK_FADE_MS)
@@ -1095,22 +1207,12 @@ class AuctionAudioMixin:
     def _set_auction_soundtrack_edit_enabled(self, enabled: bool) -> None:
         if not hasattr(self, "auction_soundtrack_combo"):
             return
-        enabled = bool(enabled)
-        self.auction_soundtrack_combo.setEnabled(enabled)
-        self.auction_soundtrack_loop_one.setEnabled(enabled)
+        self.auction_soundtrack_combo.setEnabled(True)
         self.add_auction_soundtrack_btn.setEnabled(
-            enabled and self._auction_soundtrack_copy_worker is None
+            self._auction_soundtrack_copy_worker is None
         )
-        # Volume and Mute intentionally remain live while the auction is active.
-        asset = self._selected_auction_soundtrack_asset()
-        repair = bool(
-            enabled
-            and asset is not None
-            and asset.storage_mode == MEDIA_STORAGE_EXTERNAL
-            and not media_asset_available(self.db.path.parent, asset)
-        )
-        self.repair_auction_soundtrack_btn.setVisible(repair)
-        self.repair_auction_soundtrack_btn.setEnabled(repair)
+        self.repair_auction_soundtrack_btn.setVisible(False)
+        self.repair_auction_soundtrack_btn.setEnabled(False)
 
     def _update_auction_soundtrack_panel(self, session: dict | None) -> None:
         if not hasattr(self, "auction_soundtrack_widget"):
@@ -1137,14 +1239,14 @@ class AuctionAudioMixin:
 
     def _schedule_wheel_soundtrack(self, wheel_payload: dict) -> None:
         """Schedule audio from the exact authoritative visual animation clock."""
-        asset = None
-        raw = self.db.get_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "")
-        if str(raw).isdigit():
-            asset = self.db.get_media_asset(int(raw))
-        if asset is None or asset.category != MEDIA_CATEGORY_WHEEL_JINGLES:
-            return
-        if not media_asset_available(self.db.path.parent, asset):
-            self._refresh_wheel_soundtrack_availability()
+        asset = self._configured_soundtrack_asset(WHEEL_SOUNDTRACK_MEDIA_ID_KEY)
+        if asset is None:
+            self._wheel_audio_asset_id = None
+            self._stop_wheel_soundtrack(immediate=True)
+            self._sync_audio_owner_with_session(
+                self._current_session(),
+                spin_running=False,
+            )
             return
 
         animation = (wheel_payload or {}).get("animation") or {}
@@ -1162,8 +1264,17 @@ class AuctionAudioMixin:
                 duration_ms=duration_ms,
                 fade_ms=self.WHEEL_SOUNDTRACK_FADE_MS,
             )
+            self._sync_audio_owner_with_session(
+                self._current_session(),
+                spin_running=True,
+            )
+            self._refresh_browser_audio_snapshot()
         except Exception as exc:
             self._wheel_audio_error(str(exc))
+            self._sync_audio_owner_with_session(
+                self._current_session(),
+                spin_running=False,
+            )
 
     def _stop_wheel_soundtrack(self, *, immediate: bool = False) -> None:
         self.wheel_audio.stop(immediate=immediate, fade_ms=self.WHEEL_SOUNDTRACK_FADE_MS)
@@ -1183,18 +1294,9 @@ class AuctionAudioMixin:
     def _set_wheel_soundtrack_edit_enabled(self, enabled: bool) -> None:
         if not hasattr(self, "wheel_soundtrack_combo"):
             return
-        enabled = bool(enabled)
-        self.wheel_soundtrack_combo.setEnabled(enabled)
+        self.wheel_soundtrack_combo.setEnabled(True)
         self.add_wheel_soundtrack_btn.setEnabled(
-            enabled and self._wheel_soundtrack_copy_worker is None
+            self._wheel_soundtrack_copy_worker is None
         )
-        # Volume and Mute intentionally remain live during playback.
-        asset = self._selected_wheel_soundtrack_asset()
-        repair = bool(
-            enabled
-            and asset is not None
-            and asset.storage_mode == MEDIA_STORAGE_EXTERNAL
-            and not media_asset_available(self.db.path.parent, asset)
-        )
-        self.repair_wheel_soundtrack_btn.setVisible(repair)
-        self.repair_wheel_soundtrack_btn.setEnabled(repair)
+        self.repair_wheel_soundtrack_btn.setVisible(False)
+        self.repair_wheel_soundtrack_btn.setEnabled(False)
