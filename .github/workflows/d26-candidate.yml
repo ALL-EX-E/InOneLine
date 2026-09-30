@@ -75,6 +75,7 @@ jobs:
           from streaming_manager.media import (
               MEDIA_CATEGORY_MUSIC,
               MEDIA_CATEGORY_SOUNDTRACK,
+              MEDIA_STORAGE_EXTERNAL,
               managed_media_directory,
           )
           from streaming_manager.music_player import (
