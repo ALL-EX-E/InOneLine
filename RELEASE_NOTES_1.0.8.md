@@ -1,86 +1,90 @@
 # InOneLine 1.0.8
 
-Candidate after accepted/released 1.0.7. CURRENT remains 1.0.7 until native Windows manual QA and explicit user acceptance.
+Функциональный patch после принятой 1.0.7. Global Conditional UI Visibility candidate прошёл автоматические Windows-gates и полный focused manual QA перед публикацией.
 
 ## Conditional UI Visibility
 
-The UI now distinguishes two different states:
+Интерфейс теперь различает два состояния:
 
-- **semantically inapplicable** controls are hidden;
-- controls that are still valid but only **temporarily unavailable** stay visible and disabled.
+- **логически неприменимые** элементы скрываются;
+- элементы, которые всё ещё применимы, но **временно недоступны**, остаются видимыми и disabled.
 
-This avoids permanent grey clutter without making short worker/RNG/connection locks jump around.
+Это убирает постоянный серый UI-мусор, но не заставляет интерфейс прыгать во время коротких worker/RNG/connection lock-состояний.
 
 ### Stream / OBS
 
-- Timer: “Цвет фона” is shown only for the Color background mode.
-- Auction Lots: “Цвет фона” is shown only for Color; “Свой фон” is shown only for Custom.
-- Rules: background color and opacity are shown only for Color.
-- Main overlay:
-  - webcam position is hidden while the webcam block is disabled;
-  - list side is hidden while the list block is disabled;
-  - information position is hidden while the information block is disabled;
-  - frame-color rows for webcam/list/info are hidden with the corresponding block;
-  - Top-1/Top-2/Top-3/list typography is hidden with the list block;
-  - information typography is hidden with the information block.
-- Existing D26 Music Player conditional rows are preserved unchanged.
+- Timer: «Цвет фона» показывается только для режима Color.
+- Auction Lots: «Цвет фона» показывается только для Color; «Свой фон» — только для Custom.
+- Rules: цвет и непрозрачность фона показываются только для Color.
+- Основной overlay:
+  - положение веб-камеры скрывается, когда webcam block выключен;
+  - сторона списка скрывается, когда list block выключен;
+  - положение информации скрывается, когда info block выключен;
+  - строки цвета рамки webcam/list/info скрываются вместе с соответствующим блоком;
+  - Top-1/Top-2/Top-3/list typography скрывается вместе со списком;
+  - typography дополнительной информации скрывается вместе с info block.
+- Существующая D26 conditional visibility Music Player сохранена без изменений.
 
-### Auction settings
+### Настройки аукциона
 
-For timer auto-extension:
+Для автопродления:
 
-- each reason duration is hidden while that reason is OFF;
-- “Также учитывать неденежные единицы интеграций” is hidden while External donation is OFF;
-- the threshold duration is hidden while the threshold is OFF.
+- время каждой причины скрывается, пока причина OFF;
+- «Также учитывать неденежные единицы интеграций» скрывается, пока External donation OFF;
+- поле threshold duration скрывается, пока threshold OFF.
 
-Saved values are not deleted when their controls are hidden.
+Сохранённые значения не удаляются при скрытии.
 
-### Games
+### Игры
 
-- For an active selected game, only “В архив” is shown.
-- For an archived selected game, only “Восстановить” is shown.
-- With no selected game, neither mutually exclusive action is shown.
-- If an applicable action is temporarily blocked by a worker, it stays visible but disabled.
+- Для активной выбранной игры показывается только «В архив».
+- Для архивной выбранной игры показывается только «Восстановить».
+- Без выбранной игры обе взаимоисключающие кнопки скрыты.
+- Если применимое действие временно заблокировано worker-операцией, оно остаётся видимым, но disabled.
 
 ### XLSX connections
 
-- Public-list XLSX: “Отключить” is hidden when no table is connected.
-- Shared main-list XLSX: “Отключить” is hidden when no table is connected.
-- During a transient worker operation, an existing Disconnect action remains visible and may be temporarily disabled.
+- Public XLSX: «Отключить» скрыта, если таблица не подключена.
+- Shared XLSX: «Отключить» скрыта, если таблица не подключена.
+- Во время временной worker-операции существующая Disconnect-кнопка остаётся видимой и может быть disabled.
 
-### Auction and history actions
+### Аукцион и история
 
-- Current-auction “Удалить лот” is visible only when the auction is running **and** the selected row is a temporary auction-only lot.
-- Completed-auction verification actions are hidden when no verification snapshot exists.
-- The Random.org+ proof action keeps its existing conditional visibility.
+- «Удалить лот» видна только при running-аукционе и выборе временного auction-only lot.
+- В истории завершённых аукционов verification actions скрыты, если snapshot отсутствует.
+- Random.org+ proof action сохраняет прежнюю условную видимость.
 
-## Deliberately unchanged
+## Намеренно не изменено
 
-Temporary/safety locks remain disabled rather than hidden:
+Временные/safety lock-состояния остаются disabled, а не hidden:
 
-- active file copy/import/backup/restore workers;
-- RNG preparation, active spin and timer safety states;
-- integration actions unavailable because a provider is disconnected;
+- активные file copy/import/backup/restore workers;
+- RNG preparation, active spin и timer safety states;
+- integration actions, временно недоступные из-за состояния provider;
 - concurrent/destructive mutation locks.
 
 ## Compatibility
 
 - SQLite schema: **19**
 - Named migrations: **15**
-- No database migration.
-- No RNG/winner-selection change.
-- Updating from 1.0.7 preserves all saved values; hidden controls continue using their saved state when they become applicable again.
+- Database migration: **нет**
+- RNG / winner selection: **без изменений**
+- Обновление с 1.0.7 сохраняет все значения; скрытые controls продолжают использовать сохранённые данные при повторном появлении.
 
-## Acceptance gate
+## Verification
 
-Candidate must pass:
+Accepted candidate commit:
 
-- compile/static/semantic checks;
-- protected RNG-source diff;
-- PyInstaller + Inno Setup Windows build;
-- frozen startup/API smoke;
-- publication wording gate;
-- focused native Windows manual verification;
-- explicit user acceptance.
+`af29d033d5d8cf6bcb774355771121c1bdc7d10f`
 
-Until then **1.0.7 remains CURRENT / RELEASED**.
+Automated Windows candidate gate:
+
+`36739896076` — SUCCESS
+
+Publication wording gate:
+
+`36739896140` — SUCCESS
+
+Manual Windows QA:
+
+**PASS 1–10 / FINAL**
