@@ -592,11 +592,15 @@ jobs:
                   assert "createAnalyser" in overlay
                   assert "object-fit:cover" in overlay
                   assert "marquee" in overlay
-                  assert "22.5vw" in overlay
+                  assert 'left:1.2vw' in overlay
+                  assert 'border-radius:1.1vw' in overlay
+                  assert 'id="vinylFallback"' in overlay
+                  assert 'const demo=preview ||' in overlay
+                  assert 'padding:0 .24em' in overlay
 
                   with urllib.request.urlopen(base + "/music-placeholder", timeout=5) as response:
                       placeholder = response.read()
-                  assert placeholder.startswith(b"\x89PNG\r\n\x1a\n")
+                  assert b"<svg" in placeholder and b"Vinyl record" in placeholder
               finally:
                   api.stop()
 
@@ -722,10 +726,15 @@ jobs:
           assert "object-fit:cover" in overlay
           assert "slide-left" in overlay
           assert "marquee" in overlay
-          assert "width:100vw; height:22.5vw" in overlay
+          assert "width:97.6vw; height:21.96vw" in overlay
+          assert "border-radius:1.1vw" in overlay
+          assert 'id="vinylFallback"' in overlay
+          assert "const demo=preview ||" in overlay
 
-          placeholder = Path("streaming_manager/web/music_placeholder_vinyl.png")
-          assert placeholder.is_file() and placeholder.stat().st_size > 1000
+          placeholder = Path("streaming_manager/web/music_placeholder_vinyl.svg")
+          assert placeholder.is_file()
+          placeholder_text = placeholder.read_text(encoding="utf-8")
+          assert "<svg" in placeholder_text and "Vinyl record" in placeholder_text
 
           notes = Path("RELEASE_NOTES_1.0.7.md").read_text(encoding="utf-8")
           assert "D26" in notes and "Музыкальный плеер" in notes
@@ -749,7 +758,7 @@ jobs:
           }
 
           $web = "dist\InOneLine\_internal\streaming_manager\web"
-          foreach ($name in @("music_player_overlay.html", "music_placeholder_vinyl.png")) {
+          foreach ($name in @("music_player_overlay.html", "music_placeholder_vinyl.svg")) {
             if (!(Test-Path (Join-Path $web $name))) {
               throw "Missing packaged D26 resource: $name"
             }
@@ -848,8 +857,8 @@ jobs:
             }
 
             $placeholder = Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-placeholder" -TimeoutSec 2
-            if ($placeholder.RawContentLength -lt 1000) {
-              throw "Frozen vinyl placeholder missing/empty"
+            if ($placeholder.Content -notmatch '<svg' -or $placeholder.Content -notmatch 'Vinyl record') {
+              throw "Frozen vinyl placeholder missing/invalid"
             }
 
             $timer = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/timer-overlay" -TimeoutSec 2).Content

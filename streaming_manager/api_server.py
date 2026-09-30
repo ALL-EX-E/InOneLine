@@ -147,7 +147,7 @@ class LocalApiServer:
             Path(__file__).resolve().parent / "web" / "music_player_overlay.html"
         )
         music_placeholder_path = (
-            Path(__file__).resolve().parent / "web" / "music_placeholder_vinyl.png"
+            Path(__file__).resolve().parent / "web" / "music_placeholder_vinyl.svg"
         )
         auction_lots_overlay_path = (
             Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"
@@ -390,7 +390,7 @@ class LocalApiServer:
                     self._send_json({"error": "placeholder_unavailable"}, 404)
                     return
                 self.send_response(200)
-                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()

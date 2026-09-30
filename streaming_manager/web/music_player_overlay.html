@@ -15,18 +15,19 @@ html,body { margin:0; width:100%; height:100%; overflow:hidden; background:trans
 body { font-family:var(--font); }
 #stage { position:fixed; inset:0; overflow:hidden; pointer-events:none; }
 #card {
-  position:absolute; left:0; top:50%;
-  width:100vw; height:22.5vw;
+  position:absolute; left:1.2vw; top:50%;
+  width:97.6vw; height:21.96vw;
   transform:translateY(-50%);
   opacity:0;
   display:flex; align-items:center;
-  padding:3.125vw;
-  gap:3.75vw;
+  padding:3.05vw;
+  gap:3.65vw;
   background:var(--bg);
   border:0.22vw solid var(--frame);
-  box-shadow:0 0 0.55vw color-mix(in srgb,var(--frame) 88%,transparent),
-             0 0 1.65vw color-mix(in srgb,var(--frame) 55%,transparent),
-             inset 0 0 0.65vw color-mix(in srgb,var(--frame) 35%,transparent);
+  border-radius:1.1vw;
+  box-shadow:0 0 0.42vw color-mix(in srgb,var(--frame) 92%,transparent),
+             0 0 1.15vw color-mix(in srgb,var(--frame) 52%,transparent),
+             inset 0 0 0.52vw color-mix(in srgb,var(--frame) 32%,transparent);
   transition:opacity .45s ease, transform .45s cubic-bezier(.2,.8,.2,1),
              background-color .7s ease, border-color .7s ease, box-shadow .7s ease;
 }
@@ -38,23 +39,54 @@ body { font-family:var(--font); }
 #card.hidden.slide-bottom { opacity:0; transform:translateY(calc(-50% + 100vh + 22.5vw)); }
 
 #coverFrame {
-  flex:0 0 16.25vw; width:16.25vw; height:16.25vw;
+  position:relative;
+  flex:0 0 15.85vw; width:15.85vw; height:15.85vw;
   display:flex; align-items:center; justify-content:center; overflow:hidden;
   border:0.22vw solid var(--frame);
-  box-shadow:0 0 0.45vw color-mix(in srgb,var(--frame) 88%,transparent),
-             0 0 1.15vw color-mix(in srgb,var(--frame) 48%,transparent),
-             inset 0 0 0.55vw color-mix(in srgb,var(--frame) 30%,transparent);
+  border-radius:0.95vw;
+  background:rgba(255,255,255,.018);
+  box-shadow:0 0 0.36vw color-mix(in srgb,var(--frame) 92%,transparent),
+             0 0 0.95vw color-mix(in srgb,var(--frame) 48%,transparent),
+             inset 0 0 0.48vw color-mix(in srgb,var(--frame) 28%,transparent);
   transition:border-color .7s ease, box-shadow .7s ease;
 }
-#cover { width:100%; height:100%; display:block; object-fit:cover; object-position:center; }
-#cover.placeholder { object-fit:contain; padding:8%; }
+#cover {
+  position:absolute; inset:0;
+  width:100%; height:100%; display:block;
+  object-fit:cover; object-position:center;
+  border-radius:0.72vw;
+}
+#vinylFallback {
+  position:absolute; inset:8%;
+  display:none;
+  border-radius:50%;
+  background-image:
+    url("/music-placeholder"),
+    repeating-radial-gradient(circle at center,
+      rgba(255,255,255,.065) 0 .10vw,
+      rgba(0,0,0,0) .12vw .42vw),
+    radial-gradient(circle at 50% 50%,
+      #050608 0 7%,
+      #262a30 7.4% 8.5%,
+      #101216 9% 27%,
+      #2b3036 27.4% 28.4%,
+      #0b0d10 29% 100%);
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:contain,100% 100%,100% 100%;
+  filter:drop-shadow(0 0 .28vw rgba(255,255,255,.12));
+}
+#coverFrame.placeholder #vinylFallback { display:block; }
+#coverFrame.placeholder #cover { display:none; }
 
 #right { flex:1 1 auto; min-width:0; height:100%; display:flex; flex-direction:column; }
 #titleViewport {
   flex:0 0 48%; min-width:0; overflow:hidden; display:flex; align-items:center;
+  padding:0 .24em;
   color:var(--text); font-size:var(--font-size); font-weight:650; white-space:nowrap;
-  text-shadow:-.08em -.08em .09em var(--outline), .08em -.08em .09em var(--outline),
-              -.08em .08em .09em var(--outline), .08em .08em .09em var(--outline);
+  text-shadow:-.052em -.052em .018em var(--outline), .052em -.052em .018em var(--outline),
+              -.052em .052em .018em var(--outline), .052em .052em .018em var(--outline),
+              0 0 .045em var(--outline);
 }
 #titleInner { display:inline-block; white-space:nowrap; will-change:transform; }
 #titleInner.marquee {
@@ -75,7 +107,7 @@ body { font-family:var(--font); }
 <body>
 <div id="stage">
   <div id="card" class="hidden fade">
-    <div id="coverFrame"><img id="cover" class="placeholder" src="/music-placeholder" alt=""></div>
+    <div id="coverFrame" class="placeholder"><div id="vinylFallback" aria-hidden="true"></div><img id="cover" alt=""></div>
     <div id="right">
       <div id="titleViewport"><span id="titleInner">Исполнитель - Название трека</span></div>
       <div id="spectrumWrap"><canvas id="spectrum"></canvas></div>
@@ -266,17 +298,40 @@ function applyAutoColorsIfPossible(){
 }
 
 function updateCover(state, demo=false){
-  const url=demo?"/music-placeholder":(state.cover_url||"/music-placeholder");
-  const placeholder=demo || !state.has_cover;
+  const placeholder=demo || !state.has_cover || !state.cover_url;
+  coverFrame.classList.toggle("placeholder",placeholder);
+  if(placeholder){
+    if(cover.getAttribute("src")) cover.removeAttribute("src");
+    lastCoverUrl="";
+    autoPalette=null;
+    autoPaletteUrl="";
+    setManualColors(appearance);
+    return;
+  }
+
+  const url=state.cover_url;
   if(lastCoverUrl!==url){
     lastCoverUrl=url;
     autoPalette=null;
     autoPaletteUrl="";
-    cover.onload=()=>{ applyAutoColorsIfPossible(); };
+    cover.onload=()=>{
+      coverFrame.classList.remove("placeholder");
+      applyAutoColorsIfPossible();
+    };
+    cover.onerror=()=>{
+      coverFrame.classList.add("placeholder");
+      cover.removeAttribute("src");
+      lastCoverUrl="";
+      autoPalette=null;
+      autoPaletteUrl="";
+      setManualColors(appearance);
+      contrastColors(
+        appearance,
+        appearance.background==="color" ? hexRgb(appearance.background_color) : null
+      );
+    };
     cover.src=url;
   }
-  cover.classList.toggle("placeholder",placeholder);
-  if(placeholder) setManualColors(appearance);
 }
 function updateTitle(text, force=false){
   const value=text||"Исполнитель - Название трека";
@@ -287,7 +342,11 @@ function updateTitle(text, force=false){
     titleInner.classList.remove("marquee");
     titleInner.style.removeProperty("--marquee-distance");
     titleInner.style.removeProperty("--marquee-duration");
-    const overflow=Math.max(0,titleInner.scrollWidth-titleViewport.clientWidth);
+    const viewportStyle=getComputedStyle(titleViewport);
+    const safeLeft=parseFloat(viewportStyle.paddingLeft)||0;
+    const safeRight=parseFloat(viewportStyle.paddingRight)||0;
+    const available=Math.max(0,titleViewport.clientWidth-safeLeft-safeRight);
+    const overflow=Math.max(0,titleInner.scrollWidth-available);
     if(overflow>2){
       const seconds=clamp(7+overflow/70,9,24);
       titleInner.style.setProperty("--marquee-distance",overflow+"px");
@@ -362,7 +421,7 @@ function drawSpectrum(){
   const cssGap=Math.max(2,4*dpr);
   const count=Math.max(8,Math.floor(w/(cssBar+cssGap)));
   let values=[];
-  const demo=preview && (!currentState || !currentState.playing);
+  const demo=preview || (!currentState || !currentState.playing);
   if(!demo && analyser && frequencyData){
     analyser.getByteFrequencyData(frequencyData);
     const usable=Math.max(1,Math.floor(frequencyData.length*.72));
@@ -409,7 +468,11 @@ async function poll(){
       : (currentState.display_title||currentState.filename||"Исполнитель - Название трека");
     const mediaChanged=String(currentState.media_id??"")!==String(lastMediaId??"");
     updateTitle(displayText,mediaChanged);
-    await syncAudio(currentState);
+    if(preview){
+      if(!audio.paused) audio.pause();
+    } else {
+      await syncAudio(currentState);
+    }
     evaluateVisibility(currentState,lastEventSerial<0);
     if(!demo) lastEventSerial=Number(currentState.event_serial)||0;
   } catch(_e) {
