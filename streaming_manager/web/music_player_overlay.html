@@ -142,8 +142,13 @@ function setAudioGain(state){
   if(gainNode) gainNode.gain.value=audible ? clamp(Number(state.gain)||0,0,1) : 0;
 }
 async function syncAudio(state){
-  if(!state || !state.media_id || !state.url){
+  if(!state || state.stopped || !state.media_id || !state.url){
     if(!audio.paused) audio.pause();
+    if(state && state.stopped && audio.src){
+      audio.removeAttribute("src");
+      audio.load();
+      lastMediaId=null;
+    }
     return;
   }
   const wanted=new URL(state.url,location.href).href;
