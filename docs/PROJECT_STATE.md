@@ -4,32 +4,37 @@
 
 ## CURRENT / RELEASED
 
-- Version: **1.0.7**
-- Scope: **D26 — Music Player**
+- Version: **1.0.8**
+- Scope: **Global Conditional UI Visibility / Issue #3**
 - Status: **RELEASED / MANUALLY ACCEPTED**
 - SQLite schema: **19**
 - Named migrations: **15**
-- Accepted candidate commit: `8f58f8561ecd9832cf575a2bc0fdaf102375f298`
-- Final release commit on `main`: `5ee92aaa19472fa81f1b844886c9f999662c9674`
-- Final D26 Windows gate: `36715896504` — SUCCESS
-- Publication wording gate: `36725498488` — SUCCESS
-- GitHub publication workflow: `36725498493` — SUCCESS
-- Accepted artifact: `11097065150`
-- Manual Windows QA: **PASS**
+- Accepted candidate commit: `af29d033d5d8cf6bcb774355771121c1bdc7d10f`
+- Final release commit on `main`: `946365a10fa276f203846f6741da9c0bbce0ad5f`
+- Accepted Windows candidate gate: `36739896076` — SUCCESS
+- Post-acceptance metadata branch gate: `36746181439` — SUCCESS
+- Final main publication wording gate: `36746572696` — SUCCESS
+- GitHub publication workflow: `36746572837` — SUCCESS
+- Accepted artifact: `11110716356`
+- Manual Windows QA: **PASS 1–10 / FINAL**
 
-## Официальные артефакты 1.0.7
+## Официальные артефакты 1.0.8
 
-Installer: `InOneLine_Setup_1.0.7.exe`
+Installer: `InOneLine_Setup_1.0.8.exe`
 
-- Size: `47,618,359` bytes
-- SHA-256: `f89e0e713ca53354cda603c1e4748c064c96570edfeef5aa28fbfe1548106dc1`
+- Size: `47,607,483` bytes
+- SHA-256: `b960ece03364788941dacec0723cf4664ea4fb11461ec4322a2c03fb79ca66e4`
 
-Source: `InOneLine_Source_1.0.7.zip`
+Source: `InOneLine_Source_1.0.8.zip`
 
-- Size: `13,802,881` bytes
-- Files: `182`
-- SHA-256: `33e11f6590089d479eb9e9a64bde49dfef2858d4caefeab858a000a3e22ee20b`
+- Size: `13,816,053` bytes
+- Files: `192`
+- SHA-256: `babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15`
 - ZIP CRC: PASS
+
+GitHub Release/tag: **v1.0.8**
+
+Publication workflow повторно скачал опубликованные installer/source и подтвердил те же SHA-256.
 
 ## Последние принятые функциональные релизы
 
@@ -37,21 +42,20 @@ Source: `InOneLine_Source_1.0.7.zip`
 - **1.0.5 / D43** — OBS Browser Audio Transport через Timer Browser Source + AudioCoordinator foundation.
 - **1.0.6 / D21** — формат weighted wheel «Выбывание» + multi-spin verification.
 - **1.0.7 / D26** — полноценный Music Player, shared soundtrack library, AudioCoordinator ownership и отдельный OBS Music Player Overlay.
+- **1.0.8 / Global Conditional UI Visibility** — логически неприменимые controls скрываются; временно недоступные controls остаются visible + disabled.
 
 Подробности каждой версии находятся в `RELEASE_NOTES_<version>.md`.
 
 ## Текущая рабочая очередь
 
-Новый implementation scope **не выбран автоматически** после 1.0.7.
+После 1.0.8 новый implementation scope **не выбран автоматически**.
 
-Первым отдельным post-D26 patch разрешено рассматривать:
+Ближайшие eligible items:
 
-1. Global Conditional UI Visibility.
-2. Global Multi-File Import.
+1. **Global Multi-File Import** — Issue #4.
+2. **D22 — Battle Royale** — Issue #5, approved post-completion item, отложен и требует fresh design/review.
 
-Отдельно остаётся отложенный approved post-completion item:
-
-- **D22 — Battle Royale**.
+Issue #3 — **CLOSED / RELEASED in 1.0.8**.
 
 Выбор следующего scope требует отдельного решения пользователя и fresh exact-CURRENT review.
 
@@ -59,4 +63,4 @@ Source: `InOneLine_Source_1.0.7.zip`
 
 В счёт cadence входят только версии, которые прошли финальную пользовательскую приёмку и стали CURRENT/released. Candidate/FIX версии не считаются.
 
-Последняя явно зафиксированная отметка после 1.0.3 была 16/25; с принятыми 1.0.4–1.0.7 текущая арифметическая отметка — **20/25**. Перед фактическим C1 gate счётчик нужно сверить с release history, а не с candidate APP_VERSION.
+Последняя явно зафиксированная отметка после 1.0.3 была 16/25; с принятыми 1.0.4–1.0.8 текущая арифметическая отметка — **21/25**. Перед фактическим C1 gate счётчик нужно сверить с release history, а не с candidate APP_VERSION.
