@@ -369,8 +369,14 @@ class MusicTab(QWidget):
             QMessageBox.critical(self, "Добавление музыки", f"Не удалось добавить файл:\n{exc}")
             return
 
+        # Adding a file must not disturb the currently playing/prepared track.
+        # Refresh the library and only move the UI selection to the new row.
         self.controller.refresh_library()
-        self.controller.select_media(asset.id, play=False)
+        for index in range(self.list_widget.count()):
+            row = self.list_widget.item(index)
+            if int(row.data(Qt.UserRole)) == int(asset.id):
+                self.list_widget.setCurrentItem(row)
+                break
 
     def _show_playback_error(self, message: str) -> None:
         QMessageBox.warning(
