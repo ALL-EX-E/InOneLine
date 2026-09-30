@@ -49,6 +49,93 @@ class MediaMixin:
         with self.connect() as conn:
             return self._get_media_asset_conn(conn, asset_id)
 
+    @staticmethod
+    def _media_asset_filename(asset: MediaAsset) -> str:
+        if asset.storage_mode == MEDIA_STORAGE_MANAGED:
+            return Path(asset.managed_name).name
+        if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
+            return Path(asset.external_path).name
+        return str(asset.display_name or "")
+
+    def media_assets_by_filename(
+        self,
+        category: str,
+        filename: str,
+    ) -> list[MediaAsset]:
+        wanted = Path(str(filename)).name.casefold()
+        if not wanted:
+            return []
+        return [
+            asset
+            for asset in self.list_media_assets(category)
+            if self._media_asset_filename(asset).casefold() == wanted
+        ]
+
+    def promote_external_media_asset_to_managed(
+        self,
+        asset_id: int,
+        managed_name: str,
+        original_name: str | None = None,
+    ) -> MediaAsset:
+        name = Path(str(managed_name)).name
+        if not name or name != str(managed_name):
+            raise ValueError("Managed media must be one filename")
+
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM media_assets WHERE id=?",
+                (int(asset_id),),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Media asset not found")
+            current = self._media_asset_from_row(row)
+            if current.storage_mode != MEDIA_STORAGE_EXTERNAL:
+                raise ValueError("Only external media references can be promoted")
+            if not is_supported_media_name(current.category, name):
+                raise ValueError(
+                    f"Unsupported media type for {current.category}: {name}"
+                )
+
+            collisions = conn.execute(
+                """
+                SELECT id, managed_name
+                FROM media_assets
+                WHERE category=? AND storage_mode=? AND id<>?
+                """,
+                (
+                    current.category,
+                    MEDIA_STORAGE_MANAGED,
+                    int(asset_id),
+                ),
+            ).fetchall()
+            for collision in collisions:
+                if str(collision["managed_name"] or "").casefold() == name.casefold():
+                    raise ValueError("Managed media with this filename already exists")
+
+            conn.execute(
+                """
+                UPDATE media_assets
+                SET storage_mode=?, managed_name=?, external_path=?,
+                    original_name=?, updated_at=?
+                WHERE id=? AND storage_mode=?
+                """,
+                (
+                    MEDIA_STORAGE_MANAGED,
+                    name,
+                    "",
+                    str(original_name or name),
+                    utc_now(),
+                    int(asset_id),
+                    MEDIA_STORAGE_EXTERNAL,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM media_assets WHERE id=?",
+                (int(asset_id),),
+            ).fetchone()
+        assert row is not None
+        return self._media_asset_from_row(row)
+
     def ensure_managed_media_asset(
         self,
         category: str,

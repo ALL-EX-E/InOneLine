@@ -276,20 +276,20 @@ class MusicTab(QWidget):
         if media_id is not None:
             self.controller.select_media(int(media_id), play=True)
 
-    @staticmethod
-    def _asset_filename(asset) -> str:
-        if asset.storage_mode == MEDIA_STORAGE_MANAGED:
-            return Path(asset.managed_name).name
-        if asset.storage_mode == MEDIA_STORAGE_EXTERNAL:
-            return Path(asset.external_path).name
-        return str(asset.display_name or "")
+    def _existing_assets_by_filename(self, filename: str):
+        return self.db.media_assets_by_filename(MEDIA_CATEGORY_MUSIC, filename)
 
-    def _existing_asset_by_filename(self, filename: str):
-        wanted = Path(str(filename)).name.casefold()
-        for asset in self.db.list_media_assets(MEDIA_CATEGORY_MUSIC):
-            if self._asset_filename(asset).casefold() == wanted:
-                return asset
-        return None
+    @staticmethod
+    def _preferred_existing_asset(assets):
+        if not assets:
+            return None
+        return min(
+            assets,
+            key=lambda asset: (
+                0 if asset.storage_mode == MEDIA_STORAGE_MANAGED else 1,
+                int(asset.id),
+            ),
+        )
 
     def _select_library_asset(self, media_id: int) -> None:
         if self.search.text():
@@ -300,6 +300,32 @@ class MusicTab(QWidget):
                 self.list_widget.setCurrentItem(row)
                 self.list_widget.scrollToItem(row)
                 return
+
+    def _show_external_duplicate_notice(
+        self,
+        duplicates: list[tuple[str, int]],
+    ) -> None:
+        if not duplicates:
+            return
+        if len(duplicates) == 1:
+            name, media_id = duplicates[0]
+            QMessageBox.information(
+                self,
+                "Трек уже есть",
+                f"Трек «{name}» уже есть в библиотеке.\n\n"
+                "Существующая запись выбрана в списке.",
+            )
+            self._select_library_asset(media_id)
+            return
+
+        preview = "\n".join(name for name, _ in duplicates[:10])
+        if len(duplicates) > 10:
+            preview += f"\n… и ещё {len(duplicates) - 10}"
+        QMessageBox.information(
+            self,
+            "Треки уже есть",
+            preview + "\n\nУже есть в библиотеке.",
+        )
 
     def _choose_storage_mode(self, sources: list[Path]) -> str | None:
         dialog = QMessageBox(self)
@@ -390,61 +416,70 @@ class MusicTab(QWidget):
             )
             return
 
-        duplicates: list[tuple[str, int]] = []
-        import_sources: list[Path] = []
-        for source in sources:
-            existing = self._existing_asset_by_filename(source.name)
-            if existing is None:
-                import_sources.append(source)
-            else:
-                duplicates.append((source.name, int(existing.id)))
-
-        if duplicates:
-            # Filename is the canonical duplicate rule for the Music Player.
-            # Managed copies and external references intentionally share this
-            # namespace: same basename means "already in the library".
-            self._select_library_asset(duplicates[-1][1])
-            if len(duplicates) == 1:
-                duplicate_message = (
-                    f"Трек «{duplicates[0][0]}» уже есть в музыкальной библиотеке.\n\n"
-                    "Существующая запись выбрана в списке."
-                )
-            else:
-                preview = "\n".join(f"• {name}" for name, _ in duplicates[:10])
-                if len(duplicates) > 10:
-                    preview += f"\n• … и ещё {len(duplicates) - 10}"
-                duplicate_message = (
-                    "Эти треки уже есть в музыкальной библиотеке:\n\n"
-                    + preview
-                    + "\n\nСуществующая запись одного из совпадений выбрана в списке."
-                )
-            QMessageBox.information(
-                self,
-                "Трек уже есть",
-                duplicate_message,
-            )
-
-        if not import_sources:
-            return
-
-        mode = self._choose_storage_mode(import_sources)
+        mode = self._choose_storage_mode(sources)
         if mode is None:
             return
 
-        sources = import_sources
-        added_ids: list[int] = []
+        touched_ids: list[int] = []
+        external_duplicates: list[tuple[str, int]] = []
         skipped: list[str] = []
         errors: list[str] = list(invalid)
 
         for source in sources:
             try:
+                matches = self._existing_assets_by_filename(source.name)
+                managed_matches = [
+                    asset
+                    for asset in matches
+                    if asset.storage_mode == MEDIA_STORAGE_MANAGED
+                ]
+                external_matches = [
+                    asset
+                    for asset in matches
+                    if asset.storage_mode == MEDIA_STORAGE_EXTERNAL
+                ]
+
                 if mode == MEDIA_STORAGE_EXTERNAL:
+                    if matches:
+                        existing = self._preferred_existing_asset(matches)
+                        assert existing is not None
+                        external_duplicates.append((source.name, int(existing.id)))
+                        continue
                     asset = self.db.register_external_media_asset(
                         MEDIA_CATEGORY_MUSIC,
                         source,
                     )
-                else:
-                    self.music_dir.mkdir(parents=True, exist_ok=True)
+                    touched_ids.append(int(asset.id))
+                    continue
+
+                self.music_dir.mkdir(parents=True, exist_ok=True)
+
+                if managed_matches:
+                    asset = self._preferred_existing_asset(managed_matches)
+                    assert asset is not None
+                    target = self.music_dir / asset.managed_name
+                    if source.resolve() != target.resolve() and target.exists():
+                        action, chosen = self._duplicate_action(source, target)
+                        if action == "cancel" or chosen is None:
+                            skipped.append(source.name)
+                            continue
+                        target = chosen
+                        if action in {"replace", "separate"}:
+                            shutil.copy2(source, target)
+                        if action == "separate":
+                            asset = self.db.ensure_managed_media_asset(
+                                MEDIA_CATEGORY_MUSIC,
+                                target.name,
+                                target.name,
+                            )
+                    elif source.resolve() != target.resolve():
+                        shutil.copy2(source, target)
+                    touched_ids.append(int(asset.id))
+                    continue
+
+                if external_matches:
+                    asset = self._preferred_existing_asset(external_matches)
+                    assert asset is not None
                     target = self.music_dir / source.name
                     if source.resolve() != target.resolve() and target.exists():
                         action, chosen = self._duplicate_action(source, target)
@@ -457,25 +492,47 @@ class MusicTab(QWidget):
                     elif source.resolve() != target.resolve():
                         shutil.copy2(source, target)
 
-                    asset = self.db.ensure_managed_media_asset(
-                        MEDIA_CATEGORY_MUSIC,
+                    asset = self.db.promote_external_media_asset_to_managed(
+                        int(asset.id),
                         target.name,
-                        target.name,
+                        source.name,
                     )
-                added_ids.append(int(asset.id))
+                    touched_ids.append(int(asset.id))
+                    continue
+
+                target = self.music_dir / source.name
+                if source.resolve() != target.resolve() and target.exists():
+                    action, chosen = self._duplicate_action(source, target)
+                    if action == "cancel" or chosen is None:
+                        skipped.append(source.name)
+                        continue
+                    target = chosen
+                    if action in {"replace", "separate"}:
+                        shutil.copy2(source, target)
+                elif source.resolve() != target.resolve():
+                    shutil.copy2(source, target)
+
+                asset = self.db.ensure_managed_media_asset(
+                    MEDIA_CATEGORY_MUSIC,
+                    target.name,
+                    target.name,
+                )
+                touched_ids.append(int(asset.id))
             except Exception as exc:
                 errors.append(f"{source.name}: {exc}")
 
-        if added_ids:
-            # One catalog refresh after the whole batch. Importing music must
-            # not interrupt the currently playing/prepared track.
+        if touched_ids:
+            # One catalog refresh after the whole batch. Importing or promoting
+            # music must not interrupt the currently playing/prepared track.
             self.controller.refresh_library()
-            wanted = added_ids[-1]
+            wanted = touched_ids[-1]
             for index in range(self.list_widget.count()):
                 row = self.list_widget.item(index)
                 if int(row.data(Qt.UserRole)) == wanted:
                     self.list_widget.setCurrentItem(row)
                     break
+
+        self._show_external_duplicate_notice(external_duplicates)
 
         if errors or skipped:
             lines = []

@@ -76,6 +76,7 @@ jobs:
               MEDIA_CATEGORY_MUSIC,
               MEDIA_CATEGORY_SOUNDTRACK,
               MEDIA_STORAGE_EXTERNAL,
+              MEDIA_STORAGE_MANAGED,
               managed_media_directory,
           )
           from streaming_manager.music_player import (
@@ -385,24 +386,32 @@ jobs:
               assert {"batch-a.wav", "batch-b.wav"}.issubset(batch_names)
               assert player.current_media_id == current_before_batch
 
-              # Filename-only duplicate rule: a managed track blocks an
-              # external registration with the same basename, regardless of
-              # path or contents. The existing row is revealed/selected and
-              # playback is not switched.
+              # Filename-only duplicate rule is evaluated after storage choice.
+              # Managed -> External: do not create a second row; for one
+              # collision reveal/select the existing track without changing
+              # playback.
               managed_a = next(
                   asset for asset in db.list_media_assets(MEDIA_CATEGORY_MUSIC)
-                  if asset.storage_mode != MEDIA_STORAGE_EXTERNAL
+                  if asset.storage_mode == MEDIA_STORAGE_MANAGED
                   and asset.managed_name.casefold() == "a track.wav"
+              )
+              managed_b = next(
+                  asset for asset in db.list_media_assets(MEDIA_CATEGORY_MUSIC)
+                  if asset.storage_mode == MEDIA_STORAGE_MANAGED
+                  and asset.managed_name.casefold() == "b track.wav"
               )
               same_name_dir = root / "same-name-source"
               same_name_source = same_name_dir / "A track.wav"
+              same_name_b = same_name_dir / "B track.wav"
               make_wav(same_name_source, seconds=0.25)
+              make_wav(same_name_b, seconds=0.25)
               count_before_duplicate = len(db.list_media_assets(MEDIA_CATEGORY_MUSIC))
               current_before_duplicate = player.current_media_id
               music_tab.search.setText("no-visible-results")
               original_get_open_names = QFileDialog.getOpenFileNames
               original_choose_storage = music_tab._choose_storage_mode
               original_information = QMessageBox.information
+              single_messages = []
               try:
                   QFileDialog.getOpenFileNames = staticmethod(
                       lambda *args, **kwargs: (
@@ -411,12 +420,13 @@ jobs:
                       )
                   )
                   music_tab._choose_storage_mode = (
-                      lambda sources: (_ for _ in ()).throw(
-                          AssertionError("duplicate import must stop before storage choice")
-                      )
+                      lambda sources: MEDIA_STORAGE_EXTERNAL
                   )
                   QMessageBox.information = staticmethod(
-                      lambda *args, **kwargs: QMessageBox.StandardButton.Ok
+                      lambda *args, **kwargs: (
+                          single_messages.append(str(args[2]))
+                          or QMessageBox.StandardButton.Ok
+                      )
                   )
                   music_tab._import_music()
               finally:
@@ -429,6 +439,94 @@ jobs:
               assert selected_row is not None
               assert int(selected_row.data(Qt.UserRole)) == int(managed_a.id)
               assert player.current_media_id == current_before_duplicate
+              assert single_messages and "уже есть в библиотеке" in single_messages[-1]
+
+              # Several filename collisions only produce one informational
+              # warning. They must not search, scroll to or select any of the
+              # duplicate rows.
+              music_tab.search.setText("A track")
+              music_tab._select_library_asset(managed_a.id)
+              music_tab.search.setText("A track")
+              selected_before_multiple = int(
+                  music_tab.list_widget.currentItem().data(Qt.UserRole)
+              )
+              count_before_multiple = len(db.list_media_assets(MEDIA_CATEGORY_MUSIC))
+              multiple_messages = []
+              original_get_open_names = QFileDialog.getOpenFileNames
+              original_choose_storage = music_tab._choose_storage_mode
+              original_information = QMessageBox.information
+              try:
+                  QFileDialog.getOpenFileNames = staticmethod(
+                      lambda *args, **kwargs: (
+                          [str(same_name_source), str(same_name_b)],
+                          "Аудио (*.mp3 *.wav *.ogg)",
+                      )
+                  )
+                  music_tab._choose_storage_mode = (
+                      lambda sources: MEDIA_STORAGE_EXTERNAL
+                  )
+                  QMessageBox.information = staticmethod(
+                      lambda *args, **kwargs: (
+                          multiple_messages.append(str(args[2]))
+                          or QMessageBox.StandardButton.Ok
+                      )
+                  )
+                  music_tab._import_music()
+              finally:
+                  QFileDialog.getOpenFileNames = original_get_open_names
+                  music_tab._choose_storage_mode = original_choose_storage
+                  QMessageBox.information = original_information
+              assert len(db.list_media_assets(MEDIA_CATEGORY_MUSIC)) == count_before_multiple
+              assert music_tab.search.text() == "A track"
+              assert int(music_tab.list_widget.currentItem().data(Qt.UserRole)) == selected_before_multiple
+              assert multiple_messages
+              assert "A track.wav" in multiple_messages[-1]
+              assert "B track.wav" in multiple_messages[-1]
+              assert "Уже есть в библиотеке" in multiple_messages[-1]
+              assert player.current_media_id == current_before_duplicate
+
+              # External -> Managed: copy the file into data\music and promote
+              # the existing DB row in place. ID/count/queue identity stay
+              # stable instead of creating a duplicate.
+              promote_source = root / "promote-me.wav"
+              make_wav(promote_source, seconds=0.2)
+              external_to_promote = db.register_external_media_asset(
+                  MEDIA_CATEGORY_MUSIC,
+                  promote_source,
+              )
+              player.refresh_library()
+              promote_id = int(external_to_promote.id)
+              count_before_promote = len(db.list_media_assets(MEDIA_CATEGORY_MUSIC))
+              current_before_promote = player.current_media_id
+              promote_target = music_dir / promote_source.name
+              if promote_target.exists():
+                  promote_target.unlink()
+              original_get_open_names = QFileDialog.getOpenFileNames
+              original_choose_storage = music_tab._choose_storage_mode
+              try:
+                  QFileDialog.getOpenFileNames = staticmethod(
+                      lambda *args, **kwargs: (
+                          [str(promote_source)],
+                          "Аудио (*.mp3 *.wav *.ogg)",
+                      )
+                  )
+                  music_tab._choose_storage_mode = (
+                      lambda sources: MEDIA_STORAGE_MANAGED
+                  )
+                  music_tab._import_music()
+              finally:
+                  QFileDialog.getOpenFileNames = original_get_open_names
+                  music_tab._choose_storage_mode = original_choose_storage
+              promoted = db.get_media_asset(promote_id)
+              assert promoted is not None
+              assert promoted.id == promote_id
+              assert promoted.storage_mode == MEDIA_STORAGE_MANAGED
+              assert promoted.managed_name == promote_source.name
+              assert promoted.external_path == ""
+              assert promote_target.exists()
+              assert len(db.list_media_assets(MEDIA_CATEGORY_MUSIC)) == count_before_promote
+              assert promote_id in player.queue
+              assert player.current_media_id == current_before_promote
 
               assert stream_tab.music_player_show_mode.count() == 3
               assert stream_tab.music_player_animation.count() == 2
