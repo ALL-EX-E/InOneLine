@@ -276,11 +276,23 @@ class MusicTab(QWidget):
         if media_id is not None:
             self.controller.select_media(int(media_id), play=True)
 
-    def _choose_storage_mode(self, source: Path) -> str | None:
+    def _choose_storage_mode(self, sources: list[Path]) -> str | None:
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Как использовать музыку?")
         dialog.setIcon(QMessageBox.Icon.Question)
-        dialog.setText(f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?")
+        if len(sources) == 1:
+            selection_text = f"Выбран файл:\n{sources[0]}"
+        else:
+            preview = "\n".join(f"• {path.name}" for path in sources[:8])
+            if len(sources) > 8:
+                preview += f"\n• … и ещё {len(sources) - 8}"
+            selection_text = (
+                f"Выбрано файлов: {len(sources)}\n\n{preview}"
+            )
+        dialog.setText(
+            selection_text
+            + "\n\nКак In one line должен использовать выбранные файлы?"
+        )
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в data\\music. "
             "«Использовать исходный файл» сохранит ссылку на оригинал."
@@ -322,57 +334,105 @@ class MusicTab(QWidget):
         return "cancel", None
 
     def _import_music(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Добавить музыку",
             "",
             "Аудио (*.mp3 *.wav *.ogg);;Все файлы (*.*)",
         )
-        if not path:
-            return
-        source = Path(path)
-        if not source.is_file():
-            QMessageBox.critical(self, "Ошибка", "Выбранный аудиофайл не найден.")
-            return
-        if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_MUSIC):
-            QMessageBox.warning(self, "Неподдерживаемый формат", "Поддерживаются MP3, WAV и OGG.")
+        if not paths:
             return
 
-        mode = self._choose_storage_mode(source)
+        allowed = supported_media_extensions(MEDIA_CATEGORY_MUSIC)
+        sources: list[Path] = []
+        invalid: list[str] = []
+        for raw_path in paths:
+            source = Path(raw_path)
+            if not source.is_file():
+                invalid.append(f"{source.name}: файл не найден")
+                continue
+            if source.suffix.lower() not in allowed:
+                invalid.append(f"{source.name}: неподдерживаемый формат")
+                continue
+            sources.append(source)
+
+        if not sources:
+            QMessageBox.warning(
+                self,
+                "Добавление музыки",
+                "Не найдено ни одного поддерживаемого аудиофайла. "
+                "Поддерживаются MP3, WAV и OGG.",
+            )
+            return
+
+        mode = self._choose_storage_mode(sources)
         if mode is None:
             return
-        try:
-            if mode == MEDIA_STORAGE_EXTERNAL:
-                asset = self.db.register_external_media_asset(MEDIA_CATEGORY_MUSIC, source)
-            else:
-                self.music_dir.mkdir(parents=True, exist_ok=True)
-                target = self.music_dir / source.name
-                if source.resolve() != target.resolve() and target.exists():
-                    action, chosen = self._duplicate_action(source, target)
-                    if action == "cancel" or chosen is None:
-                        return
-                    target = chosen
-                    if action in {"replace", "separate"}:
-                        shutil.copy2(source, target)
-                elif source.resolve() != target.resolve():
-                    shutil.copy2(source, target)
-                asset = self.db.ensure_managed_media_asset(
-                    MEDIA_CATEGORY_MUSIC,
-                    target.name,
-                    target.name,
-                )
-        except Exception as exc:
-            QMessageBox.critical(self, "Добавление музыки", f"Не удалось добавить файл:\n{exc}")
-            return
 
-        # Adding a file must not disturb the currently playing/prepared track.
-        # Refresh the library and only move the UI selection to the new row.
-        self.controller.refresh_library()
-        for index in range(self.list_widget.count()):
-            row = self.list_widget.item(index)
-            if int(row.data(Qt.UserRole)) == int(asset.id):
-                self.list_widget.setCurrentItem(row)
-                break
+        added_ids: list[int] = []
+        skipped: list[str] = []
+        errors: list[str] = list(invalid)
+
+        for source in sources:
+            try:
+                if mode == MEDIA_STORAGE_EXTERNAL:
+                    asset = self.db.register_external_media_asset(
+                        MEDIA_CATEGORY_MUSIC,
+                        source,
+                    )
+                else:
+                    self.music_dir.mkdir(parents=True, exist_ok=True)
+                    target = self.music_dir / source.name
+                    if source.resolve() != target.resolve() and target.exists():
+                        action, chosen = self._duplicate_action(source, target)
+                        if action == "cancel" or chosen is None:
+                            skipped.append(source.name)
+                            continue
+                        target = chosen
+                        if action in {"replace", "separate"}:
+                            shutil.copy2(source, target)
+                    elif source.resolve() != target.resolve():
+                        shutil.copy2(source, target)
+
+                    asset = self.db.ensure_managed_media_asset(
+                        MEDIA_CATEGORY_MUSIC,
+                        target.name,
+                        target.name,
+                    )
+                added_ids.append(int(asset.id))
+            except Exception as exc:
+                errors.append(f"{source.name}: {exc}")
+
+        if added_ids:
+            # One catalog refresh after the whole batch. Importing music must
+            # not interrupt the currently playing/prepared track.
+            self.controller.refresh_library()
+            wanted = added_ids[-1]
+            for index in range(self.list_widget.count()):
+                row = self.list_widget.item(index)
+                if int(row.data(Qt.UserRole)) == wanted:
+                    self.list_widget.setCurrentItem(row)
+                    break
+
+        if errors or skipped:
+            lines = []
+            if skipped:
+                lines.append(
+                    "Пропущено по выбору пользователя: "
+                    + ", ".join(skipped[:10])
+                    + ("…" if len(skipped) > 10 else "")
+                )
+            if errors:
+                lines.append(
+                    "Не удалось добавить:\n"
+                    + "\n".join(errors[:10])
+                    + ("\n…" if len(errors) > 10 else "")
+                )
+            QMessageBox.warning(
+                self,
+                "Добавление музыки",
+                "\n\n".join(lines),
+            )
 
     def _show_playback_error(self, message: str) -> None:
         QMessageBox.warning(
