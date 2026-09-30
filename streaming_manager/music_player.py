@@ -4,6 +4,7 @@ import base64
 import json
 import random
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
@@ -23,6 +24,30 @@ from .constants import (
     MUSIC_PLAYER_OUTPUT_MODE_DEFAULT,
     MUSIC_PLAYER_OUTPUT_MODE_KEY,
     MUSIC_PLAYER_OUTPUT_MODE_OBS,
+    MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_ANIMATION_KEY,
+    MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY,
+    MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_DIRECTION_KEY,
+    MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
+    MUSIC_PLAYER_OVERLAY_FONT_FAMILY_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY,
+    MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
+    MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
+    MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
+    MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
     MUSIC_PLAYER_POSITION_MS_KEY,
     MUSIC_PLAYER_QUEUE_KEY,
     MUSIC_PLAYER_REPEAT_DEFAULT,
@@ -85,6 +110,7 @@ class MusicPlayerController(QObject):
         self._suppressed = False
         self._revision = 0
         self._event_serial = 0
+        self._event_started_at_ms = 0
         self._pending_new_track_event = False
         self._pending_seek_ms: int | None = None
         self._loading_source = False
@@ -326,6 +352,7 @@ class MusicPlayerController(QObject):
 
     def _trigger_new_track_event(self) -> None:
         self._event_serial += 1
+        self._event_started_at_ms = int(time.time() * 1000)
         self._pending_new_track_event = False
 
     def select_media(self, media_id: int, *, play: bool = True) -> None:
@@ -524,7 +551,7 @@ class MusicPlayerController(QObject):
         if not self._suppressed:
             return
         self._suppressed = False
-        if isinstance(snapshot, dict) and int(snapshot.get("revision") or -1) == self._revision:
+        if isinstance(snapshot, dict) and int(snapshot.get("revision", -1)) == self._revision:
             media_id = snapshot.get("media_id")
             if media_id is not None and int(media_id) in self._assets and int(media_id) != self._current_media_id:
                 self._current_media_id = int(media_id)
@@ -736,6 +763,7 @@ class MusicPlayerController(QObject):
                 and not self._muted
             ),
             "event_serial": int(self._event_serial),
+            "event_started_at_ms": int(self._event_started_at_ms),
         }
         with self._browser_lock:
             self._browser_snapshot = snapshot
@@ -755,3 +783,70 @@ class MusicPlayerController(QObject):
         self.player.setSource(QUrl())
         if self.audio_coordinator is not None:
             self.audio_coordinator.unregister_music_player()
+
+
+def music_player_overlay_appearance(db) -> dict[str, object]:
+    """Read the persisted D26 visual settings without touching Qt objects."""
+    settings = db.get_settings()
+    def setting(key: str, default):
+        return settings.get(key, str(default))
+
+    try:
+        font_size = max(8, min(200, int(setting(
+            MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
+            MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT,
+        ))))
+    except (TypeError, ValueError):
+        font_size = MUSIC_PLAYER_OVERLAY_FONT_SIZE_DEFAULT
+    try:
+        duration = max(1, min(120, int(setting(
+            MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
+            MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT,
+        ))))
+    except (TypeError, ValueError):
+        duration = MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT
+
+    return {
+        "font_family": str(setting(
+            MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY,
+            MUSIC_PLAYER_OVERLAY_FONT_FAMILY_DEFAULT,
+        )),
+        "font_size": font_size,
+        "text_color": str(setting(
+            MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
+            MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
+        )),
+        "background": str(setting(
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY,
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_DEFAULT,
+        )),
+        "background_color": str(setting(
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY,
+            MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+        )),
+        "frame_color": str(setting(
+            MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+            MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
+        )),
+        "spectrum_color": str(setting(
+            MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
+            MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
+        )),
+        "auto_colors": str(setting(
+            MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
+            "1" if MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT else "0",
+        )) == "1",
+        "show_mode": str(setting(
+            MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
+            MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
+        )),
+        "duration_seconds": duration,
+        "animation": str(setting(
+            MUSIC_PLAYER_OVERLAY_ANIMATION_KEY,
+            MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT,
+        )),
+        "direction": str(setting(
+            MUSIC_PLAYER_OVERLAY_DIRECTION_KEY,
+            MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT,
+        )),
+    }
