@@ -373,6 +373,19 @@ class AuctionAudioMixin:
         if hasattr(self, "auction_soundtrack_combo"):
             self._refresh_auction_soundtrack_library(auction_selected)
 
+    def _adopt_wheel_soundtrack_asset(self, asset_id: int) -> None:
+        self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(int(asset_id)))
+        self._refresh_shared_soundtrack_catalogs(wheel_selected=int(asset_id))
+        # Refresh blocks combo signals deliberately; invoke the one canonical
+        # live-selection path explicitly so imports during an active spin take
+        # effect immediately.
+        self._wheel_soundtrack_selection_changed()
+
+    def _adopt_auction_soundtrack_asset(self, asset_id: int) -> None:
+        self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(int(asset_id)))
+        self._refresh_shared_soundtrack_catalogs(auction_selected=int(asset_id))
+        self._auction_soundtrack_selection_changed()
+
     def _saved_wheel_soundtrack_volume(self) -> int:
         raw = self.db.get_setting(
             WHEEL_SOUNDTRACK_VOLUME_KEY,
@@ -635,8 +648,7 @@ class AuctionAudioMixin:
             target.name,
             target.name,
         )
-        self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-        self._refresh_shared_soundtrack_catalogs(wheel_selected=asset.id)
+        self._adopt_wheel_soundtrack_asset(asset.id)
 
     def _wheel_soundtrack_copy_failed(self, exc) -> None:
         QMessageBox.critical(
@@ -682,8 +694,7 @@ class AuctionAudioMixin:
                 MEDIA_CATEGORY_SOUNDTRACK,
                 source,
             )
-            self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_wheel_soundtrack_library(asset.id)
+            self._adopt_wheel_soundtrack_asset(asset.id)
             return
 
         if source.resolve().parent == self.wheel_jingles_dir.resolve():
@@ -692,8 +703,7 @@ class AuctionAudioMixin:
                 source.name,
                 source.name,
             )
-            self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_wheel_soundtrack_library(asset.id)
+            self._adopt_wheel_soundtrack_asset(asset.id)
             return
 
         action, target = self._resolve_soundtrack_copy_target(source)
@@ -705,8 +715,7 @@ class AuctionAudioMixin:
                 target.name,
                 target.name,
             )
-            self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_wheel_soundtrack_library(asset.id)
+            self._adopt_wheel_soundtrack_asset(asset.id)
             return
         self._start_wheel_soundtrack_copy(source, target)
 
@@ -1058,8 +1067,7 @@ class AuctionAudioMixin:
             target.name,
             target.name,
         )
-        self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-        self._refresh_shared_soundtrack_catalogs(auction_selected=asset.id)
+        self._adopt_auction_soundtrack_asset(asset.id)
 
     def _auction_soundtrack_copy_failed(self, exc) -> None:
         QMessageBox.critical(
@@ -1102,8 +1110,7 @@ class AuctionAudioMixin:
             return
         if storage_mode == MEDIA_STORAGE_EXTERNAL:
             asset = self.db.register_external_media_asset(MEDIA_CATEGORY_SOUNDTRACK, source)
-            self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_auction_soundtrack_library(asset.id)
+            self._adopt_auction_soundtrack_asset(asset.id)
             return
 
         if source.resolve().parent == self.auction_music_dir.resolve():
@@ -1112,8 +1119,7 @@ class AuctionAudioMixin:
                 source.name,
                 source.name,
             )
-            self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_auction_soundtrack_library(asset.id)
+            self._adopt_auction_soundtrack_asset(asset.id)
             return
 
         action, target = self._resolve_soundtrack_copy_target(source)
@@ -1125,8 +1131,7 @@ class AuctionAudioMixin:
                 target.name,
                 target.name,
             )
-            self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset.id))
-            self._refresh_auction_soundtrack_library(asset.id)
+            self._adopt_auction_soundtrack_asset(asset.id)
             return
         self._start_auction_soundtrack_copy(source, target)
 
