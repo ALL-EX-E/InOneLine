@@ -404,7 +404,11 @@ async function poll(){
     const demo=preview && !currentState.playing;
     updateCover(currentState,demo);
     applyAppearance(appearance);
-    updateTitle(demo ? "Исполнитель - Название трека" : (currentState.display_title||currentState.filename||"Исполнитель - Название трека"));
+    const displayText=demo
+      ? "Исполнитель - Название трека"
+      : (currentState.display_title||currentState.filename||"Исполнитель - Название трека");
+    const mediaChanged=String(currentState.media_id??"")!==String(lastMediaId??"");
+    updateTitle(displayText,mediaChanged);
     await syncAudio(currentState);
     evaluateVisibility(currentState,lastEventSerial<0);
     if(!demo) lastEventSerial=Number(currentState.event_serial)||0;
