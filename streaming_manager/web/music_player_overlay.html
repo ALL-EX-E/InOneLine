@@ -99,6 +99,33 @@ body { font-family:var(--font); }
 #spectrumWrap { flex:1 1 auto; min-height:0; display:flex; align-items:flex-end; padding-top:1.2vw; }
 #spectrum { width:100%; height:100%; display:block; }
 
+#spectrumUnlock {
+  position:absolute;
+  left:50%;
+  top:calc(50% + 7.2vw);
+  transform:translate(-50%,-50%);
+  z-index:20;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  min-height:2.65vw;
+  padding:.42vw 1.05vw;
+  border:.13vw solid var(--frame);
+  border-radius:.72vw;
+  background:rgba(7,10,14,.88);
+  color:var(--text);
+  font:600 1.05vw var(--font);
+  line-height:1.2;
+  white-space:nowrap;
+  text-shadow:0 .03em .05em rgba(0,0,0,.7);
+  box-shadow:0 0 .35vw color-mix(in srgb,var(--frame) 88%,transparent),
+             0 0 .9vw color-mix(in srgb,var(--frame) 42%,transparent);
+  cursor:pointer;
+  pointer-events:auto;
+}
+#spectrumUnlock.visible { display:flex; }
+#spectrumUnlock:focus-visible { outline:.12vw solid var(--text); outline-offset:.16vw; }
+
 @media (prefers-reduced-motion: reduce) {
   #card { transition-duration:.15s; }
 }
@@ -123,6 +150,7 @@ body { font-family:var(--font); }
       <div id="spectrumWrap"><canvas id="spectrum"></canvas></div>
     </div>
   </div>
+  <button id="spectrumUnlock" type="button">Нажмите для активации Spectrum</button>
 </div>
 <audio id="audio" preload="auto"></audio>
 <script>
@@ -137,6 +165,7 @@ const titleViewport = document.getElementById("titleViewport");
 const titleInner = document.getElementById("titleInner");
 const canvas = document.getElementById("spectrum");
 const ctx = canvas.getContext("2d");
+const spectrumUnlock = document.getElementById("spectrumUnlock");
 const audio = document.getElementById("audio");
 
 let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
@@ -154,6 +183,22 @@ function hexRgb(hex){
 function rgbHex(rgb){ return "#"+rgb.map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join(""); }
 function luminance(rgb){ return .299*rgb[0]+.587*rgb[1]+.114*rgb[2]; }
 function mix(rgb, target, amount){ return rgb.map((v,i)=>v+(target[i]-v)*amount); }
+
+function setSpectrumUnlockRequired(required){
+  const show=Boolean(required && currentState && currentState.playing);
+  spectrumUnlock.classList.toggle("visible",show);
+  spectrumUnlock.setAttribute("aria-hidden",show?"false":"true");
+}
+
+function analysisTransportReady(playOk){
+  return Boolean(
+    playOk
+    && audioContext
+    && audioContext.state==="running"
+    && analyser
+    && frequencyData
+  );
+}
 
 function ensureAudioGraph(){
   if(audioContext) return;
@@ -187,6 +232,7 @@ function setAudioGain(state){
 async function syncAudio(state){
   if(!state || state.stopped || !state.media_id || !state.url){
     if(!audio.paused) audio.pause();
+    setSpectrumUnlockRequired(false);
     if(state && state.stopped && audio.src){
       audio.removeAttribute("src");
       audio.load();
@@ -207,16 +253,48 @@ async function syncAudio(state){
   }
   if(state.playing){
     ensureAudioGraph();
+    let playOk=false;
     try {
+      if(audioContext && audioContext.state==="suspended"){
+        try { await audioContext.resume(); } catch(_e){}
+      }
       await audio.play();
+      playOk=true;
       // A muted start is permitted by normal browsers. Once playback is live,
       // analysis-only playback is unmuted at the media element but still
       // routed through a zero-gain WebAudio branch. This keeps preview silent
       // while AnalyserNode sees the same real audio as the OBS overlay.
       if(!audible && gainNode) audio.muted=false;
-    } catch(_e){}
-  } else if(!audio.paused) {
-    audio.pause();
+    } catch(_e){
+      playOk=false;
+    }
+    setSpectrumUnlockRequired(!analysisTransportReady(playOk));
+  } else {
+    if(!audio.paused) audio.pause();
+    setSpectrumUnlockRequired(false);
+  }
+}
+
+async function unlockSpectrum(){
+  if(!currentState || !currentState.playing){
+    setSpectrumUnlockRequired(false);
+    return;
+  }
+  try {
+    ensureAudioGraph();
+    if(!audioContext || !analyser || !frequencyData){
+      setSpectrumUnlockRequired(true);
+      return;
+    }
+    if(audioContext.state!=="running"){
+      await audioContext.resume();
+    }
+    const audible=setAudioGain(currentState);
+    await audio.play();
+    if(!audible && gainNode) audio.muted=false;
+    setSpectrumUnlockRequired(!analysisTransportReady(true));
+  } catch(_e){
+    setSpectrumUnlockRequired(true);
   }
 }
 
@@ -485,6 +563,7 @@ async function poll(){
   } finally { pollBusy=false; }
 }
 window.addEventListener("resize",()=>{ resizeCanvas(); updateTitle(titleInner.textContent,true); });
+spectrumUnlock.addEventListener("click",unlockSpectrum);
 cover.addEventListener("load",applyAutoColorsIfPossible);
 drawSpectrum();
 poll();
