@@ -164,7 +164,13 @@ async function syncAudio(state){
   }
   if(state.playing){
     ensureAudioGraph();
-    try { await audio.play(); } catch(_e){}
+    try {
+      await audio.play();
+      // A muted start is permitted by normal browsers. Once playback is live,
+      // route analysis-only audio through the zero-gain WebAudio branch so
+      // AnalyserNode still receives the real signal without audible output.
+      if(!state.browser_audible && gainNode) audio.muted=false;
+    } catch(_e){}
   } else if(!audio.paused) {
     audio.pause();
   }
