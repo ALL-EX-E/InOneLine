@@ -290,7 +290,10 @@ class MusicPlayerController(QObject):
         self._pending_new_track_event = False
         if media_id is not None:
             self._load_current(position_ms=position, play=False)
-        self._persist_state()
+        # QMediaPlayer applies the saved seek asynchronously after LoadedMedia.
+        # Do not overwrite the persisted position with the temporary 0 ms that
+        # exists between setSource() and that authoritative seek.
+        self._persist_state(position_override=position)
 
     def _path_for_asset(self, asset: MediaAsset) -> Path:
         return resolve_media_asset_path(self.db.path.parent, asset)
@@ -723,13 +726,18 @@ class MusicPlayerController(QObject):
         self.db.set_setting(MUSIC_PLAYER_POSITION_MS_KEY, str(self.position_ms))
         self._refresh_browser_snapshot()
 
-    def _persist_state(self) -> None:
+    def _persist_state(self, *, position_override: int | None = None) -> None:
+        persisted_position = (
+            self.position_ms
+            if position_override is None
+            else max(0, int(position_override))
+        )
         self.db.set_settings_bulk(
             {
                 MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY: (
                     str(self._current_media_id) if self._current_media_id is not None else ""
                 ),
-                MUSIC_PLAYER_POSITION_MS_KEY: str(self.position_ms),
+                MUSIC_PLAYER_POSITION_MS_KEY: str(persisted_position),
                 MUSIC_PLAYER_ORDER_MODE_KEY: self._order_mode,
                 MUSIC_PLAYER_QUEUE_KEY: json.dumps(self._queue, ensure_ascii=False),
                 MUSIC_PLAYER_REPEAT_KEY: "1" if self._repeat else "0",
