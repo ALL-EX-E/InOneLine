@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..media import (
+    MEDIA_CATEGORY_MUSIC,
+    MEDIA_CATEGORY_SOUNDTRACK,
     MEDIA_STORAGE_EXTERNAL,
     MEDIA_STORAGE_MANAGED,
     MediaAsset,
@@ -193,21 +195,25 @@ class MediaMixin:
                 present[path.name.casefold()] = path
                 self.ensure_managed_media_asset(category, path.name, path.name)
 
-        with self.connect() as conn:
-            rows = conn.execute(
-                "SELECT id, managed_name FROM media_assets "
-                "WHERE category=? AND storage_mode=?",
-                (str(category), MEDIA_STORAGE_MANAGED),
-            ).fetchall()
-            stale_ids = [
-                int(row["id"])
-                for row in rows
-                if str(row["managed_name"] or "").casefold() not in present
-            ]
-            if stale_ids:
-                placeholders = ",".join("?" for _ in stale_ids)
-                conn.execute(
-                    f"DELETE FROM media_assets WHERE id IN ({placeholders})",
-                    tuple(stale_ids),
-                )
+        # D26 changes source-of-truth semantics only for its audio
+        # libraries. Existing overlay/background/center-image categories keep
+        # their established missing-file recovery behavior.
+        if str(category) in {MEDIA_CATEGORY_MUSIC, MEDIA_CATEGORY_SOUNDTRACK}:
+            with self.connect() as conn:
+                rows = conn.execute(
+                    "SELECT id, managed_name FROM media_assets "
+                    "WHERE category=? AND storage_mode=?",
+                    (str(category), MEDIA_STORAGE_MANAGED),
+                ).fetchall()
+                stale_ids = [
+                    int(row["id"])
+                    for row in rows
+                    if str(row["managed_name"] or "").casefold() not in present
+                ]
+                if stale_ids:
+                    placeholders = ",".join("?" for _ in stale_ids)
+                    conn.execute(
+                        f"DELETE FROM media_assets WHERE id IN ({placeholders})",
+                        tuple(stale_ids),
+                    )
         return self.list_media_assets(category)
