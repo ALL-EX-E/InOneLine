@@ -332,8 +332,56 @@ jobs:
               stream_tab = StreamTab(db, api)
               assert music_tab.mode_combo.count() == 2
               assert music_tab.output_combo.count() == 2
+              assert music_tab.search.isClearButtonEnabled()
               assert stream_tab.music_player_show_mode.count() == 3
               assert stream_tab.music_player_animation.count() == 2
+
+              # D26 manual-gate UX: only settings that can affect the selected
+              # presentation mode stay visible.
+              stream_tab.music_player_show_mode.setCurrentIndex(
+                  stream_tab.music_player_show_mode.findData("hidden")
+              )
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert stream_tab.music_player_duration_seconds_control.isHidden()
+              assert stream_tab.music_player_animation.isHidden()
+              assert stream_tab.music_player_direction.isHidden()
+
+              stream_tab.music_player_show_mode.setCurrentIndex(
+                  stream_tab.music_player_show_mode.findData("track_change")
+              )
+              stream_tab.music_player_animation.setCurrentIndex(
+                  stream_tab.music_player_animation.findData("fade")
+              )
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert not stream_tab.music_player_duration_seconds_control.isHidden()
+              assert not stream_tab.music_player_animation.isHidden()
+              assert stream_tab.music_player_direction.isHidden()
+
+              stream_tab.music_player_animation.setCurrentIndex(
+                  stream_tab.music_player_animation.findData("slide")
+              )
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert not stream_tab.music_player_direction.isHidden()
+
+              stream_tab.music_player_show_mode.setCurrentIndex(
+                  stream_tab.music_player_show_mode.findData("always")
+              )
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert stream_tab.music_player_duration_seconds_control.isHidden()
+              assert not stream_tab.music_player_animation.isHidden()
+              assert not stream_tab.music_player_direction.isHidden()
+
+              stream_tab.music_player_auto_colors.setChecked(True)
+              stream_tab.music_player_background_color_mode.setChecked(True)
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert stream_tab.music_player_background_color_row.isHidden()
+              assert stream_tab.music_player_frame_color_row.isHidden()
+              assert not stream_tab.music_player_spectrum_color_row.isHidden()
+
+              stream_tab.music_player_auto_colors.setChecked(False)
+              stream_tab._update_music_player_overlay_enabled_state()
+              assert not stream_tab.music_player_background_color_row.isHidden()
+              assert not stream_tab.music_player_frame_color_row.isHidden()
 
               api.start()
               try:
