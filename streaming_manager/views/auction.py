@@ -1242,6 +1242,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.shared_xlsx_path_label.setText(
             str(self._shared_xlsx_path) if connected else "Не подключена"
         )
+        self.shared_xlsx_disconnect_btn.setVisible(connected)
         self.shared_xlsx_disconnect_btn.setEnabled(connected and not busy)
         self.shared_xlsx_create_btn.setEnabled(not busy)
         self.shared_xlsx_connect_btn.setEnabled(not busy)
@@ -2599,7 +2600,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             session = self._current_session()
             running = bool(session and session.get("status") == "running")
         enabled = bool(running and self._selected_conduct_is_temporary_lot())
-        self._set_visible_state(self.delete_lot_btn, bool(running))
+        self._set_visible_state(self.delete_lot_btn, enabled)
         self._set_enabled_state(self.delete_lot_btn, enabled)
 
     @staticmethod
