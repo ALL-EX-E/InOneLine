@@ -87,7 +87,7 @@ jobs:
 
           app = QApplication.instance() or QApplication([])
 
-          with tempfile.TemporaryDirectory() as tmp:
+          with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               root = Path(tmp)
               paths = AppPaths.from_root(root)
               paths.ensure_runtime_dirs()
