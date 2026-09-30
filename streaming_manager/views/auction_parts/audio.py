@@ -358,17 +358,56 @@ class AuctionAudioMixin:
         if hasattr(self, "auction_soundtrack_combo"):
             self._refresh_auction_soundtrack_library(auction_selected)
 
+    def _force_select_soundtrack_asset(
+        self,
+        combo,
+        asset_id: int,
+        label_builder,
+    ) -> None:
+        """Select a freshly imported soundtrack without relying on a catalog rescan.
+
+        External files are deliberately not a reusable shared library.  The
+        just-selected external reference therefore has to survive the same UI
+        turn in which it was registered, even if a managed-catalog refresh is
+        racing with it.  Re-query the exact DB row and inject it into this
+        selector when the normal catalog rebuild did not include it.
+        """
+        asset = self.db.get_media_asset(int(asset_id))
+        if asset is None or asset.category != MEDIA_CATEGORY_SOUNDTRACK:
+            return
+        index = combo.findData(int(asset_id))
+        if index < 0:
+            available = media_asset_available(self.db.path.parent, asset)
+            combo.addItem(label_builder(asset, available), int(asset.id))
+            index = combo.findData(int(asset_id))
+        if index >= 0:
+            combo.blockSignals(True)
+            combo.setCurrentIndex(index)
+            combo.blockSignals(False)
+
     def _adopt_wheel_soundtrack_asset(self, asset_id: int) -> None:
-        self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(int(asset_id)))
-        self._refresh_shared_soundtrack_catalogs(wheel_selected=int(asset_id))
+        asset_id = int(asset_id)
+        self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset_id))
+        self._refresh_shared_soundtrack_catalogs(wheel_selected=asset_id)
+        self._force_select_soundtrack_asset(
+            self.wheel_soundtrack_combo,
+            asset_id,
+            self._wheel_soundtrack_asset_label,
+        )
         # Refresh blocks combo signals deliberately; invoke the one canonical
         # live-selection path explicitly so imports during an active spin take
         # effect immediately.
         self._wheel_soundtrack_selection_changed()
 
     def _adopt_auction_soundtrack_asset(self, asset_id: int) -> None:
-        self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(int(asset_id)))
-        self._refresh_shared_soundtrack_catalogs(auction_selected=int(asset_id))
+        asset_id = int(asset_id)
+        self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset_id))
+        self._refresh_shared_soundtrack_catalogs(auction_selected=asset_id)
+        self._force_select_soundtrack_asset(
+            self.auction_soundtrack_combo,
+            asset_id,
+            self._auction_soundtrack_asset_label,
+        )
         self._auction_soundtrack_selection_changed()
 
     def _saved_wheel_soundtrack_volume(self) -> int:
