@@ -41,11 +41,14 @@ try:
         archive_path = Path(tmp) / "source.zip"
         create_source_snapshot(archive_path)
         with zipfile.ZipFile(archive_path, "r") as archive:
-            names = {
-                info.filename.replace("\\", "/").lstrip("./")
-                for info in archive.infolist()
-                if not info.is_dir()
-            }
+            names = set()
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                name = info.filename.replace("\\", "/")
+                while name.startswith("./"):
+                    name = name[2:]
+                names.add(name)
 
         expected = tracked_source_files()
         assert names == expected, (
