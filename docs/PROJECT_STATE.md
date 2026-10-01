@@ -36,6 +36,51 @@ GitHub Release/tag: **v1.0.8**
 
 Publication workflow повторно скачал опубликованные installer/source и подтвердил те же SHA-256.
 
+## ACCEPTED MAINTENANCE BASELINE — 2026-10-01
+
+Текущий принятый runtime 1.0.8 дополнен maintenance-scope из filesystem/source audit.
+
+- App version: **1.0.8**
+- SQLite schema: **19**
+- Named migrations: **15**
+- Release cadence: **не изменён**
+- PR: **#12**
+- Accepted candidate head: `6fa7589625027bc47f51757782f66836b5e60293`
+- Merge commit: `9d31b4af1ea19c80f257be2fec2b660b3cc4aadb`
+- Candidate vs merged tree: **131 blob files / 0 differences**
+- Final candidate regression: `36862136841` — **SUCCESS**
+- Accepted artifact build: `36862185114` — **SUCCESS**
+- Post-merge main regression: `36881245153` — **SUCCESS**
+- Maintenance publication: `36881837005` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-filesystem-maintenance.md`
+- Filesystem audit: `docs/audits/FILESYSTEM_AUDIT_2026-10-01.md`
+
+Accepted maintenance release/tag:
+
+**v1.0.8-maintenance-2026-10-01**
+
+Installer: `InOneLine_1.0.8_MAINTENANCE_FINAL.exe`
+
+- Size: `47,629,306` bytes
+- SHA-256: `2b469e334480d5073a15f48c0e0d84ce3926b990dd4e415c4c90ff0885ba28f1`
+
+Source: `InOneLine_Source_1.0.8_MAINTENANCE_FINAL.zip`
+
+- Size: `1,408,876` bytes
+- SHA-256: `bba8214b87729517036f3d422d5e86b6d56b9f23738d396bd4069b4801429e83`
+- Non-empty duplicate groups: **0**
+
+Maintenance changes accepted:
+- retired legacy `data/wheel_jingles` with safe migration into `data/soundtrack`;
+- preserved 1.0.6 full-backup compatibility;
+- retired unused stock `data/import_template.csv` while preserving user-edited copies;
+- added conservative stale staging cleanup while preserving recovery/rollback data;
+- source snapshots now use Git-tracked bytes only;
+- clean-install root/data filesystem and duplicate checks are permanent regression coverage.
+
+The original `v1.0.8` release remains the historical initial 1.0.8 publication. For the latest accepted 1.0.8 maintenance baseline, use `v1.0.8-maintenance-2026-10-01`.
+
 ## Контрольный codebase audit — 2026-10-01
 
 Проведён отдельный audit-only проход exact accepted/released 1.0.8.
@@ -47,7 +92,7 @@ Publication workflow повторно скачал опубликованные 
 - Runtime 1.0.8 этим аудитом **не изменялся**.
 - Подробный отчёт: `docs/audits/CODEBASE_AUDIT_2026-10-01.md`.
 
-Первый обязательный шаг аудита выполнен: существующий старый regression/QA foundation из Drive reuse-first восстановлен и адаптирован к exact 1.0.8. Runtime при этом не изменялся. Следующий maintenance-пункт аудита выбирается отдельно.
+Выполнены первые maintenance-шаги аудита: reuse-first восстановлен постоянный regression/QA foundation, исправлена сборка чистого Source ZIP и завершён filesystem/duplicate audit с принятой maintenance-сборкой 1.0.8. Следующий maintenance-пункт выбирается отдельно.
 
 ## Regression foundation — restored 2026-10-01
 
