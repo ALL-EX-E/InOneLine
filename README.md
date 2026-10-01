@@ -5,7 +5,7 @@
 ## Скачать и установить
 
 1. Откройте страницу [Releases](../../releases).
-2. Скачайте **`InOneLine_Setup_1.0.8.exe`**.
+2. Скачайте **`InOneLine_1.0.8_MAINTENANCE_FINAL.exe`** из последнего принятого maintenance-релиза **v1.0.8-maintenance-2026-10-01**.
 3. Запустите установщик и следуйте его подсказкам.
 4. После установки запустите InOneLine через ярлык или меню «Пуск».
 
@@ -28,7 +28,8 @@
 - интеграции Twitch и DonationAlerts;
 - семь встроенных OBS Browser Sources;
 - экспорт CSV / JSON / Excel;
-- резервное копирование и полное восстановление данных;\n- условное скрытие логически неприменимых настроек без скрытия временно заблокированных действий.
+- резервное копирование и полное восстановление данных;
+- условное скрытие логически неприменимых настроек без скрытия временно заблокированных действий.
 
 ## OBS
 
@@ -36,34 +37,36 @@
 
 ## Проверка установщика
 
-Официальный installer 1.0.8:
+Текущий принятый installer 1.0.8 maintenance:
 
-`InOneLine_Setup_1.0.8.exe`
+`InOneLine_1.0.8_MAINTENANCE_FINAL.exe`
 
 SHA-256:
 
 ```text
-b960ece03364788941dacec0723cf4664ea4fb11461ec4322a2c03fb79ca66e4
+2b469e334480d5073a15f48c0e0d84ce3926b990dd4e415c4c90ff0885ba28f1
 ```
 
 PowerShell:
 
 ```powershell
-Get-FileHash .\InOneLine_Setup_1.0.8.exe -Algorithm SHA256
+Get-FileHash .\InOneLine_1.0.8_MAINTENANCE_FINAL.exe -Algorithm SHA256
 ```
+
+Первоначальный `v1.0.8` сохранён в GitHub Releases как историческая публикация исходной принятой 1.0.8.
 
 ## Исходный код и лицензия
 
 Исходный код опубликован в этом репозитории. Полные условия находятся в [LICENSE](./LICENSE).
 
-Exact accepted source snapshot релиза 1.0.8:
+Текущий accepted source snapshot 1.0.8 maintenance:
 
-`InOneLine_Source_1.0.8.zip`
+`InOneLine_Source_1.0.8_MAINTENANCE_FINAL.zip`
 
 SHA-256:
 
 ```text
-babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15
+bba8214b87729517036f3d422d5e86b6d56b9f23738d396bd4069b4801429e83
 ```
 
 GitHub автоматически создаёт собственные Source code archives для тега; они не обязаны быть byte-identical файлу `InOneLine_Source_1.0.8.zip`.
@@ -96,6 +99,7 @@ InOneLine разрабатывался автором при помощи **Chat
 ## Дополнительная информация
 
 - [Release notes 1.0.8](./RELEASE_NOTES_1.0.8.md)
+- [Maintenance notes 1.0.8 — 2026-10-01](./RELEASE_NOTES_1.0.8_MAINTENANCE_2026-10-01.md)
 - [SHA256SUMS.txt](./SHA256SUMS.txt)
 
 ## Автор
