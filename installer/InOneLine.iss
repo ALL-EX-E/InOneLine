@@ -82,7 +82,6 @@ Name: "{app}\logs"; Permissions: users-modify; Flags: uninsneveruninstall
 [Files]
 Source: "{#DistRoot}\InOneLine.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#DistRoot}\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\data\import_template.csv"; DestDir: "{app}\data"; Flags: onlyifdoesntexist uninsneveruninstall
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
