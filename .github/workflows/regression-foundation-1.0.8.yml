@@ -28,8 +28,11 @@ jobs:
       - name: Confirm QA-only candidate scope
         shell: pwsh
         run: |
-          git fetch origin main --depth=1
-          $runtime = git diff --name-only origin/main...HEAD -- app.py streaming_manager installer requirements.txt data assets
+          $baseline = "2010228bdba6db406eb2b2899e759fa9e460f5cc"
+          git cat-file -e "$baseline^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw "QA baseline commit is unavailable" }
+          $runtime = git diff --name-only "$baseline...HEAD" -- app.py streaming_manager installer requirements.txt data assets
+          if ($LASTEXITCODE -ne 0) { throw "QA scope diff failed" }
           if ($runtime) {
             Write-Host $runtime
             throw "QA foundation candidate changed runtime/build product files"
