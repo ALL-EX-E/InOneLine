@@ -61,6 +61,14 @@ Publication workflow повторно скачал опубликованные 
 
 Persistent regression coverage now includes exact dependency lock, DB backup/restore and rollback, fresh DB integrity, native GUI current-contract checks, frozen EXE/Browser Source smoke, installer build and silent-install startup.
 
+Permanent repository gate:
+- PR: **#11**
+- Squash merge: `90ab778f2952dadb203f467b6d69e1930f34751c`
+- PR regression: `36835785368` — **SUCCESS**
+- Main push regression: `36836121385` — **SUCCESS**
+- Main publication wording: `36836120962` — **SUCCESS**
+- Runs automatically for relevant product/build/test changes on PRs to `main` and pushes to `main`; documentation-only changes are filtered out.
+
 ## Последние принятые функциональные релизы
 
 - **1.0.4 / D19** — пользовательское/анимированное изображение в центре колеса и быстрый выбор.
