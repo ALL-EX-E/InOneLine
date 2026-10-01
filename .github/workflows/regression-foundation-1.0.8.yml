@@ -1,0 +1,206 @@
+name: Regression Foundation 1.0.8
+
+on:
+  push:
+    branches:
+      - maintenance/qa-foundation-1.0.8
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-regression:
+    runs-on: windows-2025
+    timeout-minutes: 55
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Confirm QA-only candidate scope
+        shell: pwsh
+        run: |
+          git fetch origin main --depth=1
+          $runtime = git diff --name-only origin/main...HEAD -- app.py streaming_manager installer requirements.txt data assets
+          if ($runtime) {
+            Write-Host $runtime
+            throw "QA foundation candidate changed runtime/build product files"
+          }
+          Write-Host "QA_ONLY_SCOPE=PASS"
+
+      - name: Install exact accepted 1.0.8 dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build-lock.txt
+          python -m pip check
+
+      - name: Compile current source and restored QA
+        shell: pwsh
+        run: |
+          python -m compileall -q streaming_manager app.py tools
+          if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
+          Write-Host "COMPILEALL=PASS"
+
+      - name: Database backup and restore regressions
+        shell: pwsh
+        run: |
+          python tools/full_backup_smoke.py
+          python tools/full_restore_rollback_smoke.py
+
+      - name: Fresh database integrity
+        shell: pwsh
+        run: |
+          @'
+          import sqlite3
+          import tempfile
+          from pathlib import Path
+          from streaming_manager.constants import APP_VERSION, SCHEMA_VERSION
+          from streaming_manager.database import Database
+
+          assert APP_VERSION == "1.0.8"
+          assert SCHEMA_VERSION == 19
+          with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+              path = Path(tmp) / "streaming.db"
+              Database(path)
+              with sqlite3.connect(path) as conn:
+                  assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
+                  assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                  assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+                  assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 19
+                  assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 15
+          print("FRESH_DB_1_0_8=PASS")
+          '@ | python -
+
+      - name: Native GUI regression core
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/gui_regression_smoke.py
+
+      - name: Build frozen application with accepted toolchain
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean installer/InOneLine.spec
+          if (!(Test-Path "dist\InOneLine\InOneLine.exe")) { throw "Frozen EXE missing" }
+
+      - name: Frozen startup and browser-source regression
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist\InOneLine\InOneLine.exe").Path
+          Remove-Item "dist\InOneLine\data\streaming.db" -Force -ErrorAction SilentlyContinue
+          Remove-Item "dist\InOneLine\data\streaming.db-wal" -Force -ErrorAction SilentlyContinue
+          Remove-Item "dist\InOneLine\data\streaming.db-shm" -Force -ErrorAction SilentlyContinue
+
+          $proc = Start-Process -FilePath $exe -WorkingDirectory "dist\InOneLine" -PassThru
+          try {
+            $health = $null
+            for ($i = 0; $i -lt 60; $i++) {
+              Start-Sleep -Milliseconds 500
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health" -TimeoutSec 2
+                break
+              } catch {}
+            }
+            if ($null -eq $health) { throw "Frozen API did not start" }
+            if ($health.version -ne "1.0.8") { throw "Wrong frozen version: $($health.version)" }
+
+            $routes = @(
+              "/overlay",
+              "/list-overlay",
+              "/wheel-overlay",
+              "/rules-overlay",
+              "/timer-overlay",
+              "/music-player-overlay?preview=1"
+            )
+            foreach ($route in $routes) {
+              $response = Invoke-WebRequest -Uri ("http://127.0.0.1:8765" + $route) -TimeoutSec 3
+              if ($response.Content -notmatch "iol-version-handshake") {
+                throw "Browser Source version handshake missing: $route"
+              }
+            }
+
+            $timer = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/timer-overlay" -TimeoutSec 2).Content
+            if ($timer -notmatch "auction-audio") { throw "D43 Timer audio transport missing" }
+
+            $music = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-player-overlay?preview=1" -TimeoutSec 2).Content
+            if ($music -notmatch "createAnalyser" -or $music -notmatch "marquee") {
+              throw "D26 Music Player overlay regression"
+            }
+
+            Write-Host "FROZEN_STARTUP_BROWSER_REGRESSION=PASS"
+          } finally {
+            if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+
+      - name: Install Inno Setup 7.1.0
+        shell: pwsh
+        run: |
+          $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
+          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $inno = "$env:RUNNER_TEMP\InnoSetup710"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          if (!(Test-Path "$inno\ISCC.exe")) { throw "ISCC.exe missing" }
+
+      - name: Build installer regression
+        shell: pwsh
+        run: |
+          $inno = "$env:RUNNER_TEMP\InnoSetup710\ISCC.exe"
+          $dist = (Resolve-Path "dist\InOneLine").Path
+          & $inno "/DDistRoot=$dist" "installer\InOneLine.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+          $setup = "installer\output\InOneLine_Setup_1.0.8.exe"
+          if (!(Test-Path $setup)) { throw "Installer output missing" }
+          $item = Get-Item $setup
+          Write-Host "REGRESSION_SETUP_BYTES=$($item.Length)"
+          Write-Host "REGRESSION_SETUP_SHA256=$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant())"
+          if ($item.VersionInfo.FileVersion -notlike "1.0.8*") {
+            throw "Wrong installer FileVersion: $($item.VersionInfo.FileVersion)"
+          }
+
+      - name: Silent installer startup regression
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.8.exe").Path
+          $install = "$env:RUNNER_TEMP\InOneLineRegressionInstalled"
+          Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Regression install failed: $($p.ExitCode)" }
+          $exe = "$install\InOneLine.exe"
+          if (!(Test-Path $exe)) { throw "Installed InOneLine.exe missing" }
+          Remove-Item "$install\data\streaming.db" -Force -ErrorAction SilentlyContinue
+
+          $proc = Start-Process -FilePath $exe -WorkingDirectory $install -PassThru
+          try {
+            $health = $null
+            for ($i = 0; $i -lt 60; $i++) {
+              Start-Sleep -Milliseconds 500
+              try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/health" -TimeoutSec 2
+                break
+              } catch {}
+            }
+            if ($null -eq $health) { throw "Installed app API did not start" }
+            if ($health.version -ne "1.0.8") { throw "Wrong installed version: $($health.version)" }
+
+            $timer = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/timer-overlay" -TimeoutSec 2).Content
+            if ($timer -notmatch "auction-audio") { throw "Installed D43 Timer transport missing" }
+            $music = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/music-player-overlay?preview=1" -TimeoutSec 2).Content
+            if ($music -notmatch "createAnalyser" -or $music -notmatch "marquee") {
+              throw "Installed D26 Music Player overlay regression"
+            }
+            Write-Host "SILENT_INSTALL_STARTUP_REGRESSION=PASS"
+          } finally {
+            if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+          }
+
