@@ -14,11 +14,13 @@
 
 - [qa/1.0.8-conditional-ui.md](./qa/1.0.8-conditional-ui.md) — полный ручной gate 1.0.8 / Global Conditional UI Visibility.
 - [qa/1.0.8-regression-foundation.md](./qa/1.0.8-regression-foundation.md) — восстановленный постоянный regression foundation exact 1.0.8: DB, GUI, frozen EXE и installer.
+- [qa/1.0.8-filesystem-maintenance.md](./qa/1.0.8-filesystem-maintenance.md) — принятый filesystem/source cleanup maintenance: legacy media, backup compatibility, clean install и duplicate audit.
 - [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
 
 ## Аудиты
 
 - [audits/CODEBASE_AUDIT_2026-10-01.md](./audits/CODEBASE_AUDIT_2026-10-01.md) — контрольный аудит exact CURRENT 1.0.8: dead code, reuse-first, performance, QA/release infrastructure.
+- [audits/FILESYSTEM_AUDIT_2026-10-01.md](./audits/FILESYSTEM_AUDIT_2026-10-01.md) — полный аудит установочных/runtime-файлов, каталогов, временных объектов и exact-дубликатов.
 
 ## История
 
