@@ -40,6 +40,7 @@ class Database(SchemaMixin, GamesMixin, AuctionMixin, MediaMixin, IntegrationsMi
         ensure_managed_media_directories(self.path.parent)
         self._configure_database()
         self._init_schema()
+        self.migrate_legacy_wheel_jingles()
 
 
 __all__ = [

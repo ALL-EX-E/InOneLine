@@ -1,0 +1,109 @@
+name: Maintenance Source Cleanup Candidate
+
+on:
+  push:
+    branches:
+      - maintenance/source-snapshot-legacy-media-cleanup
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-candidate:
+    runs-on: windows-2025
+    timeout-minutes: 55
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Install exact 1.0.8 build lock
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build-lock.txt
+          python -m pip check
+
+      - name: Candidate focused regressions
+        shell: pwsh
+        run: |
+          python -m compileall -q streaming_manager app.py tools
+          if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
+          python tools/legacy_wheel_jingles_migration_smoke.py
+          python tools/legacy_full_backup_restore_smoke.py
+          python tools/full_backup_smoke.py
+          python tools/full_restore_rollback_smoke.py
+          python tools/runtime_filesystem_cleanup_smoke.py
+          python tools/source_snapshot_smoke.py
+
+      - name: Build frozen application
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean installer/InOneLine.spec
+          if (!(Test-Path "dist\InOneLine\InOneLine.exe")) { throw "Frozen EXE missing" }
+
+      - name: Audit frozen distribution duplicates
+        shell: pwsh
+        run: |
+          python tools/frozen_dist_duplicate_audit.py dist\InOneLine
+
+      - name: Install Inno Setup 7.1.0
+        shell: pwsh
+        run: |
+          $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
+          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $inno = "$env:RUNNER_TEMP\InnoSetup710"
+          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          if (!(Test-Path "$inno\ISCC.exe")) { throw "ISCC.exe missing" }
+
+      - name: Build candidate installer
+        shell: pwsh
+        run: |
+          $inno = "$env:RUNNER_TEMP\InnoSetup710\ISCC.exe"
+          $dist = (Resolve-Path "dist\InOneLine").Path
+          & $inno "/DDistRoot=$dist" "installer\InOneLine.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+          $setup = "installer\output\InOneLine_Setup_1.0.8.exe"
+          if (!(Test-Path $setup)) { throw "Installer output missing" }
+
+          $out = "$env:RUNNER_TEMP\InOneLine_Maintenance_Candidate"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item $setup "$out\InOneLine_1.0.8_MAINTENANCE_CANDIDATE.exe"
+
+          python tools/create_source_snapshot.py "$out\InOneLine_Source_1.0.8_MAINTENANCE_CANDIDATE.zip"
+
+          $installer = Get-Item "$out\InOneLine_1.0.8_MAINTENANCE_CANDIDATE.exe"
+          $source = Get-Item "$out\InOneLine_Source_1.0.8_MAINTENANCE_CANDIDATE.zip"
+          $installerSha = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceSha = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          commit=$env:GITHUB_SHA
+          installer_bytes=$($installer.Length)
+          installer_sha256=$installerSha
+          source_bytes=$($source.Length)
+          source_sha256=$sourceSha
+          "@ | Set-Content "$out\BUILD_INFO.txt" -Encoding UTF8
+
+          Write-Host "CANDIDATE_COMMIT=$env:GITHUB_SHA"
+          Write-Host "CANDIDATE_INSTALLER_BYTES=$($installer.Length)"
+          Write-Host "CANDIDATE_INSTALLER_SHA256=$installerSha"
+          Write-Host "CANDIDATE_SOURCE_BYTES=$($source.Length)"
+          Write-Host "CANDIDATE_SOURCE_SHA256=$sourceSha"
+
+      - name: Upload maintenance candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: InOneLine-1.0.8-maintenance-candidate
+          path: ${{ runner.temp }}\InOneLine_Maintenance_Candidate\*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

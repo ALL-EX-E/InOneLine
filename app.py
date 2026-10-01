@@ -93,6 +93,9 @@ def main() -> int:
 
     try:
         paths.ensure_runtime_dirs()
+        from streaming_manager.backup_restore import cleanup_stale_runtime_artifacts
+
+        cleanup_stale_runtime_artifacts(paths.root_dir)
         # E4 FIX7: Qt's own plugin loader is outside CPython's extension loader.
         # Stage plugins proactively once the native-loader safety headroom is
         # reached, before QApplication is created.

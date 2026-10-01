@@ -43,7 +43,6 @@ with TemporaryDirectory() as tmp:
         "credentials/cred_test.bin": b"dpapi-ciphertext-placeholder",
         "music/theme.wav": b"MUSIC-ORIGINAL",
         "soundtrack/event.wav": b"SOUNDTRACK-ORIGINAL",
-        "wheel_jingles/jingle.wav": b"JINGLE-ORIGINAL",
         "wheel_center_icons/icon.png": b"ICON-ORIGINAL",
         "overlay_backgrounds/bg.png": b"BG-ORIGINAL",
     }
@@ -74,13 +73,14 @@ with TemporaryDirectory() as tmp:
     )
 
     checked = validate_full_backup_archive(dest)
-    assert checked["file_count"] == 7, checked
+    assert checked["file_count"] == 6, checked
     assert checked["credentials_present"] is True
 
     with zipfile.ZipFile(dest) as archive:
         names = set(archive.namelist())
         assert "data/streaming.db" in names
         assert "data/soundtrack/event.wav" in names
+        assert not any(name.startswith("data/wheel_jingles/") for name in names)
         assert not any(name.startswith("logs/") or name.startswith("backups/") for name in names)
 
     with closing(sqlite3.connect(paths.database_path)) as conn, conn:

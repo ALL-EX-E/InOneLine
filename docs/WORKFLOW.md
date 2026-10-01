@@ -12,9 +12,10 @@
 8. При дефекте исправлять только candidate, выпускать новый FIX и повторять только нужные проверки плюс regression gates.
 9. После полного PASS получить явную пользовательскую приёмку.
 10. Продвигать **точно проверенные bytes**, не пересобирая installer/source после ручной приёмки.
-11. Публиковать GitHub Release и проверять опубликованные SHA-256.
-12. Обновлять `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, QA и решения.
-13. Только после этого считать версию CURRENT/released.
+11. Source ZIP собирать только из Git-tracked файлов через `tools/create_source_snapshot.py`; запрещено архивировать post-build workspace копированием каталога.
+12. Публиковать GitHub Release и проверять опубликованные SHA-256.
+13. Обновлять `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, QA и решения.
+14. Только после этого считать версию CURRENT/released.
 
 ## Версии
 

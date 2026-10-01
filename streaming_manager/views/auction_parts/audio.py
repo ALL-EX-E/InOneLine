@@ -63,7 +63,6 @@ class AuctionAudioMixin:
         )
         self.soundtrack_dir.mkdir(parents=True, exist_ok=True)
         # Auction and Wheel deliberately share one D26 soundtrack catalog.
-        self.wheel_jingles_dir = self.soundtrack_dir
         self.wheel_audio.set_volume_percent(self._saved_wheel_soundtrack_volume())
         self.wheel_audio.set_muted(self._saved_wheel_soundtrack_mute())
 
@@ -722,7 +721,7 @@ class AuctionAudioMixin:
             QMessageBox.critical(self, "Ошибка", "Выбранный аудиофайл не найден.")
             return
 
-        self.wheel_jingles_dir.mkdir(parents=True, exist_ok=True)
+        self.soundtrack_dir.mkdir(parents=True, exist_ok=True)
         storage_mode = self._choose_wheel_soundtrack_storage_mode(source)
         if storage_mode is None:
             return
@@ -734,7 +733,7 @@ class AuctionAudioMixin:
             self._adopt_wheel_soundtrack_asset(asset.id)
             return
 
-        if source.resolve().parent == self.wheel_jingles_dir.resolve():
+        if source.resolve().parent == self.soundtrack_dir.resolve():
             asset = self.db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_SOUNDTRACK,
                 source.name,

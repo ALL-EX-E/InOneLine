@@ -39,7 +39,9 @@ FULL_BACKUP_FORMAT = "InOneLineFullBackup"
 FULL_BACKUP_FORMAT_VERSION = 1
 FULL_BACKUP_EXTENSION = ".iolbackup"
 # Full-backup format 1 existed before D26. Keep the exact legacy directory
-# declaration readable so 1.0.7 can restore a full backup created by 1.0.6.
+# declaration readable so current builds can restore a full backup created by
+# 1.0.6. On restart Database migrates restored data/wheel_jingles into the
+# shared D26 data/soundtrack catalog.
 LEGACY_FULL_BACKUP_MANAGED_DIRS = (
     "credentials",
     "overlay_backgrounds",
@@ -52,12 +54,101 @@ FULL_BACKUP_MANAGED_DIRS = (
     "overlay_backgrounds",
     "music",
     "soundtrack",
-    "wheel_jingles",
     "wheel_center_icons",
 )
 _FULL_BACKUP_MANIFEST = "manifest.json"
 _FULL_BACKUP_DATABASE = "data/streaming.db"
 _FULL_BACKUP_MANIFEST_MAX_BYTES = 2 * 1024 * 1024
+
+# Pre-1.0.8 installer artifact. The current UI already contains a richer CSV
+# import help/example, so new installations no longer need a physical template.
+# Remove only the untouched installer copy; a user-edited file is preserved.
+_LEGACY_IMPORT_TEMPLATE_SHA256 = "d3c59e2e430a6dada8fee6f9b824bc4db5783e492426da91ac85e12ee84235b9"
+_STALE_RUNTIME_ARTIFACT_AGE_SECONDS = 24 * 60 * 60
+
+
+def cleanup_stale_runtime_artifacts(
+    project_dir: str | Path,
+    *,
+    minimum_age_seconds: float = _STALE_RUNTIME_ARTIFACT_AGE_SECONDS,
+) -> dict[str, int]:
+    """Best-effort cleanup for disposable InOneLine filesystem artifacts.
+
+    Only staging/work files that are copies of authoritative data are eligible.
+    Rollback/recovery material is deliberately excluded because after a hard
+    crash it may be the only recoverable copy of user data.
+    """
+    paths = AppPaths.from_root(project_dir)
+    cutoff = time.time() - max(0.0, float(minimum_age_seconds))
+    removed_files = 0
+    removed_directories = 0
+    preserved_user_files = 0
+    errors = 0
+
+    def old_enough(path: Path) -> bool:
+        try:
+            return path.stat().st_mtime <= cutoff
+        except OSError:
+            return False
+
+    file_patterns = (
+        (paths.data_dir, ".restore_pending_*.db"),
+        (paths.data_dir, "restore_result.json.tmp"),
+        (paths.backups_dir, ".backup_*.error.txt"),
+    )
+    directory_patterns = (
+        (paths.data_dir, ".full_restore_pending_*"),
+        (paths.data_dir, ".full_backup_create_*"),
+        (paths.backups_dir, ".full_restore_safety_work_*"),
+    )
+
+    for parent, pattern in file_patterns:
+        try:
+            candidates = list(parent.glob(pattern)) if parent.is_dir() else []
+        except OSError:
+            errors += 1
+            continue
+        for candidate in candidates:
+            if not old_enough(candidate):
+                continue
+            try:
+                candidate.unlink(missing_ok=True)
+                removed_files += 1
+            except OSError:
+                errors += 1
+
+    for parent, pattern in directory_patterns:
+        try:
+            candidates = list(parent.glob(pattern)) if parent.is_dir() else []
+        except OSError:
+            errors += 1
+            continue
+        for candidate in candidates:
+            if not candidate.is_dir() or not old_enough(candidate):
+                continue
+            try:
+                shutil.rmtree(candidate)
+                removed_directories += 1
+            except OSError:
+                errors += 1
+
+    legacy_template = paths.data_dir / "import_template.csv"
+    if legacy_template.is_file():
+        try:
+            if _sha256_file(legacy_template) == _LEGACY_IMPORT_TEMPLATE_SHA256:
+                legacy_template.unlink()
+                removed_files += 1
+            else:
+                preserved_user_files += 1
+        except OSError:
+            errors += 1
+
+    return {
+        "removed_files": removed_files,
+        "removed_directories": removed_directories,
+        "preserved_user_files": preserved_user_files,
+        "errors": errors,
+    }
 
 
 def _sha256_file(path: Path) -> str:
@@ -337,7 +428,10 @@ def stage_full_restore_candidate(
     try:
         with zipfile.ZipFile(source, "r") as archive:
             manifest, infos = _full_backup_manifest_and_infos(archive)
-            for directory in FULL_BACKUP_MANAGED_DIRS:
+            staged_managed_directories = tuple(
+                str(value) for value in manifest["managed_directories"]
+            )
+            for directory in staged_managed_directories:
                 (stage_root / "data" / directory).mkdir(parents=True, exist_ok=True)
             for item in manifest["files"]:
                 name = item["path"]
@@ -417,6 +511,23 @@ def apply_staged_full_restore(
     if not paths.database_path.is_file():
         raise RuntimeError(f"Текущая база не найдена: {paths.database_path}")
 
+    # A validated legacy 1.0.6 backup can contain data/wheel_jingles while
+    # current backups do not. Restore every directory carried by this staged
+    # backup plus all current managed directories. This clears newer-only
+    # managed state (for example data/soundtrack) when restoring an older
+    # snapshot, while still making the legacy wheel payload available to the
+    # normal Database startup migration on relaunch.
+    staged_managed_directories = tuple(
+        sorted(
+            item.name
+            for item in stage_data.iterdir()
+            if item.is_dir()
+        )
+    )
+    restore_directories = tuple(
+        dict.fromkeys((*FULL_BACKUP_MANAGED_DIRS, *staged_managed_directories))
+    )
+
     safety_backup = _create_full_restore_safety_backup(paths)
     rollback_root = paths.backups_dir / f".full_restore_rollback_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
     rollback_root.mkdir(parents=True, exist_ok=False)
@@ -425,7 +536,7 @@ def apply_staged_full_restore(
     replacement_database = paths.data_dir / f".full_restore_database_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.db"
 
     try:
-        for directory in FULL_BACKUP_MANAGED_DIRS:
+        for directory in restore_directories:
             current = paths.data_dir / directory
             old = rollback_root / directory
             if current.exists():
@@ -437,7 +548,7 @@ def apply_staged_full_restore(
         for sidecar in _sidecar_paths(paths.database_path):
             sidecar.unlink(missing_ok=True)
 
-        for directory in FULL_BACKUP_MANAGED_DIRS:
+        for directory in restore_directories:
             staged = stage_data / directory
             target = paths.data_dir / directory
             if target.exists():
@@ -446,6 +557,28 @@ def apply_staged_full_restore(
                 shutil.move(str(staged), str(target))
             else:
                 target.mkdir(parents=True, exist_ok=True)
+
+        # wheel_jingles is no longer a managed directory. If an upgraded
+        # installation still contains unrelated/unsupported user files there,
+        # a legacy full restore must not silently delete them. Audio belongs to
+        # the restored backup and will be migrated to soundtrack on relaunch;
+        # only non-audio leftovers from the pre-restore directory are merged
+        # back without overwriting restored files.
+        legacy_old = rollback_root / "wheel_jingles"
+        legacy_target = paths.data_dir / "wheel_jingles"
+        if legacy_old.is_dir():
+            audio_extensions = {".mp3", ".wav", ".ogg"}
+            for item in sorted(
+                legacy_old.rglob("*"), key=lambda value: value.as_posix().casefold()
+            ):
+                if not item.is_file() or item.suffix.lower() in audio_extensions:
+                    continue
+                relative = item.relative_to(legacy_old)
+                destination = legacy_target / relative
+                if destination.exists():
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, destination)
 
         final_validation = validate_streaming_manager_backup(paths.database_path)
         return {
@@ -461,7 +594,7 @@ def apply_staged_full_restore(
         rollback_error: Exception | None = None
         try:
             replacement_database.unlink(missing_ok=True)
-            for directory in FULL_BACKUP_MANAGED_DIRS:
+            for directory in restore_directories:
                 target = paths.data_dir / directory
                 if target.exists():
                     shutil.rmtree(target)
