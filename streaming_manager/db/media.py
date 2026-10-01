@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import filecmp
+import shutil
 from pathlib import Path
 
+from ..constants import WHEEL_SOUNDTRACK_MEDIA_ID_KEY
 from ..media import (
+    LEGACY_MEDIA_CATEGORY_WHEEL_JINGLES,
     MEDIA_CATEGORY_MUSIC,
     MEDIA_CATEGORY_SOUNDTRACK,
     MEDIA_STORAGE_EXTERNAL,
@@ -263,6 +267,253 @@ class MediaMixin:
             ).fetchone()
         assert row is not None
         return self._media_asset_from_row(row)
+
+    def migrate_legacy_wheel_jingles(self) -> dict[str, int]:
+        """Adopt the pre-D26 wheel soundtrack library into data/soundtrack.
+
+        In 1.0.6 managed wheel audio lived in data/wheel_jingles and media
+        rows used category=wheel_jingles. D26 deliberately unified wheel and
+        auction soundtracks under data/soundtrack, but old installations and
+        old full backups can still carry the legacy directory/category.
+
+        The migration is idempotent, preserves media IDs whenever possible,
+        re-points the selected wheel soundtrack when an equivalent soundtrack
+        row already exists, never overwrites a different file, and removes the
+        legacy directory only after it is empty.
+        """
+        legacy_dir = self.path.parent / LEGACY_MEDIA_CATEGORY_WHEEL_JINGLES
+        soundtrack_dir = managed_media_directory(
+            self.path.parent, MEDIA_CATEGORY_SOUNDTRACK
+        )
+        soundtrack_dir.mkdir(parents=True, exist_ok=True)
+
+        selected_raw = str(
+            self.get_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "") or ""
+        ).strip()
+        selected_id = int(selected_raw) if selected_raw.isdigit() else None
+
+        migrated_rows = 0
+        moved_files = 0
+        merged_rows = 0
+        selected_repointed = 0
+
+        def unique_target(source: Path) -> Path:
+            candidate = soundtrack_dir / source.name
+            if not candidate.exists():
+                return candidate
+            try:
+                if filecmp.cmp(source, candidate, shallow=False):
+                    return candidate
+            except OSError:
+                pass
+            counter = 2
+            while True:
+                candidate = soundtrack_dir / (
+                    f"{source.stem} (legacy wheel {counter}){source.suffix}"
+                )
+                if not candidate.exists():
+                    return candidate
+                try:
+                    if filecmp.cmp(source, candidate, shallow=False):
+                        return candidate
+                except OSError:
+                    pass
+                counter += 1
+
+        with self.connect() as conn:
+            legacy_rows = conn.execute(
+                "SELECT * FROM media_assets WHERE category=? ORDER BY id ASC",
+                (LEGACY_MEDIA_CATEGORY_WHEEL_JINGLES,),
+            ).fetchall()
+
+            for row in legacy_rows:
+                asset = self._media_asset_from_row(row)
+                final_name = asset.managed_name
+                duplicate_id: int | None = None
+
+                if asset.storage_mode == MEDIA_STORAGE_MANAGED:
+                    name = Path(asset.managed_name).name
+                    source = legacy_dir / name
+                    target = soundtrack_dir / name
+
+                    if source.is_file():
+                        target = unique_target(source)
+                        if target.exists():
+                            try:
+                                same_file = filecmp.cmp(source, target, shallow=False)
+                            except OSError:
+                                same_file = False
+                            if same_file:
+                                source.unlink(missing_ok=True)
+                            else:
+                                raise RuntimeError(
+                                    f"Legacy soundtrack collision was not resolved: {source}"
+                                )
+                        else:
+                            shutil.move(str(source), str(target))
+                            moved_files += 1
+                        final_name = target.name
+                    elif target.is_file():
+                        final_name = target.name
+                    else:
+                        # The legacy DB row no longer has a physical managed
+                        # file. It is stale and cannot be migrated usefully.
+                        if selected_id == asset.id:
+                            selected_id = None
+                            selected_repointed += 1
+                        conn.execute("DELETE FROM media_assets WHERE id=?", (asset.id,))
+                        migrated_rows += 1
+                        continue
+
+                    candidates = conn.execute(
+                        """
+                        SELECT id FROM media_assets
+                        WHERE category=? AND storage_mode=? AND id<>?
+                        """,
+                        (
+                            MEDIA_CATEGORY_SOUNDTRACK,
+                            MEDIA_STORAGE_MANAGED,
+                            asset.id,
+                        ),
+                    ).fetchall()
+                    for candidate in candidates:
+                        candidate_asset = self._get_media_asset_conn(
+                            conn, int(candidate["id"])
+                        )
+                        if (
+                            candidate_asset is not None
+                            and candidate_asset.managed_name.casefold()
+                            == final_name.casefold()
+                        ):
+                            duplicate_id = candidate_asset.id
+                            break
+                else:
+                    candidates = conn.execute(
+                        """
+                        SELECT id, external_path FROM media_assets
+                        WHERE category=? AND storage_mode=? AND id<>?
+                        """,
+                        (
+                            MEDIA_CATEGORY_SOUNDTRACK,
+                            MEDIA_STORAGE_EXTERNAL,
+                            asset.id,
+                        ),
+                    ).fetchall()
+                    for candidate in candidates:
+                        if (
+                            str(candidate["external_path"] or "").casefold()
+                            == asset.external_path.casefold()
+                        ):
+                            duplicate_id = int(candidate["id"])
+                            break
+
+                if duplicate_id is not None:
+                    if selected_id == asset.id:
+                        selected_id = duplicate_id
+                        selected_repointed += 1
+                    conn.execute("DELETE FROM media_assets WHERE id=?", (asset.id,))
+                    merged_rows += 1
+                    migrated_rows += 1
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE media_assets
+                    SET category=?, managed_name=?, updated_at=?
+                    WHERE id=?
+                    """,
+                    (
+                        MEDIA_CATEGORY_SOUNDTRACK,
+                        final_name if asset.storage_mode == MEDIA_STORAGE_MANAGED else "",
+                        utc_now(),
+                        asset.id,
+                    ),
+                )
+                migrated_rows += 1
+
+            # Preserve manually copied legacy audio that never had a DB row.
+            if legacy_dir.is_dir():
+                allowed = supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK)
+                for source in sorted(
+                    legacy_dir.iterdir(), key=lambda item: item.name.casefold()
+                ):
+                    if not source.is_file() or source.suffix.lower() not in allowed:
+                        continue
+                    target = unique_target(source)
+                    if target.exists():
+                        try:
+                            same_file = filecmp.cmp(source, target, shallow=False)
+                        except OSError:
+                            same_file = False
+                        if same_file:
+                            source.unlink(missing_ok=True)
+                        else:
+                            continue
+                    else:
+                        shutil.move(str(source), str(target))
+                        moved_files += 1
+
+                    existing = conn.execute(
+                        """
+                        SELECT id, managed_name FROM media_assets
+                        WHERE category=? AND storage_mode=?
+                        """,
+                        (MEDIA_CATEGORY_SOUNDTRACK, MEDIA_STORAGE_MANAGED),
+                    ).fetchall()
+                    if not any(
+                        str(item["managed_name"] or "").casefold()
+                        == target.name.casefold()
+                        for item in existing
+                    ):
+                        now = utc_now()
+                        conn.execute(
+                            """
+                            INSERT INTO media_assets(
+                                category,storage_mode,managed_name,external_path,
+                                original_name,created_at,updated_at
+                            ) VALUES(?,?,?,?,?,?,?)
+                            """,
+                            (
+                                MEDIA_CATEGORY_SOUNDTRACK,
+                                MEDIA_STORAGE_MANAGED,
+                                target.name,
+                                "",
+                                target.name,
+                                now,
+                                now,
+                            ),
+                        )
+
+            desired_setting = str(selected_id) if selected_id is not None else ""
+            if desired_setting != selected_raw:
+                conn.execute(
+                    "INSERT INTO settings(key,value) VALUES(?,?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (WHEEL_SOUNDTRACK_MEDIA_ID_KEY, desired_setting),
+                )
+                if hasattr(self, "_log_conn"):
+                    self._log_conn(
+                        conn,
+                        "setting",
+                        None,
+                        "legacy_wheel_soundtrack_migration",
+                        {"key": WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "value": selected_raw},
+                        {"key": WHEEL_SOUNDTRACK_MEDIA_ID_KEY, "value": desired_setting},
+                    )
+
+        if legacy_dir.is_dir():
+            try:
+                legacy_dir.rmdir()
+            except OSError:
+                # Unsupported/user files are never deleted implicitly.
+                pass
+
+        return {
+            "migrated_rows": migrated_rows,
+            "moved_files": moved_files,
+            "merged_rows": merged_rows,
+            "selected_repointed": selected_repointed,
+        }
 
     def sync_managed_media_category(self, category: str) -> list[MediaAsset]:
         """Mirror one managed category to the files physically present on disk.
