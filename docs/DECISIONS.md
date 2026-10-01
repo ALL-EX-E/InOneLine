@@ -46,7 +46,7 @@ Released behavior имеет приоритет над ранними draft-оп
 
 ## Post-D26 UX rules
 
-Два отдельных patch item были записаны до закрытия D26 и теперь eligible for selection:
+Из двух post-D26 UX patch items один уже закрыт:
 
-1. скрывать логически неприменимые controls вместо серого disabled UI после отдельного полного UI audit;
-2. распространить стандартный Windows Ctrl/Shift multi-file import на все применимые `Добавить файл…` flows.
+1. **Conditional UI Visibility** — RELEASED in 1.0.8. Логически неприменимые controls скрываются; временно недоступные, но применимые controls остаются visible + disabled.
+2. **Global Multi-File Import** — остаётся eligible for selection. Требование: распространить стандартный Windows Ctrl/Shift multi-file import на все применимые `Добавить файл…` flows, переиспользуя уже реализованный D26 multi-select механизм Music Player.
