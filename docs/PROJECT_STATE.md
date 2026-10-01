@@ -47,7 +47,19 @@ Publication workflow повторно скачал опубликованные 
 - Runtime 1.0.8 этим аудитом **не изменялся**.
 - Подробный отчёт: `docs/audits/CODEBASE_AUDIT_2026-10-01.md`.
 
-Главный вывод аудита: перед широкой cleanup/refactor-работой нужно reuse-first восстановить существующий старый regression/QA foundation из Drive и адаптировать его к 1.0.8. Новый implementation scope этим аудитом автоматически не выбран.
+Первый обязательный шаг аудита выполнен: существующий старый regression/QA foundation из Drive reuse-first восстановлен и адаптирован к exact 1.0.8. Runtime при этом не изменялся. Следующий maintenance-пункт аудита выбирается отдельно.
+
+## Regression foundation — restored 2026-10-01
+
+- PR: **#8**
+- Squash merge: `f7386fa324fa82a42cd38f743d655859163ccf11`
+- Windows regression gate: `36833625221` — **SUCCESS**
+- Publication wording gate: `36833625136` — **SUCCESS**
+- Product runtime changes: **0**
+- Version/schema/migrations remain **1.0.8 / 19 / 15**
+- Canonical QA record: `docs/qa/1.0.8-regression-foundation.md`
+
+Persistent regression coverage now includes exact dependency lock, DB backup/restore and rollback, fresh DB integrity, native GUI current-contract checks, frozen EXE/Browser Source smoke, installer build and silent-install startup.
 
 ## Последние принятые функциональные релизы
 
