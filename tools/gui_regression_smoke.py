@@ -271,7 +271,7 @@ def main() -> int:
 
         moved_track = root / "wheel-smoke-moved.wav"
         wheel_track.replace(moved_track)
-        auction.refresh()
+        auction.refresh_force()
         app.processEvents()
         if auction.wheel_soundtrack_combo.currentData():
             raise AssertionError("missing external wheel soundtrack stayed selected")
