@@ -68,7 +68,7 @@ jobs:
 
           assert APP_VERSION == "1.0.8"
           assert SCHEMA_VERSION == 19
-          with tempfile.TemporaryDirectory() as tmp:
+          with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
               Database(path)
               with sqlite3.connect(path) as conn:
