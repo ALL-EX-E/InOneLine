@@ -60,6 +60,96 @@ _FULL_BACKUP_MANIFEST = "manifest.json"
 _FULL_BACKUP_DATABASE = "data/streaming.db"
 _FULL_BACKUP_MANIFEST_MAX_BYTES = 2 * 1024 * 1024
 
+# Pre-1.0.8 installer artifact. The current UI already contains a richer CSV
+# import help/example, so new installations no longer need a physical template.
+# Remove only the untouched installer copy; a user-edited file is preserved.
+_LEGACY_IMPORT_TEMPLATE_SHA256 = "d3c59e2e430a6dada8fee6f9b824bc4db5783e492426da91ac85e12ee84235b9"
+_STALE_RUNTIME_ARTIFACT_AGE_SECONDS = 24 * 60 * 60
+
+
+def cleanup_stale_runtime_artifacts(
+    project_dir: str | Path,
+    *,
+    minimum_age_seconds: float = _STALE_RUNTIME_ARTIFACT_AGE_SECONDS,
+) -> dict[str, int]:
+    """Best-effort cleanup for disposable InOneLine filesystem artifacts.
+
+    Only staging/work files that are copies of authoritative data are eligible.
+    Rollback/recovery material is deliberately excluded because after a hard
+    crash it may be the only recoverable copy of user data.
+    """
+    paths = AppPaths.from_root(project_dir)
+    cutoff = time.time() - max(0.0, float(minimum_age_seconds))
+    removed_files = 0
+    removed_directories = 0
+    preserved_user_files = 0
+    errors = 0
+
+    def old_enough(path: Path) -> bool:
+        try:
+            return path.stat().st_mtime <= cutoff
+        except OSError:
+            return False
+
+    file_patterns = (
+        (paths.data_dir, ".restore_pending_*.db"),
+        (paths.data_dir, "restore_result.json.tmp"),
+        (paths.backups_dir, ".backup_*.error.txt"),
+    )
+    directory_patterns = (
+        (paths.data_dir, ".full_restore_pending_*"),
+        (paths.data_dir, ".full_backup_create_*"),
+        (paths.backups_dir, ".full_restore_safety_work_*"),
+    )
+
+    for parent, pattern in file_patterns:
+        try:
+            candidates = list(parent.glob(pattern)) if parent.is_dir() else []
+        except OSError:
+            errors += 1
+            continue
+        for candidate in candidates:
+            if not old_enough(candidate):
+                continue
+            try:
+                candidate.unlink(missing_ok=True)
+                removed_files += 1
+            except OSError:
+                errors += 1
+
+    for parent, pattern in directory_patterns:
+        try:
+            candidates = list(parent.glob(pattern)) if parent.is_dir() else []
+        except OSError:
+            errors += 1
+            continue
+        for candidate in candidates:
+            if not candidate.is_dir() or not old_enough(candidate):
+                continue
+            try:
+                shutil.rmtree(candidate)
+                removed_directories += 1
+            except OSError:
+                errors += 1
+
+    legacy_template = paths.data_dir / "import_template.csv"
+    if legacy_template.is_file():
+        try:
+            if _sha256_file(legacy_template) == _LEGACY_IMPORT_TEMPLATE_SHA256:
+                legacy_template.unlink()
+                removed_files += 1
+            else:
+                preserved_user_files += 1
+        except OSError:
+            errors += 1
+
+    return {
+        "removed_files": removed_files,
+        "removed_directories": removed_directories,
+        "preserved_user_files": preserved_user_files,
+        "errors": errors,
+    }
+
 
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
