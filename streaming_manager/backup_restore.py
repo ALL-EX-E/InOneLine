@@ -39,7 +39,9 @@ FULL_BACKUP_FORMAT = "InOneLineFullBackup"
 FULL_BACKUP_FORMAT_VERSION = 1
 FULL_BACKUP_EXTENSION = ".iolbackup"
 # Full-backup format 1 existed before D26. Keep the exact legacy directory
-# declaration readable so 1.0.7 can restore a full backup created by 1.0.6.
+# declaration readable so current builds can restore a full backup created by
+# 1.0.6. On restart Database migrates restored data/wheel_jingles into the
+# shared D26 data/soundtrack catalog.
 LEGACY_FULL_BACKUP_MANAGED_DIRS = (
     "credentials",
     "overlay_backgrounds",
@@ -52,7 +54,6 @@ FULL_BACKUP_MANAGED_DIRS = (
     "overlay_backgrounds",
     "music",
     "soundtrack",
-    "wheel_jingles",
     "wheel_center_icons",
 )
 _FULL_BACKUP_MANIFEST = "manifest.json"
