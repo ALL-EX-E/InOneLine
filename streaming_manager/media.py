@@ -9,18 +9,16 @@ MEDIA_STORAGE_EXTERNAL = "external"
 
 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS = "overlay_backgrounds"
 MEDIA_CATEGORY_MUSIC = "music"
-MEDIA_CATEGORY_WHEEL_JINGLES = "wheel_jingles"
+LEGACY_MEDIA_CATEGORY_WHEEL_JINGLES = "wheel_jingles"
 MEDIA_CATEGORY_SOUNDTRACK = "soundtrack"
 MEDIA_CATEGORY_WHEEL_CENTER_ICONS = "wheel_center_icons"
 
-# One shared media contract, but every functional purpose has its own physical
-# managed directory.  This intentionally preserves the historical
-# data/overlay_backgrounds location while reserving dedicated folders for the
-# next approved media features.
+# Active managed-media directories.  The pre-D26 data/wheel_jingles directory
+# is intentionally not active anymore; Database startup migrates it into the
+# shared data/soundtrack catalog before normal UI/media use.
 MANAGED_MEDIA_FOLDERS: dict[str, str] = {
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS: "overlay_backgrounds",
     MEDIA_CATEGORY_MUSIC: "music",
-    MEDIA_CATEGORY_WHEEL_JINGLES: "wheel_jingles",
     MEDIA_CATEGORY_SOUNDTRACK: "soundtrack",
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS: "wheel_center_icons",
 }
@@ -30,7 +28,6 @@ MEDIA_CATEGORY_EXTENSIONS: dict[str, frozenset[str]] = {
         {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"}
     ),
     MEDIA_CATEGORY_MUSIC: frozenset({".mp3", ".wav", ".ogg"}),
-    MEDIA_CATEGORY_WHEEL_JINGLES: frozenset({".mp3", ".wav", ".ogg"}),
     MEDIA_CATEGORY_SOUNDTRACK: frozenset({".mp3", ".wav", ".ogg"}),
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS: frozenset(
         {".png", ".jpg", ".jpeg", ".webp", ".gif"}
