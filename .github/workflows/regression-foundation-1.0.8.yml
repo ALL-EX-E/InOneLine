@@ -80,6 +80,13 @@ jobs:
           print("FRESH_DB_1_0_8=PASS")
           '@ | python -
 
+      - name: Native GUI regression core
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/gui_regression_smoke.py
+
       - name: Build frozen application with accepted toolchain
         shell: pwsh
         run: |
