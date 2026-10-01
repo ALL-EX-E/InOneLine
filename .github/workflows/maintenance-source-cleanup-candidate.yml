@@ -41,6 +41,7 @@ jobs:
           python tools/legacy_full_backup_restore_smoke.py
           python tools/full_backup_smoke.py
           python tools/full_restore_rollback_smoke.py
+          python tools/runtime_filesystem_cleanup_smoke.py
           python tools/source_snapshot_smoke.py
 
       - name: Build frozen application
