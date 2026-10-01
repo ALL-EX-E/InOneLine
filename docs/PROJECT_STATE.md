@@ -1,6 +1,6 @@
 # InOneLine — Current Project State
 
-Обновлено: **2026-09-30**
+Обновлено: **2026-10-01**
 
 ## CURRENT / RELEASED
 
@@ -36,6 +36,19 @@ GitHub Release/tag: **v1.0.8**
 
 Publication workflow повторно скачал опубликованные installer/source и подтвердил те же SHA-256.
 
+## Контрольный codebase audit — 2026-10-01
+
+Проведён отдельный audit-only проход exact accepted/released 1.0.8.
+
+- Runtime drift accepted candidate -> current main: **0 differences across 83 runtime files**.
+- Python compile: PASS.
+- Circular imports: не обнаружены.
+- Accidental mixin method collisions: не обнаружены.
+- Runtime 1.0.8 этим аудитом **не изменялся**.
+- Подробный отчёт: `docs/audits/CODEBASE_AUDIT_2026-10-01.md`.
+
+Главный вывод аудита: перед широкой cleanup/refactor-работой нужно reuse-first восстановить существующий старый regression/QA foundation из Drive и адаптировать его к 1.0.8. Новый implementation scope этим аудитом автоматически не выбран.
+
 ## Последние принятые функциональные релизы
 
 - **1.0.4 / D19** — пользовательское/анимированное изображение в центре колеса и быстрый выбор.
@@ -56,6 +69,8 @@ Publication workflow повторно скачал опубликованные 
 2. **D22 — Battle Royale** — Issue #5, approved post-completion item, отложен и требует fresh design/review.
 
 Issue #3 — **CLOSED / RELEASED in 1.0.8**.
+
+Отдельно зафиксирован maintenance-аудит 2026-10-01. Его recommended safe order начинается с возврата существующего regression/QA foundation, но это ещё не выбранный runtime implementation scope.
 
 Выбор следующего scope требует отдельного решения пользователя и fresh exact-CURRENT review.
 
