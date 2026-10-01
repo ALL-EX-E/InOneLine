@@ -62,11 +62,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
           Write-Host "COMPILEALL=PASS"
 
-      - name: Database backup and restore regressions
+      - name: Database backup, restore and legacy media regressions
         shell: pwsh
         run: |
           python tools/full_backup_smoke.py
           python tools/full_restore_rollback_smoke.py
+          python tools/legacy_wheel_jingles_migration_smoke.py
+
+      - name: Clean tracked-files source snapshot
+        shell: pwsh
+        run: |
+          python tools/source_snapshot_smoke.py
 
       - name: Fresh database integrity
         shell: pwsh
