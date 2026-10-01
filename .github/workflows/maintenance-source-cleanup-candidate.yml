@@ -49,6 +49,11 @@ jobs:
           python -m PyInstaller --noconfirm --clean installer/InOneLine.spec
           if (!(Test-Path "dist\InOneLine\InOneLine.exe")) { throw "Frozen EXE missing" }
 
+      - name: Audit frozen distribution duplicates
+        shell: pwsh
+        run: |
+          python tools/frozen_dist_duplicate_audit.py dist\InOneLine
+
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
