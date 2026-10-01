@@ -1,6 +1,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import subprocess
+import hashlib
+from collections import defaultdict
 import sys
 import zipfile
 
@@ -62,7 +64,23 @@ try:
         assert "conditional_ui_smoke.py" not in names
         assert not any(name.startswith(".github/") for name in names)
 
+        by_content: dict[tuple[int, str], list[str]] = defaultdict(list)
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            for info in archive.infolist():
+                if info.is_dir():
+                    continue
+                payload = archive.read(info.filename)
+                digest = hashlib.sha256(payload).hexdigest()
+                by_content[(len(payload), digest)].append(info.filename)
+        nonempty_duplicates = [
+            members
+            for (size, _digest), members in by_content.items()
+            if size > 0 and len(members) > 1
+        ]
+        assert not nonempty_duplicates, nonempty_duplicates
+
         print(f"SOURCE_SNAPSHOT_FILES={len(names)}")
+        print(f"SOURCE_NONEMPTY_DUPLICATE_GROUPS={len(nonempty_duplicates)}")
         print(f"SOURCE_SNAPSHOT_BYTES={archive_path.stat().st_size}")
 finally:
     for path in reversed(fake_paths):
