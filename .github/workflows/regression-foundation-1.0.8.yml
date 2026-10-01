@@ -161,6 +161,40 @@ jobs:
             if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force }
           }
 
+          Start-Sleep -Milliseconds 500
+          $expectedDirs = @("credentials","music","overlay_backgrounds","soundtrack","wheel_center_icons")
+          $actualDirs = @(Get-ChildItem "$install\data" -Directory | ForEach-Object { $_.Name } | Sort-Object)
+          $unexpectedDirs = @($actualDirs | Where-Object { $_ -notin $expectedDirs })
+          $missingDirs = @($expectedDirs | Where-Object { $_ -notin $actualDirs })
+          if ($unexpectedDirs.Count -gt 0) {
+            throw "Unexpected installed data directories: $($unexpectedDirs -join ', ')"
+          }
+          if ($missingDirs.Count -gt 0) {
+            throw "Missing installed data directories: $($missingDirs -join ', ')"
+          }
+          if ($actualDirs -contains "wheel_jingles") {
+            throw "Legacy wheel_jingles directory was recreated on clean install"
+          }
+
+          $allowedFiles = @("import_template.csv","streaming.db","streaming.db-wal","streaming.db-shm")
+          $actualFiles = @(Get-ChildItem "$install\data" -File | ForEach-Object { $_.Name } | Sort-Object)
+          $unexpectedFiles = @($actualFiles | Where-Object { $_ -notin $allowedFiles })
+          if ($unexpectedFiles.Count -gt 0) {
+            throw "Unexpected installed data files: $($unexpectedFiles -join ', ')"
+          }
+          if ("import_template.csv" -notin $actualFiles -or "streaming.db" -notin $actualFiles) {
+            throw "Required installed data files are missing"
+          }
+
+          $backupEntries = @(Get-ChildItem "$install\backups" -Force -ErrorAction SilentlyContinue)
+          $logEntries = @(Get-ChildItem "$install\logs" -Force -ErrorAction SilentlyContinue)
+          if ($backupEntries.Count -ne 0) { throw "Clean install created unexpected backup files" }
+          if ($logEntries.Count -ne 0) { throw "Clean install created unexpected log files" }
+
+          Write-Host "CLEAN_INSTALL_DATA_DIRS=$($actualDirs -join ',')"
+          Write-Host "CLEAN_INSTALL_DATA_FILES=$($actualFiles -join ',')"
+          Write-Host "CLEAN_INSTALL_FILESYSTEM=PASS"
+
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
