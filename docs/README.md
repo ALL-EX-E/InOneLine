@@ -12,7 +12,12 @@
 
 ## QA
 
-- [qa/1.0.8-conditional-ui.md](./qa/1.0.8-conditional-ui.md) — полный ручной gate 1.0.8 / Global Conditional UI Visibility.\n- [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
+- [qa/1.0.8-conditional-ui.md](./qa/1.0.8-conditional-ui.md) — полный ручной gate 1.0.8 / Global Conditional UI Visibility.
+- [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
+
+## Аудиты
+
+- [audits/CODEBASE_AUDIT_2026-10-01.md](./audits/CODEBASE_AUDIT_2026-10-01.md) — контрольный аудит exact CURRENT 1.0.8: dead code, reuse-first, performance, QA/release infrastructure.
 
 ## История
 
