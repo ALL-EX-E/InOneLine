@@ -1,9 +1,14 @@
 name: Regression Foundation 1.0.8
 
 on:
-  push:
+  pull_request:
     branches:
-      - maintenance/qa-foundation-1.0.8
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "RELEASE_NOTES_*.md"
+      - "SHA256SUMS.txt"
   workflow_dispatch:
 
 permissions:
@@ -25,17 +30,6 @@ jobs:
         with:
           python-version: "3.12.10"
 
-      - name: Confirm QA-only candidate scope
-        shell: pwsh
-        run: |
-          git fetch origin main --depth=1
-          $runtime = git diff --name-only origin/main...HEAD -- app.py streaming_manager installer requirements.txt data assets
-          if ($runtime) {
-            Write-Host $runtime
-            throw "QA foundation candidate changed runtime/build product files"
-          }
-          Write-Host "QA_ONLY_SCOPE=PASS"
-
       - name: Install exact accepted 1.0.8 dependencies
         shell: pwsh
         run: |
@@ -43,7 +37,7 @@ jobs:
           python -m pip install -r requirements-build-lock.txt
           python -m pip check
 
-      - name: Compile current source and restored QA
+      - name: Compile current source and regression QA
         shell: pwsh
         run: |
           python -m compileall -q streaming_manager app.py tools
