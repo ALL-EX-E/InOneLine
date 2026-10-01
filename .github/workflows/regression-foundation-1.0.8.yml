@@ -70,6 +70,7 @@ jobs:
           python tools/legacy_wheel_jingles_migration_smoke.py
           python tools/legacy_full_backup_restore_smoke.py
           python tools/runtime_filesystem_cleanup_smoke.py
+          python tools/media_sync_smoke.py
 
       - name: Clean tracked-files source snapshot
         shell: pwsh
