@@ -1,4 +1,10 @@
-# InOneLine 1.0.8 official release checksums
+# InOneLine 1.0.8 checksums
 
+# Current accepted 1.0.8 maintenance baseline — v1.0.8-maintenance-2026-10-01
+2b469e334480d5073a15f48c0e0d84ce3926b990dd4e415c4c90ff0885ba28f1  InOneLine_1.0.8_MAINTENANCE_FINAL.exe
+bba8214b87729517036f3d422d5e86b6d56b9f23738d396bd4069b4801429e83  InOneLine_Source_1.0.8_MAINTENANCE_FINAL.zip
+07fa91d9e576299076f029af473bbf9ed21b2ae7b887818bcc6e1ae912adaa08  InOneLine_1.0.8_MAINTENANCE_FINAL_BUILD_INFO.txt
+
+# Historical initial v1.0.8 publication
 b960ece03364788941dacec0723cf4664ea4fb11461ec4322a2c03fb79ca66e4  InOneLine_Setup_1.0.8.exe
 babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15  InOneLine_Source_1.0.8.zip
