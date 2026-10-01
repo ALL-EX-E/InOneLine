@@ -68,6 +68,7 @@ jobs:
           python tools/full_backup_smoke.py
           python tools/full_restore_rollback_smoke.py
           python tools/legacy_wheel_jingles_migration_smoke.py
+          python tools/legacy_full_backup_restore_smoke.py
 
       - name: Clean tracked-files source snapshot
         shell: pwsh
