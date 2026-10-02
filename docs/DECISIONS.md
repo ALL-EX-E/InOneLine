@@ -283,3 +283,13 @@ The first full control after the nineteenth documentation corrections recovered 
 
 Current 1.0.8 source matches the B2 startup/hourly validation and persisted connection-status model. These are documentation/process restorations, not new runtime defects.
 
+## 2026-10-02 — Twenty-second-pass Auction autoscroll / S2 / SOURCE precision
+
+The next Drive+chat+release control recovered three accepted details that were present in historical/release evidence but not explicit enough in the exhaustive inventory:
+
+- **Auction autoscroll boundary:** Auction Lots, Conduct and the dedicated Auction Lots OBS overlay share one current-session autoscroll state. It starts OFF on every application launch, is not persisted, and does not inherit Games/List presentation persistence. This is current/released behavior, not a future Games/List-autoscroll task.
+- **1.0.3 service-unit timer-extension UX:** the accepted persisted checkbox `Также учитывать неденежные единицы интеграций` defaults OFF. OFF keeps external auto-extension monetary/currency-only; ON additionally includes provider-neutral service units. Monetary and service-unit audit reasons remain distinct and use the same S2 threshold/collision/24h backend.
+- **Official accepted SOURCE asset:** `InOneLine_Source_<version>.zip` is the exact accepted SOURCE snapshot published as a dedicated release asset. GitHub-generated `Source code (zip/tar.gz)` archives come from the tagged repository tree and are not substitutes for, or expected to be byte-identical to, the official accepted SOURCE ZIP.
+
+No runtime defect or new roadmap identifier is created by these documentation restorations.
+
