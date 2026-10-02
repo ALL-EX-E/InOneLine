@@ -620,24 +620,19 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 
 # XX. Reconciliation conclusion 2026-10-02
 
-The original early-pass conclusion was superseded by the user's repeated full rechecks on the same date. The authoritative final reconciliation state is:
+The original early-pass conclusions were superseded by repeated user-requested full rechecks on the same date. The authoritative final reconciliation state after **pass 27** is:
 
 - **D1–D43 are accounted for; there is no actual D44 item.**
-- Three historical A namespaces remain separate: **August Stabilization A1–A12 (including A7.1/A11.1)**, **Product A1–A8/A6.1**, and **Maintenance A1–A10**.
+- The three historical A namespaces remain separate: **August Stabilization A1–A12 (including A7.1/A11.1)**, **Product A1–A8/A6.1**, and **Maintenance A1–A10**.
 - Rules aliases remain corrected: **R1 = editor/templates/session snapshot**, **R2 = standalone OBS Rules viewer**.
-- Current accepted-scope QA findings are explicitly tracked: **QA-1.0.8-01**, **QA-1.0.8-02**, **QA-1.0.8-03**. They are findings, not automatic authorization to change runtime.
-- The repeated seventh–tenth sequence recovered the B2 test-event safety rule, B3 `Требует привязки`, outside-auction persistent-game behavior, provider contracts, E1 exact build gate, publication/reference-wording rules, detailed Rules/B1/Winner/D28–D42 boundaries and then reached a clean post-correction control.
-- The repeated **eleventh–fourteenth** sequence then recovered further durable detail:
-  - the missing 2026-08-21 original reference-image archive gap and the `QA-<version>-NN` defect-numbering convention;
-  - advanced History identity/comparability rules, W1 input/re-entrancy guards and W2 external-reference safety;
-  - exact standalone Timer idle/default-duration behavior and deferred A8 compensating-Undo invariants;
-  - exact S2 collision/threshold semantics, standalone-widget architecture, B6 protected-secret/common-backend rules, Winner Verification public-hosting boundary and A7 history-card/hover semantics;
-  - the full B1 plaintext-secret exclusion plus disabled-integration/no-background-validation lifecycle;
-  - one production-unreachable DonationAlerts manual-Client-ID fallback branch, classified as **source-hygiene/compatibility residue**, not a runtime QA defect and not auto-authorized for cleanup.
-- **Fifteenth post-correction orphan-only control: CLEAN.** After all of those corrections were written, no additional durable direct-user product requirement, future idea, rejection, UX rule, provider contract, deployment rule, release/QA rule or documentation/process rule remained orphaned.
-- Therefore the repeated audit itself was **not zero-delta**, but the **final post-correction control had zero additional delta**.
+- Current accepted-scope QA findings are exactly **QA-1.0.8-01**, **QA-1.0.8-02**, **QA-1.0.8-03**. They are findings, not automatic authorization to change runtime.
+- Reconciliation passes 7–25 restored the previously recorded integration, Rules, History, Winner Verification, media/audio, deployment, publication, release/QA, S1/S2, B4 and D26 precision contracts documented above and in Decisions/history.
+- **Pass 26** recovered further direct-user detail that earlier clean stops had missed: Drive audit-log/screenshot archival, R1.0.4 full-backup recommendation, D19 animated-center runtime, D21 explicit elimination/no-final-winner terminal behavior, S1 preferred user-facing `Баллы`, R1/S3 Windows input details, Auction session-only autoscroll, A11.1 1-minute/24-hour wheel-motion acceptance, A12 real-operator smoke path, public SmartScreen guidance, and the one-time public-Git privacy/history cleanup process.
+- The SmartScreen public-documentation gap from pass 25 is now corrected in README.
+- **Pass 27 post-correction control: CLEAN.** A new direct-chat orphan search, Drive history/review/policy control, GitHub source scan and mechanical identifier/QA check found **zero additional durable delta after the pass-26 corrections**.
+- The repeated audit itself was therefore **not zero-delta**; only the final post-correction pass is zero-delta.
 - GitHub Issues remain tracking aids only, not the complete backlog. Open tracking remains #4 Global Multi-File Import and #5 D22 Battle Royale; stale PR #9 remains repository hygiene, not product scope.
-- No implementation scope was automatically selected by this reconciliation.
+- No implementation scope is automatically selected by this reconciliation.
 - Current runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Canonical current selection: `PROJECT_STATE.md` + `ROADMAP.md`.
