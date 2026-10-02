@@ -110,6 +110,7 @@ class _AuctionHistoryList(QListWidget):
         super().leaveEvent(event)
 
 
+from .auction_dialogs import AuctionTimeDialog
 from .auction_parts.state import AuctionStateMixin
 from .auction_parts.audio import AuctionAudioMixin
 from .auction_parts.search import AuctionSearchMixin
