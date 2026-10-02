@@ -85,6 +85,7 @@
 - **Метод выбирается до старта и не меняется молча в ходе сессии** — **IMPLEMENTED / ACCEPTED**.
 - **При ничьей в max-amount используется отдельный tie-break wheel только среди лидеров** — **IMPLEMENTED / ACCEPTED**.
 - **Weighted wheel использует суммы/баллы как веса, local + OBS синхронизированы** — **IMPLEMENTED / ACCEPTED**.
+- **Default wheel winner/animation contract** — **IMPLEMENTED / ACCEPTED / PRESERVE**: authoritative RNG выбирает winner до визуальной анимации; winner не раскрывается зрителю до завершения spin; persisted spin/result state восстанавливается после перезапуска. D27 является отдельной будущей альтернативой, а не reinterpretation этого режима.
 - **В обычном weighted wheel zero-point lot участвует с minimum effective weight, а tie-break max-amount остаётся отдельным сценарием** — **IMPLEMENTED / ACCEPTED** после Winner Verification correction.
 - **Timer Start/Pause/Resume одним основным lifecycle; reset с подтверждением; ручные +/- времени; 00:00 завершает приём ставок** — **IMPLEMENTED / ACCEPTED**.
 - **Temporary auction-only lot во время аукциона: название+сумма/баллы; после завершения/отмены переносится в основной список** — **IMPLEMENTED / ACCEPTED**.
