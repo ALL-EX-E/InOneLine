@@ -383,3 +383,23 @@ This pass was **NOT ZERO-DELTA**. It found:
 
 A new control pass is required after these corrections before a clean stop result can be claimed.
 
+## Eighth control pass — B3 binding + Rules UX — 2026-10-02
+
+After seventh-pass corrections, another direct-chat control search recovered two additional durable details:
+
+1. **B3 `Требует привязки` is a real accepted workflow, not just wording.**
+   - User acceptance on 2026-09-02 explicitly covered: usable unknown title during running auction -> temporary `auction_only`; usable unknown title outside auction -> normal persistent game; missing/unusable title -> separate `Требует привязки` state.
+   - `Требует привязки` means: no automatic create/credit; event waits for manual operator binding to a game/lot.
+   - It is distinct from `pending_conversions`, which handles unknown conversion rate/unit.
+   - Current 1.0.8 implements both usable-title paths, but `missing_target` is marked `inapplicable` and there is no manual bind path.
+   - Added **QA-1.0.8-03 / ACCEPTED B3 WORKFLOW OMISSION / NOT FIXED / NOT AUTO-AUTHORIZED**.
+
+2. **Rules standalone viewer exact numeric-control UX was missing from the exhaustive inventory.**
+   - `Непрозрачность` and `Внутренний отступ` use wide external ▲/▼ buttons, manual numeric entry and hold/repeat.
+   - Mouse-wheel scrolling must not silently change those values.
+   - Current source already uses the shared wide-step/scroll-safe controls, so this is documentation precision, not a runtime defect.
+
+Also restored the exact accepted DonationAlerts built-in public OAuth Client ID **20915**.
+
+Runtime/source/version/schema/migrations remain unchanged: **1.0.8 / 19 / 15**.
+
