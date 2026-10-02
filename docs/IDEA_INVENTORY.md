@@ -75,7 +75,7 @@
 - **Прозрачны только interior cutouts game/webcam; фон, рамки, список, info/title остаются визуальными слоями** — **IMPLEMENTED / ACCEPTED**.
 - **Второй режим с полностью прозрачным фоном всего Browser Source** — **EXPLICITLY REJECTED / NOT PART OF THE PRODUCT**; прозрачность ограничена внутренними вырезами game/webcam, которые следуют геометрии и исчезают вместе с отключённым блоком.
 - **Фон сцены из файла + Stretch/Fit/Fill/Center** — **IMPLEMENTED / ACCEPTED**.
-- **Фоны PNG/JPG/JPEG/WebP/GIF/MP4/WebM** — **IMPLEMENTED / ACCEPTED**. Accepted background-library contract preserves the original/display filename metadata instead of losing the user-facing source name during managed registration/copy; current shared media model keeps `original_name`.
+- **Фоны PNG/JPG/JPEG/WebP/GIF/MP4/WebM** — **IMPLEMENTED / ACCEPTED**. Current shared media model also preserves `original_name` for managed media rows. **PROVENANCE NOTE:** the latest exact direct-chat recheck did not recover a direct user sentence making original-filename preservation a separate product requirement; keep it as implemented historical behavior, not as a newly promoted user-originated idea.
 - **Изменения сохранённых presentation settings применяются к открытым Browser Sources без смены URL** — **IMPLEMENTED / ACCEPTED**. Accepted 5.9 detail: only explicit Save/Apply changes authoritative viewer configuration; unsaved intermediate edits are not pushed. Ordinary settings updates require no manual OBS refresh and should preserve unrelated runtime visual/business state where practical; this is separate from E2 app-version stale-page reload.
 - **OBS композиция/позиционирование остаётся задачей OBS, а InOneLine даёт standalone responsive widgets** — **IMPLEMENTED / ACCEPTED**.
 
@@ -451,7 +451,7 @@
 
 ## 0.2.0–0.2.22 — Games/Public foundation refinements
 
-- **0.2.0 — enlarged/cleaner UI foundation**: скрытый technical ID, status/archive counters, improved search/selection, compact review rendering, local-time `updated_at`, pre-import backup, Public search/count/local JSON, OBS/API helpers, detailed Journal changes — **IMPLEMENTED / ACCEPTED**. Direct early sorting contract: `updated_at DESC` is the final business tie-breaker before stable ID; every real edit, including review text, updates it, while no-op save/import and reverting to the original values must not change `updated_at` or reorder the row.
+- **0.2.0 — enlarged/cleaner UI foundation**: скрытый technical ID, status/archive counters, improved search/selection, compact review rendering, local-time `updated_at`, no-op save/import does not reorder/update timestamp, pre-import backup, Public search/count/local JSON, OBS/API helpers, detailed Journal changes — **IMPLEMENTED / ACCEPTED**. Current source uses `updated_at DESC` as the last business-order tie-breaker before stable ID. **PROVENANCE NOTE:** exact direct-user wording for `updated_at` as a separate sorting requirement was not recovered on the latest targeted recheck, so do not elevate that implementation detail into a new user-originated requirement.
 - **0.2.1 — explicit save confirmation + unsaved-close warning** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.2 — confirmation only for real edits; reverting to original values counts as no change** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.3 — irreversible Delete game with warning + safety backup, distinct from Archive** — **IMPLEMENTED / ACCEPTED**.
