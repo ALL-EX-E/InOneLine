@@ -65,7 +65,7 @@
 - **D1** double timer / elapsed count-up — user-accepted as possible / deferred.
 - **D2** pin/unpin lot — user-accepted as possible / deferred.
 - **D5 advanced History analytics** — **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only possibility: activity heatmap, weekdays distribution, participant rankings, separate points/donations analytics, record cards и «Самый дорогой победивший лот». Core History уже реализован.
-- **D9** localization/languages — user-accepted / deferred post-completion.
+- **D9** localization/languages — user-accepted / deferred post-completion; централизованная UI-localization, без автоматического перевода пользовательских данных, названий игр и History/Journal content.
 - **D10** GitHub link — conditional future item; prerequisite public repo теперь существует, но fresh review required.
 - **D11** Telegram link — conditional on official project Telegram resource.
 - **D12** support/Boosty link — conditional on official support resource.
