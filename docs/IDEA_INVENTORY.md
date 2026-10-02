@@ -138,8 +138,8 @@
 
 # IV. W-series / media / audio
 
-- **W1 — Space вызывает существующий путь «Крутить»** — **ACCEPTED / DEFERRED**. Был реализован, но 2026-09-01 пользователь отменил включение в MAIN и попросил оставить улучшением готовой программы; current runtime этого shortcut не содержит.
-- **W2 — единая managed-copy / external-reference media infrastructure** — **IMPLEMENTED / ACCEPTED**. Final UX distinguishes the normal contextual add/select action (for example `Добавить фон…`) from `Восстановить ссылку…`, which appears as a repair action for a missing external reference instead of looking like a second ordinary picker.
+- **W1 — Space вызывает существующий путь «Крутить»** — **ACCEPTED / DEFERRED**. Был реализован, но 2026-09-01 пользователь отменил включение в MAIN и попросил оставить улучшением готовой программы; current runtime этого shortcut не содержит. Accepted guard contract for any future reintroduction: Space must call the existing Spin action rather than a second start/RNG path; it must be ignored while focus is in text/numeric/other controls where Space has normal meaning, and it must not cause duplicate/re-entrant spin while spinning or when Spin is otherwise unavailable.
+- **W2 — единая managed-copy / external-reference media infrastructure** — **IMPLEMENTED / ACCEPTED**. Final UX distinguishes the normal contextual add/select action (for example `Добавить фон…`) from `Восстановить ссылку…`, which appears as a repair action for a missing external reference instead of looking like a second ordinary picker. External-reference contract: InOneLine never modifies/deletes the referenced original file; moved/renamed/deleted/disconnected/unavailable media degrades safely instead of crashing; the user can repair/reselect the reference; Browser Sources never receive arbitrary filesystem access or raw absolute-path exposure, and existing traversal/range-serving protections remain authoritative for referenced video/media.
 - **W2 direct UX corrections** — **IMPLEMENTED / ACCEPTED**: основное действие для фона формулируется как `Добавить фон…`; repair/restore-reference UI показывается только для реально потерянного external-файла, а не как постоянная параллельная кнопка.
 - **Разные managed media folders по назначению** (backgrounds, music/soundtrack, wheel/center assets и т.п.) — **IMPLEMENTED / ACCEPTED**.
 - **W3 — soundtrack колеса MP3/WAV/OGG, application-owned transport, volume/mute** — **IMPLEMENTED / ACCEPTED**.
@@ -212,14 +212,14 @@
 
 Текущий core History уже реализован. Следующие блоки были **прямо приняты пользователем** как будущая аналитика, а не просто assistant suggestions:
 
-- **Activity calendar / heatmap аукционов** — **ACCEPTED / POST-COMPLETION**.
-- **Распределение по дням недели** — **ACCEPTED / POST-COMPLETION**.
-- **Лучшие участники / rankings** — **ACCEPTED / POST-INTEGRATION + POST-COMPLETION**, требует stable participant identity.
-- **Отдельная статистика Points и Donations** — **ACCEPTED / POST-INTEGRATION + POST-COMPLETION**; raw units/currencies не смешиваются без определённой базы.
-- **Record card «Самый большой аукцион»** — **ACCEPTED / POST-COMPLETION**.
-- **Record card «Самый популярный»** — **ACCEPTED / POST-INTEGRATION**.
-- **Record card «Больше всего баллов»** — **ACCEPTED / POST-INTEGRATION**.
-- **Record card «Больше всего донатов»** — **ACCEPTED / POST-INTEGRATION**.
+- **Activity calendar / heatmap аукционов** — **ACCEPTED / POST-COMPLETION**. Derive only from authoritative completed-auction/session history; no parallel analytics backend and no guessed copy of an external intensity formula. Period/color-scale details stay for future design.
+- **Распределение по дням недели** — **ACCEPTED / POST-COMPLETION**. Reuse the same inclusion rule for which sessions count as completed/conducted across History analytics; do not invent a second session-eligibility rule.
+- **Лучшие участники / rankings** — **ACCEPTED / POST-INTEGRATION + POST-COMPLETION**. Requires stable participant identity based at minimum on provider/source + stable external user ID; display nickname is mutable presentation metadata, not the primary key. Accounts from different services must not be auto-merged merely because visible nicknames match; future cross-service account linking requires an explicit separate design.
+- **Отдельная статистика Points и Donations** — **ACCEPTED / POST-INTEGRATION + POST-COMPLETION**. Raw source units/currencies are preserved separately and must not be naively combined without a defined comparable basis; normalized historical SM-point totals may be used where the metric is explicitly about accumulated InOneLine value.
+- **Record card «Самый большой аукцион»** — **ACCEPTED / POST-COMPLETION**: use final historical session/lot snapshot values, not current mutable Games values.
+- **Record card «Самый популярный»** — **ACCEPTED / POST-INTEGRATION**: greatest count of unique real participants after stable identity exists.
+- **Record card «Больше всего баллов»** — **ACCEPTED / POST-INTEGRATION**: only within a comparable points system/source unless a later explicit normalization rule is designed.
+- **Record card «Больше всего донатов»** — **ACCEPTED / POST-INTEGRATION**: monetary values/currencies require an explicitly defined comparable/base-currency rule; do not naively add unlike currencies.
 - **«Самый дорогой победивший лот»** — **ACCEPTED / POST-COMPLETION**; считать по historical snapshot, не по текущей mutable сумме игры.
 
 Ранний D5 umbrella поэтому **PARTIALLY SUPERSEDED**: core History реализован, а перечисленная advanced analytics остаётся принятой future work.
