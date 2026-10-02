@@ -11,8 +11,7 @@ on:
       - "requirements.txt"
       - "requirements-build-lock.txt"
       - "tools/**"
-      - ".github/workflows/regression-foundation-1.0.8.yml"
-      - ".github/workflows/publish-accepted-release.yml"
+      - ".github/workflows/**"
       - ".github/release/requests/**"
       - "data/**"
       - "assets/**"
@@ -63,6 +62,11 @@ jobs:
           python -m compileall -q streaming_manager app.py tools
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
           Write-Host "COMPILEALL=PASS"
+
+      - name: GitHub Actions version regression
+        shell: pwsh
+        run: |
+          python tools/actions_version_smoke.py
 
       - name: Publication CI consolidation regression
         shell: pwsh

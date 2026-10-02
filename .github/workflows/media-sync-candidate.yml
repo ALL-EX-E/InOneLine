@@ -101,7 +101,7 @@ jobs:
           Write-Host "CANDIDATE_SOURCE_SHA256=$sourceSha"
 
       - name: Upload media-sync candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: InOneLine-1.0.8-media-sync-candidate
           path: ${{ runner.temp }}\InOneLine_MediaSync_Candidate\*
