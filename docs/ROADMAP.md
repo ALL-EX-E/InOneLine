@@ -68,9 +68,9 @@
 - **D2** pin/unpin lot — user-accepted as possible / deferred.
 - **D5 advanced History analytics** — **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only possibility: activity heatmap, weekdays distribution, participant rankings, separate points/donations analytics, record cards и «Самый дорогой победивший лот». Core History уже реализован. Fresh review must preserve the accepted identity/comparability rules: participant identity uses provider/source + stable external user ID rather than mutable nickname; cross-service accounts are not auto-merged by matching names; unlike point systems/currencies are not naively combined without an explicit comparable basis/base-currency rule; analytics reuse authoritative completed-history snapshots rather than a second backend.
 - **D9** localization/languages — user-accepted / deferred post-completion; централизованная UI-localization, без автоматического перевода пользовательских данных, названий игр и History/Journal content.
-- **D10** GitHub link — conditional future item; prerequisite public repo теперь существует, но fresh review required.
-- **D11** Telegram link — conditional on official project Telegram resource.
-- **D12** support/Boosty link — conditional on official support resource.
+- **D10** GitHub link — conditional future item; only the official InOneLine repository is valid. The public repo exists; placement still needs fresh review.
+- **D11** Telegram link — conditional on an official project Telegram resource; official project link only.
+- **D12** support/Boosty link — conditional on completion/publication and an official support resource; informational/project UI, not Auction business UI.
 - **D13** optional Pending/manual-processing queue — user-accepted as possible post-completion; MAIN automatic acceptance не меняется.
 - **D28** artificial/fixed probability mode — user-accepted as possible post-completion, only explicit artificial-chance mode.
 - **D29** viewer names in viewer-facing table — user-accepted as possible / integration-dependent.
