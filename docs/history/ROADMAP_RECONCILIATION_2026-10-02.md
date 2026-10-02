@@ -4,7 +4,7 @@
 
 Повторно сверены:
 - доступная история рабочих чатов «Программа для стрима» 1–31 и зафиксированные прямые пользовательские решения;
-- Google Drive: cumulative current/history/order files, PASS 1–13 reconciliation archives, Pointauc review/audit records и roadmap addenda 2026-09-28–2026-09-30;
+- Google Drive: cumulative current/history/order files, PASS 1–13 reconciliation archives, historical reference-review records и roadmap addenda 2026-09-28–2026-09-30;
 - GitHub: current docs, Issues, release notes 1.0.0–1.0.8, current runtime/source and maintenance audit records.
 
 Цель: найти потерянные идеи, неверные статусы, сломанный dependency-order и stale-задачи, которые уже реализованы/отклонены.
