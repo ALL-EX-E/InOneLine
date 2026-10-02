@@ -24,7 +24,7 @@
 
 ## История
 
-- [history/RECONCILIATION_2026-09-27.md](./history/RECONCILIATION_2026-09-27.md) — итог последнего полного аудита старой документации/решений.
+- [history/RECONCILIATION_2026-09-27.md](./history/RECONCILIATION_2026-09-27.md) — предыдущий полный reconciliation старой документации/решений.
 - [history/ROADMAP_RECONCILIATION_2026-10-02.md](./history/ROADMAP_RECONCILIATION_2026-10-02.md) — повторная сверка чатов/Drive/GitHub и восстановление полного survivable roadmap inventory с поздними defer/status corrections.
 - [MIGRATION_2026-09-30.md](./MIGRATION_2026-09-30.md) — переход от Google Drive к GitHub как source of truth.
 - Release-specific факты находятся в корневых `RELEASE_NOTES_*.md`, тегах и GitHub Releases.
