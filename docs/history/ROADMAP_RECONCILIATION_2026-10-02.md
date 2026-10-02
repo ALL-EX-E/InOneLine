@@ -868,3 +868,68 @@ Current 1.0.8 source and accepted 1.0.7 release notes match these decisions. Thi
 
 This pass is **NOT CLEAN** because these durable D26 details had to be restored. A further post-correction full/orphan control is required.
 
+## Twenty-sixth same-scenario full pass — archive/UI/release precision — 2026-10-02
+
+The user requested another complete reconciliation using the same scenario: direct chats -> Google Drive current/history/review files -> GitHub current source/issues/PR/docs -> comparison with the already-corrected canonical documents.
+
+### New durable detail recovered in this pass
+
+1. **Drive audit/archive preservation**
+   - direct user rule: audit/check text logs and user screenshots used as project/QA evidence are saved to Google Drive;
+   - GitHub's later source-of-truth role does not cancel this; Drive remains backup/history only and cannot supersede canonical GitHub CURRENT.
+
+2. **R1.0.4 uninstall backup recommendation**
+   - destructive uninstall warning explicitly recommends creating the dedicated external full `.iolbackup` first and storing it outside the installation root;
+   - current installer already implements this.
+
+3. **D19 animated center runtime**
+   - animated media remains animated on local+OBS center before/during/after spin;
+   - center itself remains stationary while sectors rotate;
+   - center media has zero effect on RNG, sectors, probabilities, target rotation or result.
+
+4. **D21 elimination terminal semantics**
+   - `Выбывает` + explicit `В архив` replaces normal winner confirmation;
+   - archive is non-destructive and excludes that lot from later rounds;
+   - operator archival action is not viewer OBS UI;
+   - final remaining lot still spins and is archived normally; elimination ends at zero active lots with **no separate final-winner concept**.
+
+5. **S1 UI naming**
+   - user-facing terminology is `Баллы`, not `Баллы SM`;
+   - legacy `БАЛЛЫ SM` may remain only as compatibility input/header alias.
+
+6. **R1/S3 Windows-input precision**
+   - Rules font-size numeric control is scroll-safe, uses external wide step buttons and manual entry;
+   - eyedropper left-click accepts, Escape/right-click cancel, and all exit paths release temporary mouse/keyboard grabs.
+
+7. **Auction autoscroll boundary**
+   - Auction Lots + Conduct + Auction Lots OBS share one session-only state;
+   - default OFF after each application launch;
+   - intentionally not persisted and separate from Games/List presentation persistence.
+
+8. **A11.1/A12 acceptance precision**
+   - local+OBS acceleration/cruise/deceleration scales across manually checked 1-minute and 24-hour spin durations while preserving RNG/result;
+   - A12 smoke must enter weighted-wheel through the real operator `start_auction()` path and cannot replace that with direct DB/session setup or a manual `run_wheel()`.
+
+9. **Public installer documentation**
+   - README SmartScreen/Unknown Publisher guidance restored with ordinary-user explanation, official source/SHA-256 verification, the accepted `Подробнее -> Выполнить в любом случае` path when offered, UAC confirmation, and no instruction to disable Windows security.
+
+10. **Public Git-history privacy process**
+    - direct user approval existed for a one-time history rewrite to remove personal e-mail/author metadata before public publication;
+    - backup first; preserve file content; synchronize refs/tags/releases/docs afterward;
+    - user chose direct PowerShell instead of downloadable-script workflow;
+    - do not re-publish/reconstruct removed personal data.
+
+### Cross-check against passes 11–25
+
+Latest `DECISIONS.md` was re-read after discovering that later reconciliation commits had appeared during this audit. Every pass-11–25 durable item was checked against current `IDEA_INVENTORY.md`. The only uncovered item from that set was the Auction autoscroll boundary above; the remaining pass-11–25 details are now already represented in the exhaustive inventory or current project state.
+
+### Classification
+
+- No new D/A/W/B/E/R identifier.
+- No new future implementation candidate.
+- No new runtime QA omission beyond existing **QA-1.0.8-01 / 02 / 03**.
+- README public-documentation gap from pass 25 is now corrected.
+- Runtime/source product behavior remains **1.0.8 / schema 19 / 15 migrations**.
+
+Because this pass recovered durable detail, it is **NOT CLEAN**. A new post-correction orphan/mechanical control is required before declaring the repeated audit clean.
+
