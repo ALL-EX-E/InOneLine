@@ -25,6 +25,9 @@ DisableProgramGroupPage=yes
 AllowRootDirectory=no
 AllowNetworkDrive=no
 AllowUNCPath=no
+; Admin mode is intentional: the default C:\InOneLine root and ACL changes for
+; app-owned mutable directories require elevation. Per-user UI state is owned
+; by the application in data\ui_state.ini, not by this administrative installer.
 PrivilegesRequired=admin
 SetupArchitecture=x64
 ArchitecturesAllowed=x64compatible
@@ -65,13 +68,6 @@ Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{app}\backups"
 Type: filesandordirs; Name: "{app}\logs"
 
-[Registry]
-; R1.0.4 FIX1: register private QSettings keys for declarative uninstall cleanup.
-; dontcreatekey keeps installation side-effect free if the app has not created a key yet;
-; uninsdeletekey removes the whole private key after a confirmed uninstall.
-Root: HKCU; Subkey: "Software\Local Streaming Tools\Streaming Manager"; Flags: dontcreatekey uninsdeletekey
-Root: HKCU; Subkey: "Software\Local Streaming Tools\InOneLine"; Flags: dontcreatekey uninsdeletekey
-
 [Dirs]
 ; C:\InOneLine is created by an elevated installer. Grant normal users modify rights only
 ; to application-owned mutable directories, never to the EXE/_internal runtime tree.
@@ -88,7 +84,7 @@ Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingD
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "Запустить {#MyAppName}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [Code]
 const
@@ -114,17 +110,6 @@ begin
     mbConfirmation, MB_YESNO or MB_DEFBUTTON2
   );
   Result := Answer = IDYES;
-end;
-
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-begin
-  if CurUninstallStep = usPostUninstall then
-  begin
-    { QSettings in 1.0.0 still uses the legacy application key for compatibility. }
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Local Streaming Tools\Streaming Manager');
-    { Also remove the reserved final-name key if it exists. }
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Local Streaming Tools\InOneLine');
-  end;
 end;
 
 function CandidateExePath(): String;

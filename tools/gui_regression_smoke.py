@@ -17,11 +17,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from PySide6.QtCore import QSettings, QThreadPool, Qt
+from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from streaming_manager.app_paths import AppPaths
+from streaming_manager.ui_settings import open_ui_settings
 from streaming_manager.constants import (
     APP_VERSION,
     AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
@@ -77,7 +78,10 @@ def main() -> int:
     app.setOrganizationName("Local Streaming Tools QA")
     app.setApplicationName(f"InOneLine 1.0.8 GUI Regression Core {os.getpid()}")
 
-    settings = QSettings()
+    root = Path(tempfile.mkdtemp(prefix="inone_gui_regression_"))
+    paths = AppPaths.from_root(root)
+    paths.ensure_runtime_dirs()
+    settings = open_ui_settings(paths.data_dir, migrate_native=False)
     settings.clear()
     probe = QMainWindow()
     probe.setMinimumSize(1100, 700)
@@ -88,7 +92,6 @@ def main() -> int:
     settings.sync()
     probe.deleteLater()
 
-    root = Path(tempfile.mkdtemp(prefix="inone_gui_regression_"))
     window = None
     original_excepthook = sys.excepthook
     uncaught: list[tuple[type[BaseException], BaseException]] = []
@@ -99,8 +102,6 @@ def main() -> int:
 
     sys.excepthook = capture
     try:
-        paths = AppPaths.from_root(root)
-        paths.ensure_runtime_dirs()
         db = Database(paths.database_path)
         db.set_setting("api_port", str(free_local_port()))
 
@@ -317,9 +318,6 @@ def main() -> int:
         except Exception:
             pass
         cleanup_tree(root)
-        settings = QSettings()
-        settings.clear()
-        settings.sync()
 
     print("1.0.8 GUI REGRESSION CORE: OK")
     return 0

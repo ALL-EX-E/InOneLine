@@ -73,6 +73,13 @@ jobs:
         run: |
           python tools/publication_ci_smoke.py
 
+      - name: A9 UI settings and installer user-area regression
+        shell: pwsh
+        run: |
+          python tools/ui_settings_migration_smoke.py
+          python tools/installer_user_area_smoke.py
+          python tools/single_instance_smoke.py
+
       - name: Database backup, restore and legacy media regressions
         shell: pwsh
         run: |
@@ -191,8 +198,15 @@ jobs:
         run: |
           $inno = "$env:RUNNER_TEMP\InnoSetup710\ISCC.exe"
           $dist = (Resolve-Path "dist\InOneLine").Path
-          & $inno "/DDistRoot=$dist" "installer\InOneLine.iss"
-          if ($LASTEXITCODE -ne 0) { throw "ISCC failed: $LASTEXITCODE" }
+          $innoOutput = @(& $inno "/DDistRoot=$dist" "installer\InOneLine.iss" 2>&1)
+          $innoExit = $LASTEXITCODE
+          $innoOutput | ForEach-Object { Write-Host $_ }
+          if ($innoExit -ne 0) { throw "ISCC failed: $innoExit" }
+          $innoText = $innoOutput -join "`n"
+          if ($innoText -match 'per-user areas \(HKCU\)' -or $innoText -match 'UsedUserAreasWarning') {
+            throw "Inno Setup administrative user-area warning returned"
+          }
+          Write-Host "INNO_USER_AREAS_WARNING=NONE"
           $setup = "installer\output\InOneLine_Setup_1.0.8.exe"
           if (!(Test-Path $setup)) { throw "Installer output missing" }
           $item = Get-Item $setup
@@ -212,6 +226,9 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "Regression install failed: $($p.ExitCode)" }
           $exe = "$install\InOneLine.exe"
           if (!(Test-Path $exe)) { throw "Installed InOneLine.exe missing" }
+          if (Test-Path "$install\data\ui_state.ini") {
+            throw "Installer created per-user UI state before the application started"
+          }
           Remove-Item "$install\data\streaming.db" -Force -ErrorAction SilentlyContinue
 
           $proc = Start-Process -FilePath $exe -WorkingDirectory $install -PassThru
@@ -279,13 +296,13 @@ jobs:
             throw "Legacy wheel_jingles directory was recreated on clean install"
           }
 
-          $allowedFiles = @("streaming.db","streaming.db-wal","streaming.db-shm")
+          $allowedFiles = @("streaming.db","streaming.db-wal","streaming.db-shm","ui_state.ini",".inone_line.instance.lock")
           $actualFiles = @(Get-ChildItem "$install\data" -File | ForEach-Object { $_.Name } | Sort-Object)
           $unexpectedFiles = @($actualFiles | Where-Object { $_ -notin $allowedFiles })
           if ($unexpectedFiles.Count -gt 0) {
             throw "Unexpected installed data files: $($unexpectedFiles -join ', ')"
           }
-          if ("streaming.db" -notin $actualFiles) {
+          if ("streaming.db" -notin $actualFiles -or "ui_state.ini" -notin $actualFiles) {
             throw "Required installed data files are missing"
           }
 
