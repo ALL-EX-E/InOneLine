@@ -119,7 +119,7 @@ Exact accepted candidate bytes:
 - Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
 - Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
 
-A5 verified unused/stale imports is now closed. The next unresolved maintenance item from the control audit is **A6 — confirmed dead private helpers / compatibility no-ops**. It requires a fresh exact-current compatibility review before any deletion.
+A5 verified unused/stale imports is closed. A6 dead private helper cleanup is also closed. The next unresolved maintenance item from the control audit is **A7 — duplicated historical publish workflows / CI publication consolidation**.
 
 ## A5 Verified Unused Imports — accepted 2026-10-02
 
@@ -150,7 +150,38 @@ Exact accepted candidate bytes:
 - Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
 - Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
 
-The next unresolved maintenance item is **A6 — confirmed dead private helpers / compatibility no-ops**.
+A6 is now closed. The next unresolved maintenance item is **A7 — duplicated historical publish workflows / CI publication consolidation**.
+
+## A6 Dead Private Helpers — accepted 2026-10-02
+
+Maintenance scope A6 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#15**
+- Corrected candidate build head: `d176e5bd91357eabcbed58ca05221ba8bd174395`
+- Final clean PR head: `81aef4a3ae9cda20b6c2ba1cb7270749b491d064`
+- Squash merge on `main`: `452daf5742a62e95b2c5470ae476b509e05908e8`
+- Corrected candidate workflow: `36958423991` — **SUCCESS**
+- Corrected candidate artifact: `11206613134`
+- Final clean PR regression: `36958711684` — **SUCCESS**
+- Post-merge main regression: `36959577220` — **SUCCESS**
+- Corrected manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-dead-helper-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted cleanup:
+- removed **7** verified dead/private helpers;
+- retained `AuctionSessionMixin._remaining_from_session` and both deprecated Twitch B4 compatibility shims;
+- first A6 candidate artifact `11205260970` was rejected after manual QA exposed a missing `normalize_text_key` runtime dependency;
+- fresh review also found and prevented a missing `RandomOrgClient` runtime dependency;
+- permanent regression now includes `tools/a6_dependency_smoke.py`.
+
+Exact accepted corrected candidate bytes:
+- Installer: 47,627,232 bytes; SHA-256 `8b1a213989cdd8d3e8c864d2b299327d72ef2fc7426e6c7c3bebbbf9669164c9`
+- Source: 1,419,509 bytes; SHA-256 `5da7afe8f167413a4718bb1b9e0e42ae8b0f5b03090a059d682037766cf963da`
+
+The next unresolved maintenance item is **A7 — duplicated historical publish workflows / CI publication consolidation**.
 
 ## Regression foundation — restored 2026-10-01
 
