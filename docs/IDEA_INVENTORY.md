@@ -137,7 +137,7 @@
 # IV. W-series / media / audio
 
 - **W1 — Space вызывает существующий путь «Крутить»** — **ACCEPTED / DEFERRED**. Был реализован, но 2026-09-01 пользователь отменил включение в MAIN и попросил оставить улучшением готовой программы; current runtime этого shortcut не содержит.
-- **W2 — единая managed-copy / external-reference media infrastructure** — **IMPLEMENTED / ACCEPTED**.
+- **W2 — единая managed-copy / external-reference media infrastructure** — **IMPLEMENTED / ACCEPTED**. Final UX distinguishes the normal contextual add/select action (for example `Добавить фон…`) from `Восстановить ссылку…`, which appears as a repair action for a missing external reference instead of looking like a second ordinary picker.
 - **W2 direct UX corrections** — **IMPLEMENTED / ACCEPTED**: основное действие для фона формулируется как `Добавить фон…`; repair/restore-reference UI показывается только для реально потерянного external-файла, а не как постоянная параллельная кнопка.
 - **Разные managed media folders по назначению** (backgrounds, music/soundtrack, wheel/center assets и т.п.) — **IMPLEMENTED / ACCEPTED**.
 - **W3 — soundtrack колеса MP3/WAV/OGG, application-owned transport, volume/mute** — **IMPLEMENTED / ACCEPTED**.
@@ -231,7 +231,7 @@
 - **D16 — local-wheel hover highlight** — **USER-APPROVED / EXPLICITLY DEFERRED**.
 - **D17 — random spin duration** — **USER-APPROVED / SKIPPED FOR NOW**.
 - **D18 — wheel visual style selector** — **USER-APPROVED / SKIPPED FOR NOW**.
-- **D19 — custom center image** — **IMPLEMENTED / RELEASED 1.0.4**. Поздний user scope включил direct URL, Twitch, 7TV, BTTV, FFZ и quick picker.
+- **D19 — custom center image** — **IMPLEMENTED / RELEASED 1.0.4**. Поздний direct-user scope включил direct URL, Twitch, 7TV, BTTV, FFZ и quick picker. Picker intentionally has no search/source filters: one unified visual emote/image grid plus `Загрузить своё изображение`; animated emotes/local animated media animate directly in the picker so static vs animated is visible before selection.
 - **D20 — visual sector split without changing logical probability** — **USER-APPROVED / DEFERRED**.
 - **D21 — Elimination wheel** — **IMPLEMENTED / RELEASED 1.0.6**. Released behavior supersedes early draft: каждый elimination spin использует настоящий weighted RNG текущих активных лотов; archive только после `В архив`; последний lot тоже spins.
 - **D22 — Battle Royale** — **USER-APPROVED / EXPLICITLY DEFERRED**; Issue #5.
