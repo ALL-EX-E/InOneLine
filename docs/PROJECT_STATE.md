@@ -316,6 +316,14 @@ Permanent repository gate:
 
 После принятия A9 все maintenance findings контрольного codebase audit закрыты. Новый product implementation scope **не выбран автоматически**.
 
+Отдельно после повторной cross-source сверки 2026-10-02 зафиксирован **QA-1.0.8-01 — Conduct integration last-event visibility**:
+- исторический B1 contract прямо включал показ времени последнего принятого integration event в compact Conduct integration status;
+- current 1.0.8 продолжает сохранять `integration_connections.last_event_at` и Settings показывает последнюю принятую активность;
+- current Conduct integration status/dialog это время не показывает;
+- более позднего direct-user superseding decision не найдено;
+- статус: **ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED / NOT AUTO-AUTHORIZED**;
+- version/schema/migrations остаются **1.0.8 / 19 / 15**, runtime этим documentation pass не изменялся.
+
 - **Global Multi-File Import / Issue #4** — текущий post-D26 eligible candidate для fresh review; это не pre-authorization.
 - **D22 / Issue #5** — остаётся approved post-completion, но был явно отложен пользователем 2026-09-29 и не является автоматическим следующим пунктом.
 - Восстановленная retained dependency/complexity chain после D26: **D40 → D34 → D41 → older YouTube integration candidate → D38 → Public Web → D27 → D7**.
