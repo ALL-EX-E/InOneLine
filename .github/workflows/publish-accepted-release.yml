@@ -1,0 +1,184 @@
+name: Publish accepted InOneLine release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/release/requests/*.json"
+  workflow_dispatch:
+    inputs:
+      request_path:
+        description: "Existing immutable publication request path"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: accepted-release-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Resolve immutable publication request
+        id: request
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $request = "${{ inputs.request_path }}"
+          } else {
+            $before = "${{ github.event.before }}"
+            $after = "${{ github.sha }}"
+            $changes = @(git diff --name-status $before $after -- ".github/release/requests/*.json")
+            if ($LASTEXITCODE -ne 0) { throw "Cannot resolve publication request diff" }
+            if ($changes.Count -ne 1) {
+              throw "Exactly one publication request must be added in a publication commit"
+            }
+            $parts = $changes[0] -split "`t"
+            if ($parts.Count -lt 2) { throw "Unexpected publication request diff format" }
+            $status = $parts[0]
+            $request = $parts[-1]
+            if ($status -ne "A") {
+              throw "Publication requests are immutable: only a newly added request may trigger publication"
+            }
+          }
+
+          if ($request -notmatch '^\.github/release/requests/[A-Za-z0-9._-]+\.json$') {
+            throw "Invalid publication request path: $request"
+          }
+          if (!(Test-Path $request)) { throw "Publication request is missing: $request" }
+          "path=$request" >> $env:GITHUB_OUTPUT
+
+      - name: Validate publication manifest
+        id: manifest
+        shell: pwsh
+        run: |
+          python tools/release_publication.py validate `
+            --manifest "${{ steps.request.outputs.path }}" `
+            --repo-root . `
+            --github-output $env:GITHUB_OUTPUT
+          if ($LASTEXITCODE -ne 0) { throw "Publication manifest validation failed" }
+
+      - name: Verify publication target and refuse existing tag/release
+        shell: pwsh
+        run: |
+          $target = "${{ steps.manifest.outputs.accepted_target_commit }}"
+          $notes = "${{ steps.manifest.outputs.release_notes }}"
+          $tag = "${{ steps.manifest.outputs.release_tag }}"
+
+          git cat-file -e "$target^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw "Accepted target commit does not exist: $target" }
+
+          git merge-base --is-ancestor $target HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Accepted target commit is not an ancestor of current main: $target" }
+
+          git ls-files --error-unmatch $notes *> $null
+          if ($LASTEXITCODE -ne 0) { throw "Release notes are not Git-tracked: $notes" }
+
+          gh release view $tag --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -eq 0) { throw "$tag already has a GitHub Release; refusing to overwrite" }
+
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
+          if ($LASTEXITCODE -eq 0) { throw "$tag already exists; refusing to overwrite" }
+
+          Write-Host "PUBLICATION_TARGET_GUARD=PASS"
+
+      - name: Download exact accepted artifact
+        shell: pwsh
+        run: |
+          $artifactId = "${{ steps.manifest.outputs.accepted_artifact_id }}"
+          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/$artifactId/zip"
+          curl.exe -L `
+            -H "Authorization: Bearer $env:GH_TOKEN" `
+            -H "Accept: application/vnd.github+json" `
+            -H "X-GitHub-Api-Version: 2022-11-28" `
+            $uri -o accepted-artifact.zip
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path accepted-artifact.zip)) {
+            throw "Accepted artifact download failed"
+          }
+          Expand-Archive accepted-artifact.zip -DestinationPath accepted -Force
+
+      - name: Verify and stage exact accepted bytes
+        shell: pwsh
+        run: |
+          python tools/release_publication.py stage `
+            --manifest "${{ steps.request.outputs.path }}" `
+            --artifact-root accepted `
+            --output-dir publish
+          if ($LASTEXITCODE -ne 0) { throw "Accepted-byte verification failed" }
+
+      - name: Create GitHub Release from exact accepted bytes
+        shell: pwsh
+        run: |
+          $manifest = Get-Content "${{ steps.request.outputs.path }}" -Raw | ConvertFrom-Json
+          $args = @(
+            "release", "create", $manifest.release_tag,
+            "--repo", $env:GITHUB_REPOSITORY,
+            "--target", $manifest.accepted_target_commit,
+            "--title", $manifest.release_title,
+            "--notes-file", $manifest.release_notes
+          )
+          foreach ($asset in $manifest.assets) {
+            $path = Join-Path "publish" $asset.release_name
+            $args += "$path#$($asset.release_name)"
+          }
+
+          & gh @args
+          if ($LASTEXITCODE -ne 0) { throw "GitHub Release creation failed" }
+
+      - name: Verify published release bytes and metadata
+        shell: pwsh
+        run: |
+          $manifest = Get-Content "${{ steps.request.outputs.path }}" -Raw | ConvertFrom-Json
+          New-Item -ItemType Directory -Force -Path verify | Out-Null
+          gh release download $manifest.release_tag --repo "$env:GITHUB_REPOSITORY" --dir verify
+          if ($LASTEXITCODE -ne 0) { throw "Published release download failed" }
+
+          python tools/release_publication.py verify-dir `
+            --manifest "${{ steps.request.outputs.path }}" `
+            --directory verify
+          if ($LASTEXITCODE -ne 0) { throw "Published-byte verification failed" }
+
+          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$($manifest.release_tag)" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Cannot read published release metadata" }
+          if ($release.draft -or $release.prerelease) {
+            throw "Published release has incorrect draft/prerelease state"
+          }
+          if ([string]$release.target_commitish -ne [string]$manifest.accepted_target_commit) {
+            throw "Published release target mismatch: $($release.target_commitish)"
+          }
+
+          $expectedNames = @($manifest.assets | ForEach-Object { [string]$_.release_name } | Sort-Object)
+          $actualNames = @($release.assets | ForEach-Object { [string]$_.name } | Sort-Object)
+          if (($expectedNames -join "`n") -ne ($actualNames -join "`n")) {
+            throw "Published release asset set mismatch"
+          }
+
+          $expectedHashes = @{}
+          foreach ($asset in $manifest.assets) {
+            $expectedHashes[[string]$asset.release_name] = "sha256:" + ([string]$asset.sha256).ToLowerInvariant()
+          }
+          foreach ($asset in $release.assets) {
+            if ($asset.digest -and ([string]$asset.digest).ToLowerInvariant() -ne $expectedHashes[[string]$asset.name]) {
+              throw "GitHub asset digest mismatch for $($asset.name): $($asset.digest)"
+            }
+          }
+
+          Write-Host "PUBLICATION_VERIFY=PASS"
