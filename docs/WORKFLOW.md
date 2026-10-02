@@ -17,6 +17,17 @@
 13. Обновлять `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, QA и решения.
 14. Только после этого считать версию CURRENT/released.
 
+## Инженерные инварианты
+
+Эти правила действуют для любых future feature, maintenance, optimization и cleanup scope:
+
+- **Reuse first → minimal diff → no parallel logic → no new persistence unless unavoidable.** Существующие механизмы, данные, UI, settings, calculations, APIs и storage paths переиспользуются прежде, чем вводить новую сущность/ветку/backend.
+- Новый механизм/сущность допустим только если существующий объективно непригоден для **корректности, надёжности или требуемой производительности**; удобство рефакторинга само по себе недостаточно.
+- **Стабильность и работоспособность важнее ускорения/уменьшения размера.** Оптимизация не должна повышать риск зависаний, вылетов, потери данных, нарушения RNG/verification/business semantics или чрезмерного RAM/package growth.
+- Любой performance/size/RAM cleanup должен быть измеримым и локальным; удаление кода/зависимостей/файлов без доказательства безопасности запрещено.
+- Перед рискованным cleanup/refactor должна существовать постоянная regression/Windows QA foundation. Если проблема находится в QA/build harness, сначала исправляется QA/build слой, а runtime не меняется без отдельного approved scope.
+- Вне утверждённого scope запрещено менять runtime behavior, schema/migrations, RNG/weights/probabilities, persistence ownership или пользовательские данные.
+
 ## Версии
 
 - Candidate/FIX не считаются релизами.
