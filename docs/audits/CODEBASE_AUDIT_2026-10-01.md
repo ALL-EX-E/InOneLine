@@ -23,13 +23,16 @@ The findings below are retained as the historical audit record. Current executio
 - **A6** confirmed dead private helpers / compatibility no-ops — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #15; post-merge regression `36959577220` SUCCESS. Seven verified dead/private helpers removed; explicit compatibility shims retained. The first candidate was rejected after manual QA exposed a missing runtime import, then corrected with permanent dependency regression coverage.
 - **A7** duplicated historical publish workflows / CI publication consolidation — **CLOSED / ACCEPTED / MERGED** in PR #16; post-merge regression `36962356315` SUCCESS. Historical per-release publishers retired from active CI; one immutable-request publisher added; historical releases/tags/assets unchanged.
 - **A8** GitHub Actions version refresh for current deprecation warnings — **CLOSED / ACCEPTED / MERGED** in PR #17; post-merge regression `36964693520` SUCCESS; post-merge wording log has no Node 20/deprecation warning. Active checkout/setup-python/upload-artifact references are on major v7 with permanent regression coverage.
-- **A9** installer admin/HKCU warning — next unresolved maintenance item; requires dedicated installer review and must not change privilege mode casually.
+- **A9** installer admin/HKCU warning — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #18; corrected V2 passed real Windows upgrade QA; post-merge regression `36978675944` SUCCESS and publication wording `36978675956` SUCCESS. Elevated installer mode remains intentional; per-user UI state is now app-owned and migrated safely.
 
 Canonical A4 QA: `docs/qa/1.0.8-media-sync-maintenance.md`.
 Canonical A5 QA: `docs/qa/1.0.8-unused-import-maintenance.md`.
 Canonical A6 QA: `docs/qa/1.0.8-dead-helper-maintenance.md`.
 Canonical A7 QA: `docs/qa/1.0.8-publication-ci-maintenance.md`.
 Canonical A8 QA: `docs/qa/1.0.8-actions-version-maintenance.md`.
+Canonical A9 QA: `docs/qa/1.0.8-installer-user-state-maintenance.md`.
+
+**Control-audit closeout:** all A1–A10 findings are now closed.
 
 ## Audit goal
 
@@ -252,7 +255,7 @@ Use the current extraction pattern and reuse existing helpers when a future feat
 6. **Clean verified unused imports.**
 7. **Remove confirmed dead private helpers/shims only after tests cover their surrounding paths.**
 8. **Consolidate CI publish workflows / refresh GitHub Actions versions.**
-9. Review the Inno Setup privilege/HKCU warning separately.
+9. Review the Inno Setup privilege/HKCU warning separately. — **COMPLETED as A9**.
 10. Only after these gates, consider any larger architectural split.
 
 ## Audit conclusion
@@ -267,3 +270,7 @@ No evidence was found of:
 The largest immediate risk is not a currently observed user-facing runtime failure. It is **loss of regression protection plus non-reproducible/dirty release infrastructure**, which would make future cleanup riskier than necessary.
 
 Therefore the next maintenance scope should start by restoring the already-existing QA foundation, not by rewriting runtime architecture.
+
+### Execution closeout — 2026-10-02
+
+The recommended maintenance sequence was subsequently executed through A9 with permanent regression coverage and focused manual QA where required. All A1–A10 audit findings are closed. This does not select a new feature scope and does not authorize a broad architectural rewrite.
