@@ -98,6 +98,7 @@
 - **Wheel OBS Overlay и Timer Overlay** — **IMPLEMENTED / ACCEPTED**.
 - **Winner confirmation lifecycle сохраняется** — **EXISTING / PRESERVE**.
 - **Cross-surface data synchronization invariant** — **IMPLEMENTED / ACCEPTED**: изменение статуса/баллов через аукцион должно без ручного F5 обновлять authoritative DB и связанные представления `Игры`, `Публичный список`, `Аукцион`, `Журнал` и применимые OBS/API surfaces; перенос temporary lots после completion/cancel следует тому же правилу.
+- **Auction autoscroll boundary** — **IMPLEMENTED / ACCEPTED / PRESERVE**: Auction → Lots, Auction → Conduct and the dedicated Auction Lots OBS overlay share one current-session autoscroll state. It starts **OFF on every application launch**, is intentionally **not persisted**, and does not inherit Games/List presentation persistence. This existing auction-specific behavior must not be revived as a separate Games/List autoscroll backlog item.
 - **Open-auction / selected-winner persistence across restart** — **IMPLEMENTED / ACCEPTED**: поддерживаемые open-session states и уже выбранный winner/frozen result должны восстанавливаться после перезапуска, а не вычисляться заново.
 
 ## Product S/A MAIN items
