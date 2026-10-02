@@ -324,6 +324,8 @@ Permanent repository gate:
 
 Полный текущий inventory и статусы: `docs/ROADMAP.md`.
 
+Полная история пользовательских идей, включая уже реализованные/отложенные/отклонённые: `docs/IDEA_INVENTORY.md`.
+
 Повторная сверка чатов/Drive/GitHub: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
 
 Выбор следующего scope требует отдельного решения пользователя и fresh exact-CURRENT review.
