@@ -1835,17 +1835,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             return {}
         return dict(snapshot or {}) if isinstance(snapshot, dict) else {}
 
-    def _integration_status_text(self) -> str:
-        base = self.integration_manager.operational_status_text()
-        runtime = self._runtime_health_snapshot()
-        active_keys = {view.service_key for view in self._active_integration_views()}
-        for service_key, state in runtime.items():
-            if service_key not in active_keys or not isinstance(state, dict):
-                continue
-            if str(state.get("error") or "").strip():
-                return "Интеграции: ошибка"
-        return base
-
     def refresh_integration_status(self) -> None:
         # A reconnect/account change may alter Twitch/7TV/BTTV/FFZ emotes.
         self._wheel_center_catalog_cache = None
@@ -2218,10 +2207,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         minutes, remainder = divmod(remainder, 60_000)
         seconds, millis = divmod(remainder, 1000)
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{millis:03d}"
-
-    @classmethod
-    def _format_seconds(cls, seconds: int) -> str:
-        return cls._format_milliseconds(max(0, int(seconds)) * 1000)
 
     @staticmethod
     def _parse_timer_text(text: str) -> int:
