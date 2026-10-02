@@ -265,3 +265,12 @@ The same control also corrected the sixteenth-pass note about Games `Всего`
 
 No runtime/source/version/schema/migration change is authorized or performed.
 
+## 2026-10-02 — Eighteenth-pass conditional-link and archive-preservation precision
+
+A post-seventeenth orphan check recovered two small direct-decision areas that were still compressed:
+
+- **D10/D11/D12 link boundary:** GitHub/Telegram/support links are valid only for the corresponding official project resource. D10's repository prerequisite now exists but placement remains fresh-review work; D11 waits for an official project Telegram resource; D12 waits for completion/publication plus an official support page and belongs to informational/project/support UI, not Auction business UI.
+- **Historical artifact preservation:** cleanup of active docs/CI/source trees must not destroy the only surviving historical audit/reference/release evidence. Retired material remains recoverable through Git history, canonical history docs or Drive archive. If original bytes/screenshots are gone, a later textual reconstruction must not be represented as the original archive.
+
+These are documentation/process precision corrections only; no runtime/product scope is selected.
+
