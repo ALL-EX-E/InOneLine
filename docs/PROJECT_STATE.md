@@ -119,7 +119,7 @@ Exact accepted candidate bytes:
 - Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
 - Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
 
-A5, A6, A7 and A8 are closed. The next unresolved maintenance item from the control audit is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+A5, A6, A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
 
 ## A5 Verified Unused Imports — accepted 2026-10-02
 
@@ -150,7 +150,7 @@ Exact accepted candidate bytes:
 - Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
 - Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
 
-A6, A7 and A8 are closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+A6, A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
 
 ## A6 Dead Private Helpers — accepted 2026-10-02
 
@@ -181,7 +181,7 @@ Exact accepted corrected candidate bytes:
 - Installer: 47,627,232 bytes; SHA-256 `8b1a213989cdd8d3e8c864d2b299327d72ef2fc7426e6c7c3bebbbf9669164c9`
 - Source: 1,419,509 bytes; SHA-256 `5da7afe8f167413a4718bb1b9e0e42ae8b0f5b03090a059d682037766cf963da`
 
-A7 and A8 are closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
 
 ## A7 Publication CI Consolidation — accepted 2026-10-02
 
@@ -212,7 +212,7 @@ Accepted infrastructure change:
 
 Immediately after A7 merge, the public release set remains unchanged: 10 tags from `v1.0.0` through `v1.0.8-maintenance-2026-10-01`.
 
-A8 is now closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+A8 is now closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
 
 ## A8 GitHub Actions Version Refresh — accepted 2026-10-02
 
@@ -238,7 +238,49 @@ Accepted infrastructure change:
 - permanent regression now includes `tools/actions_version_smoke.py`;
 - the permanent regression triggers on any `.github/workflows/**` change.
 
-The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
+
+
+## A9 Installer User-State / HKCU Ownership — accepted 2026-10-02
+
+Maintenance scope A9 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#18**
+- Corrected V2 candidate build head: `f0f4a47aa7c6b51f1ca531f4a6d673cd56b7b361`
+- Final clean runtime PR head before acceptance documentation: `340022e9d3ca35052c5ab2dad269dc0413cdc07c`
+- Manual-acceptance documentation head: `3ba9f3bb0e9402c9267d80a0b1879884139ad892`
+- Squash merge on `main`: `74ad16c5772d5cc191f7e307203b6a574af7815c`
+- Corrected candidate workflow: `36972036097` — **SUCCESS**
+- Corrected candidate artifact: `11211662949`
+- Final clean PR regression: `36972339831` — **SUCCESS**
+- Post-merge publication wording: `36978675956` — **SUCCESS**
+- Post-merge main regression: `36978675944` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-installer-user-state-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted maintenance:
+- elevated installer mode remains intentionally `PrivilegesRequired=admin`;
+- administrative installer no longer owns or deletes per-user HKCU UI state;
+- MainWindow state is now app-owned in `data/ui_state.ini`;
+- frozen Windows migration checks both Registry32 and Registry64 views;
+- legacy state is copied to `data/legacy_ui_state_backup.ini` before cleanup;
+- legacy Registry is cleared only after successful INI write and backup;
+- post-install launch uses `runasoriginaluser`;
+- per-install `QLockFile` single-instance protection prevents concurrent UI-state writers;
+- permanent regression covers dual-view migration, legacy backup and single-instance behavior.
+
+Corrected A9 V2 accepted bytes:
+- Package: 49,060,040 bytes; SHA-256 `a4707ed4c149085ebb52c550fb9bca236e944591774c46a31ba84ac753ceb044`
+- Installer: 47,618,014 bytes; SHA-256 `38540d8bc6aa8268c5ec727120cd4646f186e6c38759f5c32bd348fdfe08b402`
+- Source: 1,441,202 bytes; SHA-256 `0414cb0e15c449bf6965d725e48fe632ce71a4e17d96b0a68353ba5db5fa8211`
+
+The first A9 candidate artifact `11210430783` remains **REJECTED / DO NOT ACCEPT**.
+
+With A9 accepted and merged, **all A1–A10 findings from the 2026-10-01 control codebase audit are closed**. No larger architectural rewrite is implied by this closeout.
+
 
 ## Regression foundation — restored 2026-10-01
 
