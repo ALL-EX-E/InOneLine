@@ -57,7 +57,7 @@
 - **CSV/Excel/Google-readable import/export с безопасным обновлением существующей БД** — **IMPLEMENTED / ACCEPTED**.
 - **Backup / Restore пользовательской БД и данных** — **IMPLEMENTED / ACCEPTED**.
 - **Явная команда `Настройки → Восстановить из резервной копии…`** — **IMPLEMENTED / ACCEPTED**: выбранный `.db` проверяется, текущее состояние предварительно страхуется, затем выполняется безопасное восстановление.
-- **Full external `.iolbackup` для восстановления после полного удаления программы** — **IMPLEMENTED / ACCEPTED**: authoritative DB, protected credentials и managed media; backup хранится вне install root и переживает uninstall; logs/temp/runtime/external referenced files не встраиваются.
+- **Full external `.iolbackup` для восстановления после полного удаления программы** — **IMPLEMENTED / ACCEPTED**: authoritative DB, protected credentials и managed media; backup хранится вне install root и переживает uninstall; logs/temp/runtime/external referenced files не встраиваются. Accepted UI wording is exactly `Создать полную резервную копию в случае полного удаления программы`; separate full restore remains available.
 - **P1 — одностороннее публичное XLSX-зеркало для Google Drive/Sheets** — **IMPLEMENTED / ACCEPTED**. Финальный публичный файл содержит только `НАЗВАНИЕ ИГРЫ / БАЛЛЫ / ОТЗЫВ / СТАТУС`.
 - **C2 — обычный .xlsx общего основного списка с двусторонней синхронизацией между экземплярами, last-change-wins** — **IMPLEMENTED / ACCEPTED**.
 - **Не создавать собственный закрытый формат для C2; файл должен читаться Google Sheets** — **IMPLEMENTED / ACCEPTED**.
@@ -348,7 +348,7 @@
 - **No portable-user migration** — **USER DECISION / PRESERVE**.
 - **Official artifacts after 1.0: SOURCE + INSTALLER; portable not CURRENT** — **USER DECISION / PRESERVE**.
 - **Uninstall warning + confirmation; удалить app-owned DB/data/QSettings after confirmation; external .iolbackup/external referenced files preserve** — **IMPLEMENTED / ACCEPTED**.
-- **Canonical icon: улучшить существующий дизайн (толще/центрированнее/резче) и переиспользовать** — **IMPLEMENTED / ACCEPTED**.
+- **Canonical icon: approved green InOneLine icon; improve the existing design (thicker/centered/sharper) and reuse one canonical asset for app/Setup/shortcuts** — **IMPLEMENTED / ACCEPTED**.
 
 ---
 
