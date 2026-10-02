@@ -343,6 +343,8 @@
 Это не feature backlog, но прямые пользовательские проектные решения:
 
 - **Публичный GitHub repository + GitHub Releases** — **IMPLEMENTED / ACCEPTED**.
+- **Initial GitHub release-only/no-source publication plan (2026-09-26)** — **USER-ACCEPTED THEN SUPERSEDED**. It allowed a public release repository with installer release but no published source/license; later explicit decisions replaced it with official SOURCE + INSTALLER publication and the custom no-paid-redistribution license.
+- **Installer-first public deployment/update model** — **USER-ACCEPTED / IMPLEMENTED**: normal users install InOneLine through the installer, and later updates/patches are applied to the installed program while preserving mutable user data according to the accepted update/reinstall contract.
 - **GitHub становится source of truth; Drive остаётся history/backup** — **IMPLEMENTED / ACCEPTED**.
 - **Публично указать, что InOneLine создан автором с помощью ChatGPT от OpenAI; другие нейросети не использовались** — **IMPLEMENTED / ACCEPTED**.
 - **Программа и source можно бесплатно использовать, изменять и бесплатно распространять; платное распространение запрещено** — **IMPLEMENTED / ACCEPTED** custom license policy.
