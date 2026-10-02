@@ -119,7 +119,7 @@ Exact accepted candidate bytes:
 - Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
 - Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
 
-A5, A6 and A7 are closed. The next unresolved maintenance item from the control audit is **A8 — GitHub Actions version refresh for current deprecation warnings**.
+A5, A6, A7 and A8 are closed. The next unresolved maintenance item from the control audit is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
 
 ## A5 Verified Unused Imports — accepted 2026-10-02
 
@@ -150,7 +150,7 @@ Exact accepted candidate bytes:
 - Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
 - Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
 
-A6 and A7 are closed. The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
+A6, A7 and A8 are closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
 
 ## A6 Dead Private Helpers — accepted 2026-10-02
 
@@ -181,7 +181,7 @@ Exact accepted corrected candidate bytes:
 - Installer: 47,627,232 bytes; SHA-256 `8b1a213989cdd8d3e8c864d2b299327d72ef2fc7426e6c7c3bebbbf9669164c9`
 - Source: 1,419,509 bytes; SHA-256 `5da7afe8f167413a4718bb1b9e0e42ae8b0f5b03090a059d682037766cf963da`
 
-A7 is now closed. The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
+A7 and A8 are closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
 
 ## A7 Publication CI Consolidation — accepted 2026-10-02
 
@@ -212,7 +212,33 @@ Accepted infrastructure change:
 
 Immediately after A7 merge, the public release set remains unchanged: 10 tags from `v1.0.0` through `v1.0.8-maintenance-2026-10-01`.
 
-The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
+A8 is now closed. The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
+
+## A8 GitHub Actions Version Refresh — accepted 2026-10-02
+
+Maintenance scope A8 from the codebase audit is complete.
+
+- Status: **CLOSED / ACCEPTED / MERGED**
+- PR: **#17**
+- Accepted clean PR head: `bc266c8be8916611846a7c7ff50a28de03ecebcd`
+- Squash merge on `main`: `488865ab7420239ff07d6c4eb8244d46cb54b520`
+- Direct Actions v7 validation: `36963052321` — **SUCCESS**
+- Final clean PR regression: `36963105972` — **SUCCESS**
+- Post-merge publication wording: `36964693488` — **SUCCESS / NO DEPRECATION WARNINGS**
+- Post-merge main regression: `36964693520` — **SUCCESS**
+- Manual Windows QA: **N/A — CI-only**
+- Canonical QA: `docs/qa/1.0.8-actions-version-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted infrastructure change:
+- all active `actions/checkout`, `actions/setup-python` and `actions/upload-artifact` references now use major `v7`;
+- product/build semantics, Python versions, build lock and artifact naming were not changed;
+- temporary direct-action validation proved checkout/setup-python/upload-artifact v7 execute successfully without the Node 20 deprecation warning;
+- permanent regression now includes `tools/actions_version_smoke.py`;
+- the permanent regression triggers on any `.github/workflows/**` change.
+
+The next unresolved maintenance item is **A9 — dedicated Inno Setup privilege/HKCU warning review**.
 
 ## Regression foundation — restored 2026-10-01
 
