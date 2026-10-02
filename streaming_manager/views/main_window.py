@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer
+from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QWidget
 
@@ -9,6 +9,7 @@ from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
 from ..music_player import MusicPlayerController
+from ..ui_settings import open_ui_settings
 from ..backup_restore import read_and_clear_restore_result
 from ..constants import APP_NAME, APP_VERSION, DEFAULT_API_HOST
 from ..integrations import STATUS_CONNECTED, IntegrationManager, IntegrationRegistry
@@ -33,6 +34,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.db = db
         self.paths = paths
+        self._ui_settings = open_ui_settings(paths.data_dir)
         self.project_dir = paths.root_dir
         self.thread_pool = QThreadPool.globalInstance()
         # The application uses short, gated background jobs rather than CPU
@@ -376,7 +378,7 @@ class MainWindow(QMainWindow):
 
     def _restore_ui_state(self):
         """Восстанавливает окно и единое состояние списков."""
-        settings = QSettings()
+        settings = self._ui_settings
 
         # Состояние списков восстанавливается независимо от геометрии.
         # R1.0.7 больше не имеет автоматического компактного размера окна.
@@ -417,7 +419,7 @@ class MainWindow(QMainWindow):
 
     def _save_ui_state(self):
         """Сохраняет пользовательское состояние интерфейса."""
-        settings = QSettings()
+        settings = self._ui_settings
         settings.setValue("main_window/geometry", self.saveGeometry())
         settings.setValue("main_window/maximized", self.isMaximized())
         settings.setValue("main_window/tab_index", self.tabs.currentIndex())
