@@ -326,6 +326,9 @@ Permanent repository gate:
 
 - **Global Multi-File Import / Issue #4** — текущий post-D26 eligible candidate для fresh review; это не pre-authorization.
 - **Repository hygiene:** PR #9 `Make 1.0.8 regression foundation persistent` всё ещё открыт, хотя его purpose уже superseded/closed более поздним принятым PR #11 `Make 1.0.8 regression foundation permanent`. PR #9 не содержит нового product scope и не меняет CURRENT; это stale repository object, оставленный без автоматического закрытия в ходе documentation audit.
+- **QA-1.0.8-02 — B2 test-event safety contract gap:** direct user acceptance was recovered for the adapter-neutral rule that provider-marked test/sandbox/demo events cannot mutate real points/auction/timer/wheel/winner state. Current 1.0.8 generic normalized-event core has no explicit test-event field/gate. Status: **ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**. No current supported-provider reproduction was established in this audit.
+- **B3 provenance correction:** direct user acceptance was recovered for outside-auction unknown-title auto-creation of a normal persistent game. Current 1.0.8 already implements this; it is documentation/provenance correction, not a runtime defect.
+- Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**; this seventh-pass work changes documentation only.
 - **D22 / Issue #5** — остаётся approved post-completion, но был явно отложен пользователем 2026-09-29 и не является автоматическим следующим пунктом.
 - Восстановленная retained dependency/complexity chain после D26: **D40 → D34 → D41 → older YouTube integration candidate → D38 → Public Web → D27 → D7**.
 - Отдельно сохранены approved/parked **D23, D24, D25, D42**, а также deferred **D16, D17, D18, D20, D22, W1, Saved Auctions/New Auction, A8, B6** и provider-specific follow-ups.
