@@ -12,6 +12,8 @@ on:
       - "requirements-build-lock.txt"
       - "tools/**"
       - ".github/workflows/regression-foundation-1.0.8.yml"
+      - ".github/workflows/publish-accepted-release.yml"
+      - ".github/release/requests/**"
       - "data/**"
       - "assets/**"
   pull_request:
@@ -61,6 +63,11 @@ jobs:
           python -m compileall -q streaming_manager app.py tools
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
           Write-Host "COMPILEALL=PASS"
+
+      - name: Publication CI consolidation regression
+        shell: pwsh
+        run: |
+          python tools/publication_ci_smoke.py
 
       - name: Database backup, restore and legacy media regressions
         shell: pwsh

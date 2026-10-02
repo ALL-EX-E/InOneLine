@@ -1,0 +1,77 @@
+# Accepted Release Publication
+
+InOneLine uses one publication workflow for future accepted releases:
+
+- workflow: `.github/workflows/publish-accepted-release.yml`;
+- request directory: `.github/release/requests/`;
+- validation/staging helper: `tools/release_publication.py`.
+
+## Why
+
+Historical release-specific workflows for 1.0.4–1.0.8 duplicated the same publication logic and remained triggerable by later edits to old release-note files. They are retained in Git history, but are no longer active workflow files.
+
+Historical GitHub Releases/tags remain unchanged and remain the public release record.
+
+## Publication request
+
+After manual acceptance and all required gates, create exactly one new JSON file under:
+
+`.github/release/requests/<unique-name>.json`
+
+Publication requests are append-only. Editing or replacing an existing request is not a valid publication operation.
+
+Schema:
+
+```json
+{
+  "schema": 1,
+  "release_tag": "v1.0.9",
+  "release_title": "InOneLine 1.0.9",
+  "release_notes": "RELEASE_NOTES_1.0.9.md",
+  "accepted_artifact_id": 123456789,
+  "accepted_target_commit": "0123456789abcdef0123456789abcdef01234567",
+  "assets": [
+    {
+      "artifact_path": "InOneLine_Setup_1.0.9.exe",
+      "release_name": "InOneLine_Setup_1.0.9.exe",
+      "sha256": "<64 hex>"
+    },
+    {
+      "artifact_path": "InOneLine_Source_1.0.9.zip",
+      "release_name": "InOneLine_Source_1.0.9.zip",
+      "sha256": "<64 hex>"
+    }
+  ]
+}
+```
+
+Additional accepted assets such as a build-info file may be included in the same `assets` list.
+
+## Safety rules
+
+The publisher:
+
+1. accepts only a newly added request on normal `main` push;
+2. validates request paths, tag format, full target SHA and SHA-256 values;
+3. requires the target commit to exist and be an ancestor of current `main`;
+4. requires release notes to be Git-tracked;
+5. refuses to run if either the tag or GitHub Release already exists;
+6. downloads the exact accepted Actions artifact by numeric ID;
+7. verifies every asset SHA-256 before staging;
+8. copies/renames accepted files without rebuilding them;
+9. creates the release at the exact accepted target commit;
+10. downloads the published assets again and verifies the exact asset set and SHA-256;
+11. verifies GitHub release metadata and available GitHub asset digests.
+
+This preserves the project rule: **manual acceptance promotes the exact tested bytes; publication never rebuilds them**.
+
+## Historical releases
+
+Do not recreate old publication requests for already published releases. Their facts remain in:
+
+- GitHub Releases/tags;
+- release notes;
+- `SHA256SUMS.txt` where applicable;
+- Git history of the retired release-specific workflows.
+
+A historical release may contain later asset maintenance that differs from the original one-off workflow's embedded checksum. The GitHub Release itself plus canonical project documentation are the current public record; retired workflow constants are historical implementation detail.
