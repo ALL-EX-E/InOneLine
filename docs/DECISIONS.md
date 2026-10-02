@@ -118,3 +118,16 @@ These are historical/current invariants, not new implementation scopes.
 - The historical assistant proposal for a separate local InOneLine write API (`POST /api/v1/bids`/generic `PUT /lot`) was **not directly user-approved**. User approval was for the dedicated Pointauc/B6 adapter using Pointauc's official Bearer API. Do not promote the assistant proposal into roadmap/backlog.
 - Early 0.2.x and pre-1.0 stabilization/release-stage user-approved scopes are historical implemented evidence and belong in `IDEA_INVENTORY.md`; they do not create new future roadmap items.
 - The accepted outside-auction integration rule is provider-neutral: a valid game-targeted external monetary/service-unit event may update persistent game points without a running auction, but may not create/start/resume an auction or mutate current auction/timer/wheel state; S2 requires an eligible running auction.
+
+## 2026-10-02 — B1/B2 integration contract recovery and QA finding
+
+Повторная сверка прямых решений пользователя, старого `APPROVED_FUTURE_IMPLEMENTATION_ORDER_CURRENT`, current 1.0.8 source и полного inventory подтвердила:
+
+- B1 Conduct integration status contract включает только configured/used services, заметные ошибки даже в compact/collapsed state, переход в `Настройки → Интеграции` и **время последнего принятого integration event**.
+- `Отключить` и `Удалить подключение` — разные операции; Remove требует подтверждения и удаляет только локальную connection config/secret, не historical external events, contributions или auction history.
+- Provider/network/auth work не должен блокировать GUI; provider capabilities определяют применимые controls.
+- B2 Twitch lifecycle сохраняет Public Device Code/native authorization без Client Secret, protected access/refresh credentials, startup/hourly validation, serialized refresh, `Требует входа` для invalid/revoked auth и bounded `Ошибка` для transient failures; Connect/Reconnect/Disconnect/Remove имеют разные принятые semantics.
+- Current 1.0.8 сохраняет `integration_connections.last_event_at` и показывает последнюю принятую активность в Settings, но Conduct integration status/dialog не показывает accepted last-event time.
+- Это зафиксировано как **QA-1.0.8-01 / ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED**. Это не новая feature idea и не автоматическое разрешение менять runtime.
+- Reconciliation-файл не должен считать B1/B2 детали восстановленными, если exhaustive `IDEA_INVENTORY.md` снова схлопывает их до одной общей строки; durable detail должен храниться в inventory.
+
