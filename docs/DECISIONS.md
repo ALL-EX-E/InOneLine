@@ -162,3 +162,10 @@ Additional direct-chat comparison after the seventh pass recovered:
 - The accepted DonationAlerts built-in public OAuth Client ID is **20915**; the user should authorize, not create their own application or enter a Client Secret.
 - Rules viewer controls `Непрозрачность` and `Внутренний отступ` preserve the accepted wide external ▲/▼ + manual entry + hold/repeat UX; mouse wheel must not alter values while scrolling.
 
+## 2026-10-02 — Ninth-pass verification/security and retained-scope preservation
+
+- Winner Verification MAIN contract is the immutable per-run snapshot + deterministic read-only replay + completed-History details + optional pre-spin read-only data view. The snapshot preserves participants/weights or chances, effective range/equal fallback, RNG method/random value, winner, timestamp and algorithm/mapping version; Random.org+ reuses its signed ticket/signature evidence where present.
+- A SHA-256 stored only in the same mutable database is **not** considered meaningful protection against intentional tampering. Whole-snapshot signing, protected key management, external hash publication/notarization and independent off-app verification remain separate post-completion security hardening.
+- Future D28–D42 scopes must preserve their recorded presentation/business-state boundaries; presence in the inventory is not permission to implement them. In particular viewer-only presentation features cannot mutate authoritative auction/RNG state, D35/D36 remain separate per-bet post-completion mechanics, D38 keeps MAIN localhost-only, and D41 ordinary chat cannot mutate auction business state.
+- Directly accepted R1/B1 detailed contracts are durable requirements even when shorter summaries exist elsewhere; do not collapse them back into one-line aliases during future documentation cleanup.
+
