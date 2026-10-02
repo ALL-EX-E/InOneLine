@@ -142,3 +142,33 @@ If a future chat surfaces an older idea not listed in the reconciled roadmap, it
 - `docs/PROJECT_STATE.md` — current queue summary points to reconciled roadmap.
 - `docs/DECISIONS.md` — durable reconciliation/status rules.
 - `docs/README.md` — this reconciliation added to the canonical reading path.
+
+
+## Second exhaustive idea-inventory pass — 2026-10-02
+
+После первого roadmap reconciliation выполнен отдельный полный проход уже не по «следующей очереди», а по всем пользовательским идеям.
+
+Дополнительно сверены direct-chat decisions, full-history dedup audit и dedicated Wheel / History / Settings & Integrations / Widgets / Winner Verification reviews.
+
+Recovered/corrected:
+- создан canonical full inventory `docs/IDEA_INVENTORY.md`;
+- разведены два разных namespace: Product A1–A8/A6.1 и Maintenance A1–A10;
+- advanced completed-auction History analytics восстановлена как **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only review-later: heatmap, weekdays, participant rankings, points/donations analytics, record cards, «Самый дорогой победивший лот»;
+- D9–D12 получили обратно direct-user provenance/conditionality;
+- full external `.iolbackup` и расширенные Saved Auctions details восстановлены в полном inventory;
+- исторические aliases R2 (Rules package) и I1 (DonationAlerts) добавлены для однозначного сопоставления со старыми логами;
+- Wheel Point 13 перепроверен: отдельного нового result-panel backlog нет; existing confirmation + W4 + D25 + explicit reroll/delete rejections полностью покрывают решение;
+- backup-retention last-N/N-days не восстановлен как user idea: evidence показывает assistant-originated maintenance suggestion, а не отдельное user-approved roadmap item.
+
+Mechanical completeness:
+- D1–D43: **43/43 present**;
+- Product A1–A8 + A6.1: complete;
+- S1–S3, W1–W4, B1–B6, E1–E4: complete;
+- P1, C2, R2, I1 and post-1.0 scopes are mapped.
+
+Final orphan-only result:
+- no D44;
+- no additional durable user-proposed product idea found outside `docs/IDEA_INVENTORY.md`;
+- no rejected/superseded/historical assistant idea needs revival.
+
+Google Drive backup mirror: `USER_IDEA_INVENTORY_2026-10-02` in «Текстовый лог».
