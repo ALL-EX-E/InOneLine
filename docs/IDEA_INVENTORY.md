@@ -379,7 +379,7 @@
 - **GitHub становится source of truth; Drive остаётся history/backup** — **IMPLEMENTED / ACCEPTED**.
 - **Публично указать, что InOneLine создан автором с помощью ChatGPT от OpenAI; другие нейросети не использовались** — **IMPLEMENTED / ACCEPTED**.
 - **Программа и source можно бесплатно использовать, изменять и бесплатно распространять; платное распространение запрещено** — **IMPLEMENTED / ACCEPTED** custom license policy.
-- **Не покупать платный Authenticode; документировать SmartScreen/Unknown Publisher UX** — **USER DECISION / IMPLEMENTED IN DOCS**.
+- **Не покупать платный Authenticode; документировать SmartScreen/Unknown Publisher UX** — **USER DECISION / IMPLEMENTED IN DOCS / README GUIDANCE REFRESHED 2026-10-02**. Public install guidance explains why the warning appears, recommends verifying the official Releases source/SHA-256, gives the accepted `Подробнее → Выполнить в любом случае` + UAC `Да` path when available, and explicitly does not require disabling Windows protection.
 - **В публичных GitHub-файлах не раскрывать названия сторонних программ, использованных только как development/UI/UX reference; правило относится и к старым публичным документам** — **DIRECT USER DECISION / PRESERVE**. Функции называются по назначению. Названия реально поддерживаемых внешних сервисов используются только там, где они необходимы для фактической интеграции или совместимости. B6 в публичной документации остаётся обезличенным external auction-service API adapter.
 - **Release exact accepted bytes without rebuild after manual acceptance** — **DURABLE PROCESS RULE**.
 - **Candidate/FIX не считаются в release cadence; только принятые CURRENT/released** — **DURABLE PROCESS RULE**.
