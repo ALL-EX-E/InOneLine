@@ -348,6 +348,8 @@ Permanent repository gate:
 - Отдельно сохранены approved/parked **D23, D24, D25, D42**, а также deferred **D16, D17, D18, D20, D22, W1, Saved Auctions/New Auction, A8, B6** и provider-specific follow-ups.
 - Более старый PASS13 не используется без поздних corrections: Games/List Autoscroll позже был прямо отклонён как ненужное добавление; Compact presentation отложен; D15 не подтверждён как InOneLine item; D39 не actionable без нового прямого решения пользователя.
 
+- **Twenty-fourth reconciliation documentation delta:** restored accepted D26 media-identity behavior: case-insensitive filename dedup across managed/external Music Player rows, external→managed promotion preserving media ID/queue, and context-local external soundtrack selections that clear safely without D26 recovery UI. Current 1.0.8 already implements this; documentation only, no new scope/runtime change.
+
 Полный текущий inventory и статусы: `docs/ROADMAP.md`.
 
 Полная история пользовательских идей, включая уже реализованные/отложенные/отклонённые: `docs/IDEA_INVENTORY.md`.
