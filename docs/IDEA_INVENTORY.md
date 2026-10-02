@@ -69,6 +69,7 @@
 - **Webcam/List/Info можно отключать и располагать независимо; layout переиспользует освободившееся место** — **IMPLEMENTED / ACCEPTED**.
 - **Отдельные glow/frame colors для game/webcam/list/info** — **IMPLEMENTED / ACCEPTED**.
 - **Прозрачны только interior cutouts game/webcam; фон, рамки, список, info/title остаются визуальными слоями** — **IMPLEMENTED / ACCEPTED**.
+- **Второй режим с полностью прозрачным фоном всего Browser Source** — **EXPLICITLY REJECTED / NOT PART OF THE PRODUCT**; прозрачность ограничена внутренними вырезами game/webcam, которые следуют геометрии и исчезают вместе с отключённым блоком.
 - **Фон сцены из файла + Stretch/Fit/Fill/Center** — **IMPLEMENTED / ACCEPTED**.
 - **Фоны PNG/JPG/JPEG/WebP/GIF/MP4/WebM** — **IMPLEMENTED / ACCEPTED**.
 - **Изменения сохранённых presentation settings применяются к открытым Browser Sources без смены URL** — **IMPLEMENTED / ACCEPTED**.
@@ -91,6 +92,8 @@
 - **Random.org/Random.org+ и local RNG; selector показывается только при сохранённом API key, иначе local RNG** — **IMPLEMENTED / ACCEPTED**.
 - **Wheel OBS Overlay и Timer Overlay** — **IMPLEMENTED / ACCEPTED**.
 - **Winner confirmation lifecycle сохраняется** — **EXISTING / PRESERVE**.
+- **Cross-surface data synchronization invariant** — **IMPLEMENTED / ACCEPTED**: изменение статуса/баллов через аукцион должно без ручного F5 обновлять authoritative DB и связанные представления `Игры`, `Публичный список`, `Аукцион`, `Журнал` и применимые OBS/API surfaces; перенос temporary lots после completion/cancel следует тому же правилу.
+- **Open-auction / selected-winner persistence across restart** — **IMPLEMENTED / ACCEPTED**: поддерживаемые open-session states и уже выбранный winner/frozen result должны восстанавливаться после перезапуска, а не вычисляться заново.
 
 ## Product S/A MAIN items
 
@@ -129,8 +132,10 @@
 
 - **W1 — Space вызывает существующий путь «Крутить»** — **ACCEPTED / DEFERRED**. Был реализован, но 2026-09-01 пользователь отменил включение в MAIN и попросил оставить улучшением готовой программы; current runtime этого shortcut не содержит.
 - **W2 — единая managed-copy / external-reference media infrastructure** — **IMPLEMENTED / ACCEPTED**.
+- **W2 direct UX corrections** — **IMPLEMENTED / ACCEPTED**: основное действие для фона формулируется как `Добавить фон…`; repair/restore-reference UI показывается только для реально потерянного external-файла, а не как постоянная параллельная кнопка.
 - **Разные managed media folders по назначению** (backgrounds, music/soundtrack, wheel/center assets и т.п.) — **IMPLEMENTED / ACCEPTED**.
 - **W3 — soundtrack колеса MP3/WAV/OGG, application-owned transport, volume/mute** — **IMPLEMENTED / ACCEPTED**.
+- **W3 direct UI contract** — **IMPLEMENTED / ACCEPTED**: `Музыка колеса` и `Добавить soundtrack…` визуально разделены; крупные кнопки изменения громкости имеют полностью кликабельную площадь; Mute находится отдельной строкой; ошибки/отсутствие аудио не могут блокировать RNG/winner lifecycle.
 - **Auction/Timer Music** с Pause/Resume на точной позиции, loop/profile и отдельным Auction/Wheel state — **IMPLEMENTED / ACCEPTED**; позднее transport расширен D43.
 - **W4 — точный frozen chance выпавшего победителя из resolved snapshot на desktop + Wheel OBS** — **IMPLEMENTED / ACCEPTED**.
 
@@ -157,11 +162,12 @@
 ## Реализованная архитектура
 
 - **B1 — единый `Настройки → Интеграции` center, adapter/status/security contract, DPAPI credential storage** — **IMPLEMENTED / ACCEPTED**.
+- **Integration connection UX** — **USER-ACCEPTED / IMPLEMENTED DIRECTION**: пользователь не должен вручную управлять client secrets или собирать сложную конфигурацию; где provider позволяет, подключение идёт через штатную browser/device authorization с public client/application credentials и protected local tokens.
 - **B2 Twitch first adapter** — **IMPLEMENTED / ACCEPTED**.
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
 - **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; user correction допускает Channel Points contribution flow и во время, и вне активного аукциона по соответствующим правилам; live redemption verification отложена до Affiliate/Partner eligibility.
 - **B5 — `Ставки` feed автоматически принятых integration events** — **IMPLEMENTED / ACCEPTED**.
-- **I1 / DonationAlerts adapter** с browser auth/status и отдельным auction enable; public Client ID встроен, user вводит только authorization — **IMPLEMENTED / ACCEPTED**.
+- **I1 / DonationAlerts adapter** — **IMPLEMENTED / ACCEPTED**: browser authorization/status, public Client ID встроен, пользователь проходит только авторизацию. **Поздний контракт supersedes ранний auction-only toggle:** подключение/enable интеграции является permission на постоянный intake; donations маршрутизируются по source timestamp в running auction либо в persistent game list вне аукциона. Отдельного `учитывать только в аукционе` intake-переключателя больше нет.
 
 ## Принятые, но отложенные service targets
 
@@ -296,6 +302,7 @@
 - **Отдельный универсальный внешний write/control API / generic `PUT /lot` вне B6 contract** — **REJECTED / NOT A SEPARATE APPROVED ITEM**.
 - **Обратная конвертация internal SM points -> money как продуктовая функция** — **CANCELLED/SUPERSEDED**; S1 финально использует one-way source unit/currency -> integer SM points, positive values round upward.
 - **Split installation с runtime отдельно, AppData как основной user-data root** — **REJECTED**; выбран один install root (default `C:\InOneLine`) с user-selectable destination.
+- **Ранний release-only план «публичный GitHub без публикации source»** — **SUPERSEDED** поздним решением публиковать официальный SOURCE вместе с INSTALLER и использовать custom free-use/no-paid-redistribution license.
 
 ---
 
