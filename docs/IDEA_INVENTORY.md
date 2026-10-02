@@ -104,7 +104,7 @@
 - **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**.
 - **S1 integer conversion rule** — **IMPLEMENTED / ACCEPTED**: результат зачисления всегда целое число SM points; положительный дробный результат округляется вверх одинаково для валют и неденежных service units; reverse `SM points → money` не используется.
 - **Product A1 — сохранять последнее значение общего ручного поля суммы/баллов** — **IMPLEMENTED / ACCEPTED**.
-- **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**.
+- **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**. Название после trim/normalization не может быть пустым/whitespace-only и использует общую duplicate protection вместо создания параллельного правила.
 - **Product A3 — frozen start position + live/current position** — **IMPLEMENTED / ACCEPTED**.
 - **Product A4 — ручные «Добавить» / «Уменьшить» как auditable compensating operations** — **IMPLEMENTED / ACCEPTED**.
 - **Product A5 — удалять только ошибочный temporary auction-only lot текущей активной сессии** — **IMPLEMENTED / ACCEPTED**.
@@ -543,9 +543,44 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 - **August Stabilization A12 / 0.3.15→0.3.16 — GUI smoke direct weighted-wheel path must use the real operator `start_auction()` flow; corrected hidden-tab initialization before asserting local animation** — **CLOSED / MANUALLY ACCEPTED**.
 - The stale OBS Browser Source self-reload/version-handshake proposal was explicitly deferred at this stage and later became **IMPLEMENTED** through the accepted overlay version/cache-busting mechanism; it is not an open item.
 
+
+# XX. User-approved pre-1.0 stabilization / release-stage ledger
+
+Эти пункты не являются current feature backlog. Они отдельно восстановлены третьим reconciliation-pass как пользовательски одобренные/принятые engineering, deployment и UI scopes перед публичным 1.0.0.
+
+## Post-MAIN engineering audits
+
+- **FINAL MAIN STABILIZATION / 0.3.83** — полный regression/documentation/manual closure уже реализованного MAIN без изменения product bytes — **CLOSED / MANUALLY ACCEPTED**.
+- **Optimization & Deep Audit / 0.3.84** — меньше SQLite connections/narrow projections на hot read paths, bounded Rules sanitizer cache, batched integration-status reads, demand-driven UI timers, sleeping static Browser Source RAF loops, compact JSON with optional pretty mode, denser release compression/docs — **IMPLEMENTED / ACCEPTED CURRENT** before 0.3.85. Product behavior/schema intentionally unchanged.
+- **Optimization & Reliability Audit II / 0.3.89** — one-snapshot Games/Public refresh composition, safe QTableWidgetItem reuse with complete state rewrite, Main/List serialization cleanup, shared Qt thread-pool cap/idle expiry and explicit release-clean separation of end-user source from QA/dev material — **CLOSED / MANUALLY ACCEPTED**.
+- **Release-clean QA separation** — clean end-user package excludes tests/tools/dev harness/caches/runtime-user data; separate QA package may contain verification tooling but must never be promoted as CURRENT — **IMPLEMENTED / ACCEPTED**.
+
+## E1 focused UI follow-up
+
+- **0.3.91 — remove native up/down arrows from Games `Баллы` numeric field** while preserving numeric entry/range/step and mouse-wheel protection — **USER REQUEST / IMPLEMENTED / MANUALLY ACCEPTED**.
+
+## R1.0.x public-1.0 release-stage decisions
+
+- **R1.0.1 — one selected installation root**: default `C:\InOneLine`, user may choose another drive/folder; app-owned `data/backups/logs` stay under that root; no AppData split — **USER-ACCEPTED / IMPLEMENTED**.
+- **R1.0.2 — external full `.iolbackup` create/validate/restore/rollback** — **IMPLEMENTED / INCLUDED IN ACCEPTED 1.0.0**. It remains distinct from ordinary internal SQLite-only safety backups.
+- **R1.0.3 — production Windows installer + approved application/shortcut icon behavior** — installer/GUI/icon gate **USER ACCEPTED / CLOSED**. Approved icon preserves the green rounded-square/black branching-arrow identity without a white square/background.
+- **R1.0.4 — final uninstall policy**: explicit destructive warning, safe Cancel/No path, confirmed removal of program + app-owned data/backups/logs/private settings/shortcuts/registration while external `.iolbackup` and merely referenced external files survive — **USER ACCEPTED / CLOSED**.
+- **R1.0.5 — update/reinstall contract**: stable AppId/previous chosen custom root is reused; immutable runtime refreshed while mutable `data/backups/logs` survives — **QA-ONLY GATE / USER ACCEPTED / CLOSED**.
+- **R1.0.6 — real-host no-development-stack proof**: installed InOneLine must run without Visual Studio/Python/Inno/build environment and must not install unrelated development components — **USER-DEFINED GATE / MANUAL PASS / CLOSED**.
+- **R1.0.7 scope — global MainWindow geometry stability**: tab/subtab/dynamic-control changes must not resize the user-chosen top-level window; Games/Public hide/show and duplicate navigation cannot force hard-coded geometry; dense Auction content must reflow/scroll internally — **USER EXPLICITLY PULLED FORWARD BEFORE 1.0.0**. The R1.0.7 candidate itself failed minimum-window QA, but the geometry contract survived into final 1.0.10.
+- **R1.0.8 retained fix — minimum-window vertical readability**: Settings pages and Auction/Conduct use vertical scroll/minimum-layout constraints instead of collapsing/overlapping dense controls — **IMPLEMENTED IN FINAL 1.0.10** after the R1.0.8 candidate exposed a residual time-field defect.
+- **R1.0.9 retained UI organization** — **USER APPROVED / IMPLEMENTED IN FINAL 1.0.10**:
+  - Auction top-level subtabs reduced to Lots / Conducting; visible Auction Export removed;
+  - new Settings → Export centralizes CSV/JSON/Excel + Pointauc CSV/Copy list;
+  - Public List keeps search/Public XLSX but loses duplicate CSV/JSON/Excel buttons;
+  - shared main-list XLSX controls move to Games;
+  - auction time editors receive explicit readable width floors.
+- **R1.0.10 — cold-start auction-duration field height floor**: minimum 34 px avoids first-layout vertical clipping at saved 1100×700 without reintroducing automatic window resizing — **MANUALLY ACCEPTED / RELEASED as 1.0.0**.
+- R1.0.7, R1.0.8 and R1.0.9 candidate statuses themselves remain **SUPERSEDED / NOT ACCEPTED**; only their retained corrected behavior is part of final accepted 1.0.0.
+
 # XVII. Reconciliation conclusion 2026-10-02
 
-После третьего полного cross-source pass:
+После текущего третьего полного cross-source pass:
 
 - **D44 не найден**.
 - Дополнительно восстановлены ранний granular 0.2.x implementation ledger и отдельный August Stabilization A1–A12/A7.1/A11.1 namespace; они были реализованы/закрыты и поэтому не влияют на current future backlog.
