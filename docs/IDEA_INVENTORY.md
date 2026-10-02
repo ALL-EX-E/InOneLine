@@ -597,19 +597,26 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 
 # XX. Reconciliation conclusion 2026-10-02
 
-После третьего глубокого cross-source pass и финального zero-delta поиска по прошлым чатам:
+The original third-pass conclusion was **superseded by the user's later repeated full rechecks on the same date**. The authoritative final reconciliation state is:
 
-- **D44 не найден**.
-- Восстановлены granular 0.2.x implementation ledger, отдельный August Stabilization A1–A12/A7.1/A11.1 namespace и pre-1.0 stabilization/release-stage ledger.
-- Исправлено сопоставление Rules: **R1 = editor/templates/session snapshot**, **R2 = standalone OBS Rules viewer**.
-- Восстановлены direct UX details Auction/Conducting, Saved/New Auction, A6.1, B1/B2, D19 picker, W2 repair flow и provider-neutral outside-auction contribution rule.
-- Старый отдельный local write API `POST /api/v1/bids`/generic `PUT /lot` подтверждён как assistant-only proposal, а не user-approved backlog; пользователь утвердил dedicated B6 provider adapter.
-- Зафиксирован superseded initial GitHub release-only/no-source plan и более поздняя official SOURCE+INSTALLER/license model.
-- Advanced History analytics остаётся **USER-ACCEPTED post-completion/post-integration**, D9–D12 сохраняют direct-user provenance/conditionality.
-- Все новые находки этого прохода — реализованные/закрытые/исторические решения или уточнения provenance; **нового future implementation candidate не найдено**.
-- Финальный conversation orphan search после внесения этих исправлений не вернул дополнительной direct user-proposed функции: только уже записанные решения и operational/assistant-only false positives.
-- GitHub Issues не являются полным backlog.
-- Любой будущий найденный старый пункт сначала проверяется против более позднего direct-user decision и current/released behavior, и только затем может менять `ROADMAP.md`.
+- **D1–D43 are accounted for; there is no actual D44 item.**
+- Three historical A namespaces are preserved separately: August Stabilization A1–A12 (including A7.1/A11.1), Product A1–A8/A6.1, and Maintenance A1–A10.
+- Rules aliases remain corrected: **R1 = editor/templates/session snapshot**, **R2 = standalone OBS Rules viewer**.
+- Granular 0.2.x / pre-1.0 implementation and release ledgers, direct Auction/Conduct/OBS UX, Saved/New Auction, W/media/audio, integration/provider, History/verification and deployment/publication decisions are preserved in this inventory.
+- The repeated seventh–ninth passes recovered/corrected additional accepted details that the earlier conclusion missed, including:
+  - **QA-1.0.8-02** — adapter-neutral provider test/sandbox/demo safety contract is not represented generically in current normalized-event core;
+  - **QA-1.0.8-03** — accepted B3 `Требует привязки` manual-binding workflow for missing/unusable target text is absent in current 1.0.8;
+  - direct B3 approval for outside-auction unknown-title persistent-game creation, which current 1.0.8 already implements;
+  - exact B1/B2/provider, R1/R2, Winner Verification/security, D16–D42, E1, backup/icon and publication/privacy/reference-wording boundaries.
+- **QA-1.0.8-01** remains the separately recovered Conduct integration last-event visibility omission.
+- These QA findings are accepted-scope gaps, **not automatic authorization to change runtime**.
+- The old local InOneLine write/control API proposal remains assistant-only/not user-approved; B6 is the separately accepted provider adapter.
+- Advanced History analytics remains user-accepted post-completion/post-integration work.
+- GitHub Issues remain tracking aids only, not the full backlog.
+- The post-correction **tenth orphan-only control was CLEAN**: after all corrections were written, no additional durable direct-user product requirement, future idea, rejection, UX rule, provider contract, deployment rule or process rule remained orphaned.
+- Therefore the repeated audit itself was **not zero-delta**, but the **final control after corrections had zero additional delta**.
+- Current runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Canonical current selection: `PROJECT_STATE.md` + `ROADMAP.md`.
-Полная история идей: этот файл.
+Full exhaustive idea/history ledger: this file.
+Detailed reconciliation trail: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
