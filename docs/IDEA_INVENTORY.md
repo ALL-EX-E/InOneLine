@@ -237,9 +237,9 @@
 - **D7 — Winner Verification umbrella** — MAIN verification **IMPLEMENTED**; whole-snapshot cryptographic tamper-resistance **ACCEPTED AS POST-COMPLETION HARDENING**.
 - **D8 — Video Requests** — **REJECTED / NOT NEEDED**.
 - **D9 — Localization/languages** — **ACCEPTED / DEFERRED POST-COMPLETION**; русский остаётся primary. Accepted boundary: локализация должна быть централизованной на уровне UI/программных строк; пользовательские данные, названия игр и исторические записи не переводятся автоматически. Конкретный набор будущих языков не зафиксирован.
-- **D10 — GitHub link** — **CONDITIONAL FUTURE ITEM**; public repo prerequisite теперь существует, но нужен fresh review.
-- **D11 — Telegram link** — **CONDITIONAL FUTURE ITEM** только после появления официального проекта/канала.
-- **D12 — Support/Boosty link** — **CONDITIONAL FUTURE ITEM** только после появления официального support resource.
+- **D10 — GitHub link** — **CONDITIONAL FUTURE ITEM**; link may point only to the official InOneLine repository. Public-repo prerequisite now exists, but placement/UX still requires fresh review and is not auto-authorized.
+- **D11 — Telegram link** — **CONDITIONAL FUTURE ITEM** only after an official project channel/group exists; use only the official project URL, never a placeholder/unofficial community link.
+- **D12 — Support/Boosty link** — **CONDITIONAL FUTURE ITEM** only after program completion/publication and an official support page exists. Accepted placement intent is informational/project/support UI, **not Auction business UI**; use only the official support URL.
 - **D13 — Pending/manual-processing queue** — **ACCEPTED AS POSSIBLE POST-COMPLETION**, не MAIN.
 - **D14 — historical operator/wheel umbrella** — **SUPERSEDED** concrete W/D items.
 - **D15 — Twitch AI-bot/neural network** — **NOT A CONFIRMED InOneLine USER IDEA / HISTORICAL ONLY**.
