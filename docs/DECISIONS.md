@@ -221,7 +221,7 @@ The Games `Всего`/archive-counter behavior was also rechecked. Current code
 
 No runtime/source/version/schema/migration change is authorized or performed by this documentation correction.
 
-## 2026-10-02 — Sixteenth-pass engineering/audio contract recovery
+## 2026-10-02 — Seventeenth-pass engineering/audio contract recovery
 
 A further same-scenario recheck against direct chats, released 1.0.5/1.0.7 evidence and current 1.0.8 source recovered two durable areas that were still compressed too aggressively.
 
