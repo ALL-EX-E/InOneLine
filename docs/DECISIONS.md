@@ -152,3 +152,13 @@ These are historical/current invariants, not new implementation scopes.
 - Historical E1 native-EXE acceptance required the exact build output to visibly reach `[9/9] BUILD EXE: OK` with console kept open/full output visible; exact binary/manual QA and explicit user acceptance remained separate mandatory gates.
 - Public GitHub wording rule is reaffirmed: do not expose development-reference provenance in published files. A provider name may remain only where genuinely necessary as the name of the actual provider/integration/API itself.
 
+## 2026-10-02 — Eighth-pass B3 binding and Rules control recovery
+
+Additional direct-chat comparison after the seventh pass recovered:
+
+- **B3 missing/unusable target text** was directly accepted as a distinct `Требует привязки` state. Such an event must not auto-create or auto-credit and must await manual operator binding to a game/lot; this is separate from `pending_conversions`, which is for unknown conversion rate/unit.
+- During a running auction, a usable unknown title follows the ordinary temporary `auction_only` path; outside auction, a usable unknown title creates a normal persistent game.
+- Current 1.0.8 handles usable-title paths correctly, but `missing_target` is marked `inapplicable` and there is no manual bind workflow. Track as **QA-1.0.8-03 / ACCEPTED B3 WORKFLOW OMISSION / NOT FIXED / NOT AUTO-AUTHORIZED**.
+- The accepted DonationAlerts built-in public OAuth Client ID is **20915**; the user should authorize, not create their own application or enter a Client Secret.
+- Rules viewer controls `Непрозрачность` and `Внутренний отступ` preserve the accepted wide external ▲/▼ + manual entry + hold/repeat UX; mouse wheel must not alter values while scrolling.
+
