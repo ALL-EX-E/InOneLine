@@ -169,3 +169,10 @@ Additional direct-chat comparison after the seventh pass recovered:
 - Future D28–D42 scopes must preserve their recorded presentation/business-state boundaries; presence in the inventory is not permission to implement them. In particular viewer-only presentation features cannot mutate authoritative auction/RNG state, D35/D36 remain separate per-bet post-completion mechanics, D38 keeps MAIN localhost-only, and D41 ordinary chat cannot mutate auction business state.
 - Directly accepted R1/B1 detailed contracts are durable requirements even when shorter summaries exist elsewhere; do not collapse them back into one-line aliases during future documentation cleanup.
 
+## 2026-10-02 — Eleventh-pass archive/provenance and QA-ID recovery
+
+- Historical reconciliation PASS 12 is still correct that the original **2026-08-21 external-reference screenshot set** is not recoverable from currently accessible Drive image search. Later text/dedup/dedicated review records preserve the product decisions, but the original image bytes must **not** be claimed as archived and must not be reconstructed and presented as originals.
+- This is a **REFERENCE ARCHIVE GAP**, not a product feature, runtime defect or reason to reopen already accepted/rejected roadmap decisions.
+- Release/reconciliation defects use **`QA-<version>-NN`** identifiers. Permanent roadmap/product identifiers (D/A/W/B/E/R and similar) must not be recycled for temporary QA defects or omissions.
+- Recovering one of these process/archive rules does not select a new implementation scope; runtime remains unchanged until a separately reviewed and explicitly approved code change.
+
