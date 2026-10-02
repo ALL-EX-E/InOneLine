@@ -197,3 +197,14 @@ A further post-correction comparison against the dedicated Settings/Widgets/Winn
 - Winner Verification MAIN does not imply a public Internet verification page. Localhost remains the default service boundary; LAN/public sharing is a separate D38/Public-Web/security decision.
 - Product A7 history cards keep explicit affected-lot/object/value context, understandable event icons and exact stored timestamps; hover linkage remains operator UI only.
 
+## 2026-10-02 — Fourteenth-pass B1/B2 secret/lifecycle precision
+
+Direct-chat recheck recovered two B1/B2 details that were still compressed in current documentation:
+
+- **Secret hygiene is broader than “not in SQLite”.** Plaintext tokens/passwords/API secrets must not be stored in main SQLite, ordinary settings/provider config, logs/diagnostics, exports or full-backup manifests/plain content. Full backup may carry protected credential files only as their already-protected DPAPI ciphertext. Secret-bearing errors/diagnostics must be masked/sanitized.
+- **Disconnect/disabled lifecycle:** disabling use preserves local configuration, protected credentials, account/capability metadata and history. After restart the integration remains disabled and does not undergo background provider validation until use is re-enabled. A preserved connected grant is represented as `Статус: Подключено · использование отключено`. Remove is distinct: after confirmation it deletes local connection config/credential metadata and returns to `Не настроено`, but never deletes historical events/contributions/auction history.
+
+Current 1.0.8 source already follows these runtime rules: active validation filters to enabled+connected adapters and diagnostic errors pass through secret sanitization.
+
+Source review also found a **production-unreachable DonationAlerts manual-Client-ID fallback UI** after `has_built_in_client_id()`. The shipped path constructs `DonationAlertsAdapter()` with built-in public Client ID 20915 and returns before that fallback. Classification: **SOURCE-HYGIENE / COMPATIBILITY RESIDUE / NOT RUNTIME QA DEFECT / NOT AUTO-AUTHORIZED FOR CLEANUP**. Do not revive manual Client ID management as product scope.
+
