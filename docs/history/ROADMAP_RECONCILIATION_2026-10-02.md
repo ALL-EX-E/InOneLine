@@ -777,3 +777,20 @@ Current 1.0.8 source already matches the integration validation/persistence mode
 
 This twentieth pass is **NOT CLEAN** because these accepted historical/process details had to be restored. Another post-correction orphan-only/full control is required.
 
+## Twenty-first orphan control — 0.2.69 input-guard precision — 2026-10-02
+
+After the twentieth A1/B2 correction, another direct-chat orphan-only pass was run.
+
+### Recovered precision
+
+- Direct user decision from 2026-08-19 confirms that the 0.2.69 protection is a **whole-program Windows input guard**, not merely a dialog/local-wheel fix.
+- If a mouse event reaches InOneLine while the foreground window or the window directly under the cursor belongs to another process, the event must be consumed before hidden/covered InOneLine controls react.
+- The accepted scope includes press/release/double-click/wheel/context-menu and drag movement with buttons held; InOneLine's own windows/dialogs continue working normally.
+- Current `streaming_manager/input_guard.py` still implements the Win32 foreground/cursor-window process ownership checks, so this is documentation precision only.
+
+The same pass rechecked the old backup-retention `last N / N days` wording. Direct-source recovery confirms that this was an **assistant suggestion only**, explicitly not acted on; the current non-roadmap classification remains correct.
+
+No new feature identifier, runtime defect, future roadmap item or status change was found.
+
+This twenty-first pass is **NOT CLEAN** only because the exact 0.2.69 accepted behavior had to be expanded in the exhaustive inventory. Another post-correction control is required.
+
