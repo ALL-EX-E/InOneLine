@@ -13,7 +13,7 @@
 9. После полного PASS получить явную пользовательскую приёмку.
 10. Продвигать **точно проверенные bytes**, не пересобирая installer/source после ручной приёмки.
 11. Source ZIP собирать только из Git-tracked файлов через `tools/create_source_snapshot.py`; запрещено архивировать post-build workspace копированием каталога.
-12. Публиковать GitHub Release и проверять опубликованные SHA-256.
+12. Для публикации создать новый immutable request в `.github/release/requests/` с exact artifact ID, target commit, именами файлов и SHA-256; единый `publish-accepted-release.yml` проверяет bytes, запрещает overwrite существующего tag/release, публикует без пересборки и повторно проверяет опубликованные SHA-256.
 13. Обновлять `docs/PROJECT_STATE.md`, `docs/ROADMAP.md`, QA и решения.
 14. Только после этого считать версию CURRENT/released.
 
@@ -47,3 +47,11 @@
 Сторонние продукты нельзя использовать как публичные design/UX references. Название стороннего продукта допустимо только когда оно объективно необходимо для фактической интеграции, API/протокола, зависимости, лицензии/атрибуции или legacy-совместимости.
 
 Перед публикацией действует `publication-wording` gate.
+
+
+## Publication requests
+
+- Publication requests после создания не редактируются и не переиспользуются.
+- Изменение старого `RELEASE_NOTES_*.md` само по себе никогда не должно запускать публикацию.
+- Исторические release-specific workflows хранятся только в Git history; active CI использует единый publisher.
+- Для уже существующего tag или GitHub Release publisher обязан завершаться отказом до загрузки/публикации новых assets.
