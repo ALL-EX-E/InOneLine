@@ -23,14 +23,15 @@
 
 Любой незакрытый пункт перед реализацией всё равно проходит fresh exact-CURRENT review и отдельное явное approval.
 
-## Важное про идентификаторы A1–A10
+## Важное про повторно использованные A-идентификаторы
 
-В проекте существуют **два разных пространства A-идентификаторов**:
+В истории проекта существуют **три разных пространства A-идентификаторов**:
 
-1. **Product A1–A8 / A6.1** — аукционные функции 2026-08/09.
-2. **Maintenance A1–A10** — findings контрольного codebase audit 2026-10-01.
+1. **August Stabilization A1–A12** (включая A7.1 и A11.1) — ранний технический аудит/оптимизация 0.3.03–0.3.16, август 2026.
+2. **Product A1–A8 / A6.1** — аукционные продуктовые функции 0.3.22+ / август–сентябрь 2026.
+3. **Maintenance A1–A10** — findings контрольного codebase audit 2026-10-01.
 
-Например, **Product A8 = Undo**, а **Maintenance A8 = GitHub Actions Version Refresh**. Их нельзя смешивать.
+Например, **August Stabilization A8 = hidden AuctionTab visual timers/refresh optimization**, **Product A8 = Undo**, а **Maintenance A8 = GitHub Actions Version Refresh**. Их нельзя смешивать.
 
 ---
 
@@ -399,12 +400,153 @@
 
 ---
 
+
+
+---
+
+# XVIII. Granular historical accepted implementation ledger — 0.2.0–0.3.02
+
+Этот раздел восстановлен третьим reconciliation-pass 2026-10-02. Ранее эти решения были функционально учтены крупными блоками, но не были видны как отдельные исторические идеи/улучшения.
+
+Это **закрытые/реализованные** пункты, а не future backlog. Часть возникла как пользовательские запросы, часть как предложенные в ходе аудита улучшения, после чего была отдельно проверена/принята пользователем. Там, где прямое авторство идеи пользователя не доказано, статус здесь означает **historically approved/implemented**, а не «идея точно первоначально предложена пользователем».
+
+## 0.2.0–0.2.22 — Games/Public foundation refinements
+
+- **0.2.0 — enlarged/cleaner UI foundation**: скрытый technical ID, status/archive counters, improved search/selection, compact review rendering, local-time updated_at, no-op save/import does not reorder/update timestamp, pre-import backup, Public search/count/local JSON, OBS/API helpers, detailed Journal changes — **IMPLEMENTED / ACCEPTED**.
+- **0.2.1 — explicit save confirmation + unsaved-close warning** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.2 — confirmation only for real edits; reverting to original values counts as no change** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.3 — irreversible Delete game with warning + safety backup, distinct from Archive** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.4 — flexible release-date input normalized to DD.MM.YYYY** (digits, separators, Russian month text) — **IMPLEMENTED / ACCEPTED**.
+- **0.2.5 — explicit invalid-date error message** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.6 — duplicate-title protection + navigation to existing row/archive** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.7 — Games filters for ИГРАЛ / НЕ ИГРАЛ / КООП / НЕ КООП** — **IMPLEMENTED / ACCEPTED**, later UI presentation superseded by statistic-card filters.
+- **0.2.8 — one-click Reset filters/search/archive view** — **IMPLEMENTED / ACCEPTED**, later adapted to statistic-card UI.
+- **0.2.9 — separate Played / Not played statistics** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.10 — status ЗАБРОШЕНО**, sorting/filter/count/Public behavior and exclusion from auction export — **IMPLEMENTED / ACCEPTED**.
+- **0.2.11 — statistic ДЛЯ АУКА = ИГРАЛ + НЕ ИГРАЛ** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.12 — Rules of sorting dialog instead of permanent explanatory text** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.13 — hide technical API/status line from main UI** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.14 — Hide/Show Games list toggle with auto-reveal when navigation requires a row** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.15 — compact window behavior when list hidden + Find button/Enter search, auto-select first match, explicit no-result message** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.16 — adaptive compact mode that does not distort when maximized/fullscreen** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.17 — QSizePolicy startup correction preserving adaptive compact mode** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+- **0.2.18 — File-menu spacing/DPI readability correction** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+- **0.2.19 — Games final hardening**: Unicode case-insensitive search, DB-level duplicate guard, clear selection/actions when list hidden, active rows above archived block, strict two-phase CSV validation, microsecond backup filenames — **IMPLEMENTED / ACCEPTED**.
+- **0.2.20 — persist main-window geometry/position/maximized/current tab/Games list visibility** — **IMPLEMENTED / ACCEPTED**; later storage mechanism evolved through A9 installer-user-state maintenance.
+- **0.2.21 — statistic cards become clickable filters; old dropdown/archive checkbox removed** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.22 — Всего counts all DB games including archive; other working counters count active rows** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+
+## 0.2.23–0.2.54 — Public/OBS presentation build-out
+
+- **0.2.23 — filter «Всего» behavior** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.24 — hide Public list** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.25 — synchronized Games/Public list visibility** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.27 — search in Public List** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.28 — synchronized search behavior between Games/Public** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.29 — lower-right OBS information block** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.30 — readable OBS JSON** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.31 — built-in OBS overlay** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.32–0.2.33 — current-game title + lower-right information block refinements** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.35 — Top-3 + list scroll direction** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.36 — corrected Top-3 composition** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+- **0.2.37 — configurable overlay placement** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.38 — hide zero sums from scrolling viewer list where applicable** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.39–0.2.40 — per-block/adaptive overlay typography and Top-3 typography** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.41 — large current-game title typography** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.42–0.2.43 — adaptive Stream/OBS tab, size controls and scroll restoration** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.44–0.2.46 — glow/frame colors, list/info glow and independent frame colors** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.47–0.2.48 — transparent game/webcam cutouts inside otherwise opaque visual overlay** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.49 — separate OBS URL for list** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.50 — overlay background-image library** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.51 — GIF/video backgrounds** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.52 — scrollable settings + compact presentation controls** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.53 — synchronize frames and transparent cutouts** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.54 — final verification of first three tabs** — **CLOSED / ACCEPTED**.
+
+## 0.2.55–0.2.72 — Auction/wheel operator UX
+
+- **0.2.55 — clearer Preview button names** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.56 — unified Auction search** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.57 — Auction table** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.58 — local Auction mode foundation** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.59 — nested Auction tabs** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.60 — contextually hidden Auction-tab rules/controls** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.61 — conduct auction without forced tab switching** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.62 — conduct-auction corrections** — **IMPLEMENTED / ACCEPTED CORRECTIONS**.
+- **0.2.63 — search/focus/info field/tie handling refinements** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.64 — search focus + wheel on tie** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.65 — restore active auction state after restart** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.66 — random-number generator choices** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.67 — visual wheel** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.68 — wheel preview, smoothness and adding new lots during auction** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.69 — protection against clicks leaking through other windows/dialogs** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.70 — local wheel smoothness rework** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.71 — readable local-wheel labels** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.72 — tie-wheel timing and larger time arrows/controls** — **IMPLEMENTED / ACCEPTED**.
+
+## 0.2.73–0.2.93 — performance/safety/detail hardening
+
+- **0.2.73 — technical optimization/decomposition**: UI/DB facades split into subject modules, batched settings transaction, fewer API DB connections, WAL configured once, named migrations, remote RNG off GUI thread, dirty/lazy heavy tabs, cached OBS HTML, temp-DB smoke, cleaner docs/release archive — **IMPLEMENTED / ACCEPTED**.
+- **0.2.75 — relative-import correction after decomposition + static import check** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.77 — Windows smoke + immediate release of SQLite backup handles** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.78 — cancel promotes temporary lots with saved points + readable adaptive local-wheel labels** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.79 — cancel refreshes Games/Public/Auction/Journal immediately + full OBS wheel labels** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.80 — responsive destructive delete + minimal audit tombstone** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.81 — isolated-process backup + aggregate Games counters + performance diagnostics** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.82 — responsive Journal via model/view + background loading** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.83 — targeted SQLite performance indexes** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.84 — RNG selector shown only when RANDOM.ORG API key is configured** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.85 — Wheel OBS URL/preview controls shown only when wheel is relevant** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.86 — correct word-boundary wrapping in standalone list overlay** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.87 — preserve list-overlay scroll position across live resort/re-render** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.88 — bounded/rotating technical logs; performance trace opt-in** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.89 — asynchronous full-history Journal search with debounce/stale-result protection** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.90 — safe background CSV import with isolated backup/prune gate** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.91 — flexible CSV import/compatibility refinements** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.92 — safe backup restore** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.93 — destructive «Очистить все игры…» with typed confirmation, mandatory backup, open-auction guard and historical auction-entry snapshots** — **IMPLEMENTED / ACCEPTED**.
+
+## 0.2.94–0.3.02 — Auction timer point 9
+
+- **0.2.94 — compact timer controls**: one Start/Pause/Resume button, quick +/- time, Reset with confirmation, persistence through deadline state — **IMPLEMENTED / ACCEPTED**.
+- **0.2.95 — millisecond timer + editable HH:MM:SS.mmm, -10/-1/+1/+10 min, Finish intake and Stop auction actions** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.96 — contextual timer**: max-amount countdown vs direct weighted-wheel spin duration in the same large timer; tie overtime/wheel reuses same UI — **IMPLEMENTED / ACCEPTED**.
+- **0.2.97 — startup compatibility re-export correction after timer refactor** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+- **0.2.98 — wheel duration up to 24h, timer remains visible after result, winner_selected can still be cancelled with audit preservation, long-spin visual scaling** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.99 — persist edited wheel duration before tie-break refresh can overwrite it** — **IMPLEMENTED / ACCEPTED CORRECTION**.
+- **0.3.00 — Settings → General/Auction split + persisted default wheel-spin duration** — **IMPLEMENTED / ACCEPTED**.
+- **0.3.01 — six-digit HHMMSS shorthand normalized to HH:MM:SS.000** — **IMPLEMENTED / ACCEPTED**.
+- **0.3.02 — persisted default max-amount duration, independent from current live session** — **IMPLEMENTED / ACCEPTED**.
+- Historical proposal for a separate tie-overtime default existed at this stage; later E3 decision **SUPERSEDED** it by reusing the existing duration model instead of creating another independent setting.
+
+---
+
+# XIX. August Stabilization A1–A12 — separate historical namespace
+
+These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 from October.
+
+- **August Stabilization A1 / 0.3.03 — safe update/release archive**: user DB/WAL/SHM/backups/media/logs/temp excluded; single fail-closed release builder; atomic final ZIP replacement; clean-install/update simulations — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A2 / 0.3.04 — secret settings redaction in Journal**: RANDOM.ORG API key stored normally for RNG but audit before/after contains only `[СКРЫТО]` — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A3/A4 / 0.3.05 — protect games participating in unfinished auction from archive/delete; unrelated games remain editable; winner forced visible/not archived** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A5 / 0.3.06 — eliminate wheel-payload N+1 DB access via shared connection-aware payload path** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A6 / 0.3.07 — atomic CSV import transaction; no partial commits after later-row failure** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A7 / 0.3.08 — large MP4/WEBM background copy off GUI thread via existing worker pool** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A7.1 / 0.3.09 — selecting an external video whose filename already exists reuses existing library item instead of creating `(2)` duplicate** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A8 / 0.3.10 — hidden AuctionTab stops unnecessary high-frequency visual timers/refresh while functional deadline watchdog remains active** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A9 / 0.3.11 — synchronized search updates visible table immediately while hidden tables become dirty and catch up lazily** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A10 / 0.3.12 — local wheel frame timer stops in idle/static state** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A11 / 0.3.13 — OBS wheel does not keep permanent requestAnimationFrame in idle; later spins can restart animation without page reload** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A11.1 / 0.3.14 — corrected wheel motion profile with acceleration, cruise and deceleration while preserving RNG/result** — **CLOSED / MANUALLY ACCEPTED**.
+- **August Stabilization A12 / 0.3.15→0.3.16 — GUI smoke direct weighted-wheel path must use the real operator `start_auction()` flow; corrected hidden-tab initialization before asserting local animation** — **CLOSED / MANUALLY ACCEPTED**.
+- The stale OBS Browser Source self-reload/version-handshake proposal was explicitly deferred at this stage and later became **IMPLEMENTED** through the accepted overlay version/cache-busting mechanism; it is not an open item.
+
 # XVII. Reconciliation conclusion 2026-10-02
 
-После второго полного cross-source pass:
+После третьего полного cross-source pass:
 
 - **D44 не найден**.
-- Отдельного durable user-proposed feature, отсутствующего из этого inventory, не найдено.
+- Дополнительно восстановлены ранний granular 0.2.x implementation ledger и отдельный August Stabilization A1–A12/A7.1/A11.1 namespace; они были реализованы/закрыты и поэтому не влияют на current future backlog.
+- После внесения этой дельты отдельного durable user-proposed future feature, отсутствующего из этого inventory, не найдено.
 - Обнаружена и исправлена важная provenance/status ошибка: advanced History analytics были user-accepted post-completion ideas, а не просто assistant-proposed possibilities.
 - D9–D12 также сохранены с direct-user provenance/conditionality.
 - GitHub Issues не являются полным backlog.
