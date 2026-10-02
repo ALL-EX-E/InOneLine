@@ -754,3 +754,26 @@ These are documentation/process precision corrections only. No new feature ident
 
 Because new durable detail was restored, this nineteenth pass is **NOT CLEAN**. Another post-correction full/orphan control is required.
 
+## Twentieth full control — A1 isolated update QA + B2 restart persistence — 2026-10-02
+
+The post-nineteenth full control compared direct August/September chat evidence against the corrected inventory and current source.
+
+### Additional durable detail recovered
+
+- **August Stabilization A1 exact safe-release/update test contract**
+  - the release builder uses temporary `.building` staging;
+  - forbidden runtime/user content is validated before promotion;
+  - validation failure preserves the previous safe archive instead of replacing it;
+  - update simulation uses a copied installation, not the main working folder;
+  - copied `data\streaming.db` SHA-256 is checked unchanged before launching the updated copy;
+  - clean-install simulation verifies absence of user DB state before first launch.
+- **B2 restart persistence**
+  - a valid stored Twitch authorization survives app restart without a new OAuth/Device Code flow;
+  - account/status state persists;
+  - enabled connected integrations are automatically validated shortly after startup and hourly thereafter, refreshing the stored/visible last-check timestamp;
+  - only genuine invalid/revoked auth transitions to reauthorization.
+
+Current 1.0.8 source already matches the integration validation/persistence model. No new runtime defect, feature identifier or roadmap-order change was found.
+
+This twentieth pass is **NOT CLEAN** because these accepted historical/process details had to be restored. Another post-correction orphan-only/full control is required.
+
