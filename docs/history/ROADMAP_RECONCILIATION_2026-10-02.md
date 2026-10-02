@@ -566,3 +566,24 @@ These are accepted-contract/documentation restorations, not newly selected runti
 
 Because this pass again recovered durable detail, it is **NOT CLEAN**. Another orphan-only control is required after synchronization.
 
+## Fourteenth direct-chat/source control — B1/B2 secret/lifecycle precision — 2026-10-02
+
+A further direct-chat orphan check focused on B1/B2/Twitch/DonationAlerts lifecycle and security details.
+
+### Additional durable detail recovered
+
+- Plaintext tokens/passwords/API secrets are prohibited not only from main SQLite but also ordinary settings/provider config, logs/diagnostics, exports and unprotected backup content. Full backup may carry credential files only as already-protected DPAPI ciphertext; diagnostic/error text must mask secret-bearing values.
+- Disconnect/usage-disable preserves configuration, protected credentials, account/capability metadata and history. On restart it stays disabled and is excluded from background provider validation until re-enabled. The accepted visible state for a preserved connected grant is `Статус: Подключено · использование отключено`.
+- Remove is distinct from Disconnect: after confirmation it removes local connection/credential metadata and returns to `Не настроено`, without deleting historical business records.
+
+### Current-source result
+
+- MainWindow validates only integrations that are both enabled and connected.
+- Diagnostic integration errors are passed through the existing secret sanitizer.
+- DonationAlerts production uses built-in public Client ID **20915**.
+- A manual DonationAlerts Client-ID fallback branch still exists in Settings source after the `has_built_in_client_id()` early return. In the shipped construction path it is unreachable because MainWindow creates `DonationAlertsAdapter()` with the built-in ID. This is classified as **source-hygiene/compatibility residue**, not a runtime QA defect and not automatic cleanup authorization.
+
+Runtime/source bytes were not changed by this audit; version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+Because this pass recovered additional durable documentation detail and one source-hygiene residue, it is **NOT CLEAN**. One more post-correction orphan-only control is required.
+
