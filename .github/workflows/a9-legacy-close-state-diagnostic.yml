@@ -1,0 +1,129 @@
+name: A9 Legacy Close-State Diagnostic
+
+on:
+  push:
+    branches:
+      - maintenance/a9-installer-user-state
+    paths:
+      - ".github/workflows/a9-legacy-close-state-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-close-state:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Install exact Python runtime dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-build-lock.txt
+
+      - name: Generate close-state probe
+        shell: pwsh
+        run: |
+          @'
+          from __future__ import annotations
+
+          import os
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          from PySide6.QtCore import QSettings
+          from PySide6.QtWidgets import QApplication
+
+          from streaming_manager.app_paths import AppPaths
+          from streaming_manager.database import Database
+          from streaming_manager.views.main_window import MainWindow
+
+          app = QApplication.instance() or QApplication([])
+          app.setApplicationName("Streaming Manager")
+          app.setApplicationDisplayName("In one line")
+          app.setOrganizationName("Local Streaming Tools")
+
+          settings = QSettings()
+          settings.clear()
+          settings.sync()
+          assert settings.status() == QSettings.Status.NoError
+
+          root = Path(tempfile.mkdtemp(prefix="a9_legacy_close_"))
+          paths = AppPaths.from_root(root)
+          paths.ensure_runtime_dirs()
+          db = Database(paths.database_path)
+
+          window = MainWindow(db, paths)
+          window.show()
+          app.processEvents()
+
+          window.tabs.setCurrentIndex(3)
+          window.set_synced_lists_visible(False, adjust_window=False)
+          window.showNormal()
+          window.resize(1234, 777)
+          app.processEvents()
+
+          assert window.tabs.currentIndex() == 3
+          assert window._lists_visible is False
+          assert window.width() == 1234
+          assert window.height() == 777
+
+          assert window.close() is True
+          app.processEvents()
+
+          saved = QSettings()
+          saved.sync()
+          assert saved.status() == QSettings.Status.NoError
+          assert saved.value("main_window/tab_index", -1, type=int) == 3, saved.allKeys()
+          assert saved.value("lists/visible", True, type=bool) is False
+          assert saved.value("games/list_visible", True, type=bool) is False
+          assert saved.value("public/list_visible", True, type=bool) is False
+          assert saved.value("main_window/geometry") is not None
+
+          print("LEGACY_CLOSE_TAB_INDEX=" + str(saved.value("main_window/tab_index", -1, type=int)))
+          print("LEGACY_CLOSE_LIST_VISIBLE=" + str(saved.value("lists/visible", True, type=bool)))
+          print("LEGACY_CLOSE_GEOMETRY_PRESENT=PASS")
+          print("LEGACY_CLOSE_STATE=PASS")
+          '@ | Set-Content "$env:RUNNER_TEMP\legacy_close_probe.py" -Encoding UTF8
+
+      - name: Test official 1.0.8 maintenance close-state save
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\legacy-maintenance"
+          git worktree add --detach $dir v1.0.8-maintenance-2026-10-01
+          if ($LASTEXITCODE -ne 0) { throw "Cannot create maintenance worktree" }
+          Copy-Item "$env:RUNNER_TEMP\legacy_close_probe.py" "$dir\legacy_close_probe.py"
+          Push-Location $dir
+          try {
+            python legacy_close_probe.py
+            if ($LASTEXITCODE -ne 0) { throw "Maintenance close-state probe failed" }
+          } finally {
+            Pop-Location
+          }
+
+      - name: Test accepted A6 candidate close-state save
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\legacy-a6"
+          git worktree add --detach $dir d176e5bd91357eabcbed58ca05221ba8bd174395
+          if ($LASTEXITCODE -ne 0) { throw "Cannot create A6 worktree" }
+          Copy-Item "$env:RUNNER_TEMP\legacy_close_probe.py" "$dir\legacy_close_probe.py"
+          Push-Location $dir
+          try {
+            python legacy_close_probe.py
+            if ($LASTEXITCODE -ne 0) { throw "A6 close-state probe failed" }
+          } finally {
+            Pop-Location
+          }
