@@ -28,6 +28,8 @@
 
 Это потеряло часть ранее сохранённого backlog и создало ложное впечатление, что D22 автоматически следует сразу после post-D26 patch.
 
+Отдельно зафиксировано: GitHub Issues не являются исчерпывающим backlog; отсутствие Issue не означает удаление идеи из canonical `docs/ROADMAP.md`.
+
 Drift исправлен 2026-10-02.
 
 ## Restored retained dependency/complexity chain
