@@ -152,11 +152,11 @@ If a future chat surfaces an older idea not listed in the reconciled roadmap, it
 
 Recovered/corrected:
 - создан canonical full inventory `docs/IDEA_INVENTORY.md`;
-- разведены два разных namespace: Product A1–A8/A6.1 и Maintenance A1–A10;
+- на этом проходе были разведены Product A1–A8/A6.1 и Maintenance A1–A10; более глубокий хронологический pass позже восстановил **третий** namespace — August Stabilization A1–A12/A7.1/A11.1;
 - advanced completed-auction History analytics восстановлена как **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only review-later: heatmap, weekdays, participant rankings, points/donations analytics, record cards, «Самый дорогой победивший лот»;
 - D9–D12 получили обратно direct-user provenance/conditionality;
 - full external `.iolbackup` и расширенные Saved Auctions details восстановлены в полном inventory;
-- исторические aliases R2 (Rules package) и I1 (DonationAlerts) добавлены для однозначного сопоставления со старыми логами;
+- historical aliases уточнены позже: **R1 = Rules editor/templates/session snapshot**, **R2 = standalone OBS Rules**, **I1 = DonationAlerts**;
 - Wheel Point 13 перепроверен: отдельного нового result-panel backlog нет; existing confirmation + W4 + D25 + explicit reroll/delete rejections полностью покрывают решение;
 - backup-retention last-N/N-days не восстановлен как user idea: evidence показывает assistant-originated maintenance suggestion, а не отдельное user-approved roadmap item.
 
@@ -164,7 +164,7 @@ Mechanical completeness:
 - D1–D43: **43/43 present**;
 - Product A1–A8 + A6.1: complete;
 - S1–S3, W1–W4, B1–B6, E1–E4: complete;
-- P1, C2, R2, I1 and post-1.0 scopes are mapped.
+- P1, C2, R1, R2, I1 and post-1.0 scopes are mapped.
 
 Final orphan-only result:
 - no D44;
@@ -217,3 +217,41 @@ Final result of this pass:
 - no D44;
 - ROADMAP ordering unchanged;
 - IDEA_INVENTORY historical/implemented coverage expanded and corrected.
+
+
+## Deep chronological comparison pass — 2026-10-02
+
+После уже расширенного IDEA_INVENTORY выполнена ещё одна независимая проверка снизу вверх по временной шкале: legacy changelog 0.2.x, ранние Project State 0.3.05–0.3.16, cumulative history, pre-1.0 R1.0.x release stages и direct conversation search.
+
+Новая дельта относительно предыдущего полного inventory:
+
+### Recovered historical namespaces / accepted engineering work
+- найден отдельный **August Stabilization A1–A12** namespace (включая A7.1 и A11.1), не совпадающий ни с Product A, ни с October Maintenance A;
+- восстановлен granular 0.2.0–0.3.02 implementation ledger: Games/Public UX, OBS layout/list refinements, Auction operator UX, timer point 9, performance/safety hardening и destructive safety flows;
+- восстановлены user-approved **FINAL MAIN STABILIZATION 0.3.83**, **Optimization & Deep Audit 0.3.84**, **Optimization & Reliability Audit II 0.3.89** и release-clean QA separation;
+- восстановлен E1 follow-up 0.3.91: убрать native up/down arrows из Games `Баллы` при сохранении numeric entry/wheel protection;
+- восстановлен R1.0.x release-stage ledger: install-root architecture, full backup, installer/icon, final uninstall, update/reinstall, no-dev-stack gate, global geometry, minimum-window scrolling, Export reorganization и cold-start field-height correction.
+
+### Corrected aliases / provenance
+- старое свёртывание `R2 / Rules package` оказалось неверным: R1 и R2 — разные принятые этапы;
+- отдельный live-only `Изменить текущие правила` workflow был отвергнут; финал — один обычный editor до/во время/после аукциона;
+- old assistant proposal for a local InOneLine write API (`POST /api/v1/bids` / generic `PUT /lot`) не имел direct user approval. Direct approval относится к Pointauc/B6 adapter через официальный Pointauc API.
+
+### Recovered direct UX detail
+- Auction subtabs retain per-tab `Правила вкладки / Скрыть правила`;
+- manual bidding belongs on Conducting; Conduct list/search/autoscroll interaction and cross-surface DB synchronization restored in historical ledger;
+- no automatic focus transfer into Auction search;
+- tie UX uses `Несколько победителей` with additional-time or wheel path;
+- Saved Auction ordinary Save updates linked configuration; explicit Save-As-like path creates a copy;
+- New Auction resets only working-session runtime, not Games/Journal/History/Rules/Integrations/OBS settings;
+- A6.1 live chance is authoritative weighted-wheel current-state information and separate from W4 frozen result chance;
+- B1/B2 adapter/card/disconnect/history/status details and provider-neutral outside-auction contribution rule recovered;
+- D19 quick picker direct-user contract restored: unified grid, no search/source filters, animated media animates before selection;
+- W2 contextual add vs missing-reference repair action restored.
+
+### Final result of this pass
+- these findings expand **historical/implemented precision** only;
+- no new future implementation candidate was discovered;
+- D44 still does not exist;
+- current ROADMAP selection/order remains unchanged;
+- `docs/IDEA_INVENTORY.md` is now the exhaustive historical ledger, while `docs/ROADMAP.md` remains the short future-selection view.
