@@ -159,7 +159,7 @@
 - **B1 — единый `Настройки → Интеграции` center, adapter/status/security contract, DPAPI credential storage** — **IMPLEMENTED / ACCEPTED**.
 - **B2 Twitch first adapter** — **IMPLEMENTED / ACCEPTED**.
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
-- **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; live redemption verification отложена до Affiliate/Partner eligibility.
+- **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; user correction допускает Channel Points contribution flow и во время, и вне активного аукциона по соответствующим правилам; live redemption verification отложена до Affiliate/Partner eligibility.
 - **B5 — `Ставки` feed автоматически принятых integration events** — **IMPLEMENTED / ACCEPTED**.
 - **I1 / DonationAlerts adapter** с browser auth/status и отдельным auction enable; public Client ID встроен, user вводит только authorization — **IMPLEMENTED / ACCEPTED**.
 
@@ -293,6 +293,9 @@
 - **Historical YouTube URL/video-ID soundtrack source** — **REFERENCE-ONLY**, не direct user-approved scope.
 - **Отдельный сложный advanced autoscroll control с independent speed/pause sliders** — **REJECTED/SUPERSEDED** простым/существующим scrolling behavior.
 - **Отдельный второй Rules backend/text store** — **REJECTED BY ARCHITECTURE**; viewer uses authoritative Rules state.
+- **Отдельный универсальный внешний write/control API / generic `PUT /lot` вне B6 contract** — **REJECTED / NOT A SEPARATE APPROVED ITEM**.
+- **Обратная конвертация internal SM points -> money как продуктовая функция** — **CANCELLED/SUPERSEDED**; S1 финально использует one-way source unit/currency -> integer SM points, positive values round upward.
+- **Split installation с runtime отдельно, AppData как основной user-data root** — **REJECTED**; выбран один install root (default `C:\InOneLine`) с user-selectable destination.
 
 ---
 
