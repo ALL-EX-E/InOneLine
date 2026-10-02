@@ -587,3 +587,37 @@ Runtime/source bytes were not changed by this audit; version/schema/migrations r
 
 Because this pass recovered additional durable documentation detail and one source-hygiene residue, it is **NOT CLEAN**. One more post-correction orphan-only control is required.
 
+## Fifteenth post-correction orphan-only control — CLEAN — 2026-10-02
+
+After the eleventh through fourteenth passes had been written into canonical documentation, a new direct-chat orphan-only search was run with all already recovered contracts explicitly excluded.
+
+### Direct-chat result
+
+No additional durable direct-user product requirement, rejection, deferred idea, UX rule, integration/provider contract, wheel/audio rule, deployment requirement, release/QA rule or documentation/process constraint was recovered.
+
+Returned material was already mapped:
+- August Stabilization A namespace;
+- accepted Maintenance A4/A8 and A9 history;
+- the user's current request to write findings and repeat the audit.
+
+### Mechanical result
+
+- D1–D43: **43/43 present**.
+- Actual D44 item: **none**.
+- August Stabilization A1–A12 including A7.1/A11.1: present.
+- Product A1–A8/A6.1: present.
+- Maintenance A1–A10: present.
+- W1–W4, B1–B6, E1–E4, R1–R2: present.
+- QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03 are present in current inventory/roadmap/state.
+- QA finding numbering rule `QA-<version>-NN` is restored in WORKFLOW.
+- Runtime remains **1.0.8 / schema 19 / migrations 15**.
+- GitHub tracking remains Issues **#4 / #5** plus stale PR **#9**; none represents a hidden new scope.
+
+### CLEAN conclusion
+
+**New delta after the eleventh–fourteenth corrections: 0.**
+
+The repeated audit itself was **not zero-delta**: it recovered the archive/provenance rule, QA-ID convention, History/W1/W2/Timer/A8 details, S2/widget/B6/verification/A7 boundaries, B1/B2 secret/lifecycle rules and the DonationAlerts source-hygiene residue. The fifteenth pass establishes only that no further orphan remained after those corrections.
+
+No runtime/source bytes were modified. No implementation scope was automatically selected.
+
