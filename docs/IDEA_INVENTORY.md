@@ -103,7 +103,7 @@
 
 - **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**.
 - **S1 integer conversion rule** — **IMPLEMENTED / ACCEPTED**: результат зачисления всегда целое число SM points; положительный дробный результат округляется вверх одинаково для валют и неденежных service units; reverse `SM points → money` не используется.
-- **Product A1 — сохранять последнее значение общего ручного поля суммы/баллов** — **IMPLEMENTED / ACCEPTED**.
+- **Product A1 — сохранять последнее значение общего ручного поля суммы/баллов** — **IMPLEMENTED / ACCEPTED**. Direct UX decision: numeric/manual-bid input must not expose tiny native up/down spin arrows; value entry remains explicit and wheel-safe.
 - **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**. Название после trim/normalization не может быть пустым/whitespace-only и использует общую duplicate protection вместо создания параллельного правила.
 - **Product A3 — frozen start position + live/current position** — **IMPLEMENTED / ACCEPTED**.
 - **Product A4 — ручные «Добавить» / «Уменьшить» как auditable compensating operations** — **IMPLEMENTED / ACCEPTED**.
