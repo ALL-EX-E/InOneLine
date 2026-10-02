@@ -91,7 +91,7 @@ Released behavior имеет приоритет над ранними draft-оп
 - `docs/IDEA_INVENTORY.md` is the canonical exhaustive historical inventory of user-proposed/accepted/deferred/rejected/superseded ideas.
 - `docs/ROADMAP.md` is the shorter current/future selection view and must not be treated as a complete history of everything the user ever proposed.
 - GitHub Issues are tracking aids only; they are not the full idea inventory.
-- Product A1–A8/A6.1 and Maintenance A1–A10 are separate namespaces and must always be labelled accordingly.
+- Three historical A-namespaces must always be labelled explicitly: **August Stabilization A1–A12 (including A7.1/A11.1)**, **Product A1–A8/A6.1**, and **Maintenance A1–A10**. The same identifier can mean different work in each namespace.
 - Direct user dialogue has priority over later assistant-authored status compression. In particular, advanced History analytics (heatmap, weekdays, participant rankings, points/donations analytics, record cards, most expensive winning lot) remains USER-ACCEPTED post-completion/post-integration work.
 - Backup-retention last-N/N-days remains non-roadmap because no direct user proposal/acceptance was recovered; do not promote assistant audit suggestions into the user inventory.
 - Before declaring an old idea “missing” or “next”, check IDEA_INVENTORY + later direct decisions + released/current behavior.
@@ -110,3 +110,11 @@ A third independent comparison of old chats/Drive dedicated reviews against `doc
 - The initial public-GitHub-without-source publication plan was superseded by the later official SOURCE+INSTALLER publication and custom license decision.
 
 These are historical/current invariants, not new implementation scopes.
+
+
+## 2026-10-02 — Deep-history identifier/provenance corrections
+
+- Rules aliases are two stages, not one: **R1** = reusable Rules templates/WYSIWYG/local preview/session snapshot; **R2** = standalone OBS Rules viewer + viewer settings/live synchronization. The rejected temporary `Изменить текущие правила` live-only workflow is not a separate retained feature.
+- The historical assistant proposal for a separate local InOneLine write API (`POST /api/v1/bids`/generic `PUT /lot`) was **not directly user-approved**. User approval was for the dedicated Pointauc/B6 adapter using Pointauc's official Bearer API. Do not promote the assistant proposal into roadmap/backlog.
+- Early 0.2.x and pre-1.0 stabilization/release-stage user-approved scopes are historical implemented evidence and belong in `IDEA_INVENTORY.md`; they do not create new future roadmap items.
+- The accepted outside-auction integration rule is provider-neutral: a valid game-targeted external monetary/service-unit event may update persistent game points without a running auction, but may not create/start/resume an auction or mutate current auction/timer/wheel state; S2 requires an eligible running auction.
