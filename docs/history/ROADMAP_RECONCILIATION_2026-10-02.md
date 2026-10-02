@@ -825,3 +825,46 @@ No new feature identifier, new runtime defect or roadmap-order change was found.
 
 Another post-correction orphan/full control is required.
 
+## Twenty-third control — S1 pending/manual-apply + conversion-row visibility — 2026-10-02
+
+The post-twenty-second direct-chat/source comparison recovered two accepted S1 details that were implemented in current 1.0.8 but not explicit enough in the exhaustive inventory.
+
+### Recovered details
+
+1. **Unknown-rate external event lifecycle**
+   - an event with no configured conversion rate is stored as pending and does **not** credit SM points;
+   - saving a rate changes the pending item into a manually applicable state only;
+   - points are credited only after the operator explicitly uses `Применить` and confirms the preview;
+   - setting a rate does not retroactively auto-credit old events;
+   - late application does not rewrite a closed/paused historical auction.
+
+2. **Conversion-row visibility**
+   - ordinary currency rows follow the persistent currency registry/rate model;
+   - a service-specific conversion row is shown only while the corresponding service/capability is connected/available;
+   - disconnect hides that service-specific row.
+   - Current implementation keeps the saved service-unit rate in SQLite while hidden and restores it when the row returns. Direct-user evidence in this pass proves the visibility rule; the rate persistence is recorded as current implementation behavior rather than promoted into a separate user-originated requirement.
+
+Current source confirms these behaviors in `visible_conversion_units()`, `_update_pending_rate_status()`, `apply_pending_conversion_event()` and the Settings pending-conversion UI.
+
+No runtime/source/version/schema/migration change was required. **1.0.8 / 19 / 15** remains current.
+
+This pass is **NOT CLEAN** because durable accepted detail had to be restored. Another post-correction control is required.
+
+## Twenty-fourth control — D26 import dedup + external soundtrack lifecycle — 2026-10-02
+
+A subsequent direct-chat + 1.0.7 release-note + current-source comparison recovered additional accepted D26 precision.
+
+### Recovered details
+
+- Music Player import deduplicates case-insensitively by filename across managed and external entries.
+- Importing an external duplicate does not create another row.
+- One matching existing track may be selected automatically; multiple matches are reported informationally without auto-navigation/search.
+- Choosing `Копировать в программу` for an existing external Music Player row promotes that same record to managed while preserving its media ID and queue position.
+- External Auction/Wheel soundtrack references are context-local selections, not reusable members of the shared managed soundtrack library.
+- If a selected external soundtrack source disappears, the selection/transport clears safely and D26 does not create a recovery-button workflow for that soundtrack.
+- Managed `data\music` / `data\soundtrack` remains filesystem-synchronized source-of-truth behavior; full backup embeds managed media/settings but not bytes of merely referenced external files.
+
+Current 1.0.8 source and accepted 1.0.7 release notes match these decisions. This is documentation precision only; no runtime defect, new feature identifier or roadmap-order change was found.
+
+This pass is **NOT CLEAN** because these durable D26 details had to be restored. A further post-correction full/orphan control is required.
+
