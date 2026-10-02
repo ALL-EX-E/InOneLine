@@ -13,8 +13,14 @@
 ## QA
 
 - [qa/1.0.8-conditional-ui.md](./qa/1.0.8-conditional-ui.md) — полный ручной gate 1.0.8 / Global Conditional UI Visibility.
-- [qa/1.0.8-regression-foundation.md](./qa/1.0.8-regression-foundation.md) — восстановленный постоянный regression foundation exact 1.0.8: DB, GUI, frozen EXE и installer.
-- [qa/1.0.8-filesystem-maintenance.md](./qa/1.0.8-filesystem-maintenance.md) — принятый filesystem/source cleanup maintenance: legacy media, backup compatibility, clean install и duplicate audit.
+- [qa/1.0.8-regression-foundation.md](./qa/1.0.8-regression-foundation.md) — восстановленный постоянный regression foundation exact 1.0.8.
+- [qa/1.0.8-filesystem-maintenance.md](./qa/1.0.8-filesystem-maintenance.md) — filesystem/source cleanup maintenance.
+- [qa/1.0.8-media-sync-maintenance.md](./qa/1.0.8-media-sync-maintenance.md) — A4 Managed Media Sync.
+- [qa/1.0.8-unused-import-maintenance.md](./qa/1.0.8-unused-import-maintenance.md) — A5 Verified Unused Imports.
+- [qa/1.0.8-dead-helper-maintenance.md](./qa/1.0.8-dead-helper-maintenance.md) — A6 Dead Private Helpers.
+- [qa/1.0.8-publication-ci-maintenance.md](./qa/1.0.8-publication-ci-maintenance.md) — A7 Publication CI Consolidation.
+- [qa/1.0.8-actions-version-maintenance.md](./qa/1.0.8-actions-version-maintenance.md) — A8 GitHub Actions Version Refresh.
+- [qa/1.0.8-installer-user-state-maintenance.md](./qa/1.0.8-installer-user-state-maintenance.md) — A9 Installer User-State / HKCU Ownership.
 - [qa/1.0.7-D26.md](./qa/1.0.7-D26.md) — полный ручной gate D26 / Music Player.
 
 ## Аудиты
