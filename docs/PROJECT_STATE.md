@@ -92,7 +92,7 @@ The original `v1.0.8` release remains the historical initial 1.0.8 publication. 
 - Runtime 1.0.8 этим аудитом **не изменялся**.
 - Подробный отчёт: `docs/audits/CODEBASE_AUDIT_2026-10-01.md`.
 
-Выполнены первые maintenance-шаги аудита: reuse-first восстановлен постоянный regression/QA foundation, исправлена сборка чистого Source ZIP и завершён filesystem/duplicate audit с принятой maintenance-сборкой 1.0.8. Следующий maintenance-пункт выбирается отдельно.
+Maintenance-последовательность контрольного аудита завершена: regression/QA foundation восстановлен, Source/filesystem cleanup принят, а последующие A4–A9 закрыты и слиты. Все A1–A10 findings этого аудита теперь CLOSED; следующего незакрытого maintenance-пункта из него нет.
 
 ## A4 Managed Media Sync — accepted 2026-10-02
 
