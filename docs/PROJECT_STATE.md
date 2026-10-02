@@ -312,18 +312,19 @@ Permanent repository gate:
 
 Подробности каждой версии находятся в `RELEASE_NOTES_<version>.md`.
 
-## Текущая рабочая очередь
+## Текущая рабочая очередь — reconciled 2026-10-02
 
-После 1.0.8 новый implementation scope **не выбран автоматически**.
+После принятия A9 все maintenance findings контрольного codebase audit закрыты. Новый product implementation scope **не выбран автоматически**.
 
-Ближайшие eligible items:
+- **Global Multi-File Import / Issue #4** — текущий post-D26 eligible candidate для fresh review; это не pre-authorization.
+- **D22 / Issue #5** — остаётся approved post-completion, но был явно отложен пользователем 2026-09-29 и не является автоматическим следующим пунктом.
+- Восстановленная retained dependency/complexity chain после D26: **D40 → D34 → D41 → older YouTube integration candidate → D38 → Public Web → D27 → D7**.
+- Отдельно сохранены approved/parked **D23, D24, D25, D42**, а также deferred **D16, D17, D18, D20, D22, W1, Saved Auctions/New Auction, A8, B6** и provider-specific follow-ups.
+- Более старый PASS13 не используется без поздних corrections: Games/List Autoscroll позже был прямо отклонён как ненужное добавление; Compact presentation отложен; D15 не подтверждён как InOneLine item; D39 не actionable без нового прямого решения пользователя.
 
-1. **Global Multi-File Import** — Issue #4.
-2. **D22 — Battle Royale** — Issue #5, approved post-completion item, отложен и требует fresh design/review.
+Полный текущий inventory и статусы: `docs/ROADMAP.md`.
 
-Issue #3 — **CLOSED / RELEASED in 1.0.8**.
-
-Отдельно зафиксирован maintenance-аудит 2026-10-01. Его recommended safe order начинается с возврата существующего regression/QA foundation, но это ещё не выбранный runtime implementation scope.
+Повторная сверка чатов/Drive/GitHub: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
 
 Выбор следующего scope требует отдельного решения пользователя и fresh exact-CURRENT review.
 
