@@ -235,7 +235,7 @@ Final result of this pass:
 ### Corrected aliases / provenance
 - старое свёртывание `R2 / Rules package` оказалось неверным: R1 и R2 — разные принятые этапы;
 - отдельный live-only `Изменить текущие правила` workflow был отвергнут; финал — один обычный editor до/во время/после аукциона;
-- old assistant proposal for a local InOneLine write API (`POST /api/v1/bids` / generic `PUT /lot`) не имел direct user approval. Direct approval относится к Pointauc/B6 adapter через официальный Pointauc API.
+- old assistant proposal for a local InOneLine write API (`POST /api/v1/bids` / generic `PUT /lot`) не имел direct user approval. Direct approval относится к dedicated B6 provider adapter через официальный API провайдера.
 
 ### Recovered direct UX detail
 - Auction subtabs retain per-tab `Правила вкладки / Скрыть правила`;
@@ -275,8 +275,8 @@ Final result of this pass:
 - B2 Twitch Public Device Code/no-Client-Secret lifecycle, protected credentials, validation/refresh/error states и Connect/Reconnect/Disconnect/Remove semantics.
 
 ### Rejected false positives in this pass
-- B3 outside-auction event for a title absent from the permanent Games list: automatic creation/`Требует привязки` wording was recovered only as an assistant proposal, not a direct user-approved durable requirement.
-- Generic provider `test/sandbox/demo` event suppression appeared in an assistant-authored Settings review block, but this pass did not recover a direct user approval sufficient to promote it into the user idea inventory.
+- **SUPERSEDED BY SEVENTH PASS:** the earlier fourth-pass conclusion was wrong. Direct chat evidence confirms user approval on 2026-09-02 for outside-auction unknown-title handling: create a normal persistent game and credit it, without creating/starting/resuming auction/`auction_only`/timer/wheel state. Current 1.0.8 already implements this.
+- **SUPERSEDED BY SEVENTH PASS:** direct chat evidence confirms user acceptance on 2026-08-28 through the DonateX review. Provider-marked `test/sandbox/demo` events must never mutate real points/auction/timer/wheel/winner state; diagnostics/history-only storage is allowed.
 - W2 separate managed-media folders are not missing: the final inventory already records the per-purpose managed-folder rule and current runtime preserves the active categories.
 
 ### Result before the next requested full recheck
@@ -303,7 +303,7 @@ Final result of this pass:
 - PR history: #1/#2/#6/#7/#8/#11–#18 merged/closed, #10 closed/unmerged, #9 stale/open as noted above.
 - Historical candidate/maintenance branches не дали нового hidden product scope; их apparent divergence в основном объясняется squash merges и дальнейшим развитием main.
 - Source TODO/FIXME/future scan не обнаружил отдельной незаписанной product feature.
-- Public Pointauc-name occurrences in current GitHub are tied to actual B6/API provenance/integration context; отдельного нарушения public naming rule на этом проходе не зафиксировано.
+- Public development-reference wording was rechecked; provider names are retained only where genuinely necessary to identify an actual provider/integration/API, not as disclosed development-reference provenance.
 
 ### Result
 - Новая runtime accepted-requirement omission этого full pass остаётся одна: **QA-1.0.8-01**.
@@ -326,4 +326,60 @@ Recovered documentation precision before the final zero-delta result:
 Final orphan-only search after these additions returned no additional direct user-approved product/UX/future requirement. Returned items were already mapped decisions, historical test facts or previously rejected/superseded/assistant-only material.
 
 **Final result of this control pass: ZERO NEW PRODUCT/FUTURE DELTA after documentation corrections.**
+
+## Seventh full recheck — same scenario repeated — 2026-10-02
+
+Повторный проход выполнен тем же сценарием: direct chat history -> Drive canonical/history/dedicated review files -> GitHub main/source/issues/PRs -> comparison against already corrected `IDEA_INVENTORY.md`, `ROADMAP.md`, `DECISIONS.md`, `PROJECT_STATE.md` and this reconciliation log.
+
+### Newly recovered / corrected relative to the sixth pass
+
+1. **B3 provenance correction — previous false-positive rejection was wrong.**
+   - Direct chat evidence confirms user approval on 2026-09-02.
+   - Outside an auction, a valid event with a usable unknown game title creates a **normal persistent game** and credits it.
+   - It must not create/start/resume an auction, `auction_only`, auction entry, timer or wheel state.
+   - Unknown conversion rate remains Pending and must not pre-create the game before credit can actually be applied.
+   - Current 1.0.8 source already implements this behavior, so this is a documentation/provenance correction rather than a runtime defect.
+
+2. **Generic B2 test-event safety — previous assistant-only classification was wrong.**
+   - Direct chat evidence confirms the user accepted DonateX on 2026-08-28 with the proposed `isTest=true` rule; the rule was then generalized to B2.
+   - Provider-marked test/sandbox/demo events must never credit real points, create/increment game/lot, change leader, trigger timer auto-extension or affect wheel/winner logic.
+   - They may only be preserved in technical integration diagnostics/history marked as test.
+   - Current 1.0.8 normalized-event core has no explicit test-event field/gate.
+   - Classification added: **QA-1.0.8-02 / ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**.
+   - No current supported-provider reproduction was established during this audit.
+
+3. **Deferred provider contracts were too compressed.**
+   - Restored common B2/B3 contract: source+external-event-ID dedup; common source-unit conversion; message/order text as ordinary lot/game text; sender identity separate; immutable original source data + applied conversion rate + credited points; common timer path; official/reliable programmatic APIs only; no page/OBS/browser scraping.
+   - iHAQ and Donate Helper remain feasibility-gated.
+   - DonatePay realtime path requires exact endpoint/auth/channel/payload/currency/event-ID revalidation.
+   - DonateX official API path was previously confirmed, but live-delivery contract must be revalidated and provider test flags must obey the common safety rule.
+
+4. **Historical E1 exact build-gate detail was missing from the exhaustive inventory.**
+   - User required the exact native build run to visibly reach `[9/9] BUILD EXE: OK`.
+   - An auto-closing console was not accepted; rerun from CMD/PowerShell with the console left open/full output visible was required.
+   - Exact binary/manual EXE QA and explicit user acceptance remained separate gates.
+
+5. **Public GitHub reference-wording cleanup found a real documentation-policy drift.**
+   - Direct user rule from 2026-09-28: do not disclose development-reference provenance in published GitHub files; provider/reference names may remain only where genuinely necessary as the name of the actual provider/integration/API.
+   - Current public docs still contained historical reference/tab/export wording that was not necessary.
+   - Those historical disclosures were neutralized in canonical docs.
+   - Necessary B6 provider naming remains only where the actual B6 integration itself must be identified.
+
+### GitHub/source check
+
+- Current source confirms B3 unknown-title outside-auction auto-create behavior through the common normalized event transaction.
+- Current source does **not** expose a generic normalized `is_test`/test-event gate.
+- No additional new product identifier was found.
+- Runtime/source/version/schema/migrations were not changed by this pass: **1.0.8 / 19 / 15**.
+
+### Result after seventh pass
+
+This pass was **NOT ZERO-DELTA**. It found:
+- one new accepted safety-contract gap: **QA-1.0.8-02**;
+- one previously misclassified but already implemented B3 requirement;
+- several lost provider-contract details;
+- one missing historical E1 acceptance detail;
+- one public-documentation wording-policy drift.
+
+A new control pass is required after these corrections before a clean stop result can be claimed.
 
