@@ -78,6 +78,7 @@ jobs:
         run: |
           python tools/ui_settings_migration_smoke.py
           python tools/installer_user_area_smoke.py
+          python tools/single_instance_smoke.py
 
       - name: Database backup, restore and legacy media regressions
         shell: pwsh
@@ -295,7 +296,7 @@ jobs:
             throw "Legacy wheel_jingles directory was recreated on clean install"
           }
 
-          $allowedFiles = @("streaming.db","streaming.db-wal","streaming.db-shm","ui_state.ini")
+          $allowedFiles = @("streaming.db","streaming.db-wal","streaming.db-shm","ui_state.ini",".inone_line.instance.lock")
           $actualFiles = @(Get-ChildItem "$install\data" -File | ForEach-Object { $_.Name } | Sort-Object)
           $unexpectedFiles = @($actualFiles | Where-Object { $_ -notin $allowedFiles })
           if ($unexpectedFiles.Count -gt 0) {
