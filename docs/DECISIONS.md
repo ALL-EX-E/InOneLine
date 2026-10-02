@@ -274,3 +274,12 @@ A post-seventeenth orphan check recovered two small direct-decision areas that w
 
 These are documentation/process precision corrections only; no runtime/product scope is selected.
 
+## 2026-10-02 — Twentieth-pass A1 isolation and B2 restart precision
+
+The first full control after the nineteenth documentation corrections recovered two accepted details that were still only implicit:
+
+- **August Stabilization A1 exact fail-closed QA/promotion contract:** create the candidate archive in temporary `.building`; validate forbidden runtime/user files before promotion; a failed validation must leave the previous safe archive untouched. Update simulation is performed on a copied installation rather than the main working folder, and the copied `data\streaming.db` hash is checked unchanged before launch. Clean-install simulation verifies that user DB state is absent before first launch.
+- **B2 restart persistence contract:** a valid saved Twitch authorization survives application restart with no new OAuth/Device Code popup. Saved account/status remain available; enabled connected integrations are checked automatically after startup and then hourly, updating the stored/visible last-check timestamp. Reauthorization is required only when validation/auth state actually requires login.
+
+Current 1.0.8 source matches the B2 startup/hourly validation and persisted connection-status model. These are documentation/process restorations, not new runtime defects.
+
