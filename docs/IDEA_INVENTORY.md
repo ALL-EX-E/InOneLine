@@ -151,7 +151,7 @@
 
 # V. Rules / standalone widgets / stream UI
 
-- **R1 — reusable Auction Rules package**: templates CRUD, active template, WYSIWYG editor, Undo/Redo, text-style presets, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, validation, unsaved-change protection and local read-only preview — **IMPLEMENTED / ACCEPTED**.
+- **R1 — reusable Auction Rules package**: templates CRUD, active template, WYSIWYG editor, Undo/Redo, text-style presets, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, validation, unsaved-change protection and local read-only preview — **IMPLEMENTED / ACCEPTED**. Accepted editor-detail contract: presets are simple `Обычный текст / Заголовок / Подзаголовок` rather than H1–H6; formatting applies to selected fragments where appropriate; quick colors + arbitrary color picker; create-template confirmation/cancel; template name non-empty/normalized duplicate protection/reasonable length; active template visibly marked; editor opens directly in edit mode; Save persists and closes; unsaved-change protection covers template switch/editor close/current-template delete; rules content/style remains separate from viewer geometry/background/layout.
 - **R1 session snapshot**: starting a local auction freezes rules template provenance/name/HTML into the auction session; historical sessions are not rewritten by later template changes — **IMPLEMENTED / ACCEPTED**.
 - **R2 — standalone OBS Rules widget**: stable responsive Browser Source + read-only API, independent viewer visibility/autoscroll/background/opacity/padding and live apply — **IMPLEMENTED / ACCEPTED**. Direct control UX: Rules background `Непрозрачность` and `Внутренний отступ` use wide external ▲/▼ controls with manual numeric entry and hold/repeat; mouse-wheel scrolling must not silently change these values.
 - **R2 single-editor correction**: `Аукцион → Проведение → Правила аукциона` is the only rules editor entry and remains usable before/during/after an auction. During an unfinished session, saving/renaming the matching source template synchronizes the open session copy; after finish/cancel historical rules remain frozen — **IMPLEMENTED / ACCEPTED**.
@@ -170,7 +170,7 @@
 
 ## Реализованная архитектура
 
-- **B1 — единый `Настройки → Интеграции` center, adapter/status/security contract, DPAPI credential storage** — **IMPLEMENTED / ACCEPTED**.
+- **B1 — единый `Настройки → Интеграции` center, adapter/status/security contract, DPAPI credential storage** — **IMPLEMENTED / ACCEPTED**. Accepted Integration Center structure: catalog grouped by purpose; each service is its own adapter/card with specialized settings rather than one giant generic form; moderate branding only; show operational capabilities/events/limits/status, not promotional fee/payment-logo clutter; multiple integrations may be active simultaneously; each adapter exposes capabilities so unsupported controls can be hidden; each integration has a manual connection/auth test outside the GUI thread plus adapter-appropriate automatic status tracking rather than a meaningless universal rapid poll.
 - **B1 accepted Conduct/status UX details** — **IMPLEMENTED/ACCEPTED CONTRACT; ONE CURRENT UI OMISSION TRACKED AS QA-1.0.8-01**:
   - compact `Аукцион → Проведение` integration status shows only configured/used services;
   - integration errors remain visible even in compact/collapsed presentation;
