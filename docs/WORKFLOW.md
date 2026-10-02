@@ -30,6 +30,12 @@
 
 Если пользователь сообщает `Работает`, закрывается только явно проверенный сценарий; уже пройденные сценарии не повторяются без причины.
 
+### Идентификаторы QA
+
+- Release/reconciliation defects and accepted-scope omissions use **`QA-<version>-NN`** identifiers.
+- Permanent roadmap/product identifiers such as D/A/W/B/E/R must not be reused for temporary release defects or QA findings.
+- A QA finding can point to an older accepted roadmap contract, but it remains a QA finding until the user explicitly approves and accepts the runtime correction.
+
 ## Документация
 
 После каждого долговременного решения:
