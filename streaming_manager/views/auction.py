@@ -1,48 +1,66 @@
 from __future__ import annotations
 
-import hashlib
-import json
-import shutil
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QSettings, Signal, Qt, QThreadPool, QTimer, QUrl
-from PySide6.QtGui import QAction, QBrush, QColor, QDesktopServices, QFont
+from PySide6.QtCore import (
+    Signal,
+    Qt,
+    QThreadPool,
+    QTimer,
+    QUrl,
+)
+from PySide6.QtGui import QBrush, QColor, QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QAbstractItemView, QAbstractSpinBox, QCheckBox, QComboBox, QColorDialog, QDialog,
-    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFontComboBox, QFormLayout,
-    QFrame, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
-    QLayout, QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QScrollArea,
-    QSizePolicy, QSpinBox, QTabWidget, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QApplication,
+    QAbstractItemView,
+    QAbstractSpinBox,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QLayout,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ..app_paths import AppPaths
-from ..api_server import LocalApiServer
 from ..audio import AudioCoordinator
 from ..constants import (
-    APP_NAME, APP_VERSION, AUCTION_MANUAL_BID_POINTS_MAX,
-    AUCTION_MANUAL_BID_POINTS_MIN, AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
-    AUCTION_WHEEL_FORMAT_DEFAULT, AUCTION_WHEEL_FORMAT_ELIMINATION,
-    AUCTION_WHEEL_FORMAT_KEY, AUCTION_WHEEL_FORMAT_STANDARD,
-    COOP_LABELS, DEFAULT_API_HOST,
-    SHARED_XLSX_ENABLED_KEY, SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS,
-    SHARED_XLSX_PATH_KEY, SHARED_XLSX_POLL_INTERVAL_MS,
-    STATUS_ABANDONED, STATUS_COMPLETED, STATUS_LABELS, STATUS_NOT_PLAYED,
-    STATUS_PLAYED, STATUS_PLAYING, STREAM_FORMATS,
+    AUCTION_MANUAL_BID_POINTS_MAX,
+    AUCTION_MANUAL_BID_POINTS_MIN,
+    AUCTION_MIN_DURATION_MS,
+    AUCTION_MAX_DURATION_MS,
+    AUCTION_WHEEL_FORMAT_DEFAULT,
+    AUCTION_WHEEL_FORMAT_ELIMINATION,
+    AUCTION_WHEEL_FORMAT_KEY,
+    AUCTION_WHEEL_FORMAT_STANDARD,
+    DEFAULT_API_HOST,
+    SHARED_XLSX_ENABLED_KEY,
+    SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS,
+    SHARED_XLSX_PATH_KEY,
+    SHARED_XLSX_POLL_INTERVAL_MS,
     WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
 )
-from ..database import (
-    Database, DuplicateGameError, Game, display_date, display_datetime_local,
-    format_points, normalize_date_text, normalize_text_key, parse_date,
-)
-from ..exporters import (
-    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
-    auction_pipe_text,
-)
-from ..random_sources import RandomDraw, RandomOrgClient
+from ..database import Database, format_points
 from ..integrations import IntegrationManager
 from ..emote_catalog import (
     EmoteCatalogItem,
@@ -60,14 +78,19 @@ from ..wheel_center_media import (
     store_prepared_center_image,
 )
 from ..shared_xlsx import (
-    SharedXlsxError, SharedXlsxTransientError, main_games_rows, read_shared_xlsx,
-    state_hash, write_shared_xlsx,
+    SharedXlsxTransientError,
+    main_games_rows,
+    read_shared_xlsx,
+    state_hash,
+    write_shared_xlsx,
 )
 from ..time_input import parse_duration_input
 from ..workers import FunctionWorker
 from .common import (
-    APP_STYLE, FocusClearingWidget, ScrollSafeComboBox, ScrollSafeFontComboBox,
-    ScrollSafeSpinBox, _center, _selected_id, autosize_compact_columns_once,
+    FocusClearingWidget,
+    ScrollSafeComboBox,
+    ScrollSafeSpinBox,
+    autosize_compact_columns_once,
     suspend_live_content_resize,
 )
 from .wheel import AuctionWheelWidget
@@ -87,7 +110,6 @@ class _AuctionHistoryList(QListWidget):
         super().leaveEvent(event)
 
 
-from .auction_dialogs import AuctionTimeDialog
 from .auction_parts.state import AuctionStateMixin
 from .auction_parts.audio import AuctionAudioMixin
 from .auction_parts.search import AuctionSearchMixin
