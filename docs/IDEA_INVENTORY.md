@@ -118,7 +118,7 @@
 
 - **Поиск внутри «Журнала» по любому событию** — **IMPLEMENTED / ACCEPTED**: поиск локален для Journal, проверяет отображаемые и raw-поля события и при непустом запросе ищет по полной истории, а не только по обычному окну последних 500 записей.
 - **S2 — timer auto-extension** по actual leader change / genuinely new lot / external donation, threshold, dedup, max-one-extension collision rule и 24h ceiling — **IMPLEMENTED / ACCEPTED**. Exact accepted semantics: new-lot reason fires only on actual creation of a new lot, not on increment of an existing match or manual correction; external-event reason fires only after successful common-pipeline acceptance/dedup and never twice for the same source+external_event_id; one originating action/event may yield only one extension, using the largest configured duration among simultaneously matched enabled reasons rather than summing them; threshold is persisted/configurable, equality at the threshold is eligible, disabling threshold allows enabled reasons throughout a running auction, paused/non-running sessions do not auto-extend, and an already expired timer is never resurrected.
-- **Внешнее денежное автопродление + optional service units** — **IMPLEMENTED / ACCEPTED** окончательно в 1.0.3.
+- **Внешнее денежное автопродление + optional service units** — **IMPLEMENTED / ACCEPTED** окончательно в 1.0.3. Exact released UX: `Настройки → Аукцион → Автопродление таймера` uses the existing `Внешнее пожертвование` duration plus a persisted checkbox **`Также учитывать неденежные единицы интеграций`**, default **OFF**. OFF counts monetary/currency events only; ON additionally includes provider-neutral service units such as Twitch Channel Points/future platform points. Audit reasons stay distinct (`external_donation` vs `external_service_unit`), both reuse the same S2 threshold/collision/24h backend, and pending conversions preserve currency-vs-service-unit semantics.
 - **Core «История аукционов»**: period filter, base summary, all closed sessions, newest-first, search/sort, pagination/lazy loading, read-only details — **IMPLEMENTED / ACCEPTED**.
 - **Winner Verification immutable per-run snapshot** — **IMPLEMENTED / ACCEPTED**: preserve the exact ordered participants and effective weights/chances, effective draw range/equal-weight fallback as applicable, selected RNG method, generated random value, resolved winner, timestamp and algorithm/mapping version; Random.org+ reuses the existing signed ticket/signature evidence where present. Later game/app edits must not rewrite this historical snapshot.
 - **Deterministic read-only re-check из snapshot** — **IMPLEMENTED / ACCEPTED**: mathematical replay/check only; it never redraws RNG, changes winner, mutates auction state or rewrites history.
@@ -288,7 +288,7 @@
 
 # IX. Post-1.0 идеи и патчи
 
-- **1.0.1 Auction Lots OBS Browser Source** — **IMPLEMENTED / ACCEPTED**: authoritative lot order/positions/points/chance, shared autoscroll, fixed header, presentation settings, quick URLs/previews, timer-overlay wheel/tie synchronization.
+- **1.0.1 Auction Lots OBS Browser Source** — **IMPLEMENTED / ACCEPTED**: authoritative lot order/positions/points/chance, shared autoscroll, fixed header, presentation settings, quick URLs/previews, timer-overlay wheel/tie synchronization. Accepted autoscroll boundary after later reconciliation: Auction Lots + Conduct + `/auction-lots-overlay` share one **session-only** switch, **default OFF on every app launch**, never persisted and never inherited from Games/List presentation state.
 - **1.0.2 одна общая кнопка OBS help для всех widgets** — **IMPLEMENTED / ACCEPTED**.
 - **1.0.3 External donation/service-unit timer extension completion** — **IMPLEMENTED / ACCEPTED**.
 - **1.0.4 D19 center image + remote sources** — **IMPLEMENTED / ACCEPTED**.
@@ -357,7 +357,7 @@
 - **E4 — Windows Long Path/deep path deployment contract** — **IMPLEMENTED / ACCEPTED** в поддерживаемом <260 path contract. Arbitrary >=260 direct portable launch — out of scope/new separate scope, не unfinished E4.
 - **Default install root `C:\InOneLine` + user-selectable destination/drive** — **IMPLEMENTED / ACCEPTED**.
 - **No portable-user migration** — **USER DECISION / PRESERVE**.
-- **Official artifacts after 1.0: SOURCE + INSTALLER; portable not CURRENT** — **USER DECISION / PRESERVE**.
+- **Official artifacts after 1.0: SOURCE + INSTALLER; portable not CURRENT** — **USER DECISION / PRESERVE**. The separate `InOneLine_Source_<version>.zip` release asset is the exact accepted SOURCE snapshot. GitHub-generated `Source code (zip)` / `Source code (tar.gz)` are generated from the tagged repository tree and are **not substitutes for, and need not be byte-identical to, the official accepted SOURCE asset**.
 - **Uninstall warning + confirmation; удалить app-owned DB/data/QSettings after confirmation; external .iolbackup/external referenced files preserve** — **IMPLEMENTED / ACCEPTED**.
 - **Canonical icon: approved green InOneLine icon; improve the existing design (thicker/centered/sharper) and reuse one canonical asset for app/Setup/shortcuts** — **IMPLEMENTED / ACCEPTED**.
 
