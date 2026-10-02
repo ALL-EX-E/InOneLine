@@ -409,7 +409,7 @@
 
 ---
 
-# XVIII. Granular historical accepted implementation ledger — 0.2.0–0.3.02
+# XVII. Granular historical accepted implementation ledger — 0.2.0–0.3.02
 
 Этот раздел восстановлен третьим reconciliation-pass 2026-10-02. Ранее эти решения были функционально учтены крупными блоками, но не были видны как отдельные исторические идеи/улучшения.
 
@@ -526,7 +526,7 @@
 
 ---
 
-# XIX. August Stabilization A1–A12 — separate historical namespace
+# XVIII. August Stabilization A1–A12 — separate historical namespace
 
 These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 from October.
 
@@ -546,7 +546,7 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 - The stale OBS Browser Source self-reload/version-handshake proposal was explicitly deferred at this stage and later became **IMPLEMENTED** through the accepted overlay version/cache-busting mechanism; it is not an open item.
 
 
-# XX. User-approved pre-1.0 stabilization / release-stage ledger
+# XIX. User-approved pre-1.0 stabilization / release-stage ledger
 
 Эти пункты не являются current feature backlog. Они отдельно восстановлены третьим reconciliation-pass как пользовательски одобренные/принятые engineering, deployment и UI scopes перед публичным 1.0.0.
 
@@ -580,15 +580,19 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 - **R1.0.10 — cold-start auction-duration field height floor**: minimum 34 px avoids first-layout vertical clipping at saved 1100×700 without reintroducing automatic window resizing — **MANUALLY ACCEPTED / RELEASED as 1.0.0**.
 - R1.0.7, R1.0.8 and R1.0.9 candidate statuses themselves remain **SUPERSEDED / NOT ACCEPTED**; only their retained corrected behavior is part of final accepted 1.0.0.
 
-# XVII. Reconciliation conclusion 2026-10-02
+# XX. Reconciliation conclusion 2026-10-02
 
-После текущего третьего полного cross-source pass:
+После третьего глубокого cross-source pass и финального zero-delta поиска по прошлым чатам:
 
 - **D44 не найден**.
-- Дополнительно восстановлены ранний granular 0.2.x implementation ledger и отдельный August Stabilization A1–A12/A7.1/A11.1 namespace; они были реализованы/закрыты и поэтому не влияют на current future backlog.
-- После внесения этой дельты отдельного durable user-proposed future feature, отсутствующего из этого inventory, не найдено.
-- Обнаружена и исправлена важная provenance/status ошибка: advanced History analytics были user-accepted post-completion ideas, а не просто assistant-proposed possibilities.
-- D9–D12 также сохранены с direct-user provenance/conditionality.
+- Восстановлены granular 0.2.x implementation ledger, отдельный August Stabilization A1–A12/A7.1/A11.1 namespace и pre-1.0 stabilization/release-stage ledger.
+- Исправлено сопоставление Rules: **R1 = editor/templates/session snapshot**, **R2 = standalone OBS Rules viewer**.
+- Восстановлены direct UX details Auction/Conducting, Saved/New Auction, A6.1, B1/B2, D19 picker, W2 repair flow и provider-neutral outside-auction contribution rule.
+- Старый отдельный local write API `POST /api/v1/bids`/generic `PUT /lot` подтверждён как assistant-only proposal, а не user-approved backlog; пользователь утвердил Pointauc/B6 adapter.
+- Зафиксирован superseded initial GitHub release-only/no-source plan и более поздняя official SOURCE+INSTALLER/license model.
+- Advanced History analytics остаётся **USER-ACCEPTED post-completion/post-integration**, D9–D12 сохраняют direct-user provenance/conditionality.
+- Все новые находки этого прохода — реализованные/закрытые/исторические решения или уточнения provenance; **нового future implementation candidate не найдено**.
+- Финальный conversation orphan search после внесения этих исправлений не вернул дополнительной direct user-proposed функции: только уже записанные решения и operational/assistant-only false positives.
 - GitHub Issues не являются полным backlog.
 - Любой будущий найденный старый пункт сначала проверяется против более позднего direct-user decision и current/released behavior, и только затем может менять `ROADMAP.md`.
 
