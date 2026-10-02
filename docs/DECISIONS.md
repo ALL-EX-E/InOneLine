@@ -69,6 +69,7 @@ Released behavior имеет приоритет над ранними draft-оп
 После повторной сверки чатов 1–31, исторических Drive-roadmap/audit records, GitHub Issues, release notes и current runtime зафиксированы durable rules:
 
 - Короткий post-D26 GitHub roadmap `#4 -> D22` был неполным documentation drift, а не новым решением пользователя удалить остальной backlog.
+- GitHub Issues — tracking для выбранных/выделенных задач, а не полный реестр будущих идей; отсутствие Issue не означает удаление пункта из canonical roadmap.
 - Global Multi-File Import / #4 остаётся eligible for fresh review, но не выбран автоматически.
 - D22 / #5 остаётся explicitly deferred и не является автоматическим следующим scope.
 - Retained dependency/complexity chain после released D26 сохраняет D40 -> D34 -> D41 -> older YouTube integration candidate -> D38 -> Public Web -> D27 -> D7.
