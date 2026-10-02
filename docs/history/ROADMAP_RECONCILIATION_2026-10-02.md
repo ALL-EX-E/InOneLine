@@ -508,3 +508,24 @@ The same scenario was repeated again against the already corrected state: prior 
 
 This eleventh pass was **NOT ZERO-DELTA**, but its new findings are documentation/process/archive facts only. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. Another post-correction orphan-only pass is required before declaring the recheck clean.
 
+## Twelfth control pass — History/Wheel/Timer detail recovery — 2026-10-02
+
+After the eleventh archive/QA-ID correction, the dedicated History, Winner Verification, Widgets and Wheel reviews were compared again against the current exhaustive inventory and direct-chat summaries.
+
+### Additional accepted detail recovered
+
+- **Standalone Timer viewer**: viewer output is timer value only. No viewer controls/labels are added. With no active auction it shows the configured initial/default duration for the next auction/current pre-start mode; during an auction it mirrors authoritative timer state. Current 1.0.8 current_timer_payload() already implements the idle/default-duration behavior, so this is documentation precision, not a runtime defect.
+- **W1 Space hotkey**: if reopened later, Space must call the existing Spin action, must be ignored while the user is typing/using a control where Space has normal meaning, and must not cause a duplicate/re-entrant spin while spinning or otherwise unavailable.
+- **W2 external media**: source-file references never permit InOneLine to modify/delete the original external file; missing/moved/disconnected media must fail safely and remain repairable; Browser Sources must not receive arbitrary filesystem access or raw absolute-path exposure.
+- **Advanced History participant identity**: source/provider + stable external user ID is the minimum durable identity; nickname is mutable presentation metadata. Same visible nickname across providers is not enough to merge accounts.
+- **Advanced History comparability**: unrelated point systems and currencies are not naively combined. Record cards and analytics must use authoritative historical snapshots and an explicitly defined comparable basis/base-currency rule where needed.
+- **A8 Undo safety invariants**: deferred Undo remains append-only compensation, never destructive history rewrite; dependent later changes can make reversal unavailable; operator-only controls never appear in viewer OBS outputs. Exact reversible-action whitelist remains deliberately unapproved until fresh review.
+
+### No new runtime defect from these details
+
+Current runtime already satisfies the recovered Timer-viewer default-duration behavior and W2 protected external-media architecture. W1/A8/advanced History remain deferred/future scope and are not auto-authorized.
+
+Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+Because this control pass recovered additional durable detail, it is **NOT CLEAN**. A further post-correction orphan-only pass is required.
+
