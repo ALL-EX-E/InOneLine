@@ -669,7 +669,7 @@ Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. No implemen
 
 A new post-correction orphan-only control must be run before a clean stop can be claimed.
 
-## Sixteenth same-scenario pass — engineering invariants + D43/D26 lifecycle — 2026-10-02
+## Seventeenth same-scenario pass — engineering invariants + D43/D26 lifecycle — 2026-10-02
 
 The user's requested scenario was repeated again after the fifteenth clean pass: direct prior chats -> Drive/release evidence -> current GitHub docs/source -> delta-only comparison.
 
@@ -696,7 +696,7 @@ The user's requested scenario was repeated again after the fifteenth clean pass:
 
 ### Status
 
-This sixteenth pass is **NOT ZERO-DELTA** because it restored durable engineering/audio detail, but it did not recover a new feature identifier or change future roadmap order. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+This seventeenth pass is **NOT ZERO-DELTA** because it restored durable engineering/audio detail, but it did not recover a new feature identifier or change future roadmap order. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Another post-correction full/orphan control is required before declaring this repeated check clean.
 
