@@ -12,7 +12,7 @@
 - Named migrations: **15**.
 - Все A1–A10 findings контрольного codebase audit 2026-10-01 закрыты.
 - Новый product implementation scope после maintenance-аудита **не выбран автоматически**.
-- GitHub Issues используются для отдельных tracking-задач, но **не являются исчерпывающим backlog**; полный survivable inventory находится в этом файле.
+- GitHub Issues используются для отдельных tracking-задач, но **не являются исчерпывающим backlog**; полный survivable future inventory находится в этом файле. Полная история пользовательских идей и их статусов — `docs/IDEA_INVENTORY.md`.
 
 ## Ближайшие scope для fresh review
 
@@ -53,28 +53,34 @@
 - **D25 — cumulative probability лотов с суммой <= сумме победителя**: approved only as post-completion / **не нужно сейчас**; считать по resolved weighted-wheel snapshot.
 - **D42 — текущий лот/сектор под стрелкой во время вращения**: approved post-completion; local + OBS, включаемое/выключаемое отображение, без изменения RNG/weights/winner.
 
-## Возможные / review-later идеи, которые нельзя считать утверждённой реализацией
+## Принятые/сохранённые future ideas, не выбранные в реализацию
 
-- **D1** double timer / count-up elapsed time.
-- **D2** pin/unpin lot.
-- **D3** universal inline editing in tables.
-- **D5** advanced auction analytics beyond the implemented core History.
-- **D9** localization/languages.
-- **D10** GitHub link — prerequisite (public repo) теперь существует; fresh review required.
-- **D11** Telegram link — только если появится официальный ресурс.
-- **D12** support/Boosty link — только если появится официальный ресурс.
-- **D13** optional Pending/manual-processing queue for external events.
-- **D28** artificial/fixed probability mode.
-- **D29** viewer names in viewer-facing table.
-- **D30** blind/hidden viewer amounts presentation.
-- **D31** auto-processing selector, dependent on future D13.
-- **D32** viewer name as order text in a separate participant-based mode.
-- **D33** alternative display sorts.
-- **D35** per-bet fortune multiplier.
-- **D36** viewer chooses lot, dependent on D35.
-- **D37** presets export/import.
-- **Games/List Compact presentation** — 2026-09-28 explicitly postponed until a real future need appears.
+Наличие здесь означает сохранённое пользовательское решение/идею, а не разрешение начать код.
+
+- **D1** double timer / elapsed count-up — user-accepted as possible / deferred.
+- **D2** pin/unpin lot — user-accepted as possible / deferred.
+- **D5 advanced History analytics** — **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only possibility: activity heatmap, weekdays distribution, participant rankings, separate points/donations analytics, record cards и «Самый дорогой победивший лот». Core History уже реализован.
+- **D9** localization/languages — user-accepted / deferred post-completion.
+- **D10** GitHub link — conditional future item; prerequisite public repo теперь существует, но fresh review required.
+- **D11** Telegram link — conditional on official project Telegram resource.
+- **D12** support/Boosty link — conditional on official support resource.
+- **D13** optional Pending/manual-processing queue — user-accepted as possible post-completion; MAIN automatic acceptance не меняется.
+- **D28** artificial/fixed probability mode — user-accepted as possible post-completion, only explicit artificial-chance mode.
+- **D29** viewer names in viewer-facing table — user-accepted as possible / integration-dependent.
+- **D30** blind/hidden viewer amounts — user-accepted as possible post-completion; authoritative values/RNG unchanged.
+- **D31** Never/Match/Always auto-processing selector — user-accepted as possible extension of future D13.
+- **D32** viewer name as order text — user-accepted, later narrowed to a separate future participant/viewer-based mode.
+- **D33** alternative display sorts old/new/cheap/expensive — user-accepted as possible; default amount-desc stays.
+- **D35** per-bet fortune multiplier — user-accepted as possible post-completion.
+- **D36** viewer chooses lot — user-accepted as possible, dependent on D35 and fresh interaction review.
+- **D37** presets export/import — user-accepted / deferred post-completion.
+- **Games/List Compact presentation** — earlier accepted, 2026-09-28 explicitly postponed until a real future need appears.
 - **Auction Lots Normal/Compact applicability** — only specification-reconciliation territory; not a confirmed defect.
+
+## Неутверждённые / review-later только
+
+- **D3** universal inline editing in all tables — possible post-completion; no current approval to implement.
+- **Auction Lots Normal/Compact** remains specification-reconciliation territory unless separately selected.
 
 ## Важные status corrections
 
