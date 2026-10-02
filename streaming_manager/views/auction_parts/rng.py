@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from ...constants import (
     AUCTION_WHEEL_FORMAT_ELIMINATION,
 )
-from ...random_sources import RandomDraw
+from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
 from ..winner_verification import format_verification_preview, show_readonly_text_dialog
 
