@@ -142,7 +142,7 @@
 - **Разные managed media folders по назначению** (backgrounds, music/soundtrack, wheel/center assets и т.п.) — **IMPLEMENTED / ACCEPTED**.
 - **W3 — soundtrack колеса MP3/WAV/OGG, application-owned transport, volume/mute** — **IMPLEMENTED / ACCEPTED**.
 - **W3 direct UI contract** — **IMPLEMENTED / ACCEPTED**: `Музыка колеса` и `Добавить soundtrack…` визуально разделены; крупные кнопки изменения громкости имеют полностью кликабельную площадь; Mute находится отдельной строкой; ошибки/отсутствие аудио не могут блокировать RNG/winner lifecycle.
-- **Auction/Timer Music** с Pause/Resume на точной позиции, loop/profile и отдельным Auction/Wheel state — **IMPLEMENTED / ACCEPTED**; позднее transport расширен D43.
+- **Auction/Timer Music — historical pre-D26 contract + current supersession** — ранний accepted contract включал managed/local playlist, выбранный стартовый трек, Loop One/sequential library order, независимые Auction/Wheel profiles и точное сохранение Auction track+timestamp при временном Auction → Wheel → Auction context handoff. **D26 / 1.0.7 SUPERSEDED playlist semantics for current runtime**: Auction soundtrack теперь один выбранный зацикленный файл из общего `data\\soundtrack`; старый auction playlist/checkbox `Зациклить выбранный трек` больше не используется. D43 Browser Source transport/authoritative playback architecture сохраняется. Старый playlist нельзя автоматически восстанавливать как незакрытый scope; **D40** остаётся отдельной будущей идеей manual library order и требует fresh review.
 - **W4 — точный frozen chance выпавшего победителя из resolved snapshot на desktop + Wheel OBS** — **IMPLEMENTED / ACCEPTED**.
 
 ---
@@ -191,8 +191,8 @@
 
 Каждый требует fresh current official API/auth/event review:
 
-- **Kick** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**.
-- **VK Video Live** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**.
+- **Kick Channel Points / Custom Rewards** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**; это сохранённый provider capability scope, а не generic «любая интеграция Kick». Перед реализацией заново подтвердить официальный/надёжный API/auth/event contract.
+- **VK Video Live rewards/points** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**; сохранённый scope относится к viewer/channel reward/points capability и требует свежего official API/auth/event feasibility review.
 - **iHAQ Donate v2.0** — **ACCEPTED / DEFERRED**.
 - **Donate Helper** — **ACCEPTED / DEFERRED**.
 - **DonatePay** — **ACCEPTED / DEFERRED**.
@@ -262,7 +262,7 @@
 - **D37 — presets export/import** — **USER-ACCEPTED / DEFERRED POST-COMPLETION**; secrets never silently included.
 - **D38 — optional LAN access for standalone OBS widgets from second PC** — **USER-ACCEPTED / EXPLICITLY DEFERRED POST-COMPLETION**; MAIN default localhost, no Internet exposure.
 - **D39 — per-scene widget style profiles** — **NOT DIRECTLY USER-APPROVED / HISTORICAL ASSISTANT POSSIBILITY / NOT ACTIONABLE**.
-- **D40 — manual custom soundtrack/music library order** — **RETAINED POST-COMPLETION / NOT IMPLEMENTED**; D26 currently has Alphabetical/Shuffle, no manual playlist-order editor.
+- **D40 — manual custom soundtrack/music library order** — **RETAINED POST-COMPLETION / NOT IMPLEMENTED**; D26 currently has Alphabetical/Shuffle, no manual playlist-order editor. Это отдельный future scope поверх current D26 media/audio state и **не означает восстановление superseded pre-D26 Auction playlist/Loop-One contract**.
 - **D41 — cross-platform chat aggregation + separate OBS chat overlay** — **USER IDEA / POST-COMPLETION**. Twitch/YouTube/VK/other supported chat providers; ordinary chat does not mutate auction/points/timer/wheel; reuse B1/B2 auth/adapter infrastructure.
 - **D42 — current lot/sector under pointer during spin** — **USER-APPROVED POST-COMPLETION / NOT SELECTED**; local+OBS, toggleable, no RNG changes.
 - **D43 — audio/music transport through OBS Browser Source so OBS controls loudness** — **IMPLEMENTED / RELEASED 1.0.5**. Auction/Wheel soundtrack uses Timer Browser Source; later D26 Music Player has own Browser Source and shared AudioCoordinator ownership.
