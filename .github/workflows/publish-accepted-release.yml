@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - ".github/release/requests/*.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-accepted-release.yml"
   workflow_dispatch:
     inputs:
       request_path:
@@ -23,6 +28,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.event_name != 'pull_request'
     runs-on: windows-2025
     timeout-minutes: 20
     env:
