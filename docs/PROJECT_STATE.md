@@ -330,7 +330,8 @@ Permanent repository gate:
 - **QA-1.0.8-03 — B3 `Требует привязки` workflow missing:** accepted behavior for an event without usable target text is manual binding to game/lot without auto-credit; current 1.0.8 marks `missing_target` inapplicable and exposes no bind path. Status: **ACCEPTED WORKFLOW OMISSION / NOT FIXED / NOT AUTO-AUTHORIZED**.
 - DonationAlerts accepted built-in public OAuth Client ID **20915** and Rules opacity/padding control UX were restored to durable documentation.
 - **B3 provenance correction:** direct user acceptance was recovered for outside-auction unknown-title auto-creation of a normal persistent game. Current 1.0.8 already implements this; it is documentation/provenance correction, not a runtime defect.
-- Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**; this seventh-pass work changes documentation only.
+- Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**; the repeated reconciliation changed documentation only.
+- **Repeated audit final status:** seventh–ninth passes recovered/corrected QA-1.0.8-02, QA-1.0.8-03 and multiple compressed historical/future contract details; the subsequent **tenth orphan-only control was CLEAN / zero additional delta after corrections**. This does not mean the whole repeated audit found nothing; it means no further orphan remained after the recorded corrections.
 - **D22 / Issue #5** — остаётся approved post-completion, но был явно отложен пользователем 2026-09-29 и не является автоматическим следующим пунктом.
 - Восстановленная retained dependency/complexity chain после D26: **D40 → D34 → D41 → older YouTube integration candidate → D38 → Public Web → D27 → D7**.
 - Отдельно сохранены approved/parked **D23, D24, D25, D42**, а также deferred **D16, D17, D18, D20, D22, W1, Saved Auctions/New Auction, A8, B6** и provider-specific follow-ups.
