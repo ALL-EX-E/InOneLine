@@ -794,3 +794,34 @@ No new feature identifier, runtime defect, future roadmap item or status change 
 
 This twenty-first pass is **NOT CLEAN** only because the exact 0.2.69 accepted behavior had to be expanded in the exhaustive inventory. Another post-correction control is required.
 
+## Twenty-second full control — Auction autoscroll + S2 + official SOURCE — 2026-10-02
+
+The Drive implementation-order/dedup/dedicated-review files, accepted release notes and current source were re-compared after the twenty-first input-guard correction.
+
+### Additional precision recovered
+
+1. **Auction autoscroll**
+   - later accepted/current contract is separate from the old Games/List viewer package;
+   - Auction Lots + Conduct + `/auction-lots-overlay` share one session-only state;
+   - state starts OFF on each app launch and is not persisted;
+   - it must not inherit any Games/List persistence/default.
+   - Current Auction source explicitly implements this state.
+
+2. **Accepted 1.0.3 external service-unit auto-extension**
+   - persisted checkbox `Также учитывать неденежные единицы интеграций`;
+   - default OFF;
+   - OFF = monetary/currency external events only;
+   - ON = additionally provider-neutral service units;
+   - audit reasons remain separate `external_donation` / `external_service_unit`;
+   - both reuse the existing S2 threshold/collision/24h mechanism and pending conversion keeps unit semantics.
+
+3. **Official SOURCE publication distinction**
+   - the dedicated `InOneLine_Source_<version>.zip` asset is the exact accepted SOURCE snapshot;
+   - GitHub-generated `Source code (zip/tar.gz)` comes from the tag tree and is not a byte-identical substitute for the accepted SOURCE asset.
+
+The old `last N / N days` backup-retention candidate was rechecked again and remains assistant-originated/non-roadmap.
+
+No new feature identifier, new runtime defect or roadmap-order change was found. This twenty-second pass is **NOT CLEAN** only because the three durable details above required documentation correction.
+
+Another post-correction orphan/full control is required.
+
