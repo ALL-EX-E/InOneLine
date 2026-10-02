@@ -308,7 +308,7 @@
 - **Отдельный сложный advanced autoscroll control с independent speed/pause sliders** — **REJECTED/SUPERSEDED** простым/существующим scrolling behavior.
 - **Отдельный второй Rules backend/text store** — **REJECTED BY ARCHITECTURE**; viewer uses authoritative Rules state.
 - **Отдельный `Изменить текущие правила` live-only editor/workflow** — **REJECTED/SUPERSEDED**; R2 correction keeps one ordinary `Правила аукциона` editor usable at any time and synchronizes the unfinished session copy when appropriate.
-- **Отдельный универсальный внешний write/control API / generic `PUT /lot` вне B6 contract** — **REJECTED / NOT A SEPARATE APPROVED ITEM**.
+- **Отдельный InOneLine write/control Integration API (`POST /api/v1/bids`/generic `PUT /lot`) вне B6 contract** — **NOT USER-APPROVED / HISTORICAL ASSISTANT PROPOSAL**. Direct user approval was for the dedicated Pointauc/B6 adapter using Pointauc's official API; do not invent a separate local write API from the old proposal.
 - **Обратная конвертация internal SM points -> money как продуктовая функция** — **CANCELLED/SUPERSEDED**; S1 финально использует one-way source unit/currency -> integer SM points, positive values round upward.
 - **Split installation с runtime отдельно, AppData как основной user-data root** — **REJECTED**; выбран один install root (default `C:\InOneLine`) с user-selectable destination.
 - **Ранний release-only план «публичный GitHub без публикации source»** — **SUPERSEDED** поздним решением публиковать официальный SOURCE вместе с INSTALLER и использовать custom free-use/no-paid-redistribution license.
@@ -473,11 +473,11 @@
 - **0.2.57 — Auction table** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.58 — local Auction mode foundation** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.59 — nested Auction tabs** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.60 — contextually hidden Auction-tab rules/controls** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.61 — conduct auction without forced tab switching** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.62 — conduct-auction corrections** — **IMPLEMENTED / ACCEPTED CORRECTIONS**.
+- **0.2.60 — per-subtab `Правила вкладки / Скрыть правила` on Auction → Lots / Conducting / Pointauc**; help text hidden by default and toggled locally — **IMPLEMENTED / ACCEPTED**.
+- **0.2.61 — conduct auction from one operator surface**: manual bid moved from Lots to Conducting; Conducting contains its own current-session lot list/search/manual amount controls; smooth ping-pong autoscroll pauses for real user interaction; manual amount field drops the old ₽ suffix — **IMPLEMENTED / ACCEPTED**.
+- **0.2.62 — Conducting interaction/synchronization corrections**: timer refresh no longer steals input focus; autoscroll pauses while interacting; manual amount/status changes propagate immediately across Games/Public/both Auction lists/Journal and OBS/API through the common DB path; Conduct search/selection synchronizes correctly — **IMPLEMENTED / ACCEPTED CORRECTIONS**.
 - **0.2.63 — search/focus/info field/tie handling refinements** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.64 — search focus + wheel on tie** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.64 — tie/search focus refinement**: empty focused search does not stop autoscroll, entered text does; click on empty Conducting area clears focus; `Несколько победителей → Использовать колесо` reliably exposes `Запустить колесо` and identifies `Максимальная сумма → Колесо (тай-брейк)` — **IMPLEMENTED / ACCEPTED**.
 - **0.2.65 — restore active auction state after restart** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.66 — random-number generator choices** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.67 — visual wheel** — **IMPLEMENTED / ACCEPTED**.
