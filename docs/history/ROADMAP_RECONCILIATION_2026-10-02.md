@@ -669,3 +669,34 @@ Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. No implemen
 
 A new post-correction orphan-only control must be run before a clean stop can be claimed.
 
+## Sixteenth same-scenario pass — engineering invariants + D43/D26 lifecycle — 2026-10-02
+
+The user's requested scenario was repeated again after the fifteenth clean pass: direct prior chats -> Drive/release evidence -> current GitHub docs/source -> delta-only comparison.
+
+### New documentation delta recovered
+
+1. **Permanent engineering rule was only partially represented by the word `reuse-first`.**
+   - Direct user decisions preserve the stronger rule: **reuse first -> minimal diff -> no parallel logic -> no new persistence unless unavoidable**.
+   - Existing mechanisms/data/UI/settings/calculations/APIs/storage are reused unless objectively insufficient for correctness, reliability or required performance.
+   - Speed/cleanup/package/RAM optimization must not trade away stability, correctness, data safety, RNG/business semantics or predictable resource use.
+   - Risky cleanup/refactor follows a permanent regression + Windows QA foundation; QA/build-only compatibility problems are fixed in QA/build before touching runtime unless runtime change is separately approved.
+   - No out-of-scope runtime/schema/RNG/persistence/data-semantics changes.
+   - This durable rule is now explicit in `WORKFLOW.md`, `DECISIONS.md` and the exhaustive inventory.
+
+2. **D43/D26 accepted audio lifecycle was still too compressed in the exhaustive inventory.**
+   - Opening/configuring Auction alone does not pause Music Player; ownership changes only for a real active phase with an available unmuted soundtrack.
+   - Suspension preserves exact track/position and Play/Pause intent; a paused player remains paused after release.
+   - Max-amount timer phase end returns Music Player immediately; D21 allows it between elimination rounds.
+   - Event Mute yields ownership immediately; unmute during the still-active phase reacquires without restarting event soundtrack transport.
+   - Tie setup retains auction soundtrack position for overtime; choosing a different soundtrack during tie setup discards the old retained position so the new track starts from its own beginning.
+   - Same-name managed soundtrack collision offers explicit use-existing / replace / save-separate / cancel choices.
+   - Full backup/restore preserves managed music/soundtrack + selections/settings while external referenced bytes remain external; restored Music Player starts paused.
+   - D43 Browser Source reload follows authoritative current media position and does not reset playback to zero.
+   - Current 1.0.8 source/release evidence confirms these accepted behaviors; no new runtime defect was created.
+
+### Status
+
+This sixteenth pass is **NOT ZERO-DELTA** because it restored durable engineering/audio detail, but it did not recover a new feature identifier or change future roadmap order. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+Another post-correction full/orphan control is required before declaring this repeated check clean.
+
