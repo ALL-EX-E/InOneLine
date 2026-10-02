@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
-from ...database import format_points
 from ...diagnostic_logs import sanitize_diagnostic_text
 from ...exporters import export_auction_pipe_csv, auction_pipe_text
-from ...random_sources import RandomDraw, RandomOrgClient
+from ...random_sources import RandomOrgClient
 from ...workers import FunctionWorker
 
 
