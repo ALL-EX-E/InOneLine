@@ -933,3 +933,43 @@ Latest `DECISIONS.md` was re-read after discovering that later reconciliation co
 
 Because this pass recovered durable detail, it is **NOT CLEAN**. A new post-correction orphan/mechanical control is required before declaring the repeated audit clean.
 
+## Twenty-seventh post-pass-26 control — CLEAN — 2026-10-02
+
+A fresh post-correction control was run after all twenty-sixth-pass findings were written.
+
+### Direct-chat orphan search
+The final account-history search returned only already-recorded or later-superseded decisions:
+- A9 migration/single-instance acceptance;
+- synchronized Games/Public visibility;
+- cutout-only OBS transparency;
+- temporary-auction-lot promotion;
+- historical B6 MAIN wording superseded by the later deferred/fresh-review status;
+- focused Windows/PowerShell QA;
+- Product A2/A7/A8 behavior already present in the current inventory.
+
+No additional direct-user requirement survived as an orphan.
+
+### Drive control
+The project Drive root, Text Log, Screenshots, current/history roadmap/workflow files, dedicated History/Wheel/Widgets/Settings/Winner reviews, policy docs and post-D26 backlog were rechecked against current canonical GitHub documentation.
+
+- The surviving screenshot archive contains the later review/reference sets; the specifically documented missing 2026-08-21 original external-reference set remains an archive gap and is **not** falsely claimed as recovered.
+- Drive remains historical/backup evidence and does not override later GitHub CURRENT.
+- No additional future/product identifier was recovered from Drive after applying later direct-user supersessions.
+
+### GitHub/source mechanical control
+- D1–D43: all accounted for.
+- Actual D44 item: none.
+- August/Product/Maintenance A namespaces: present and separate.
+- W1–W4, B1–B6, E1–E4: accounted for.
+- Current accepted-scope gaps: exactly **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**.
+- Source TODO/FIXME/future scan: no hidden product scope.
+- Open Issues: **#4 Global Multi-File Import**, **#5 D22 Battle Royale**.
+- Open PR: stale **#9 Make 1.0.8 regression foundation persistent**, already superseded by accepted merged PR #11; repository hygiene only.
+- Public development-reference wording check: no prohibited third-party reference-name occurrence was found in the current GitHub tree.
+- Current runtime markers remain **APP_VERSION 1.0.8 / schema 19 / 15 named migrations**.
+
+### CLEAN conclusion
+**New delta after pass-26 corrections: 0.**
+
+The twenty-sixth full pass itself was NOT clean because it recovered durable details. The twenty-seventh post-correction control is clean and satisfies the requested stop condition for this iteration. No product implementation scope is selected automatically.
+
