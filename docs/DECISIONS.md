@@ -131,3 +131,13 @@ These are historical/current invariants, not new implementation scopes.
 - Это зафиксировано как **QA-1.0.8-01 / ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED**. Это не новая feature idea и не автоматическое разрешение менять runtime.
 - Reconciliation-файл не должен считать B1/B2 детали восстановленными, если exhaustive `IDEA_INVENTORY.md` снова схлопывает их до одной общей строки; durable detail должен храниться в inventory.
 
+## 2026-10-02 — Fifth-pass current-audio/provider-scope corrections
+
+Повторная сверка current 1.0.7/1.0.8 release behavior с ранними accepted Widgets/Settings decisions зафиксировала:
+
+- Historical pre-D26 Auction/Timer Music действительно включал playlist, starting track, Loop One/sequential library order, separate Auction/Wheel profiles и точный Auction track+timestamp при временном Auction → Wheel → Auction handoff.
+- **D26 / 1.0.7 supersedes текущие auction-playlist semantics**: current Auction soundtrack — один выбранный зацикленный файл из shared `data\soundtrack`; старый Auction playlist/checkbox `Зациклить выбранный трек` больше не используется. Старую модель нельзя автоматически трактовать как незавершённую current feature.
+- **D40 manual library order** остаётся отдельной future-идеей поверх current D26/D43 architecture и не восстанавливает старый Auction playlist без fresh review.
+- Retained provider scope уточнён по исходному Settings review: **Kick Channel Points / Custom Rewards** и **VK Video Live rewards/points**, оба feasibility-conditional до свежей проверки официального/надёжного API/auth/event contract.
+- Эти уточнения не добавляют новый implementation identifier и не меняют current runtime/version/schema/migrations.
+
