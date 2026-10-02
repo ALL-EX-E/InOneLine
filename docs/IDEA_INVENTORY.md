@@ -109,8 +109,8 @@
 - **Product A4 — ручные «Добавить» / «Уменьшить» как auditable compensating operations** — **IMPLEMENTED / ACCEPTED**.
 - **Product A5 — удалять только ошибочный temporary auction-only lot текущей активной сессии** — **IMPLEMENTED / ACCEPTED**.
 - **Product A6 — итог `Всего: N баллов`** — **IMPLEMENTED / ACCEPTED**. Ранняя идея show/hide superseded: финально total всегда видим.
-- **Product A6.1 — live `Шанс в колесе`** — **IMPLEMENTED / ACCEPTED**.
-- **Product A7 — current-auction History + hover highlight связанного лота + compact `Ставки | История`** — **IMPLEMENTED / ACCEPTED**.
+- **Product A6.1 — live `Шанс в колесе`** — **IMPLEMENTED / ACCEPTED**. Weighted-wheel-only read-only chance uses exactly the authoritative selection weights/probability math, updates live without changing business state, is hidden in ordinary max-amount context, and is distinct from W4 frozen post-result winner chance.
+- **Product A7 — current-auction History + hover highlight связанного лота + compact `Ставки | История`** — **IMPLEMENTED / ACCEPTED**. Accepted detail: one mutually exclusive compact area; `Ставки` is the current-auction incoming-event feed, `История` is the current-session business-change feed distinct from global Journal/completed History; cards retain event type/time/object/details, relative time may be shown while exact timestamp remains stored, and incremental updates are preferred over heavy full rebuilds.
 - **Product A8 — safe compensating Undo для обратимых действий** — **ACCEPTED / DEFERRED**. 2026-09-01 пользователь решил не включать в MAIN; нужен новый safety/design review, прежний whitelist не pre-approved.
 
 ## S2 / History / Verification
@@ -128,8 +128,8 @@
 
 # III. Saved/New Auction
 
-- **«Сохранённые аукционы»** — несколько именованных reusable working auction configurations без второй Games database, с быстрым выбором/переключением и безопасными rename/delete flows — **ACCEPTED / DEFERRED TO POST-COMPLETION**.
-- **Полный «Новый аукцион…»** с именем, `Начать без сохранения` / `Сохранить предыдущий и начать`, безопасной обработкой активной сессии и immutable historical name snapshot — **ACCEPTED / DEFERRED**, зависит от Saved Auctions.
+- **«Сохранённые аукционы»** — несколько именованных reusable working auction configurations без второй Games database, с быстрым выбором/переключением и безопасными rename/delete flows — **ACCEPTED / DEFERRED TO POST-COMPLETION**. Обычный Save обновляет уже связанную saved-конфигурацию; отдельная копия создаётся только через явный Save-As-like путь.
+- **Полный «Новый аукцион…»** с именем, `Начать без сохранения` / `Сохранить предыдущий и начать`, безопасной обработкой активной сессии и immutable historical name snapshot — **ACCEPTED / DEFERRED**, зависит от Saved Auctions. Создание нового working auction не очищает Games, global Journal, completed History, Saved Auctions, integration settings, Rules templates или global/widget OBS settings; сбрасывается только runtime новой рабочей сессии.
 - Completed History и Saved Auctions — разные системы; переименование/удаление saved configuration не переписывает историю — **DURABLE ACCEPTED RULE**.
 
 ---
@@ -149,9 +149,10 @@
 
 # V. Rules / standalone widgets / stream UI
 
-- **R2 / WYSIWYG Rules package**: editor + templates CRUD, active template, validation, Undo/Redo, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, scrolling, unsaved-change protection — **IMPLEMENTED / ACCEPTED**.
-- **Rules snapshot на сессию аукциона** — **IMPLEMENTED / ACCEPTED**.
-- **Standalone OBS Rules widget** — **IMPLEMENTED / ACCEPTED**.
+- **R1 — reusable Auction Rules package**: templates CRUD, active template, WYSIWYG editor, Undo/Redo, text-style presets, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, validation, unsaved-change protection and local read-only preview — **IMPLEMENTED / ACCEPTED**.
+- **R1 session snapshot**: starting a local auction freezes rules template provenance/name/HTML into the auction session; historical sessions are not rewritten by later template changes — **IMPLEMENTED / ACCEPTED**.
+- **R2 — standalone OBS Rules widget**: stable responsive Browser Source + read-only API, independent viewer visibility/autoscroll/background/opacity/padding and live apply — **IMPLEMENTED / ACCEPTED**.
+- **R2 single-editor correction**: `Аукцион → Проведение → Правила аукциона` is the only rules editor entry and remains usable before/during/after an auction. During an unfinished session, saving/renaming the matching source template synchronizes the open session copy; after finish/cancel historical rules remain frozen — **IMPLEMENTED / ACCEPTED**.
 - **Rules OBS autoscroll** — **IMPLEMENTED / ACCEPTED**: overflow-only, pause top -> smooth down -> pause bottom -> reset, без сложных speed sliders в первой версии.
 - **S3 — общий screen color eyedropper** — **IMPLEMENTED / ACCEPTED**.
 - **Standalone widget foundation в «Стрим / OBS» со stable URLs и responsive Browser Sources** — **IMPLEMENTED / ACCEPTED**.
@@ -173,6 +174,7 @@
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
 - **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; user correction допускает Channel Points contribution flow и во время, и вне активного аукциона по соответствующим правилам; live redemption verification отложена до Affiliate/Partner eligibility.
 - **B5 — `Ставки` feed автоматически принятых integration events** — **IMPLEMENTED / ACCEPTED**.
+- **General outside-auction integration rule** — **IMPLEMENTED/ACCEPTED ARCHITECTURAL RULE**: a valid game-targeted monetary or non-monetary external event may update persistent game points even when no auction is running; it must not create/start/resume an auction or mutate auction lot/timer/wheel state, and S2 timer extension requires an eligible running auction.
 - **I1 / DonationAlerts adapter** — **IMPLEMENTED / ACCEPTED**: browser authorization/status, public Client ID встроен, пользователь проходит только авторизацию. **Поздний контракт supersedes ранний auction-only toggle:** подключение/enable интеграции является permission на постоянный intake; donations маршрутизируются по source timestamp в running auction либо в persistent game list вне аукциона. Отдельного `учитывать только в аукционе` intake-переключателя больше нет.
 
 ## Принятые, но отложенные service targets
@@ -305,6 +307,7 @@
 - **Historical YouTube URL/video-ID soundtrack source** — **REFERENCE-ONLY**, не direct user-approved scope.
 - **Отдельный сложный advanced autoscroll control с independent speed/pause sliders** — **REJECTED/SUPERSEDED** простым/существующим scrolling behavior.
 - **Отдельный второй Rules backend/text store** — **REJECTED BY ARCHITECTURE**; viewer uses authoritative Rules state.
+- **Отдельный `Изменить текущие правила` live-only editor/workflow** — **REJECTED/SUPERSEDED**; R2 correction keeps one ordinary `Правила аукциона` editor usable at any time and synchronizes the unfinished session copy when appropriate.
 - **Отдельный универсальный внешний write/control API / generic `PUT /lot` вне B6 contract** — **REJECTED / NOT A SEPARATE APPROVED ITEM**.
 - **Обратная конвертация internal SM points -> money как продуктовая функция** — **CANCELLED/SUPERSEDED**; S1 финально использует one-way source unit/currency -> integer SM points, positive values round upward.
 - **Split installation с runtime отдельно, AppData как основной user-data root** — **REJECTED**; выбран один install root (default `C:\InOneLine`) с user-selectable destination.
