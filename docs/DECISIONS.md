@@ -176,3 +176,14 @@ Additional direct-chat comparison after the seventh pass recovered:
 - Release/reconciliation defects use **`QA-<version>-NN`** identifiers. Permanent roadmap/product identifiers (D/A/W/B/E/R and similar) must not be recycled for temporary QA defects or omissions.
 - Recovering one of these process/archive rules does not select a new implementation scope; runtime remains unchanged until a separately reviewed and explicitly approved code change.
 
+## 2026-10-02 — Twelfth-pass History/Wheel/Timer precision recovery
+
+A post-correction control against the dedicated History/Wheel/Widgets reviews recovered additional direct-user detail that had been compressed too far:
+
+- Standalone Timer viewer is read-only and shows only the timer value. With no active auction it shows the configured initial/default duration for the next auction/current pre-start mode; during an auction it mirrors the authoritative timer. It never creates a second timer engine or viewer controls.
+- W1 Space hotkey, if ever reintroduced, must call the existing Spin action, be blocked while focus is in controls where Space has a normal meaning, and must never create duplicate/re-entrant spin.
+- W2 external media references never authorize modifying/deleting the original external file or exposing arbitrary filesystem access to Browser Sources. Missing/moved/disconnected media degrades safely and can be repaired/reselected through the existing protected media-serving path.
+- Advanced History participant identity uses provider/source + stable external user ID; mutable nickname is display metadata. Same-name accounts across services are never auto-merged without a separate explicit linking design.
+- Advanced History cross-unit statistics require an explicit comparable basis: unrelated point systems or currencies are not naively summed; record cards are computed from authoritative historical snapshots, not current mutable Games state.
+- A8 retained safety invariants survive even though implementation is deferred: reversal is an appended auditable compensating event, original history is never deleted/rewritten, unsafe dependency chains block Undo, and operator-only Undo is never exposed to viewer OBS outputs. Exact reversible-action whitelist remains for fresh review.
+
