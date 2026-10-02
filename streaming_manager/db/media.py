@@ -523,30 +523,66 @@ class MediaMixin:
         longer survive as dead library rows. External references remain
         registered but callers decide whether an unavailable path should be
         exposed in their UI.
+
+        One sync deliberately uses one SQLite transaction. The former
+        per-file ensure loop reopened SQLite and rescanned the same category
+        for every file, which made large music libraries progressively more
+        expensive without changing semantics.
         """
         directory = managed_media_directory(self.path.parent, category)
         directory.mkdir(parents=True, exist_ok=True)
         allowed = supported_media_extensions(category)
-        present: dict[str, Path] = {}
-        for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
-            if path.is_file() and path.suffix.lower() in allowed:
-                present[path.name.casefold()] = path
-                self.ensure_managed_media_asset(category, path.name, path.name)
+        present_paths = [
+            path
+            for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold())
+            if path.is_file() and path.suffix.lower() in allowed
+        ]
+        present_names = {path.name.casefold() for path in present_paths}
 
-        # D26 changes source-of-truth semantics only for its audio
-        # libraries. Existing overlay/background/center-image categories keep
-        # their established missing-file recovery behavior.
-        if str(category) in {MEDIA_CATEGORY_MUSIC, MEDIA_CATEGORY_SOUNDTRACK}:
-            with self.connect() as conn:
-                rows = conn.execute(
-                    "SELECT id, managed_name FROM media_assets "
-                    "WHERE category=? AND storage_mode=?",
-                    (str(category), MEDIA_STORAGE_MANAGED),
-                ).fetchall()
+        with self.connect() as conn:
+            managed_rows = conn.execute(
+                "SELECT * FROM media_assets "
+                "WHERE category=? AND storage_mode=? ORDER BY id ASC",
+                (str(category), MEDIA_STORAGE_MANAGED),
+            ).fetchall()
+            managed_names = {
+                str(row["managed_name"] or "").casefold()
+                for row in managed_rows
+            }
+
+            for path in present_paths:
+                key = path.name.casefold()
+                if key in managed_names:
+                    continue
+                now = utc_now()
+                conn.execute(
+                    """
+                    INSERT INTO media_assets(
+                        category,storage_mode,managed_name,external_path,
+                        original_name,created_at,updated_at
+                    ) VALUES(?,?,?,?,?,?,?)
+                    """,
+                    (
+                        str(category),
+                        MEDIA_STORAGE_MANAGED,
+                        path.name,
+                        "",
+                        path.name,
+                        now,
+                        now,
+                    ),
+                )
+                managed_names.add(key)
+
+            # D26 changes source-of-truth semantics only for its audio
+            # libraries. Existing overlay/background/center-image categories
+            # keep their established missing-file recovery behavior.
+            if str(category) in {MEDIA_CATEGORY_MUSIC, MEDIA_CATEGORY_SOUNDTRACK}:
                 stale_ids = [
                     int(row["id"])
-                    for row in rows
-                    if str(row["managed_name"] or "").casefold() not in present
+                    for row in managed_rows
+                    if str(row["managed_name"] or "").casefold()
+                    not in present_names
                 ]
                 if stale_ids:
                     placeholders = ",".join("?" for _ in stale_ids)
@@ -554,4 +590,11 @@ class MediaMixin:
                         f"DELETE FROM media_assets WHERE id IN ({placeholders})",
                         tuple(stale_ids),
                     )
-        return self.list_media_assets(category)
+
+            rows = conn.execute(
+                "SELECT * FROM media_assets WHERE category=? ORDER BY id ASC",
+                (str(category),),
+            ).fetchall()
+
+        assets = [self._media_asset_from_row(row) for row in rows]
+        return sorted(assets, key=lambda item: (item.display_name.casefold(), item.id))
