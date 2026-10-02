@@ -737,3 +737,20 @@ Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. No implemen
 
 Another post-correction orphan-only control is required before claiming a clean stop.
 
+## Eighteenth post-seventeenth orphan check — conditional links + archive preservation — 2026-10-02
+
+The next orphan-only chat comparison recovered two small but direct durable decisions:
+
+- **D10/D11/D12 exact conditional-link boundary**
+  - D10 may point only to the official InOneLine repository; the prerequisite now exists, but placement/UX remains fresh-review work.
+  - D11 remains conditional on creation of an official project Telegram resource and must use only that official project link.
+  - D12 remains conditional on completion/publication plus an official support resource; accepted intent is informational/project/support UI, not Auction business UI.
+- **Historical artifact retention rule**
+  - cleaning active source/docs/CI must not destroy the only surviving historical audit/reference/release evidence;
+  - retired material remains recoverable through Git history, canonical history docs or Drive archive;
+  - if original bytes/screenshots are already missing, a later textual reconstruction cannot be represented as the original archive.
+
+These are documentation/process precision corrections only. No new feature identifier, runtime defect, roadmap-order change, schema or migration was recovered.
+
+Because new durable detail was restored, this eighteenth pass is **NOT CLEAN**. Another post-correction full/orphan control is required.
+
