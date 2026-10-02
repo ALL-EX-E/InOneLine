@@ -221,7 +221,18 @@ The Games `Всего`/archive-counter behavior was also rechecked. Current code
 
 No runtime/source/version/schema/migration change is authorized or performed by this documentation correction.
 
-## 2026-10-02 — Seventeenth-pass engineering/audio contract recovery
+## 2026-10-02 — Seventeenth-pass process/public-wording recovery
+
+The first post-sixteenth orphan-only control found two durable direct-user process/public-documentation rules that were implemented but not yet preserved explicitly in canonical decision docs:
+
+- **Focused manual QA cadence:** Windows/PowerShell checks should be requested only when they add real verification and preferably one focused command/check at a time; do not burden the user with a long manual checklist when automated gates or already-passed Windows scenarios cover the same fact.
+- **Public installer instruction wording:** the user explicitly required the install step wording `Запустить установщик`; the current README implements it as `Запустите установщик и следуйте его подсказкам`.
+
+The same control also corrected the sixteenth-pass note about Games `Всего`: direct user provenance does exist for `Всего` including archived ordinary records, active records first and archive as a bottom block. This requirement was already present in the exhaustive historical ledger (`0.2.22`) and current code, so no new inventory item or runtime defect is created; only the provenance note required correction.
+
+No runtime/source/version/schema/migration change is authorized or performed.
+
+## 2026-10-02 — Eighteenth-pass engineering/audio contract recovery
 
 A further same-scenario recheck against direct chats, released 1.0.5/1.0.7 evidence and current 1.0.8 source recovered two durable areas that were still compressed too aggressively.
 
@@ -254,18 +265,7 @@ The released/current contract is more specific than the prior short summary:
 
 These are already accepted/released behaviors, not new feature requests and not new runtime QA findings.
 
-## 2026-10-02 — Seventeenth-pass process/public-wording recovery
-
-The first post-sixteenth orphan-only control found two durable direct-user process/public-documentation rules that were implemented but not yet preserved explicitly in canonical decision docs:
-
-- **Focused manual QA cadence:** Windows/PowerShell checks should be requested only when they add real verification and preferably one focused command/check at a time; do not burden the user with a long manual checklist when automated gates or already-passed Windows scenarios cover the same fact.
-- **Public installer instruction wording:** the user explicitly required the install step wording `Запустить установщик`; the current README implements it as `Запустите установщик и следуйте его подсказкам`.
-
-The same control also corrected the sixteenth-pass note about Games `Всего`: direct user provenance does exist for `Всего` including archived ordinary records, active records first and archive as a bottom block. This requirement was already present in the exhaustive historical ledger (`0.2.22`) and current code, so no new inventory item or runtime defect is created; only the provenance note required correction.
-
-No runtime/source/version/schema/migration change is authorized or performed.
-
-## 2026-10-02 — Eighteenth-pass conditional-link and archive-preservation precision
+## 2026-10-02 — Nineteenth-pass conditional-link and archive-preservation precision
 
 A post-seventeenth orphan check recovered two small direct-decision areas that were still compressed:
 
