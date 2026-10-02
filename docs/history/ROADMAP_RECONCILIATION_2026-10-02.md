@@ -627,3 +627,45 @@ Final read-back found one documentation-only regression introduced by this recon
 
 This wording correction does not change the fifteenth CLEAN orphan result, roadmap status or runtime.
 
+## Sixteenth full recheck — B4 permanent-source supersession + direct UI precision — 2026-10-02
+
+The same scenario was repeated again after the fifteenth CLEAN result: direct chats -> Drive current/archive/project-state records -> current GitHub docs/source -> comparison against the already corrected inventory.
+
+### New delta
+
+1. **B4 reward-availability wording in the exhaustive inventory was stale.**
+   - Earlier B4 design allowed app-managed Twitch Custom Rewards to follow auction/bid-intake state.
+   - Later direct user decision on 2026-09-03 explicitly removed that coupling as part of I1/permanent-source integration behavior.
+   - Authoritative rule: remote rewards are controlled only by explicit manual `Включить награды` / `Отключить награды` in Settings and do not automatically follow auction start/resume/pause/finish.
+   - Channel Points/EventSub intake is permanent while the integration is connected/configured and source-time routing decides auction vs outside-auction persistent-game handling.
+   - Current source confirms this: `desired_rewards_enabled()` returns the manual setting, `set_link_to_auction(True)` is rejected as a retired behavior, and old auction-link/intake settings remain compatibility-only.
+   - Classification: **DOCUMENTATION SUPERSESSION CORRECTION / CURRENT RUNTIME ALREADY CORRECT / NO QA DEFECT**.
+
+2. **Direct RANDOM.ORG UI-location decision was compressed out.**
+   - User directly requested moving the RANDOM.ORG API-key controls from `Настройки → Общие` to `Настройки → Интеграции`.
+   - Current source already follows this.
+   - Classification: **IMPLEMENTED / ACCEPTED DOCUMENTATION PRECISION**.
+
+3. **Direct OBS information-block date removal was compressed out.**
+   - User directly requested removing the date from the lower-right OBS information block.
+   - Current accepted/runtime presentation keeps that date absent.
+   - Classification: **IMPLEMENTED / ACCEPTED DOCUMENTATION PRECISION**.
+
+4. **Restore safety UI precision was incomplete.**
+   - Accepted Windows QA covered that selecting the current working `data\streaming.db` as the restore source is rejected.
+   - A real backup is validated, current state is safety-backed up, restore is applied and the app restarts.
+   - Current Settings source explicitly rejects `source == current`.
+   - Classification: **IMPLEMENTED / ACCEPTED DOCUMENTATION PRECISION**.
+
+### Rechecked false/insufficient candidate
+
+- Games `Всего` currently includes ordinary archived records and excludes temporary `auction_only` rows until promotion. This is visible in current source and historical accepted implementation evidence, but this pass did not recover a sufficiently clean standalone direct-user wording to reclassify it as a newly recovered direct-user requirement. Existing archive/counter coverage remains unchanged.
+
+### Status
+
+This sixteenth pass is **NOT CLEAN** because the B4 supersession contradiction and direct UI/restore details required documentation changes.
+
+Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. No implementation scope is selected or authorized by this correction.
+
+A new post-correction orphan-only control must be run before a clean stop can be claimed.
+
