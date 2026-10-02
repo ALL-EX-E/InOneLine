@@ -476,3 +476,35 @@ That conclusion was rewritten to reflect the authoritative repeated-audit result
 
 This was a documentation-consistency correction only. It did not recover another product requirement, did not change the roadmap order, and did not modify runtime/source/version/schema/migrations.
 
+## Eleventh full recheck — archive/provenance + QA-ID control — 2026-10-02
+
+The same scenario was repeated again against the already corrected state: prior direct chats -> Drive current/archive/dedicated reviews -> GitHub current docs/source/issues/PR -> orphan-only comparison.
+
+### New delta recovered
+
+1. **Historical reference archive gap had fallen out of the current GitHub reconciliation.**
+   - Earlier PASS 12 recorded that the original `2026-08-21_POINTAUC_reference_*` screenshot set was no longer present in accessible Drive.
+   - Fresh Drive image search again returns no image with that original reference naming; only unrelated 2026-08-21 InOneLine screenshots and later text/review material remain.
+   - The product decisions themselves remain supported by direct chat plus cumulative/dedup/dedicated review text.
+   - Do **not** claim the missing original reference images are still archived, and do **not** reconstruct replacements and present them as originals.
+   - Classification: **REFERENCE ARCHIVE GAP / HISTORICAL EVIDENCE LIMITATION / NOT PRODUCT BACKLOG**.
+
+2. **QA finding identifier convention was missing from current workflow docs.**
+   - Historical accepted process rule: release/reconciliation defects and accepted-scope omissions use `QA-<version>-NN`.
+   - Permanent roadmap/product IDs (D/A/W/B/E/R and similar) are never recycled for temporary defects.
+   - Current QA-1.0.8-01/02/03 remain correctly named under this rule.
+
+### Cross-checks
+
+- Old QA-1.0.2-01 and QA-1.0.2-02 are historical and already resolved by accepted later releases: common OBS help in 1.0.2 and external monetary/service-unit timer-extension completion in 1.0.3.
+- D39 remains assistant-only/not actionable.
+- Games/List autoscroll remains superseded by the later direct user decision that no new autoscroll work is needed.
+- D10 remains conditional/eligible for fresh review only; no auto-selection.
+- C1 counting is already resolved by the later direct user rule: only final accepted CURRENT/released versions count; rejected Candidate/FIX iterations do not.
+- No source TODO/FIXME/future comment exposed a hidden product backlog item.
+- Open GitHub tracking remains Issues #4/#5 plus stale PR #9; no hidden implementation scope was found.
+
+### Status before next control
+
+This eleventh pass was **NOT ZERO-DELTA**, but its new findings are documentation/process/archive facts only. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. Another post-correction orphan-only pass is required before declaring the recheck clean.
+
