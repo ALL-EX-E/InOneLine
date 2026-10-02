@@ -12,6 +12,7 @@
 - Named migrations: **15**.
 - Все A1–A10 findings контрольного codebase audit 2026-10-01 закрыты.
 - Новый product implementation scope после maintenance-аудита **не выбран автоматически**.
+- GitHub Issues используются для отдельных tracking-задач, но **не являются исчерпывающим backlog**; полный survivable inventory находится в этом файле.
 
 ## Ближайшие scope для fresh review
 
