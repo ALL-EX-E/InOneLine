@@ -69,6 +69,7 @@
 - **Бесшовная автопрокрутка списка сверху вниз** — **IMPLEMENTED / ACCEPTED**.
 - **Длинные названия переносятся по словам; сумма выравнивается по последней строке названия** — **IMPLEMENTED / ACCEPTED**.
 - **Основной OBS layout: игровая область 16:9, webcam, list, info/title blocks** — **IMPLEMENTED / ACCEPTED**.
+- **Direct OBS title/info UX** — **IMPLEMENTED / ACCEPTED**: current-game title is centered above the game frame; the lower-right information block remains a separate block; disabling the info block frees/reuses that area for the list instead of leaving dead space.
 - **Webcam/List/Info можно отключать и располагать независимо; layout переиспользует освободившееся место** — **IMPLEMENTED / ACCEPTED**.
 - **Отдельные glow/frame colors для game/webcam/list/info** — **IMPLEMENTED / ACCEPTED**.
 - **Прозрачны только interior cutouts game/webcam; фон, рамки, список, info/title остаются визуальными слоями** — **IMPLEMENTED / ACCEPTED**.
@@ -104,7 +105,7 @@
 - **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**.
 - **S1 integer conversion rule** — **IMPLEMENTED / ACCEPTED**: результат зачисления всегда целое число SM points; положительный дробный результат округляется вверх одинаково для валют и неденежных service units; reverse `SM points → money` не используется.
 - **Product A1 — сохранять последнее значение общего ручного поля суммы/баллов** — **IMPLEMENTED / ACCEPTED**. Direct UX decision: numeric/manual-bid input must not expose tiny native up/down spin arrows; value entry remains explicit and wheel-safe.
-- **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**. Название после trim/normalization не может быть пустым/whitespace-only и использует общую duplicate protection вместо создания параллельного правила.
+- **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**. Название после trim/normalization не может быть пустым/whitespace-only и использует общую duplicate protection вместо создания параллельного правила. Numeric points field for adding a lot, like the shared manual-bid/points field, does not expose native up/down spin arrows.
 - **Product A3 — frozen start position + live/current position** — **IMPLEMENTED / ACCEPTED**.
 - **Product A4 — ручные «Добавить» / «Уменьшить» как auditable compensating operations** — **IMPLEMENTED / ACCEPTED**.
 - **Product A5 — удалять только ошибочный temporary auction-only lot текущей активной сессии** — **IMPLEMENTED / ACCEPTED**.
@@ -488,7 +489,7 @@
 - **0.2.60 — per-subtab `Правила вкладки / Скрыть правила` on Auction → Lots / Conducting / Pointauc**; help text hidden by default and toggled locally — **IMPLEMENTED / ACCEPTED**.
 - **0.2.61 — conduct auction from one operator surface**: manual bid moved from Lots to Conducting; Conducting contains its own current-session lot list/search/manual amount controls; smooth ping-pong autoscroll pauses for real user interaction; manual amount field drops the old ₽ suffix — **IMPLEMENTED / ACCEPTED**.
 - **0.2.62 — Conducting interaction/synchronization corrections**: timer refresh no longer steals input focus; autoscroll pauses while interacting; manual amount/status changes propagate immediately across Games/Public/both Auction lists/Journal and OBS/API through the common DB path; Conduct search/selection synchronizes correctly — **IMPLEMENTED / ACCEPTED CORRECTIONS**.
-- **0.2.63 — search/focus/info field/tie handling refinements** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.63 — direct search/focus/info/tie UX decisions** — **IMPLEMENTED / ACCEPTED**: Auction search field is simply `Поиск`; switching Auction tabs does not automatically transfer focus into search; OBS `Текст информационного блока` has no preset dropdowns; tie state is named `Несколько победителей` and offers `Дополнительное время` or wheel; tie-wheel leaders use equal chances, including all-zero tie fallback.
 - **0.2.64 — tie/search focus refinement**: empty focused search does not stop autoscroll, entered text does; click on empty Conducting area clears focus; `Несколько победителей → Использовать колесо` reliably exposes `Запустить колесо` and identifies `Максимальная сумма → Колесо (тай-брейк)` — **IMPLEMENTED / ACCEPTED**.
 - **0.2.65 — restore active auction state after restart** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.66 — random-number generator choices** — **IMPLEMENTED / ACCEPTED**.
