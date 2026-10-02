@@ -31,6 +31,7 @@
 ## Версии
 
 - Candidate/FIX не считаются релизами.
+- Candidate/build staging проверяется **до** замены/продвижения безопасного артефакта; failed build/validation не должен уничтожать или перезаписывать последний принятый/безопасный archive/artifact. Historical A1 использовал temporary `.building` + fail-closed validation; current GitHub publication uses immutable accepted artifacts/requests, but safety invariant remains the same.
 - Номинальный APP_VERSION candidate не увеличивает release cadence.
 - Rollback — предыдущий реально принятый CURRENT.
 - При release-финализации допустим отдельный metadata-only commit; он не должен менять принятые runtime/source bytes.
