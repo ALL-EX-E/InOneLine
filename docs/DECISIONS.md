@@ -221,3 +221,36 @@ The Games `Всего`/archive-counter behavior was also rechecked. Current code
 
 No runtime/source/version/schema/migration change is authorized or performed by this documentation correction.
 
+## 2026-10-02 — Sixteenth-pass engineering/audio contract recovery
+
+A further same-scenario recheck against direct chats, released 1.0.5/1.0.7 evidence and current 1.0.8 source recovered two durable areas that were still compressed too aggressively.
+
+### Engineering invariants
+
+The user's permanent development rule is stronger than the short `reuse-first` wording:
+
+- **reuse first -> minimal diff -> no parallel logic -> no new persistence unless unavoidable**;
+- existing mechanisms/data/UI/settings/calculations/APIs/storage must be reused whenever they remain correct and reliable;
+- new entities/backends/persistence are justified only when the old mechanism is objectively unsuitable for correctness, reliability or required performance;
+- optimization/speed/size work must never trade away stability, correctness, data safety or predictable resource use;
+- the product must avoid hangs/crashes and unnecessary RAM/package growth;
+- risky cleanup/refactor follows a permanent regression/Windows QA foundation, and QA/build compatibility problems are fixed in QA/build before changing runtime unless runtime change is separately approved;
+- no out-of-scope runtime/schema/RNG/persistence/data-semantics changes.
+
+These rules are now explicit in `docs/WORKFLOW.md`.
+
+### D43 / D26 accepted audio lifecycle
+
+The released/current contract is more specific than the prior short summary:
+
+- merely opening/configuring Auction does **not** interrupt Music Player; audible ownership changes only when an actual auction/wheel phase starts and has an available unmuted soundtrack;
+- the Music Player suspension snapshot preserves track, exact position and desired Play/Pause intent. If it was playing, release resumes the same track/position; if it was paused, release leaves it paused;
+- max-amount timer end releases Music Player immediately at the phase boundary rather than waiting for winner confirmation;
+- tie state retains the auction soundtrack position so additional time can continue the same timeline; changing the selected soundtrack during tie setup intentionally discards the old retained position so the newly selected track starts from its own beginning;
+- event soundtrack Mute immediately yields audible ownership back to Music Player; unmuting during the still-active phase can reacquire ownership without restarting the event soundtrack transport;
+- between D21 Elimination rounds Music Player is allowed to resume;
+- same-name managed soundtrack copy requires an explicit operator choice: **use existing / replace / save separate copy / cancel**;
+- full backup/restore preserves managed `data\music`, shared `data\soundtrack`, selections and D26 settings; external referenced file bytes remain external; restored Music Player starts paused and does not autoplay.
+
+These are already accepted/released behaviors, not new feature requests and not new runtime QA findings.
+
