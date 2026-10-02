@@ -77,6 +77,8 @@ def main() -> None:
     workflow = generic.read_text(encoding="utf-8")
     assert ".github/release/requests/*.json" in workflow
     assert "workflow_dispatch:" in workflow
+    assert "pull_request:" in workflow
+    assert "if: github.event_name != 'pull_request'" in workflow
     assert "git diff --name-status" in workflow
     assert 'if ($status -ne "A")' in workflow
     assert "gh release view" in workflow
