@@ -10,6 +10,20 @@ Accepted source identity:
 - SHA-256: `babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15`
 - Files in official source ZIP: `192`
 
+## Maintenance execution status — 2026-10-02
+
+The findings below are retained as the historical audit record. Current execution status:
+
+- **A1** source snapshot pollution — CLOSED in accepted filesystem maintenance.
+- **A2** missing permanent regression foundation — CLOSED.
+- **A3** non-reproducible build dependencies — CLOSED via exact build lock.
+- **A4** repeated managed-media SQLite connections — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #13; post-merge regression `36949173717` SUCCESS.
+- **A10** documentation drift — CLOSED.
+- **A5** verified unused/stale imports — next unresolved maintenance item.
+- **A6–A9** remain pending their own exact-current review.
+
+Canonical A4 QA: `docs/qa/1.0.8-media-sync-maintenance.md`.
+
 ## Audit goal
 
 Check the current program for:
