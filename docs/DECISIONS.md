@@ -326,3 +326,10 @@ Further direct-chat/source comparison recovered:
 
 The earlier backup-retention `last N / N days` candidate was rechecked against direct chat again: the user confirmed backup creation worked, but did not directly approve/reject that assistant suggestion. It remains intentionally outside the user-approved backlog.
 
+## 2026-10-02 — Archive/process preservation correction
+
+Повторная сверка прямых решений пользователя восстановила два process/detail правила, которые были реализованы/использовались, но недостаточно явно отражались в exhaustive documentation:
+
+- **Drive audit archive rule:** текстовые логи аудитов/проверок и пользовательские скриншоты, используемые как QA/project evidence, должны сохраняться на Google Drive. Решение 2026-09-30 сделать GitHub canonical source of truth не отменяет это правило: GitHub хранит authoritative current docs/code/history, Drive остаётся backup/historical archive для логов, скриншотов и delivery artifacts. Drive не может переопределять более поздний GitHub CURRENT.
+- **R1.0.4 uninstall warning detail:** destructive uninstall warning должен не только сообщать об удалении program/user data, но и рекомендовать сначала создать внешнюю полную `.iolbackup` через dedicated full-backup flow и хранить её вне install root. Current installer already implements this; correction is documentation-only.
+
