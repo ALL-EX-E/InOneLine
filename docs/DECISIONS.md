@@ -84,3 +84,14 @@ Released behavior имеет приоритет над ранними draft-оп
 - Полный survivable inventory хранится в `docs/ROADMAP.md`; подробный reconciliation — `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
 
 Этот reconciliation не выбирает следующий implementation scope.
+
+
+## 2026-10-02 — Full user-idea inventory
+
+- `docs/IDEA_INVENTORY.md` is the canonical exhaustive historical inventory of user-proposed/accepted/deferred/rejected/superseded ideas.
+- `docs/ROADMAP.md` is the shorter current/future selection view and must not be treated as a complete history of everything the user ever proposed.
+- GitHub Issues are tracking aids only; they are not the full idea inventory.
+- Product A1–A8/A6.1 and Maintenance A1–A10 are separate namespaces and must always be labelled accordingly.
+- Direct user dialogue has priority over later assistant-authored status compression. In particular, advanced History analytics (heatmap, weekdays, participant rankings, points/donations analytics, record cards, most expensive winning lot) remains USER-ACCEPTED post-completion/post-integration work.
+- Backup-retention last-N/N-days remains non-roadmap because no direct user proposal/acceptance was recovered; do not promote assistant audit suggestions into the user inventory.
+- Before declaring an old idea “missing” or “next”, check IDEA_INVENTORY + later direct decisions + released/current behavior.
