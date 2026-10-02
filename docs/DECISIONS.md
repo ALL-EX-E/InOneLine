@@ -95,3 +95,18 @@ Released behavior имеет приоритет над ранними draft-оп
 - Direct user dialogue has priority over later assistant-authored status compression. In particular, advanced History analytics (heatmap, weekdays, participant rankings, points/donations analytics, record cards, most expensive winning lot) remains USER-ACCEPTED post-completion/post-integration work.
 - Backup-retention last-N/N-days remains non-roadmap because no direct user proposal/acceptance was recovered; do not promote assistant audit suggestions into the user inventory.
 - Before declaring an old idea “missing” or “next”, check IDEA_INVENTORY + later direct decisions + released/current behavior.
+
+
+## 2026-10-02 — Third-pass recovered product invariants
+
+A third independent comparison of old chats/Drive dedicated reviews against `docs/IDEA_INVENTORY.md` recovered several durable details:
+
+- DonationAlerts/I1 uses the later permanent-source model: enabled connection is intake permission; provider source timestamp routes an event to the auction that was running at source time or to the persistent game list outside auctions. The old auction-only intake toggle/target binding is retired compatibility state, not current product behavior.
+- Twitch Channel Points likewise are not gated by an auction-only intake switch; contribution routing may occur both inside and outside auctions according to the accepted B3/B4 rules.
+- Integration connection UX should avoid user-managed client secrets where the provider supports public/native application authorization; use browser/device authorization and protected local tokens.
+- Auction/game mutations obey a cross-surface synchronization invariant: authoritative DB mutation must propagate to Games/Public/Auction/Journal and relevant OBS/API views without manual F5.
+- The default weighted wheel remains RNG-first: the winner is determined before animation, hidden until animation completes, and persisted spin/result state is recovered after restart. D27 remains a separate future alternative.
+- Main OBS transparency remains cutout-only for game/webcam interiors; a second whole-overlay transparent mode was explicitly rejected.
+- The initial public-GitHub-without-source publication plan was superseded by the later official SOURCE+INSTALLER publication and custom license decision.
+
+These are historical/current invariants, not new implementation scopes.
