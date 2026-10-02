@@ -20,7 +20,7 @@ class ManifestError(ValueError):
 def _safe_repo_path(value: Any, field: str) -> str:
     text = str(value or "").strip()
     if not text or "\\" in text:
-        raise ManifestError(f"{field} must be a non-empty POSIX-style relative path")
+        raise ManifestError(f"{field} must be a non-empty relative path using forward slashes")
     path = PurePosixPath(text)
     if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
         raise ManifestError(f"{field} must not be absolute or contain traversal")
