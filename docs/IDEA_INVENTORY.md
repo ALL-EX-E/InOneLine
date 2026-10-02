@@ -370,6 +370,7 @@
 - **Публичный GitHub repository + GitHub Releases** — **IMPLEMENTED / ACCEPTED**.
 - **Initial GitHub release-only/no-source publication plan (2026-09-26)** — **USER-ACCEPTED THEN SUPERSEDED**. It allowed a public release repository with installer release but no published source/license; later explicit decisions replaced it with official SOURCE + INSTALLER publication and the custom no-paid-redistribution license.
 - **Installer-first public deployment/update model** — **USER-ACCEPTED / IMPLEMENTED**: normal users install InOneLine through the installer, and later updates/patches are applied to the installed program while preserving mutable user data according to the accepted update/reinstall contract.
+- **Public install-instruction wording** — **USER-ACCEPTED / IMPLEMENTED IN README**: the installation step uses the direct action wording **`Запустить установщик`**; current README preserves this as `Запустите установщик и следуйте его подсказкам`.
 - **GitHub становится source of truth; Drive остаётся history/backup** — **IMPLEMENTED / ACCEPTED**.
 - **Публично указать, что InOneLine создан автором с помощью ChatGPT от OpenAI; другие нейросети не использовались** — **IMPLEMENTED / ACCEPTED**.
 - **Программа и source можно бесплатно использовать, изменять и бесплатно распространять; платное распространение запрещено** — **IMPLEMENTED / ACCEPTED** custom license policy.
@@ -381,6 +382,7 @@
 - **Release/QA defect numbering** — **DURABLE PROCESS RULE**: release/reconciliation findings use `QA-<version>-NN`; permanent D/A/W/B/E/R identifiers are not recycled for temporary defects/omissions.
 - **Engineering reuse/stability invariant** — **DURABLE USER DECISION / PRESERVE**: `reuse first -> minimal diff -> no parallel logic -> no new persistence unless unavoidable`. Existing mechanisms/data/UI/settings/calculations/APIs/storage are reused unless objectively insufficient for correctness, reliability or required performance.
 - **Stability over optimization** — **DURABLE USER DECISION / PRESERVE**: speed/cleanup/size/RAM improvements must not reduce reliability or change business/RNG/data semantics; avoid freezes/crashes and unnecessary resource/package growth; risky refactor/cleanup follows a permanent regression + Windows QA foundation, with QA/build-only problems fixed outside runtime first.
+- **Manual Windows/PowerShell QA cadence** — **DURABLE USER PROCESS RULE / PRESERVE**: ask the user to run Windows/PowerShell checks only when they add real verification, and prefer one focused manual check/command at a time instead of batching unnecessary steps; already-passed checks are not repeated without a reason.
 
 ---
 
