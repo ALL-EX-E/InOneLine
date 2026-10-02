@@ -17,6 +17,18 @@
 - После manual acceptance официальные installer/source bytes не пересобираются.
 - Release metadata может быть добавлена отдельным commit, если runtime/source принятых bytes не меняются.
 
+## Accepted release publication
+
+- Исторические per-release publication workflows не являются текущим источником истины и хранятся только в Git history.
+- Для будущих принятых релизов используется единый `.github/workflows/publish-accepted-release.yml`.
+- Нормальная публикация начинается только с добавления нового immutable request в `.github/release/requests/`.
+- Request обязан фиксировать exact accepted Actions artifact ID, exact target commit, release metadata, final asset names и SHA-256.
+- После manual acceptance публикация не пересобирает installer/source: она только проверяет, переименовывает/стейджит и публикует exact accepted bytes.
+- Существующие tag/GitHub Release никогда не перезаписываются общим publisher.
+- Старые release notes сами по себе не запускают публикацию.
+- После публикации assets скачиваются повторно и проверяются по exact name/SHA-256.
+- Полный контракт: `docs/RELEASE_PUBLICATION.md`.
+
 ## Public naming rule
 
 В публичных материалах функции называются по назначению, а не по стороннему продукту, использованному как внутренний референс. Сторонние названия допустимы только для объективно нужной интеграции/API/protocol/dependency/license/legacy compatibility.
