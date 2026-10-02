@@ -58,7 +58,7 @@ Drift исправлен 2026-10-02.
 - W1 Space -> existing Spin;
 - Saved Auctions + dependent full New Auction workflow;
 - A8 compensating Undo;
-- B6 Pointauc API adapter contract;
+- B6 external auction-service API adapter contract;
 - provider adapters iHAQ Donate v2.0, ODA/OpenDonationAssistant, DonateX, VK Video Live, Kick, Donate Helper, DonatePay;
 - Twitch Channel Points/Custom Rewards live verification when eligibility allows.
 
