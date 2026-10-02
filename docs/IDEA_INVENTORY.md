@@ -368,6 +368,7 @@
 - **Release exact accepted bytes without rebuild after manual acceptance** — **DURABLE PROCESS RULE**.
 - **Candidate/FIX не считаются в release cadence; только принятые CURRENT/released** — **DURABLE PROCESS RULE**.
 - **C1 audit каждые 25 принятых releases/versions; перед фактическим gate счётчик сверяется по release history** — **DURABLE PROCESS RULE**.
+- **Release/QA defect numbering** — **DURABLE PROCESS RULE**: release/reconciliation findings use `QA-<version>-NN`; permanent D/A/W/B/E/R identifiers are not recycled for temporary defects/omissions.
 
 ---
 
@@ -613,6 +614,7 @@ The original third-pass conclusion was **superseded by the user's later repeated
 - The old local InOneLine write/control API proposal remains assistant-only/not user-approved; B6 is the separately accepted provider adapter.
 - Advanced History analytics remains user-accepted post-completion/post-integration work.
 - GitHub Issues remain tracking aids only, not the full backlog.
+- **Historical reference-archive gap**: the original 2026-08-21 external-reference screenshot set is not present in currently accessible Drive search. Decisions derived from that review survive through direct chat/text/dedup/dedicated-review evidence, but the missing original image bytes must not be claimed as archived or reconstructed as originals.
 - The post-correction **tenth orphan-only control was CLEAN**: after all corrections were written, no additional durable direct-user product requirement, future idea, rejection, UX rule, provider contract, deployment rule or process rule remained orphaned.
 - Therefore the repeated audit itself was **not zero-delta**, but the **final control after corrections had zero additional delta**.
 - Current runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
