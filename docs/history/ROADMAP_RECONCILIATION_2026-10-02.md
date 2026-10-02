@@ -464,3 +464,15 @@ No additional durable user-approved product requirement, future idea, rejection,
 
 This clean result applies to the **post-correction control pass**. The repeated audit itself was not zero-delta: it recovered/corrected the findings recorded in the seventh, eighth and ninth passes above.
 
+## Post-clean read-back documentation correction — 2026-10-02
+
+The final read-back found one stale **summary paragraph only**: Section XX of `IDEA_INVENTORY.md` still described the earlier third-pass conclusion as if no later findings had occurred.
+
+That conclusion was rewritten to reflect the authoritative repeated-audit result:
+- the repeated audit itself was not zero-delta;
+- QA-1.0.8-01/02/03 are explicitly tracked;
+- seventh–ninth pass recovered details are acknowledged;
+- the tenth **post-correction** orphan-only control remains CLEAN / zero additional delta.
+
+This was a documentation-consistency correction only. It did not recover another product requirement, did not change the roadmap order, and did not modify runtime/source/version/schema/migrations.
+
