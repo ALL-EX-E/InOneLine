@@ -75,7 +75,7 @@
 - **Прозрачны только interior cutouts game/webcam; фон, рамки, список, info/title остаются визуальными слоями** — **IMPLEMENTED / ACCEPTED**.
 - **Второй режим с полностью прозрачным фоном всего Browser Source** — **EXPLICITLY REJECTED / NOT PART OF THE PRODUCT**; прозрачность ограничена внутренними вырезами game/webcam, которые следуют геометрии и исчезают вместе с отключённым блоком.
 - **Фон сцены из файла + Stretch/Fit/Fill/Center** — **IMPLEMENTED / ACCEPTED**.
-- **Фоны PNG/JPG/JPEG/WebP/GIF/MP4/WebM** — **IMPLEMENTED / ACCEPTED**.
+- **Фоны PNG/JPG/JPEG/WebP/GIF/MP4/WebM** — **IMPLEMENTED / ACCEPTED**. Accepted background-library contract preserves the original/display filename metadata instead of losing the user-facing source name during managed registration/copy; current shared media model keeps `original_name`.
 - **Изменения сохранённых presentation settings применяются к открытым Browser Sources без смены URL** — **IMPLEMENTED / ACCEPTED**. Accepted 5.9 detail: only explicit Save/Apply changes authoritative viewer configuration; unsaved intermediate edits are not pushed. Ordinary settings updates require no manual OBS refresh and should preserve unrelated runtime visual/business state where practical; this is separate from E2 app-version stale-page reload.
 - **OBS композиция/позиционирование остаётся задачей OBS, а InOneLine даёт standalone responsive widgets** — **IMPLEMENTED / ACCEPTED**.
 
@@ -102,7 +102,7 @@
 
 ## Product S/A MAIN items
 
-- **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**.
+- **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**. Exact accepted legacy migration: existing RUB-denominated totals convert at **1 RUB = 1 SM point**, with positive fractional RUB rounded upward to a whole SM point. Historical `change_log` JSON is intentionally left untouched rather than rewritten into the new semantic model; current schema migration implements this boundary.
 - **S1 integer conversion rule** — **IMPLEMENTED / ACCEPTED**: результат зачисления всегда целое число SM points; положительный дробный результат округляется вверх одинаково для валют и неденежных service units; reverse `SM points → money` не используется.
 - **S1 unknown-rate pending/manual-apply contract** — **IMPLEMENTED / ACCEPTED**: если для пришедшей currency/service unit нет курса, external event сохраняется в pending и **не начисляет баллы автоматически**. После задания/сохранения курса pending event только становится готовым к обработке; начисление выполняется отдельным явным действием `Применить` с preview/confirmation, а не ретроактивно автоматически. Closed/paused historical auction state не переписывается при позднем применении.
 - **S1 conversion-row visibility** — **IMPLEMENTED / ACCEPTED**: обычные currency rows остаются доступны по registry/rate rules, а service-specific conversion row показывается только пока соответствующий сервис подключён/доступен. Отключение сервиса скрывает строку. Current implementation сохраняет ранее записанный rate в SQLite и возвращает его при повторной доступности строки; direct-user evidence этого pass подтверждает именно visibility rule, а сохранение rate фиксируется как текущая implementation behavior, не как отдельная новая пользовательская идея.
