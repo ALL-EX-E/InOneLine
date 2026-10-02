@@ -138,7 +138,7 @@
 
 # V. Rules / standalone widgets / stream UI
 
-- **WYSIWYG Rules editor**: templates CRUD, active template, validation, Undo/Redo, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, scrolling, unsaved-change protection — **IMPLEMENTED / ACCEPTED**.
+- **R2 / WYSIWYG Rules package**: editor + templates CRUD, active template, validation, Undo/Redo, fonts/sizes/colors/highlight, bold/italic/underline, alignment, bullets/numbering, scrolling, unsaved-change protection — **IMPLEMENTED / ACCEPTED**.
 - **Rules snapshot на сессию аукциона** — **IMPLEMENTED / ACCEPTED**.
 - **Standalone OBS Rules widget** — **IMPLEMENTED / ACCEPTED**.
 - **Rules OBS autoscroll** — **IMPLEMENTED / ACCEPTED**: overflow-only, pause top -> smooth down -> pause bottom -> reset, без сложных speed sliders в первой версии.
@@ -161,7 +161,7 @@
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
 - **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; live redemption verification отложена до Affiliate/Partner eligibility.
 - **B5 — `Ставки` feed автоматически принятых integration events** — **IMPLEMENTED / ACCEPTED**.
-- **DonationAlerts adapter** с browser auth/status и отдельным auction enable; public Client ID встроен, user вводит только authorization — **IMPLEMENTED / ACCEPTED**.
+- **I1 / DonationAlerts adapter** с browser auth/status и отдельным auction enable; public Client ID встроен, user вводит только authorization — **IMPLEMENTED / ACCEPTED**.
 
 ## Принятые, но отложенные service targets
 
