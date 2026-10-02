@@ -429,3 +429,38 @@ No new identifier was recovered, but several **directly accepted constraints had
 
 A final orphan-only direct-chat control is required after these precision restorations before declaring this repeated audit clean.
 
+## Tenth orphan-only control after seventh–ninth corrections — CLEAN — 2026-10-02
+
+A final direct-chat orphan-only search was run after all new findings from the repeated audit had already been written into canonical documentation.
+
+The search explicitly excluded the now-recorded:
+- QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03;
+- B1/B2/B3 exact contracts and provider details;
+- Rules/Widgets/Winner Verification exact UX/security boundaries;
+- D1–D43 including restored post-completion constraints;
+- E1–E4 deployment/release details;
+- publication/privacy/reference-naming/license/SmartScreen rules;
+- backup/uninstall/icon rules;
+- process/cadence and exact-tested-bytes release workflow.
+
+Returned direct-user decisions were already present in the updated inventory, including:
+- one-change -> version -> automated checks -> documentation -> Windows/manual verification -> explicit acceptance;
+- C1 every 25 accepted CURRENT/released versions;
+- localhost-only MAIN / LAN post-completion;
+- saved-widget settings live-apply;
+- rejected Video Requests and rejected separate top-level Wheel page.
+
+No additional durable user-approved product requirement, future idea, rejection, UX rule, provider contract, deployment rule or process rule remained orphaned.
+
+### CLEAN result
+
+- **New delta after the corrections: 0.**
+- D1–D43 accounted for; no actual D44 item.
+- All old implementation-order identifiers map to current inventory.
+- Current QA gaps explicitly tracked: **QA-1.0.8-01, QA-1.0.8-02, QA-1.0.8-03**.
+- Future dependency order unchanged.
+- Runtime/source/version/schema/migrations unchanged: **1.0.8 / 19 / 15**.
+- GitHub remains source of truth; Drive mirror is resynchronized after this pass.
+
+This clean result applies to the **post-correction control pass**. The repeated audit itself was not zero-delta: it recovered/corrected the findings recorded in the seventh, eighth and ninth passes above.
+
