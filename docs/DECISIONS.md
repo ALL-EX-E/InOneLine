@@ -115,7 +115,7 @@ These are historical/current invariants, not new implementation scopes.
 ## 2026-10-02 — Deep-history identifier/provenance corrections
 
 - Rules aliases are two stages, not one: **R1** = reusable Rules templates/WYSIWYG/local preview/session snapshot; **R2** = standalone OBS Rules viewer + viewer settings/live synchronization. The rejected temporary `Изменить текущие правила` live-only workflow is not a separate retained feature.
-- The historical assistant proposal for a separate local InOneLine write API (`POST /api/v1/bids`/generic `PUT /lot`) was **not directly user-approved**. User approval was for the dedicated Pointauc/B6 adapter using Pointauc's official Bearer API. Do not promote the assistant proposal into roadmap/backlog.
+- The historical assistant proposal for a separate local InOneLine write API (`POST /api/v1/bids`/generic `PUT /lot`) was **not directly user-approved**. User approval was for the dedicated B6 provider adapter using that provider's official API. Do not promote the assistant proposal into roadmap/backlog.
 - Early 0.2.x and pre-1.0 stabilization/release-stage user-approved scopes are historical implemented evidence and belong in `IDEA_INVENTORY.md`; they do not create new future roadmap items.
 - The accepted outside-auction integration rule is provider-neutral: a valid game-targeted external monetary/service-unit event may update persistent game points without a running auction, but may not create/start/resume an auction or mutate current auction/timer/wheel state; S2 requires an eligible running auction.
 
@@ -140,4 +140,15 @@ These are historical/current invariants, not new implementation scopes.
 - **D40 manual library order** остаётся отдельной future-идеей поверх current D26/D43 architecture и не восстанавливает старый Auction playlist без fresh review.
 - Retained provider scope уточнён по исходному Settings review: **Kick Channel Points / Custom Rewards** и **VK Video Live rewards/points**, оба feasibility-conditional до свежей проверки официального/надёжного API/auth/event contract.
 - Эти уточнения не добавляют новый implementation identifier и не меняют current runtime/version/schema/migrations.
+
+## 2026-10-02 — Seventh-pass B2/B3 provenance and publication corrections
+
+Повторный direct-chat + Drive review исправил две ошибки предыдущего reconciliation:
+
+- **B3 unknown-title outside-auction behavior was directly user-approved on 2026-09-02.** A valid outside-auction event with a usable unknown game title creates a normal persistent game and credits it in the same transaction. It must not create/start/resume an auction, `auction_only`, auction entry, timer or wheel state. Unknown conversion rate stays Pending and does not pre-create the game before credit can actually be applied. Current 1.0.8 source already implements this behavior.
+- **Generic B2 test-event safety was directly user-approved on 2026-08-28 through the DonateX review.** Provider events explicitly marked test/sandbox/demo must not credit real points, create/increment games/lots, change leader, trigger timer auto-extension, or affect wheel/winner logic. Diagnostics/history-only storage is allowed. Current 1.0.8 normalized-event core has no explicit test-event field/gate, so this is now tracked as **QA-1.0.8-02 / ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**.
+- Deferred donation adapters preserve one common B2/B3 contract: source+external-event-ID dedup; common source-unit conversion; message/order text as ordinary lot/game text while sender remains separate; immutable historical original source values + applied conversion rate + credited points; common timer path; official/reliable programmatic APIs only; no page/OBS/browser scraping.
+- Provider precision preserved: iHAQ/Donate Helper are feasibility-gated; DonatePay realtime path requires exact endpoint/auth/channel/payload/currency/event-ID revalidation; DonateX official API path was previously confirmed but live-delivery contract must be revalidated and its provider test flag must obey the common test-event safety rule.
+- Historical E1 native-EXE acceptance required the exact build output to visibly reach `[9/9] BUILD EXE: OK` with console kept open/full output visible; exact binary/manual QA and explicit user acceptance remained separate mandatory gates.
+- Public GitHub wording rule is reaffirmed: do not expose development-reference provenance in published files. A provider name may remain only where genuinely necessary as the name of the actual provider/integration/API itself.
 
