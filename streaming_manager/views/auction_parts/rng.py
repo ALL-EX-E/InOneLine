@@ -18,17 +18,12 @@ from PySide6.QtWidgets import (
 from ...constants import (
     AUCTION_WHEEL_FORMAT_ELIMINATION,
 )
-from ...random_sources import RandomDraw, RandomOrgClient
+from ...random_sources import RandomDraw
 from ...workers import FunctionWorker
 from ..winner_verification import format_verification_preview, show_readonly_text_dialog
 
 
 class AuctionRngMixin:
-    def _random_org_client(self) -> RandomOrgClient:
-        return RandomOrgClient(
-            self.db.get_random_org_api_key(),
-        )
-
     @staticmethod
     def _rng_user_data(auction_id: int, draw_info: dict) -> dict:
         snapshot = "|".join(
