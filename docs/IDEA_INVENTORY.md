@@ -514,7 +514,7 @@
 - **0.2.66 — random-number generator choices** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.67 — visual wheel** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.68 — wheel preview, smoothness and adding new lots during auction** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.69 — protection against clicks leaking through other windows/dialogs** — **IMPLEMENTED / ACCEPTED**.
+- **0.2.69 — whole-program Windows protection against accidental click-through via another foreground/overlaying program** — **IMPLEMENTED / ACCEPTED**. If a mouse event reaches Qt while the foreground window or window directly under the cursor belongs to another process, InOneLine consumes it before widgets react. The accepted guard applies across the whole program to click/release/double-click/wheel/context-menu and active drag movement; InOneLine's own windows/dialogs remain interactive. Current `input_guard.py` preserves this Win32 process/window ownership check.
 - **0.2.70 — local wheel smoothness rework** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.71 — readable local-wheel labels** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.72 — tie-wheel timing and larger time arrows/controls** — **IMPLEMENTED / ACCEPTED**.
