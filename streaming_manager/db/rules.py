@@ -48,10 +48,6 @@ class RulesMixin:
             )
         return name
 
-    @classmethod
-    def _normalized_rule_template_name(cls, value: Any) -> str:
-        return normalize_text_key(cls._validate_rule_template_name(value))
-
     def _ensure_default_rule_template_conn(self, conn: sqlite3.Connection) -> int:
         row = conn.execute(
             "SELECT id FROM auction_rule_templates ORDER BY is_active DESC, id ASC LIMIT 1"

@@ -234,13 +234,6 @@ class AuctionWheelWidget(QOpenGLWidget):
         return target * visual_progress, complete
 
     @staticmethod
-    def _short_title(text: str, limit: int = 22) -> str:
-        text = str(text or "").strip()
-        if len(text) <= limit:
-            return text
-        return text[: max(1, limit - 1)].rstrip() + "…"
-
-    @staticmethod
     def _fit_sector_font(
         painter: QPainter,
         title: str,

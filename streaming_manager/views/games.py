@@ -742,10 +742,6 @@ class GamesTab(QWidget):
         )
         self._update_action_state()
 
-    def _shrink_window_to_controls(self):
-        """Legacy compatibility no-op: child visibility must not resize MainWindow."""
-        return
-
     def toggle_games_list(self):
         self.set_games_list_visible(self.table.isHidden())
 
