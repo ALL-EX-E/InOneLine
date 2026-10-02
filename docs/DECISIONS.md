@@ -208,3 +208,16 @@ Current 1.0.8 source already follows these runtime rules: active validation filt
 
 Source review also found a **production-unreachable DonationAlerts manual-Client-ID fallback UI** after `has_built_in_client_id()`. The shipped path constructs `DonationAlertsAdapter()` with built-in public Client ID 20915 and returns before that fallback. Classification: **SOURCE-HYGIENE / COMPATIBILITY RESIDUE / NOT RUNTIME QA DEFECT / NOT AUTO-AUTHORIZED FOR CLEANUP**. Do not revive manual Client ID management as product scope.
 
+## 2026-10-02 — Sixteenth-pass B4 supersession and direct UI precision
+
+A new direct-chat/current-source recheck after the fifteenth CLEAN pass found a real documentation contradiction plus three compressed implemented decisions:
+
+- **B4 reward availability supersession:** the earlier accepted B4 design allowed app-managed Twitch rewards to follow auction/bid-intake state. The later direct-user I1/permanent-source decision on 2026-09-03 superseded that behavior. Current authoritative rule: Twitch rewards are enabled/disabled explicitly with the manual Settings controls and do **not** automatically follow auction start/resume/pause/finish. Channel Points intake remains a permanent connected source with source-time routing inside/outside auctions. Legacy `twitch_rewards_link_to_auction` and the old local Channel-Points intake toggle are compatibility-only, not current gates. Current 1.0.8 source already implements the later rule, so this is documentation correction rather than a runtime defect.
+- **RANDOM.ORG UI location:** the user directly moved the API-key configuration from `Настройки → Общие` to `Настройки → Интеграции`; B1 protected credential storage remains authoritative.
+- **OBS info-block date:** the user directly requested removal of the date from the lower-right OBS information block. Current accepted/runtime presentation keeps that date absent.
+- **Restore safety UI:** the accepted manual Restore flow rejects selecting the current working `data\streaming.db` as its own source, validates a real backup, creates a safety backup, then applies restore/restarts.
+
+The Games `Всего`/archive-counter behavior was also rechecked. Current code counts ordinary archived records in the Games total and excludes temporary `auction_only` rows until promotion, but the new direct-chat control did not recover a sufficiently clean standalone user wording beyond accepted implementation/history evidence to promote this as a newly recovered direct-user requirement. Existing inventory coverage for archive layout/counters remains unchanged.
+
+No runtime/source/version/schema/migration change is authorized or performed by this documentation correction.
+
