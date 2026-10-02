@@ -94,6 +94,33 @@ The original `v1.0.8` release remains the historical initial 1.0.8 publication. 
 
 Выполнены первые maintenance-шаги аудита: reuse-first восстановлен постоянный regression/QA foundation, исправлена сборка чистого Source ZIP и завершён filesystem/duplicate audit с принятой maintenance-сборкой 1.0.8. Следующий maintenance-пункт выбирается отдельно.
 
+## A4 Managed Media Sync — accepted 2026-10-02
+
+Maintenance scope A4 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#13**
+- Accepted candidate head: `8269dc99db3398ae4fa861fdcea3ef085ff517a1`
+- Squash merge on `main`: `278b77ca037756e1ef17f9b8f8634ad05d88e1fc`
+- Final candidate workflow: `36890302480` — **SUCCESS**
+- Final candidate artifact: `11176662125`
+- Post-merge main regression: `36949173717` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-media-sync-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted optimization:
+- managed-media category sync uses one SQLite connection/transaction instead of reopening/re-querying once per file;
+- D26 music/soundtrack stale-row semantics, external rows, IDs, original names and non-D26 recovery behavior remain preserved;
+- permanent regression now includes `tools/media_sync_smoke.py`.
+
+Exact accepted candidate bytes:
+- Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
+- Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
+
+The next unresolved maintenance item from the control audit is **A5 — verified unused/stale imports**. It requires a fresh exact-current review and must remain reuse-first.
+
 ## Regression foundation — restored 2026-10-01
 
 - PR: **#8**
