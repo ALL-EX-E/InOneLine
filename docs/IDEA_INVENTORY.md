@@ -185,7 +185,8 @@
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
 - **B4 — Twitch Channel Points / app-managed Custom Rewards** — **FUNCTIONALLY ACCEPTED / PARTIALLY ELIGIBILITY-DEPENDENT**. Архитектура/UX приняты; user correction допускает Channel Points contribution flow и во время, и вне активного аукциона по соответствующим правилам; live redemption verification отложена до Affiliate/Partner eligibility.
 - **B5 — `Ставки` feed автоматически принятых integration events** — **IMPLEMENTED / ACCEPTED**.
-- **General outside-auction integration rule** — **IMPLEMENTED/ACCEPTED ARCHITECTURAL RULE**: a valid game-targeted monetary or non-monetary external event may update persistent game points even when no auction is running; it must not create/start/resume an auction or mutate auction lot/timer/wheel state, and S2 timer extension requires an eligible running auction.
+- **General outside-auction integration rule** — **IMPLEMENTED/ACCEPTED ARCHITECTURAL RULE**: a valid monetary or non-monetary external event may update persistent Games even when no auction is running. If the adapter supplies a usable title that does not yet exist, the accepted rule is to create a **normal persistent game** and credit it in the same transaction; do not create/start/resume an auction, `auction_only` row, auction entry, timer state or wheel state. Unknown conversion rate remains Pending and does not pre-create the game before credit can actually be applied. S2 timer extension requires an eligible running auction.
+- **General B2 test/sandbox/demo event safety rule** — **USER-ACCEPTED / DURABLE SAFETY CONTRACT**: when a provider explicitly marks an event as test/sandbox/demo (e.g. a provider test flag), it must never mutate real business state: no SM-points credit, no create/increment lot/game, no leader change, no S2/3.3–3.5 timer extension, no wheel/winner effect. It may be retained only as technical integration diagnostics/history marked as test. **Current 1.0.8 generic normalized-event core has no explicit test-event field/gate**, so this accepted invariant is not represented generically yet; future adapters exposing an equivalent flag must enforce it through the common B2/B3 path. Track as **QA-1.0.8-02 / ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / NOT AUTO-AUTHORIZED**; no current supported-provider reproduction was established in this audit.
 - **I1 / DonationAlerts adapter** — **IMPLEMENTED / ACCEPTED**: browser authorization/status, public Client ID встроен, пользователь проходит только авторизацию. **Поздний контракт supersedes ранний auction-only toggle:** подключение/enable интеграции является permission на постоянный intake; donations маршрутизируются по source timestamp в running auction либо в persistent game list вне аукциона. Отдельного `учитывать только в аукционе` intake-переключателя больше нет.
 
 ## Принятые, но отложенные service targets
@@ -194,10 +195,11 @@
 
 - **Kick Channel Points / Custom Rewards** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**; это сохранённый provider capability scope, а не generic «любая интеграция Kick». Перед реализацией заново подтвердить официальный/надёжный API/auth/event contract.
 - **VK Video Live rewards/points** — **ACCEPTED / DEFERRED / FEASIBILITY-CONDITIONAL**; сохранённый scope относится к viewer/channel reward/points capability и требует свежего official API/auth/event feasibility review.
-- **iHAQ Donate v2.0** — **ACCEPTED / DEFERRED**.
-- **Donate Helper** — **ACCEPTED / DEFERRED**.
-- **DonatePay** — **ACCEPTED / DEFERRED**.
-- **DonateX** — **ACCEPTED / DEFERRED**.
+- **Common deferred donation-adapter contract** — **USER-ACCEPTED / PRESERVE**: reuse one B2/B3 ingestion path; deduplicate by source + external event ID; convert source currency/unit through common S1/POINT 5.4 rules; donation message/order text is the ordinary game/lot text while sender identity remains separate metadata; preserve original amount/unit/message/sender/event ID/time, applied conversion rate and resulting SM points in immutable history so later rate changes do not rewrite old donations; reuse common timer rules rather than provider-specific auction logic; use official/confirmed reliable programmatic APIs only, never page scraping/OBS-widget parsing/browser automation.
+- **iHAQ Donate v2.0** — **ACCEPTED / DEFERRED / FEASIBILITY-GATED**. Preserve source/user/amount/currency/message/event identifiers; special interactive/super-donation mechanics are not automatically auction bets without a later explicit rule.
+- **Donate Helper** — **ACCEPTED / DEFERRED / FEASIBILITY-GATED**. Official API/reliable transport/payload must be freshly verified; if no reliable programmatic interface exists, defer. Common history/conversion/matching rules remain authoritative.
+- **DonatePay** — **ACCEPTED / DEFERRED / FEASIBILITY-GATED**. Realtime API/Centrifugo-style path was considered technically plausible, but exact current endpoint/auth/channel/payload/currency/event-ID contract must be reverified; REST recovery/reconciliation only where current API supports it.
+- **DonateX** — **ACCEPTED / DEFERRED / OFFICIAL-API PATH PREVIOUSLY CONFIRMED, DELIVERY CONTRACT TO REVERIFY**. Preserve its provider test flag when present and apply the general B2 test-event safety rule; exact current live-delivery/auth/cursor/payload/identifier contract must be rechecked before implementation.
 - **ODA/OpenDonationAssistant** — **DEFERRED / CONTRACT-BLOCKED** до безопасного official auth/event/history contract.
 - **B6 Pointauc API adapter** — **ACCEPTED / DEFERRED**. Поздняя refinement: normal direction — InOneLine source of truth -> external mirror; emergency recovery только явно подтверждённым оператором. Перед кодом заново определить conflicts, IDs, dedup, writes/recovery.
 - **Older YouTube platform/integration candidate** — **RETAINED / SCOPE UNDEFINED**. Не путать с D41 chat provider и не путать с historical soundtrack-source wording.
@@ -319,7 +321,7 @@
 - **Отдельный сложный advanced autoscroll control с independent speed/pause sliders** — **REJECTED/SUPERSEDED** простым/существующим scrolling behavior.
 - **Отдельный второй Rules backend/text store** — **REJECTED BY ARCHITECTURE**; viewer uses authoritative Rules state.
 - **Отдельный `Изменить текущие правила` live-only editor/workflow** — **REJECTED/SUPERSEDED**; R2 correction keeps one ordinary `Правила аукциона` editor usable at any time and synchronizes the unfinished session copy when appropriate.
-- **Отдельный InOneLine write/control Integration API (`POST /api/v1/bids`/generic `PUT /lot`) вне B6 contract** — **NOT USER-APPROVED / HISTORICAL ASSISTANT PROPOSAL**. Direct user approval was for the dedicated Pointauc/B6 adapter using Pointauc's official API; do not invent a separate local write API from the old proposal.
+- **Отдельный InOneLine write/control Integration API (`POST /api/v1/bids`/generic `PUT /lot`) вне B6 contract** — **NOT USER-APPROVED / HISTORICAL ASSISTANT PROPOSAL**. Direct user approval was for the dedicated B6 provider adapter using that provider's official API; do not invent a separate local write API from the old proposal.
 - **Обратная конвертация internal SM points -> money как продуктовая функция** — **CANCELLED/SUPERSEDED**; S1 финально использует one-way source unit/currency -> integer SM points, positive values round upward.
 - **Split installation с runtime отдельно, AppData как основной user-data root** — **REJECTED**; выбран один install root (default `C:\InOneLine`) с user-selectable destination.
 - **Ранний release-only план «публичный GitHub без публикации source»** — **SUPERSEDED** поздним решением публиковать официальный SOURCE вместе с INSTALLER и использовать custom free-use/no-paid-redistribution license.
@@ -337,7 +339,7 @@
 
 # XIII. E-series / installer / deployment — выполнено
 
-- **E1 — production EXE/PyInstaller readiness** — **IMPLEMENTED / ACCEPTED**.
+- **E1 — production EXE/PyInstaller readiness** — **IMPLEMENTED / ACCEPTED**. Historical native-EXE acceptance gate required the exact `build_exe.bat` run to visibly reach `[9/9] BUILD EXE: OK`; an auto-closing console was not accepted, so the run was repeated from CMD/PowerShell with the console left open (`pause` / `Press any key to continue...`) and full output visible. Build success itself still did not equal release acceptance: exact binary/manual EXE verification + explicit user approval remained mandatory.
 - **E2 — stale OBS Browser Source version-handshake/cache-busting reload** — **IMPLEMENTED / ACCEPTED**.
 - **E3 — tie extra-time default using existing duration model** — **IMPLEMENTED / ACCEPTED**; отдельная лишняя настройка не создаётся.
 - **E4 — Windows Long Path/deep path deployment contract** — **IMPLEMENTED / ACCEPTED** в поддерживаемом <260 path contract. Arbitrary >=260 direct portable launch — out of scope/new separate scope, не unfinished E4.
@@ -486,7 +488,7 @@
 - **0.2.57 — Auction table** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.58 — local Auction mode foundation** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.59 — nested Auction tabs** — **IMPLEMENTED / ACCEPTED**.
-- **0.2.60 — per-subtab `Правила вкладки / Скрыть правила` on Auction → Lots / Conducting / Pointauc**; help text hidden by default and toggled locally — **IMPLEMENTED / ACCEPTED**.
+- **0.2.60 — per-subtab `Правила вкладки / Скрыть правила` on Auction → Lots / Conducting / legacy third subtab**; help text hidden by default and toggled locally — **IMPLEMENTED / ACCEPTED**.
 - **0.2.61 — conduct auction from one operator surface**: manual bid moved from Lots to Conducting; Conducting contains its own current-session lot list/search/manual amount controls; smooth ping-pong autoscroll pauses for real user interaction; manual amount field drops the old ₽ suffix — **IMPLEMENTED / ACCEPTED**.
 - **0.2.62 — Conducting interaction/synchronization corrections**: timer refresh no longer steals input focus; autoscroll pauses while interacting; manual amount/status changes propagate immediately across Games/Public/both Auction lists/Journal and OBS/API through the common DB path; Conduct search/selection synchronizes correctly — **IMPLEMENTED / ACCEPTED CORRECTIONS**.
 - **0.2.63 — direct search/focus/info/tie UX decisions** — **IMPLEMENTED / ACCEPTED**: Auction search field is simply `Поиск`; switching Auction tabs does not automatically transfer focus into search; OBS `Текст информационного блока` has no preset dropdowns; tie state is named `Несколько победителей` and offers `Дополнительное время` or wheel; tie-wheel leaders use equal chances, including all-zero tie fallback.
@@ -584,7 +586,7 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 - **R1.0.8 retained fix — minimum-window vertical readability**: Settings pages and Auction/Conduct use vertical scroll/minimum-layout constraints instead of collapsing/overlapping dense controls — **IMPLEMENTED IN FINAL 1.0.10** after the R1.0.8 candidate exposed a residual time-field defect.
 - **R1.0.9 retained UI organization** — **USER APPROVED / IMPLEMENTED IN FINAL 1.0.10**:
   - Auction top-level subtabs reduced to Lots / Conducting; visible Auction Export removed;
-  - new Settings → Export centralizes CSV/JSON/Excel + Pointauc CSV/Copy list;
+  - new Settings → Export centralizes CSV/JSON/Excel + legacy auction-pipe CSV/Copy list;
   - Public List keeps search/Public XLSX but loses duplicate CSV/JSON/Excel buttons;
   - shared main-list XLSX controls move to Games;
   - auction time editors receive explicit readable width floors.
@@ -599,7 +601,7 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
 - Восстановлены granular 0.2.x implementation ledger, отдельный August Stabilization A1–A12/A7.1/A11.1 namespace и pre-1.0 stabilization/release-stage ledger.
 - Исправлено сопоставление Rules: **R1 = editor/templates/session snapshot**, **R2 = standalone OBS Rules viewer**.
 - Восстановлены direct UX details Auction/Conducting, Saved/New Auction, A6.1, B1/B2, D19 picker, W2 repair flow и provider-neutral outside-auction contribution rule.
-- Старый отдельный local write API `POST /api/v1/bids`/generic `PUT /lot` подтверждён как assistant-only proposal, а не user-approved backlog; пользователь утвердил Pointauc/B6 adapter.
+- Старый отдельный local write API `POST /api/v1/bids`/generic `PUT /lot` подтверждён как assistant-only proposal, а не user-approved backlog; пользователь утвердил dedicated B6 provider adapter.
 - Зафиксирован superseded initial GitHub release-only/no-source plan и более поздняя official SOURCE+INSTALLER/license model.
 - Advanced History analytics остаётся **USER-ACCEPTED post-completion/post-integration**, D9–D12 сохраняют direct-user provenance/conditionality.
 - Все новые находки этого прохода — реализованные/закрытые/исторические решения или уточнения provenance; **нового future implementation candidate не найдено**.
