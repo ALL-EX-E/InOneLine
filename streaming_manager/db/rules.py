@@ -18,7 +18,7 @@ from ..constants import (
     RULES_OVERLAY_VISIBLE_KEY,
 )
 from ..rules_html import sanitize_rules_html
-from .common import utc_now
+from .common import normalize_text_key, utc_now
 
 
 class RulesMixin:
