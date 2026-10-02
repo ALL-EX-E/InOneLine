@@ -198,3 +198,22 @@ Cross-check result of all five dedicated reference reviews:
 - ROADMAP current future ordering does not change as a result of this pass.
 
 The third pass therefore changed historical precision/current invariants, but did not add a new implementation candidate.
+
+
+## Final orphan search after third-pass corrections — 2026-10-02
+
+Additional recovered direct-user items after comparing chat history against the already-expanded IDEA_INVENTORY:
+- `Игры -> Очистить все игры` — implemented/accepted; blocked while an auction is open, destructive typed confirmation, automatic backup, completed History and Journal preserved.
+- `Журнал` search — implemented/accepted; a real query searches the complete journal and can match visible and raw event fields, not only the normal recent-row window.
+- `Настройки -> Восстановить из резервной копии...` — implemented/accepted; selected DB is validated and current state is safety-backed up before restore.
+- S1 integer conversion rule — implemented/accepted; positive fractional conversion results round upward for currencies and service units; no reverse SM-points-to-money product output.
+
+A final account-history orphan search performed after these additions returned no further direct user-proposed product item. It surfaced only:
+- the previously known outside-auction contribution rule, now covered by the corrected permanent-source integration entries;
+- an old assistant-proposed backup-retention idea (`last N` / `N days`) with no recovered direct user proposal/acceptance, so it remains intentionally outside the user-idea inventory.
+
+Final result of this pass:
+- no new future implementation candidate;
+- no D44;
+- ROADMAP ordering unchanged;
+- IDEA_INVENTORY historical/implemented coverage expanded and corrected.
