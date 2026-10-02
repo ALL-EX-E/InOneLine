@@ -379,7 +379,7 @@
 - **Публично указать, что InOneLine создан автором с помощью ChatGPT от OpenAI; другие нейросети не использовались** — **IMPLEMENTED / ACCEPTED**.
 - **Программа и source можно бесплатно использовать, изменять и бесплатно распространять; платное распространение запрещено** — **IMPLEMENTED / ACCEPTED** custom license policy.
 - **Не покупать платный Authenticode; документировать SmartScreen/Unknown Publisher UX** — **USER DECISION / IMPLEMENTED IN DOCS**.
-- **В публичных материалах называть функции по назначению, а не именем стороннего reference product; сторонние названия только для реальных integrations/APIs/dependencies** — **USER DECISION / PRESERVE**.
+- **В публичных GitHub-файлах не раскрывать названия сторонних программ, использованных только как development/UI/UX reference; правило относится и к старым публичным документам** — **DIRECT USER DECISION / PRESERVE**. Функции называются по назначению. Названия реально поддерживаемых внешних сервисов используются только там, где они необходимы для фактической интеграции или совместимости. B6 в публичной документации остаётся обезличенным external auction-service API adapter.
 - **Release exact accepted bytes without rebuild after manual acceptance** — **DURABLE PROCESS RULE**.
 - **Candidate/FIX не считаются в release cadence; только принятые CURRENT/released** — **DURABLE PROCESS RULE**.
 - **C1 audit каждые 25 принятых releases/versions; перед фактическим gate счётчик сверяется по release history** — **DURABLE PROCESS RULE**.
