@@ -120,10 +120,11 @@
 - **S2 — timer auto-extension** по actual leader change / genuinely new lot / external donation, threshold, dedup, max-one-extension collision rule и 24h ceiling — **IMPLEMENTED / ACCEPTED**.
 - **Внешнее денежное автопродление + optional service units** — **IMPLEMENTED / ACCEPTED** окончательно в 1.0.3.
 - **Core «История аукционов»**: period filter, base summary, all closed sessions, newest-first, search/sort, pagination/lazy loading, read-only details — **IMPLEMENTED / ACCEPTED**.
-- **Winner Verification snapshot** — **IMPLEMENTED / ACCEPTED**.
-- **Deterministic read-only re-check из snapshot** — **IMPLEMENTED / ACCEPTED**.
-- **Verification inside completed-auction details** — **IMPLEMENTED / ACCEPTED**.
-- **Optional pre-spin `Данные проверки` без обязательного viewer overlay** — **IMPLEMENTED / ACCEPTED**.
+- **Winner Verification immutable per-run snapshot** — **IMPLEMENTED / ACCEPTED**: preserve the exact ordered participants and effective weights/chances, effective draw range/equal-weight fallback as applicable, selected RNG method, generated random value, resolved winner, timestamp and algorithm/mapping version; Random.org+ reuses the existing signed ticket/signature evidence where present. Later game/app edits must not rewrite this historical snapshot.
+- **Deterministic read-only re-check из snapshot** — **IMPLEMENTED / ACCEPTED**: mathematical replay/check only; it never redraws RNG, changes winner, mutates auction state or rewrites history.
+- **Verification inside completed-auction details** — **IMPLEMENTED / ACCEPTED**; no duplicate top-level verification page.
+- **Optional pre-spin `Данные проверки`** — **IMPLEMENTED / ACCEPTED**: read-only frozen participant/weight/chance/range/RNG data and Random.org+ Ticket ID where present; opening it is never required before spin and never mutates RNG/ticket/winner state; no mandatory viewer OBS overlay is created.
+- **D7 whole-snapshot cryptographic hardening boundary** — **USER-ACCEPTED / POST-COMPLETION ONLY**: MAIN relies on immutable app snapshot + existing Random.org+ signed authenticity where applicable + deterministic replay/read-only History. A same-database SHA-256 alone is explicitly **not** considered meaningful protection against intentional tampering. Whole-snapshot signing, protected key management, external hash publication/notarization or independent off-app verification require a separate future security design.
 
 ---
 
