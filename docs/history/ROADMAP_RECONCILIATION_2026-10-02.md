@@ -286,3 +286,29 @@ Final result of this pass:
 - ROADMAP future dependency order unchanged;
 - runtime/source/version/schema/migrations unchanged by this documentation pass.
 
+## Fifth full recheck — chats + Drive + GitHub — 2026-10-02
+
+Выполнен ещё один независимый проход по доступной истории чатов, старым Drive Project State/Master/Implementation Order и dedicated History/Widgets/Settings/Winner Verification reviews, текущему GitHub main/source, Issues, branches и PR history. Результаты сверены против уже обновлённых canonical docs.
+
+### Additional documentation deltas recovered
+- Future wheel entries **D16–D24 и D27** присутствовали в inventory по идентификаторам, но часть принятых design constraints была слишком сильно сжата. Exact retained constraints восстановлены в `IDEA_INVENTORY.md`: local-only/no-RNG hover; random-duration animation-only semantics; presentation-only wheel themes; logical-vs-visual D20 fragments; D22 temporary tournament weights; D23 import formats/destinations/preview/merge rules; D24 independent viewer list semantics; D27 physics-mode review boundary.
+- Старый accepted Timer/Auction Music playlist contract был найден в Widgets review, но current release evidence показал более позднюю supersession: **D26 / 1.0.7** заменил current Auction soundtrack behavior на один выбранный зацикленный файл из shared `data\soundtrack`; старый playlist/checkbox больше не используется. Inventory/Decisions/Roadmap исправлены так, чтобы D40 не мог ошибочно восстановить superseded pre-D26 playlist автоматически.
+- Provider target precision восстановлена из Settings review: retained future targets — **Kick Channel Points / Custom Rewards** и **VK Video Live rewards/points**, оба feasibility-conditional; generic provider-name compression была недостаточно точной.
+- GitHub repository hygiene: открыт stale PR **#9 `Make 1.0.8 regression foundation persistent`**. Его purpose уже superseded принятым merged PR #11 `Make 1.0.8 regression foundation permanent`. PR #9 не является скрытым feature scope и не меняет CURRENT; в ходе audit он не закрывался автоматически.
+
+### Mechanical cross-check
+- Старый `APPROVED_FUTURE_IMPLEMENTATION_ORDER_CURRENT`: все обнаруженные буквенно-цифровые identifiers имеют mapping в current `IDEA_INVENTORY.md`; unmapped future identifier line = 0.
+- D1–D43 остаются учтены; D44 не найден.
+- Open Issues: только #4 Global Multi-File Import и #5 D22 Battle Royale; Issues по-прежнему не являются полным backlog.
+- PR history: #1/#2/#6/#7/#8/#11–#18 merged/closed, #10 closed/unmerged, #9 stale/open as noted above.
+- Historical candidate/maintenance branches не дали нового hidden product scope; их apparent divergence в основном объясняется squash merges и дальнейшим развитием main.
+- Source TODO/FIXME/future scan не обнаружил отдельной незаписанной product feature.
+- Public Pointauc-name occurrences in current GitHub are tied to actual B6/API provenance/integration context; отдельного нарушения public naming rule на этом проходе не зафиксировано.
+
+### Result
+- Новая runtime accepted-requirement omission этого full pass остаётся одна: **QA-1.0.8-01**.
+- Остальные новые находки этого прохода — documentation precision/supersession/repository-hygiene corrections.
+- Нового durable user-approved future implementation identifier не найдено.
+- Retained future dependency order не изменён.
+- Runtime/source/version/schema/migrations не менялись: **1.0.8 / 19 / 15**.
+
