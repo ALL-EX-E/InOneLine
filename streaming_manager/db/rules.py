@@ -18,7 +18,7 @@ from ..constants import (
     RULES_OVERLAY_VISIBLE_KEY,
 )
 from ..rules_html import sanitize_rules_html
-from .common import normalize_text_key, utc_now
+from .common import utc_now
 
 
 class RulesMixin:
@@ -47,10 +47,6 @@ class RulesMixin:
                 f"Название шаблона не может быть длиннее {cls.RULE_TEMPLATE_NAME_MAX} символов."
             )
         return name
-
-    @classmethod
-    def _normalized_rule_template_name(cls, value: Any) -> str:
-        return normalize_text_key(cls._validate_rule_template_name(value))
 
     def _ensure_default_rule_template_conn(self, conn: sqlite3.Connection) -> int:
         row = conn.execute(
