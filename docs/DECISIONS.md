@@ -303,3 +303,16 @@ A new direct-chat comparison after the twenty-second pass recovered two accepted
 
 These are documentation-precision findings only. No runtime/source/schema/version/migration change is authorized or required by this pass.
 
+## 2026-10-02 — Twenty-fourth pass D26 media-identity and external-soundtrack contract
+
+Direct-chat + accepted 1.0.7 release evidence confirms the following D26 rules are durable:
+
+- Music Player media identity/dedup is case-insensitive by filename across managed + external rows.
+- Importing an external duplicate does not create another row; one match may select the existing track, while multiple matches are informational only and do not auto-navigate/search.
+- `Копировать в программу` on an existing external Music Player row promotes that same record to managed while preserving media ID and queue position.
+- External Auction/Wheel soundtrack references are context-local selections, not reusable members of the shared managed soundtrack library.
+- Missing selected external soundtrack clears safely without a D26 recovery-button flow.
+- Managed `data\music` and `data\soundtrack` remain filesystem-synchronized managed sources; full backup includes managed bytes/settings/selections, not bytes of external references.
+
+These details are implemented in current 1.0.8 and do not reopen D26 or alter D40.
+
