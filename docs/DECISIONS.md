@@ -293,3 +293,13 @@ The next Drive+chat+release control recovered three accepted details that were p
 
 No runtime defect or new roadmap identifier is created by these documentation restorations.
 
+## 2026-10-02 — Twenty-third pass S1 pending/manual-apply precision
+
+A new direct-chat comparison after the twenty-second pass recovered two accepted S1 details that were implemented in current 1.0.8 but still compressed out of the exhaustive ledger:
+
+- Unknown-rate external events remain pending and **do not auto-credit** when a rate later appears. Saving the rate only moves the item into a manually applicable state; the operator must explicitly press `Применить` and confirm the previewed conversion.
+- Service-specific conversion rows are visible only while the corresponding integration capability/service is connected/available; ordinary currency rows follow the persistent registry/rate model. Current implementation keeps the saved service-unit rate while its row is hidden and restores it when visible again, but this persistence is recorded as implementation behavior rather than a separately proven direct-user requirement.
+- Late manual application must not retroactively rewrite a closed/paused auction; current `apply_pending_conversion_event()` preserves that historical boundary.
+
+These are documentation-precision findings only. No runtime/source/schema/version/migration change is authorized or required by this pass.
+
