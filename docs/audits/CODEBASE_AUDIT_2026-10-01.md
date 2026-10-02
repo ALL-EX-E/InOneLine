@@ -22,13 +22,14 @@ The findings below are retained as the historical audit record. Current executio
 - **A5** verified unused/stale imports — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #14; post-merge regression `36952721884` SUCCESS.
 - **A6** confirmed dead private helpers / compatibility no-ops — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #15; post-merge regression `36959577220` SUCCESS. Seven verified dead/private helpers removed; explicit compatibility shims retained. The first candidate was rejected after manual QA exposed a missing runtime import, then corrected with permanent dependency regression coverage.
 - **A7** duplicated historical publish workflows / CI publication consolidation — **CLOSED / ACCEPTED / MERGED** in PR #16; post-merge regression `36962356315` SUCCESS. Historical per-release publishers retired from active CI; one immutable-request publisher added; historical releases/tags/assets unchanged.
-- **A8** GitHub Actions version refresh for current deprecation warnings — next unresolved maintenance item; requires fresh exact-current review.
-- **A9** installer admin/HKCU warning — remains pending dedicated installer review.
+- **A8** GitHub Actions version refresh for current deprecation warnings — **CLOSED / ACCEPTED / MERGED** in PR #17; post-merge regression `36964693520` SUCCESS; post-merge wording log has no Node 20/deprecation warning. Active checkout/setup-python/upload-artifact references are on major v7 with permanent regression coverage.
+- **A9** installer admin/HKCU warning — next unresolved maintenance item; requires dedicated installer review and must not change privilege mode casually.
 
 Canonical A4 QA: `docs/qa/1.0.8-media-sync-maintenance.md`.
 Canonical A5 QA: `docs/qa/1.0.8-unused-import-maintenance.md`.
 Canonical A6 QA: `docs/qa/1.0.8-dead-helper-maintenance.md`.
 Canonical A7 QA: `docs/qa/1.0.8-publication-ci-maintenance.md`.
+Canonical A8 QA: `docs/qa/1.0.8-actions-version-maintenance.md`.
 
 ## Audit goal
 
