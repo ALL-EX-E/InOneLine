@@ -451,7 +451,7 @@
 
 ## 0.2.0–0.2.22 — Games/Public foundation refinements
 
-- **0.2.0 — enlarged/cleaner UI foundation**: скрытый technical ID, status/archive counters, improved search/selection, compact review rendering, local-time updated_at, no-op save/import does not reorder/update timestamp, pre-import backup, Public search/count/local JSON, OBS/API helpers, detailed Journal changes — **IMPLEMENTED / ACCEPTED**.
+- **0.2.0 — enlarged/cleaner UI foundation**: скрытый technical ID, status/archive counters, improved search/selection, compact review rendering, local-time `updated_at`, pre-import backup, Public search/count/local JSON, OBS/API helpers, detailed Journal changes — **IMPLEMENTED / ACCEPTED**. Direct early sorting contract: `updated_at DESC` is the final business tie-breaker before stable ID; every real edit, including review text, updates it, while no-op save/import and reverting to the original values must not change `updated_at` or reorder the row.
 - **0.2.1 — explicit save confirmation + unsaved-close warning** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.2 — confirmation only for real edits; reverting to original values counts as no change** — **IMPLEMENTED / ACCEPTED**.
 - **0.2.3 — irreversible Delete game with warning + safety backup, distinct from Archive** — **IMPLEMENTED / ACCEPTED**.
