@@ -312,3 +312,18 @@ Final result of this pass:
 - Retained future dependency order не изменён.
 - Runtime/source/version/schema/migrations не менялись: **1.0.8 / 19 / 15**.
 
+## Sixth orphan-only control after all corrections — 2026-10-02
+
+После fifth full recheck выполнены дополнительные direct-conversation orphan searches уже с исключением всего занесённого в обновлённый inventory.
+
+Recovered documentation precision before the final zero-delta result:
+- direct OBS layout detail: current-game title centered above game frame; disabling the lower-right info block reuses/frees that area for list layout;
+- 19 August Auction UX details expanded: search label `Поиск`, no automatic search focus on subtab switch, no preset dropdowns for OBS information-block text, tie label `Несколько победителей` with additional-time or wheel paths, equal-chance tie wheel including all-zero fallback;
+- Product A2 numeric new-lot field and shared manual points/bid field preserve the no-native-spin-arrows decision;
+- Product A2 explanatory temporary-lot rule preserved with later corrected semantics: current-auction-only while open; completion/cancel promotes to Games; confirmed winner -> `ПРОХОДИТСЯ`, otherwise `НЕ ИГРАЛ`;
+- D9 future localization boundary restored: centralized UI/program-string localization only; user data, game titles and historical content are not automatically translated.
+
+Final orphan-only search after these additions returned no additional direct user-approved product/UX/future requirement. Returned items were already mapped decisions, historical test facts or previously rejected/superseded/assistant-only material.
+
+**Final result of this control pass: ZERO NEW PRODUCT/FUTURE DELTA after documentation corrections.**
+
