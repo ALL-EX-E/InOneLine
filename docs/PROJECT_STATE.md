@@ -1,6 +1,6 @@
 # InOneLine — Current Project State
 
-Обновлено: **2026-10-01**
+Обновлено: **2026-10-02**
 
 ## CURRENT / RELEASED
 
@@ -119,7 +119,38 @@ Exact accepted candidate bytes:
 - Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
 - Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
 
-The next unresolved maintenance item from the control audit is **A5 — verified unused/stale imports**. It requires a fresh exact-current review and must remain reuse-first.
+A5 verified unused/stale imports is now closed. The next unresolved maintenance item from the control audit is **A6 — confirmed dead private helpers / compatibility no-ops**. It requires a fresh exact-current compatibility review before any deletion.
+
+## A5 Verified Unused Imports — accepted 2026-10-02
+
+Maintenance scope A5 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#14**
+- Candidate build commit: `8a7a79e38b34912ab77493c20372bf4f9d75b3d4`
+- Final clean PR head: `9f13c0ceff19217bcf62dfebc3b5dc15a86886b1`
+- Squash merge on `main`: `15990f955e596d87436044b38548f53d3b033e00`
+- Corrected candidate regression: `36950070546` — **SUCCESS**
+- Candidate build: `36950066325` — **SUCCESS**
+- Candidate artifact: `11203681918`
+- Final clean PR regression: `36950474408` — **SUCCESS**
+- Post-merge main regression: `36952721884` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-unused-import-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted cleanup:
+- removed **366** verified unused imported names from 10 UI modules;
+- preserved intentional re-exports and compatibility contracts;
+- the permanent GUI gate caught and prevented accidental removal of the `AuctionTimeDialog` compatibility re-export;
+- A6 private helpers and compatibility shims were not touched.
+
+Exact accepted candidate bytes:
+- Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
+- Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
+
+The next unresolved maintenance item is **A6 — confirmed dead private helpers / compatibility no-ops**.
 
 ## Regression foundation — restored 2026-10-01
 
