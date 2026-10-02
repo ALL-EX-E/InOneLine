@@ -255,3 +255,34 @@ Final result of this pass:
 - D44 still does not exist;
 - current ROADMAP selection/order remains unchanged;
 - `docs/IDEA_INVENTORY.md` is now the exhaustive historical ledger, while `docs/ROADMAP.md` remains the short future-selection view.
+
+## Fourth independent cross-source pass — 2026-10-02
+
+После финального deep chronological pass выполнена ещё одна проверка уже против обновлённых `IDEA_INVENTORY.md` / `ROADMAP.md` / `DECISIONS.md`, direct conversation history, старых Drive master/order/audit records и exact current 1.0.8 source.
+
+### Newly recovered accepted detail
+- Старый user-accepted B1 contract для compact `Аукцион → Проведение` integration status включал **время последнего принятого integration event** наряду с configured/used-only services, persistent error visibility и переходом в Settings.
+- Current 1.0.8 всё ещё сохраняет `integration_connections.last_event_at`; Settings показывает `Последняя принятая активность`; Conduct integration status/dialog не показывает это время.
+- Более позднего direct-user решения убрать этот элемент из Conduct не найдено.
+- Классификация: **QA-1.0.8-01 / ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED / NOT AUTO-AUTHORIZED**.
+- Это не новый D-item и не новая feature idea; retained future dependency order не меняется.
+
+### B1/B2 detail-preservation correction
+Предыдущий reconciliation утверждал, что B1/B2 detail contracts восстановлены, но exhaustive inventory снова слишком сильно сжал их. В `IDEA_INVENTORY.md` теперь явно закреплены:
+- compact Conduct configured/used-only service status, persistent error visibility, Settings navigation и accepted last-event time;
+- Disconnect != Remove, confirmation + history preservation;
+- provider capabilities / non-blocking network rule;
+- B2 Twitch Public Device Code/no-Client-Secret lifecycle, protected credentials, validation/refresh/error states и Connect/Reconnect/Disconnect/Remove semantics.
+
+### Rejected false positives in this pass
+- B3 outside-auction event for a title absent from the permanent Games list: automatic creation/`Требует привязки` wording was recovered only as an assistant proposal, not a direct user-approved durable requirement.
+- Generic provider `test/sandbox/demo` event suppression appeared in an assistant-authored Settings review block, but this pass did not recover a direct user approval sufficient to promote it into the user idea inventory.
+- W2 separate managed-media folders are not missing: the final inventory already records the per-purpose managed-folder rule and current runtime preserves the active categories.
+
+### Result before the next requested full recheck
+- one accepted-requirement QA omission recovered: **QA-1.0.8-01**;
+- no D44;
+- no newly approved future feature identifier;
+- ROADMAP future dependency order unchanged;
+- runtime/source/version/schema/migrations unchanged by this documentation pass.
+
