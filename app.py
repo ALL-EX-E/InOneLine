@@ -106,13 +106,25 @@ def main() -> int:
 
         from streaming_manager.database import Database
         from streaming_manager.input_guard import WindowsInputGuard
+        from streaming_manager.single_instance import acquire_instance_lock
         from streaming_manager.ui import MainWindow
 
-        db = Database(paths.database_path)
         app = QApplication(sys.argv)
         app.setApplicationName(LEGACY_SETTINGS_APP_NAME)
         app.setApplicationDisplayName(APP_NAME)
         app.setOrganizationName("Local Streaming Tools")
+
+        instance_lock = acquire_instance_lock(paths.data_dir)
+        if instance_lock is None:
+            QMessageBox.information(
+                None,
+                APP_NAME,
+                "In one line уже запущена.",
+            )
+            return 0
+        app._inone_line_instance_lock = instance_lock
+
+        db = Database(paths.database_path)
 
         icon_path = paths.resource_path("assets", "InOneLine_icon_master.png")
         if icon_path.is_file():
