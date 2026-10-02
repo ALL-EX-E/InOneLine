@@ -169,6 +169,16 @@
 ## Реализованная архитектура
 
 - **B1 — единый `Настройки → Интеграции` center, adapter/status/security contract, DPAPI credential storage** — **IMPLEMENTED / ACCEPTED**.
+- **B1 accepted Conduct/status UX details** — **IMPLEMENTED/ACCEPTED CONTRACT; ONE CURRENT UI OMISSION TRACKED AS QA-1.0.8-01**:
+  - compact `Аукцион → Проведение` integration status shows only configured/used services;
+  - integration errors remain visible even in compact/collapsed presentation;
+  - Conduct provides navigation to `Настройки → Интеграции` instead of duplicating full provider configuration;
+  - the accepted status concept includes **time of the last accepted integration event**;
+  - `Отключить` and `Удалить подключение` are distinct operations; removal requires confirmation and must not delete historical `external_events`, contributions or auction history;
+  - service network/auth work must not block the GUI; adapter capabilities control which provider-specific controls are applicable;
+  - sufficient provider/source identifiers are preserved for future cross-service duplicate analysis, but no cross-service dedup algorithm is implicitly approved.
+- **QA-1.0.8-01 — Conduct integration last-event visibility** — **ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT YET FIXED**. Current 1.0.8 still persists `integration_connections.last_event_at` and Settings shows `Последняя принятая активность`, while the current Conduct integration status/dialog does not display the accepted last-event time. No later direct user decision superseding this detail was recovered. This is a QA/reconciliation finding, not a new feature idea and not automatic authorization to change runtime.
+- **B2 Twitch accepted lifecycle details** — **IMPLEMENTED / ACCEPTED**: public/native Device Code authorization without Client Secret; protected access/refresh credentials; startup/hourly validation and serialized refresh; invalid/revoked auth -> `Требует входа`, transient provider/network failures -> bounded `Ошибка`; Connect may reuse a valid preserved grant, Reconnect forces fresh authorization, Disconnect preserves local config/credential/history, Remove deletes local connection config + secret after confirmation but never historical integration/auction records.
 - **Integration connection UX** — **USER-ACCEPTED / IMPLEMENTED DIRECTION**: пользователь не должен вручную управлять client secrets или собирать сложную конфигурацию; где provider позволяет, подключение идёт через штатную browser/device authorization с public client/application credentials и protected local tokens.
 - **B2 Twitch first adapter** — **IMPLEMENTED / ACCEPTED**.
 - **B3 — автоматическое принятие разрешённых integration events** — **IMPLEMENTED / ACCEPTED**; generic Pending queue не является MAIN.
