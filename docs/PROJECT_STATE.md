@@ -119,7 +119,7 @@ Exact accepted candidate bytes:
 - Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
 - Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
 
-A5 verified unused/stale imports is closed. A6 dead private helper cleanup is also closed. The next unresolved maintenance item from the control audit is **A7 — duplicated historical publish workflows / CI publication consolidation**.
+A5, A6 and A7 are closed. The next unresolved maintenance item from the control audit is **A8 — GitHub Actions version refresh for current deprecation warnings**.
 
 ## A5 Verified Unused Imports — accepted 2026-10-02
 
@@ -150,7 +150,7 @@ Exact accepted candidate bytes:
 - Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
 - Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
 
-A6 is now closed. The next unresolved maintenance item is **A7 — duplicated historical publish workflows / CI publication consolidation**.
+A6 and A7 are closed. The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
 
 ## A6 Dead Private Helpers — accepted 2026-10-02
 
@@ -181,7 +181,38 @@ Exact accepted corrected candidate bytes:
 - Installer: 47,627,232 bytes; SHA-256 `8b1a213989cdd8d3e8c864d2b299327d72ef2fc7426e6c7c3bebbbf9669164c9`
 - Source: 1,419,509 bytes; SHA-256 `5da7afe8f167413a4718bb1b9e0e42ae8b0f5b03090a059d682037766cf963da`
 
-The next unresolved maintenance item is **A7 — duplicated historical publish workflows / CI publication consolidation**.
+A7 is now closed. The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
+
+## A7 Publication CI Consolidation — accepted 2026-10-02
+
+Maintenance scope A7 from the codebase audit is complete.
+
+- Status: **CLOSED / ACCEPTED / MERGED**
+- PR: **#16**
+- Accepted PR head: `a04cea9852367dc39a8f40fea2c12b0d1f1ba23a`
+- Squash merge on `main`: `d03602f5f8197abcda2d21eee10d86abb4b98d62`
+- PR publisher parse-only run: `36961378735` — **SKIPPED AS DESIGNED**
+- Final PR regression: `36961378739` — **SUCCESS**
+- Post-merge publication wording: `36962356350` — **SUCCESS**
+- Post-merge main regression: `36962356315` — **SUCCESS**
+- Manual Windows QA: **N/A — CI/release infrastructure only**
+- Canonical QA: `docs/qa/1.0.8-publication-ci-maintenance.md`
+- Publication contract: `docs/RELEASE_PUBLICATION.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted infrastructure change:
+- retired active per-release publishers `publish-1.0.4.yml` through `publish-1.0.8.yml`;
+- historical releases/tags/assets/release notes remain unchanged and are preserved by Git history;
+- future publication uses one `.github/workflows/publish-accepted-release.yml`;
+- normal publication requires a newly added immutable `.github/release/requests/*.json` manifest containing the exact accepted artifact ID, target commit, public asset names and SHA-256 values;
+- publisher refuses existing tags/releases, verifies accepted bytes before publication and verifies downloaded release bytes again afterward;
+- no A7 publication request was added, therefore A7 merge did not create any GitHub Release;
+- permanent regression now includes `tools/publication_ci_smoke.py`.
+
+Immediately after A7 merge, the public release set remains unchanged: 10 tags from `v1.0.0` through `v1.0.8-maintenance-2026-10-01`.
+
+The next unresolved maintenance item is **A8 — GitHub Actions version refresh for current deprecation warnings**.
 
 ## Regression foundation — restored 2026-10-01
 
