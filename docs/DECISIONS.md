@@ -187,3 +187,13 @@ A post-correction control against the dedicated History/Wheel/Widgets reviews re
 - Advanced History cross-unit statistics require an explicit comparable basis: unrelated point systems or currencies are not naively summed; record cards are computed from authoritative historical snapshots, not current mutable Games state.
 - A8 retained safety invariants survive even though implementation is deferred: reversal is an appended auditable compensating event, original history is never deleted/rewritten, unsafe dependency chains block Undo, and operator-only Undo is never exposed to viewer OBS outputs. Exact reversible-action whitelist remains for fresh review.
 
+## 2026-10-02 — Thirteenth-pass S2/widget/B6 boundary recovery
+
+A further post-correction comparison against the dedicated Settings/Widgets/Winner reviews restored additional accepted boundaries:
+
+- S2 timer auto-extension collision/threshold semantics are durable: only genuine new-lot creation qualifies for the new-lot reason; external events qualify only after common acceptance/dedup; one originating action/event may extend once using the largest matched configured duration rather than summing; equality at threshold is eligible; disabled threshold allows enabled triggers through the running auction; paused/non-running sessions and already-expired timers do not auto-extend/resurrect.
+- Standalone viewer architecture keeps Стрим / OBS as the single top-level output center. OBS owns scene composition and Browser Source viewport sizing; no generic named-instance/composite canvas is part of MAIN. Operator-only controls/status do not receive viewer widgets by default.
+- B6 uses the common integration/auction backend and B1 protected credential storage. Provider token/plaintext secret storage in the main SQLite DB is prohibited. Source-of-truth direction, conflicts, IDs, dedup, temporary-lot behavior and provider writes remain fresh-review items.
+- Winner Verification MAIN does not imply a public Internet verification page. Localhost remains the default service boundary; LAN/public sharing is a separate D38/Public-Web/security decision.
+- Product A7 history cards keep explicit affected-lot/object/value context, understandable event icons and exact stored timestamps; hover linkage remains operator UI only.
+
