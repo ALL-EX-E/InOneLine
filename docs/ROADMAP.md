@@ -24,7 +24,7 @@
 Это **не pre-authorized implementation queue**. Каждый пункт перед кодом требует fresh exact-CURRENT review и отдельного решения пользователя.
 
 1. **Global Multi-File Import** — текущий post-D26 candidate, tracking **#4**. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…», переиспользуя уже работающий D26 multi-select и существующие managed/external/duplicate rules.
-2. **D40 — ручной порядок soundtrack/music library** — сохранённая future-идея, не реализована D26. Должна переиспользовать D43/D26 audio/media/playback state, а не создавать второй player/library backend.
+2. **D40 — ручной порядок soundtrack/music library** — сохранённая future-идея, не реализована D26. Должна переиспользовать D43/D26 audio/media/playback state, а не создавать второй player/library backend. Это **не восстановление** superseded pre-D26 Auction playlist/Loop-One модели: с D26 текущий Auction soundtrack — один выбранный зацикленный файл из shared soundtrack library.
 3. **D34 — Tourniquet donation adapter** — possible/deferred integration; перед реализацией требуется свежая проверка официального API/event delivery/auth/currencies/security.
 4. **D41 — кроссплатформенная агрегация чатов + отдельный OBS chat overlay** — user-requested post-completion idea; обычные сообщения чата сами по себе не меняют auction/SM-points/timer/wheel state.
 5. **Older YouTube platform/integration candidate** — сохранённая отдельная integration-direction с неуточнённым scope. Не путать с историческим W3 YouTube soundtrack-source wording и не путать с закрытым «Трейлер (YouTube)».
@@ -48,7 +48,7 @@
 - **Сохранённые аукционы** + зависимый полный **«Новый аукцион...»** — deferred reusable-auction workflow.
 - **A8 compensating Undo** — только possible post-completion; прежний whitelist не считается pre-approved, fresh safety review обязателен.
 - **B6 Pointauc API adapter contract** — deferred; fresh source-of-truth/conflict/ID/dedup/write-policy review обязателен.
-- Дополнительные provider adapters: **iHAQ Donate v2.0, ODA Digital/OpenDonationAssistant, DonateX, VK Video Live, Kick, Donate Helper, DonatePay** — deferred; ODA contract-blocked до безопасного официального auth/event/history contract.
+- Дополнительные provider adapters: **iHAQ Donate v2.0, ODA Digital/OpenDonationAssistant, DonateX, VK Video Live rewards/points, Kick Channel Points/Custom Rewards, Donate Helper, DonatePay** — deferred; Kick/VK остаются feasibility-conditional до подтверждения официального/надёжного provider contract, ODA contract-blocked до безопасного официального auth/event/history contract.
 - Реальная Twitch Channel Points/Custom Rewards verification — eligibility-dependent, не потерянная feature-задача.
 
 ## Approved/retained post-completion wheel items, пока не выбранные
