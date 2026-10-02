@@ -316,3 +316,13 @@ Direct-chat + accepted 1.0.7 release evidence confirms the following D26 rules a
 
 These details are implemented in current 1.0.8 and do not reopen D26 or alter D40.
 
+## 2026-10-02 — Twenty-fifth pass early-media / S1 migration / public-install precision
+
+Further direct-chat/source comparison recovered:
+
+- Overlay background library acceptance includes preserving the original/display filename metadata during managed registration/copy. Current shared media rows preserve `original_name`; this is implemented behavior/documentation precision, not a new feature.
+- S1 legacy-money migration was explicitly accepted as **1 RUB = 1 SM point**, with positive fractional RUB rounded upward. Historical `change_log` JSON remains untouched rather than being retroactively rewritten. Current schema migration implements this exact boundary.
+- Public-install documentation had a direct user requirement to explain the Windows unsigned-publisher/SmartScreen warning path to ordinary users and why it appears, without requiring security protection to be disabled. Current README explains the unsigned installer and SHA-256 verification, but the previously requested step-by-step Windows prompt guidance is not fully preserved. Track this as a **PUBLIC-DOCUMENTATION GAP / NO RUNTIME IMPACT** pending a safe current-wording refresh.
+
+The earlier backup-retention `last N / N days` candidate was rechecked against direct chat again: the user confirmed backup creation worked, but did not directly approve/reject that assistant suggestion. It remains intentionally outside the user-approved backlog.
+
