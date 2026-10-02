@@ -54,6 +54,7 @@
 
 - **CSV/Excel/Google-readable import/export с безопасным обновлением существующей БД** — **IMPLEMENTED / ACCEPTED**.
 - **Backup / Restore пользовательской БД и данных** — **IMPLEMENTED / ACCEPTED**.
+- **Full external `.iolbackup` для восстановления после полного удаления программы** — **IMPLEMENTED / ACCEPTED**: authoritative DB, protected credentials и managed media; backup хранится вне install root и переживает uninstall; logs/temp/runtime/external referenced files не встраиваются.
 - **P1 — одностороннее публичное XLSX-зеркало для Google Drive/Sheets** — **IMPLEMENTED / ACCEPTED**. Финальный публичный файл содержит только `НАЗВАНИЕ ИГРЫ / БАЛЛЫ / ОТЗЫВ / СТАТУС`.
 - **C2 — обычный .xlsx общего основного списка с двусторонней синхронизацией между экземплярами, last-change-wins** — **IMPLEMENTED / ACCEPTED**.
 - **Не создавать собственный закрытый формат для C2; файл должен читаться Google Sheets** — **IMPLEMENTED / ACCEPTED**.
@@ -118,7 +119,7 @@
 
 # III. Saved/New Auction
 
-- **«Сохранённые аукционы»** — несколько именованных reusable working auction configurations без второй Games database — **ACCEPTED / DEFERRED TO POST-COMPLETION**.
+- **«Сохранённые аукционы»** — несколько именованных reusable working auction configurations без второй Games database, с быстрым выбором/переключением и безопасными rename/delete flows — **ACCEPTED / DEFERRED TO POST-COMPLETION**.
 - **Полный «Новый аукцион…»** с именем, `Начать без сохранения` / `Сохранить предыдущий и начать`, безопасной обработкой активной сессии и immutable historical name snapshot — **ACCEPTED / DEFERRED**, зависит от Saved Auctions.
 - Completed History и Saved Auctions — разные системы; переименование/удаление saved configuration не переписывает историю — **DURABLE ACCEPTED RULE**.
 
