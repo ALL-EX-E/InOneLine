@@ -403,3 +403,29 @@ Also restored the exact accepted DonationAlerts built-in public OAuth Client ID 
 
 Runtime/source/version/schema/migrations remain unchanged: **1.0.8 / 19 / 15**.
 
+## Ninth precision pass — dedicated Drive reviews + retained future contracts — 2026-10-02
+
+After the eighth B3-binding correction, the dedicated Drive review archive (Wheel, Widgets, Settings, Winner Verification, History and the full dedup audit) was compared line-by-line against the updated exhaustive inventory.
+
+No new identifier was recovered, but several **directly accepted constraints had been compressed too aggressively** and are now restored:
+
+- **R1 Rules editor**: simple `Обычный текст / Заголовок / Подзаголовок` presets; selected-fragment formatting; quick + arbitrary colors; create-template confirm/cancel; normalized name validation/duplicate guard; active-template marking; direct edit mode; Save persists+closes; unsaved protection on switch/close/delete; content/style separated from viewer geometry.
+- **B1 Integration Center**: purpose-grouped catalog, one specialized adapter/card per service, moderate branding, capability-driven controls, multiple active integrations, manual connection/auth test off GUI thread, adapter-specific automatic health tracking.
+- **Winner Verification / D7 security boundary**: immutable per-run participant/weight/range/RNG/random/winner/timestamp/algorithm snapshot; read-only deterministic replay; optional pre-spin data view; Random.org+ ticket/signature reuse; same-database SHA-256 alone is not meaningful intentional-tamper protection; signing/key management/notarization/off-app verification remains post-completion.
+- **D28–D36**: artificial-chance, viewer-name, blind-amount, D13 auto-processing selector, participant-mode naming, display-only sorting, per-bet fortune and dependent viewer-choice constraints restored exactly.
+- **B4 Twitch rewards**: manage only app-created/registered auction rewards; preserve reward IDs; common title + cost/color; viewer text; common B2/B3/S1 path; bid-intake availability coupling; unlink != destructive reward delete; explicit delete confirmation; eligibility-safe failure.
+- **S3 eyedropper**: multi-monitor/mixed-DPI center-pixel reticle, cancel/no-change and shared color-storage rule restored.
+- **D34 / D37 / D38 / D42**: reliability/security/API gate, preset schema/security boundary, localhost/LAN security boundary, and actual-visual-sector-under-pointer/no-RNG-change contract restored.
+- **D25**: future cumulative-probability metric must be computed from the immutable completed ordinary-weighted-wheel snapshot and must not be automatically inserted into core viewer/result UI.
+- **D41**: reuse B1/B2 auth/adapters; ordinary chat never mutates auction business state; exact cross-chat ordering/author/badges/emotes/moderation/history/style/OBS contract remains intentionally unapproved until fresh D41 review.
+- **Widgets live apply**: authoritative viewer settings change only on Save/Apply; unsaved edits are not pushed; stable URL/no manual refresh; keep separate from E2.
+- Exact accepted full-backup button wording and the canonical green icon decision were restored as historical implemented detail.
+
+### Mechanical result
+- All old implementation-order identifiers still map to current inventory.
+- D1–D43 remain accounted for; the literal sentence `D44 не найден` is documentation only and **not** a D44 item.
+- No future dependency order changed.
+- Runtime/source/version/schema/migrations unchanged: **1.0.8 / 19 / 15**.
+
+A final orphan-only direct-chat control is required after these precision restorations before declaring this repeated audit clean.
+
