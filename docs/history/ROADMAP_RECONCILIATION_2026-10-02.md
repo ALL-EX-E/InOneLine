@@ -659,7 +659,7 @@ The same scenario was repeated again after the fifteenth CLEAN result: direct ch
 
 ### Rechecked false/insufficient candidate
 
-- Games `Всего` currently includes ordinary archived records and excludes temporary `auction_only` rows until promotion. This is visible in current source and historical accepted implementation evidence, but this pass did not recover a sufficiently clean standalone direct-user wording to reclassify it as a newly recovered direct-user requirement. Existing archive/counter coverage remains unchanged.
+- **CORRECTION BY SEVENTEENTH PASS:** direct-user provenance does exist for Games `Всего`: it includes all ordinary records including archive, active records remain first and archive is shown as the bottom block. This requirement was already preserved in the historical ledger as `0.2.22` and current runtime follows it, so it is not a new feature or QA defect; only the sixteenth-pass provenance assessment was wrong.
 
 ### Status
 
@@ -699,4 +699,41 @@ The user's requested scenario was repeated again after the fifteenth clean pass:
 This seventeenth pass is **NOT ZERO-DELTA** because it restored durable engineering/audio detail, but it did not recover a new feature identifier or change future roadmap order. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Another post-correction full/orphan control is required before declaring this repeated check clean.
+
+## Seventeenth post-sixteenth orphan control — process/public wording delta — 2026-10-02
+
+After writing the sixteenth B4/UI/Restore corrections, another direct-chat orphan-only pass was run, followed by Drive/current-source comparison.
+
+### New durable documentation delta
+
+1. **Focused manual Windows/PowerShell QA cadence**
+   - Direct user rule from the August stabilization work: request Windows/PowerShell checks only when they provide real verification and keep the interaction focused, preferably one check/command at a time.
+   - This was consistent with later release practice but was not explicitly preserved in `WORKFLOW.md`.
+   - Added to canonical workflow and exhaustive inventory.
+
+2. **Public installation wording**
+   - Direct user publication decision required the installation instruction wording `Запустить установщик`.
+   - Current README already implements the rule as `Запустите установщик и следуйте его подсказкам`, but the decision itself was missing from the exhaustive ledger.
+   - Added as implemented/public-documentation precision.
+
+3. **Sixteenth Games-`Всего` provenance correction**
+   - A deeper direct-chat check recovered explicit user provenance: `Всего` includes all ordinary records including archived entries, active entries appear first and archive is a lower block.
+   - The exhaustive inventory already contained this as historical accepted `0.2.22`, and current runtime follows it.
+   - Therefore this is **not** a new product/runtime finding; it only corrects the sixteenth-pass statement that direct provenance was insufficient.
+
+### Mechanical/source result
+
+- B4 manual-reward supersession remains correctly recorded and current source matches it.
+- RANDOM.ORG location, OBS date removal and Restore-current-DB rejection remain recorded.
+- D1–D43 remain mapped; no actual D44 item.
+- Open Issues remain #4 and #5; stale PR #9 remains repository hygiene.
+- Source TODO/FIXME scan produced no hidden product scope.
+
+### Status
+
+This seventeenth pass is **NOT CLEAN** because two durable process/public-documentation decisions had to be added and one provenance statement had to be corrected.
+
+Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. No implementation scope is selected.
+
+Another post-correction orphan-only control is required before claiming a clean stop.
 
