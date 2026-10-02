@@ -232,7 +232,7 @@
 - **D6 — generic Widgets umbrella / named instances / composite builder** — **SUPERSEDED / REJECTED**; вместо него standalone function widgets.
 - **D7 — Winner Verification umbrella** — MAIN verification **IMPLEMENTED**; whole-snapshot cryptographic tamper-resistance **ACCEPTED AS POST-COMPLETION HARDENING**.
 - **D8 — Video Requests** — **REJECTED / NOT NEEDED**.
-- **D9 — Localization/languages** — **ACCEPTED / DEFERRED POST-COMPLETION**; русский остаётся primary, будущие языки не зафиксированы.
+- **D9 — Localization/languages** — **ACCEPTED / DEFERRED POST-COMPLETION**; русский остаётся primary. Accepted boundary: локализация должна быть централизованной на уровне UI/программных строк; пользовательские данные, названия игр и исторические записи не переводятся автоматически. Конкретный набор будущих языков не зафиксирован.
 - **D10 — GitHub link** — **CONDITIONAL FUTURE ITEM**; public repo prerequisite теперь существует, но нужен fresh review.
 - **D11 — Telegram link** — **CONDITIONAL FUTURE ITEM** только после появления официального проекта/канала.
 - **D12 — Support/Boosty link** — **CONDITIONAL FUTURE ITEM** только после появления официального support resource.
