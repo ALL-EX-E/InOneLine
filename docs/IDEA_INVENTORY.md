@@ -49,11 +49,13 @@
 - **Общий список + отдельный нижний блок архива в total-view** — **IMPLEMENTED / ACCEPTED**.
 - **Public List не показывает архив** — **IMPLEMENTED / ACCEPTED**.
 - **Защита от дубликатов при добавлении/импорте** — **IMPLEMENTED / ACCEPTED**.
+- **«Очистить все игры» на вкладке «Игры»** — **IMPLEMENTED / ACCEPTED**: запрещено при открытом аукционе; требует точного destructive confirmation; перед очисткой автоматически создаётся backup; удаляются обычные/архивные/temporary game records, а завершённая история аукционов и Журнал сохраняются.
 
 ## Импорт / экспорт / синхронизация / backup
 
 - **CSV/Excel/Google-readable import/export с безопасным обновлением существующей БД** — **IMPLEMENTED / ACCEPTED**.
 - **Backup / Restore пользовательской БД и данных** — **IMPLEMENTED / ACCEPTED**.
+- **Явная команда `Настройки → Восстановить из резервной копии…`** — **IMPLEMENTED / ACCEPTED**: выбранный `.db` проверяется, текущее состояние предварительно страхуется, затем выполняется безопасное восстановление.
 - **Full external `.iolbackup` для восстановления после полного удаления программы** — **IMPLEMENTED / ACCEPTED**: authoritative DB, protected credentials и managed media; backup хранится вне install root и переживает uninstall; logs/temp/runtime/external referenced files не встраиваются.
 - **P1 — одностороннее публичное XLSX-зеркало для Google Drive/Sheets** — **IMPLEMENTED / ACCEPTED**. Финальный публичный файл содержит только `НАЗВАНИЕ ИГРЫ / БАЛЛЫ / ОТЗЫВ / СТАТУС`.
 - **C2 — обычный .xlsx общего основного списка с двусторонней синхронизацией между экземплярами, last-change-wins** — **IMPLEMENTED / ACCEPTED**.
@@ -99,6 +101,7 @@
 ## Product S/A MAIN items
 
 - **S1 — внутренние InOneLine/Streaming Manager points + миграция legacy money semantics** — **IMPLEMENTED / ACCEPTED**.
+- **S1 integer conversion rule** — **IMPLEMENTED / ACCEPTED**: результат зачисления всегда целое число SM points; положительный дробный результат округляется вверх одинаково для валют и неденежных service units; reverse `SM points → money` не используется.
 - **Product A1 — сохранять последнее значение общего ручного поля суммы/баллов** — **IMPLEMENTED / ACCEPTED**.
 - **Product A2 — постоянная inline-строка добавления нового лота в Conduct** — **IMPLEMENTED / ACCEPTED**.
 - **Product A3 — frozen start position + live/current position** — **IMPLEMENTED / ACCEPTED**.
@@ -111,6 +114,7 @@
 
 ## S2 / History / Verification
 
+- **Поиск внутри «Журнала» по любому событию** — **IMPLEMENTED / ACCEPTED**: поиск локален для Journal, проверяет отображаемые и raw-поля события и при непустом запросе ищет по полной истории, а не только по обычному окну последних 500 записей.
 - **S2 — timer auto-extension** по actual leader change / genuinely new lot / external donation, threshold, dedup, max-one-extension collision rule и 24h ceiling — **IMPLEMENTED / ACCEPTED**.
 - **Внешнее денежное автопродление + optional service units** — **IMPLEMENTED / ACCEPTED** окончательно в 1.0.3.
 - **Core «История аукционов»**: period filter, base summary, all closed sessions, newest-first, search/sort, pagination/lazy loading, read-only details — **IMPLEMENTED / ACCEPTED**.
