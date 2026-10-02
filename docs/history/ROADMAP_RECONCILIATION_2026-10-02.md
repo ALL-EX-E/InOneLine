@@ -529,3 +529,40 @@ Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Because this control pass recovered additional durable detail, it is **NOT CLEAN**. A further post-correction orphan-only pass is required.
 
+## Thirteenth control pass — S2/widget/B6 boundary recovery — 2026-10-02
+
+The next post-correction comparison against the dedicated Settings/Widgets/Winner reviews recovered additional accepted boundaries that were still too compressed in the exhaustive inventory.
+
+### Recovered details
+
+- **S2 collision/threshold semantics**:
+  - new-lot auto-extension applies only to actual creation of a new lot, not increment of an existing match or manual correction;
+  - external-event extension applies only after successful common-pipeline acceptance/dedup;
+  - one originating action/event may extend the timer only once; if multiple enabled reasons match, apply the largest configured extension instead of summing;
+  - equality at the threshold is eligible;
+  - disabling the threshold allows enabled reasons throughout a running auction;
+  - paused/non-running sessions do not auto-extend and an expired timer is not resurrected.
+- **Standalone widget architecture**:
+  - Стрим / OBS remains the single top-level output center;
+  - OBS owns composition/positioning and Browser Source viewport sizing;
+  - stable standalone routes remain the model; generic named-instance/composite canvas is not MAIN;
+  - operator-only controls/status do not get viewer widgets merely for parity.
+- **B6 security/architecture**:
+  - provider token is secret and uses B1 protected credential storage, not plaintext main SQLite;
+  - B6 wraps the common integration/auction business path rather than creating a second auction backend;
+  - source-of-truth direction, conflicts, IDs, dedup, temporary-lot behavior and provider write operations remain fresh-design items.
+- **Winner Verification hosting boundary**:
+  - MAIN verification does not imply a public Internet-hosted verification page;
+  - localhost remains default; LAN/public sharing belongs to separate D38/Public-Web/security review.
+- **Product A7 card semantics**:
+  - history cards identify affected lot/object and relevant values/details;
+  - event types use understandable icons, with color only as a secondary cue;
+  - exact timestamp remains stored even when relative time is shown;
+  - hover linkage is operator UI only.
+
+### Result
+
+These are accepted-contract/documentation restorations, not newly selected runtime work. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+Because this pass again recovered durable detail, it is **NOT CLEAN**. Another orphan-only control is required after synchronization.
+
