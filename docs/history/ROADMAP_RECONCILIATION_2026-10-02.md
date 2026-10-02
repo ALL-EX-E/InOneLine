@@ -483,7 +483,7 @@ The same scenario was repeated again against the already corrected state: prior 
 ### New delta recovered
 
 1. **Historical reference archive gap had fallen out of the current GitHub reconciliation.**
-   - Earlier PASS 12 recorded that the original `2026-08-21_POINTAUC_reference_*` screenshot set was no longer present in accessible Drive.
+   - Earlier PASS 12 recorded that the original 2026-08-21 external-reference screenshot set was no longer present in accessible Drive.
    - Fresh Drive image search again returns no image with that original reference naming; only unrelated 2026-08-21 InOneLine screenshots and later text/review material remain.
    - The product decisions themselves remain supported by direct chat plus cumulative/dedup/dedicated review text.
    - Do **not** claim the missing original reference images are still archived, and do **not** reconstruct replacements and present them as originals.
@@ -620,4 +620,10 @@ Returned material was already mapped:
 The repeated audit itself was **not zero-delta**: it recovered the archive/provenance rule, QA-ID convention, History/W1/W2/Timer/A8 details, S2/widget/B6/verification/A7 boundaries, B1/B2 secret/lifecycle rules and the DonationAlerts source-hygiene residue. The fifteenth pass establishes only that no further orphan remained after those corrections.
 
 No runtime/source bytes were modified. No implementation scope was automatically selected.
+
+### Post-clean public-wording read-back correction
+
+Final read-back found one documentation-only regression introduced by this reconciliation itself: the archive-gap paragraph had repeated the historical filename pattern containing a third-party development-reference name. It was neutralized to **2026-08-21 external-reference screenshot set**. The only remaining third-party-name occurrence in current reconciliation is the actual **B6 provider API adapter**, where the name is factually necessary.
+
+This wording correction does not change the fifteenth CLEAN orphan result, roadmap status or runtime.
 
