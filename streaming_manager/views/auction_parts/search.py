@@ -1,13 +1,7 @@
 from __future__ import annotations
-import hashlib
-from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
-from ...database import format_points
-from ...exporters import export_auction_pipe_csv, auction_pipe_text
-from ...random_sources import RandomDraw, RandomOrgClient
-from ...workers import FunctionWorker
 
 
 class AuctionSearchMixin:

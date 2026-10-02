@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 import math
 import time
 from datetime import datetime, timedelta, timezone
-from PySide6.QtCore import Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt, QTimer
 
 from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
 from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
-from ...exporters import export_auction_pipe_csv, auction_pipe_text
-from ...random_sources import RandomDraw, RandomOrgClient
-from ...workers import FunctionWorker
 
 
 class AuctionStateMixin:

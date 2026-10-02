@@ -1,51 +1,45 @@
 from __future__ import annotations
 
-import hashlib
-import json
-import shutil
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
-from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer, QUrl
-from PySide6.QtGui import QAction, QBrush, QColor, QDesktopServices, QFont, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QAbstractItemView, QCheckBox, QComboBox, QColorDialog, QDialog,
-    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFontComboBox, QFormLayout,
-    QFrame, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
-    QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ..app_paths import AppPaths
 from ..api_server import LocalApiServer
 from ..constants import (
-    APP_NAME, APP_VERSION, COOP_LABELS, DEFAULT_API_HOST, PUBLIC_XLSX_ENABLED_KEY,
-    PUBLIC_XLSX_LOCAL_WRITE_DEBOUNCE_MS, PUBLIC_XLSX_MISSING_POLL_INTERVAL_MS,
-    PUBLIC_XLSX_PATH_KEY, STATUS_ABANDONED, STATUS_COMPLETED, STATUS_LABELS,
-    STATUS_NOT_PLAYED, STATUS_PLAYED, STATUS_PLAYING, STREAM_FORMATS,
+    PUBLIC_XLSX_ENABLED_KEY,
+    PUBLIC_XLSX_LOCAL_WRITE_DEBOUNCE_MS,
+    PUBLIC_XLSX_MISSING_POLL_INTERVAL_MS,
+    PUBLIC_XLSX_PATH_KEY,
 )
 from ..diagnostic_logs import append_performance_trace
-from ..database import (
-    Database, DuplicateGameError, Game, display_date, display_datetime_local,
-    format_points, normalize_date_text, normalize_text_key, parse_date,
-)
-from ..exporters import (
-    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
-    auction_pipe_text,
-)
+from ..database import Database, format_points, normalize_text_key
+from ..exporters import export_public_csv, export_public_json, export_public_xlsx
 from ..public_xlsx import (
     PublicXlsxTransientError, public_mirror_rows, public_state_hash,
     write_public_xlsx,
 )
-from ..random_sources import RandomDraw, RandomOrgClient
 from ..workers import FunctionWorker
-from .common import (
-    APP_STYLE, FocusClearingWidget, ScrollSafeComboBox, ScrollSafeFontComboBox,
-    ScrollSafeSpinBox, _center, _selected_id, autosize_compact_columns_once,
-    make_wide_step_control, suspend_live_content_resize,
-)
+from .common import autosize_compact_columns_once, suspend_live_content_resize
 
 class PublicTab(QWidget):
     _COMPACT_COLUMNS = (0, 1, 3, 5)

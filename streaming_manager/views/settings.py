@@ -1,22 +1,43 @@
 from __future__ import annotations
 
-import hashlib
 import os
-import json
 import shutil
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QBrush, QColor, QDesktopServices, QFont, QKeySequence, QShortcut
+from PySide6.QtCore import (
+    Qt,
+    QThreadPool,
+    QTimer,
+    QUrl,
+    Signal,
+)
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication, QAbstractItemView, QCheckBox, QComboBox, QColorDialog, QDialog,
-    QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFontComboBox, QFormLayout,
-    QFrame, QGridLayout, QHBoxLayout, QHeaderView, QInputDialog, QLabel, QLineEdit,
-    QLayout, QMainWindow, QMessageBox, QPushButton, QScrollArea, QSizePolicy, QSpinBox,
-    QTabWidget, QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget,
+    QApplication,
+    QAbstractItemView,
+    QCheckBox,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QLayout,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ..api_server import LocalApiServer
@@ -30,7 +51,8 @@ from ..backup_restore import (
     validate_full_backup_destination,
 )
 from ..constants import (
-    APP_NAME, APP_VERSION,
+    APP_NAME,
+    APP_VERSION,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
     AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
@@ -50,10 +72,9 @@ from ..constants import (
     AUCTION_AUTO_EXTEND_THRESHOLD_ENABLED_KEY,
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT,
     AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
-    AUCTION_MIN_DURATION_MS, AUCTION_MAX_DURATION_MS,
+    AUCTION_MIN_DURATION_MS,
+    AUCTION_MAX_DURATION_MS,
     WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
-    COOP_LABELS, DEFAULT_API_HOST, STATUS_ABANDONED, STATUS_COMPLETED,
-    STATUS_LABELS, STATUS_NOT_PLAYED, STATUS_PLAYED, STATUS_PLAYING, STREAM_FORMATS,
 )
 from ..conversion import ConversionUnit
 from ..diagnostic_logs import sanitize_diagnostic_text
@@ -70,15 +91,12 @@ from ..twitch_b4 import (
     TwitchChannelPointsService,
     TwitchRewardDefinition,
 )
-from ..database import (
-    Database, DuplicateGameError, Game, display_date, display_datetime_local,
-    format_points, normalize_date_text, normalize_text_key, parse_date,
-)
+from ..database import Database
 from ..exporters import (
     export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
     auction_pipe_text,
 )
-from ..random_sources import RandomDraw, RandomOrgClient
+from ..random_sources import RandomOrgClient
 from ..media import (
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
     media_asset_available,
@@ -92,10 +110,7 @@ from ..wheel_center_media import (
 )
 from ..workers import FunctionWorker
 from ..time_input import parse_duration_input
-from .common import (
-    APP_STYLE, FocusClearingWidget, ScrollSafeComboBox, ScrollSafeFontComboBox,
-    ScrollSafeSpinBox, _center, _selected_id, make_wide_step_control, pick_screen_color,
-)
+from .common import ScrollSafeComboBox, pick_screen_color
 
 class SettingsTab(QWidget):
     twitch_device_code_ready = Signal(object)

@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import hashlib
 import json
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QApplication, QMessageBox, QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+    QDialog,
+    QDialogButtonBox,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ...constants import (
     AUCTION_WHEEL_FORMAT_ELIMINATION,
 )
-from ...database import format_points
-from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomDraw, RandomOrgClient
 from ...workers import FunctionWorker
 from ..winner_verification import format_verification_preview, show_readonly_text_dialog
