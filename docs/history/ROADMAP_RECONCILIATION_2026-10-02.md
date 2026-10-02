@@ -172,3 +172,29 @@ Final orphan-only result:
 - no rejected/superseded/historical assistant idea needs revival.
 
 Google Drive backup mirror: `USER_IDEA_INVENTORY_2026-10-02` in «Текстовый лог».
+
+
+## Third independent comparison pass — 2026-10-02
+
+This pass compared the new full inventory itself against:
+- earlier chat decisions recovered from account history;
+- the cumulative Drive project history;
+- the dedicated Wheel, History, Settings/Integrations, Widgets and Winner Verification reviews;
+- current GitHub source where a historical status could be checked against runtime behavior.
+
+Newly recovered/corrected relative to the second-pass inventory:
+- DonationAlerts/I1 entry was stale: the old auction-only enable/target model was superseded. Current accepted behavior is permanent contribution intake while connected, with source-time routing to a running auction or persistent game list outside auctions.
+- Integration UX retains the user preference for provider-native one-click/browser/device authorization without manual client-secret management where technically possible.
+- Cross-surface auction/game synchronization was promoted into the full inventory as a durable accepted invariant: DB -> Games/Public/Auction/Journal + applicable OBS/API without manual F5.
+- Default wheel RNG-first/animation-hidden-until-finish/restart-persistence behavior was added explicitly to distinguish existing H4 behavior from future D27.
+- The explicit rejection of a second fully-transparent whole-overlay mode was added; only game/webcam interior cutouts are transparent in the accepted main OBS layout.
+- Direct W2/W3 UI decisions were added: «Добавить фон…», missing-external repair visibility, separated wheel-music controls and audio-failure isolation from RNG/winner lifecycle.
+- The early public-GitHub-without-source publication plan was marked superseded by later SOURCE+INSTALLER publication.
+
+Cross-check result of all five dedicated reference reviews:
+- every accepted/deferred/rejected item maps to an existing entry in docs/IDEA_INVENTORY.md;
+- no additional future feature identifier or durable orphan scope was found;
+- no D44 was found;
+- ROADMAP current future ordering does not change as a result of this pass.
+
+The third pass therefore changed historical precision/current invariants, but did not add a new implementation candidate.
