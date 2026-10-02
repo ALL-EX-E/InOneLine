@@ -19,10 +19,12 @@ The findings below are retained as the historical audit record. Current executio
 - **A3** non-reproducible build dependencies — CLOSED via exact build lock.
 - **A4** repeated managed-media SQLite connections — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #13; post-merge regression `36949173717` SUCCESS.
 - **A10** documentation drift — CLOSED.
-- **A5** verified unused/stale imports — next unresolved maintenance item.
-- **A6–A9** remain pending their own exact-current review.
+- **A5** verified unused/stale imports — **CLOSED / MANUALLY ACCEPTED / MERGED** in PR #14; post-merge regression `36952721884` SUCCESS.
+- **A6** confirmed dead private helpers / compatibility no-ops — next unresolved maintenance item; requires fresh compatibility review.
+- **A7–A9** remain pending their own exact-current review.
 
 Canonical A4 QA: `docs/qa/1.0.8-media-sync-maintenance.md`.
+Canonical A5 QA: `docs/qa/1.0.8-unused-import-maintenance.md`.
 
 ## Audit goal
 
