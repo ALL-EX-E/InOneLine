@@ -383,3 +383,9 @@ Permanent repository gate:
 - Open tracking remains Issues **#4 / #5** and stale PR **#9** repository hygiene.
 - No product implementation scope is selected automatically.
 - Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+## Active review / bugfix phase
+
+Новые product features временно приостановлены по прямому решению пользователя. Текущий рабочий протокол и накопительная очередь замечаний находятся в `docs/ACTIVE_REVIEW_LEDGER.md`.
+
+Правило этапа: сначала разбор скриншота и запись замечаний без изменения runtime; реализация начинается только после команды пользователя **«всё делаем»**. После неё задачи сортируются по сложности/зависимостям и выполняются по одной; после каждого исправления обязательна отдельная ручная проверка пользователя. Existing-first/minimal-diff/stability-first invariant сохраняется.
