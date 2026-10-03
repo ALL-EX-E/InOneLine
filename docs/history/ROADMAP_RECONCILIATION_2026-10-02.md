@@ -1017,4 +1017,33 @@ The user requested another complete pass after the previously clean pass 27. The
 - Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
 
 Because durable accepted detail was restored, pass 28 is **NOT CLEAN**. A fresh post-correction control pass is required.
+## Twenty-ninth post-pass-28 control — CLEAN — 2026-10-03
 
+A fresh post-correction control was run after the pass-28 precision restorations.
+
+### Direct-chat orphan control
+The account-history search explicitly excluded all already-recorded D1–D43/A/W/B/E/R/S scopes, QA-1.0.8-01/02/03 and the pass-28 Games/A7/D21/timer/B1 corrections. It returned no additional surviving direct-user product requirement. The only concrete older UI defect surfaced by the search — Timer Overlay switching from max-amount time to wheel/tie-wheel time — is already covered by the accepted/released 1.0.1 `timer-overlay wheel/tie synchronization` contract.
+
+A possible old claim that D10/D11/D12 were all explicitly placed in `About/Links` was provenance-checked against the direct chat and rejected: the retrieved direct user messages accepted the official-resource link concepts, but did not directly fix a common About/Links placement. Current D10/D11/D12 placement classifications therefore remain correct.
+
+### Drive control
+- Current Google Drive mirrors `USER_IDEA_INVENTORY_2026-10-02` and `ROADMAP_RECONCILIATION_2026-10-02` matched their canonical GitHub counterparts before the pass-28 changes.
+- Historical implementation-order / D21 release addendum confirmed the recovered D21 switching rules.
+- No new surviving identifier or user-approved future scope was recovered from Drive after later supersessions.
+
+### GitHub/source mechanical control
+- D1–D43: all accounted for.
+- Actual D44 item: none.
+- Current accepted-scope runtime gaps remain exactly **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**.
+- Open Issues remain **#4 Global Multi-File Import** and **#5 D22 Battle Royale**.
+- Open PR remains stale **#9**, repository hygiene only.
+- `TODO` / `FIXME`: no hidden product scope.
+- `NotImplementedError` occurrences are abstract adapter/validation mechanics, not unfinished product scope.
+- `deferred` source occurrences inspected are Qt/event-loop terminology, not roadmap items.
+- No prohibited third-party development-reference wording was found in the current public GitHub tree.
+- Runtime markers remain **1.0.8 / schema 19 / 15 named migrations**.
+
+### CLEAN conclusion
+**New durable delta after pass-28 corrections: 0.**
+
+Pass 28 itself was not clean because it restored accepted detail. Pass 29 is clean and satisfies the requested stop condition for this iteration. No implementation scope is selected automatically.
