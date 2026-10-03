@@ -101,13 +101,22 @@
   - Не удалять связанные backend-функции: CSV import, Settings backup и MainWindow close lifecycle сохраняются.
   - Runtime/code пока не изменялись.
 
-- **UI-005 — меню `Вид → Обновить (F5)` — REVIEWED / NEEDS USER DECISION.**
-  - Exact CURRENT: единственный action меню `Вид` вызывает `MainWindow.refresh_all()`.
-  - Функция выполняет принудительный eager refresh вкладок `Игры`, `Публичный список`, `Стрим / OBS`, `Музыка`, `История аукционов`, `Журнал`; для `Аукцион` вызывает отдельный `refresh_force()`; затем очищает внутренний набор dirty-tabs и обновляет status bar.
-  - Это **не обновление версии/программы из Интернета** и не отдельная бизнес-функция. Это ручной force-refresh текущего UI/state.
-  - Нормальные business mutations по принятому cross-surface contract должны сами синхронизировать Games/Public/Auction/Journal/OBS без ручного F5. Поэтому F5 является ручным fallback/force-refresh, а не обязательной частью нормального workflow.
-  - В коде прямо сохранена историческая пометка: `Explicit F5 refresh remains eager by user request.`
-  - Изменение пока не утверждено. Если пользователь решит удалить `Обновить`, после него меню `Вид` тоже останется пустым; тогда отдельно рассмотреть удаление самого меню и shortcut F5.
+- **UI-005 — меню `Вид → Обновить` / shortcut F5 — REVIEWED / NEEDS USER DECISION.**
+  - Exact CURRENT: клик по единственному action меню `Вид → Обновить` однозначно вызывает `MainWindow.refresh_all()`.
+  - `refresh_all()` выполняет принудительный eager refresh вкладок `Игры`, `Публичный список`, `Стрим / OBS`, `Музыка`, `История аукционов`, `Журнал`; для `Аукцион` вызывает отдельный `refresh_force()`; затем очищает внутренний набор dirty-tabs и обновляет status bar.
+  - Это **не обновление версии/программы из Интернета**. Это ручной force-refresh текущего UI/state.
+  - Важное уточнение: клавиша **F5 назначена в exact CURRENT дважды**. Menu QAction имеет `F5 -> MainWindow.refresh_all()`, а `GamesTab` отдельно создаёт `QShortcut("F5") -> GamesTab.refresh()`.
+  - Ни один из этих shortcut не задаёт явный custom shortcut context; статически нельзя считать клавишу F5 гарантированно однозначным глобальным refresh. Поведение при конфликте нужно проверить вручную в Windows/Qt перед любым решением об удалении/сохранении shortcut.
+  - Нормальные business mutations по принятому cross-surface contract должны сами синхронизировать Games/Public/Auction/Journal/OBS без ручного F5. Global refresh является fallback/force-refresh, а не обязательной частью нормального workflow.
+  - В коде для global refresh сохранена историческая пометка: `Explicit F5 refresh remains eager by user request.`
+  - Изменение пока не утверждено. Если пользователь решит удалить `Обновить`, после него меню `Вид` останется пустым; судьбу обоих F5 bindings нужно решить отдельно, не потеряв полезный fallback неявно.
+  - Runtime/code пока не изменялись.
+
+- **BUG-001 — дублирующее назначение F5 — NEEDS MANUAL REPRO / REVIEW.**
+  - `MainWindow`: `F5 -> refresh_all()`.
+  - `GamesTab`: `F5 -> self.refresh()`.
+  - Это потенциально неоднозначный shortcut внутри одного главного окна и отдельный кандидат на cleanup/bugfix уже существующего UI.
+  - Перед реализацией требуется один сфокусированный ручной тест: что фактически происходит при F5 на вкладке `Игры` и на другой вкладке в текущем Windows build.
   - Runtime/code пока не изменялись.
 
 ### 4.1 Просмотренные экраны / visual baseline
