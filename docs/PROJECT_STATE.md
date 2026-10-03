@@ -367,3 +367,12 @@ Permanent repository gate:
 В счёт cadence входят только версии, которые прошли финальную пользовательскую приёмку и стали CURRENT/released. Candidate/FIX версии не считаются.
 
 Последняя явно зафиксированная отметка после 1.0.3 была 16/25; с принятыми 1.0.4–1.0.8 текущая арифметическая отметка — **21/25**. Перед фактическим C1 gate счётчик нужно сверить с release history, а не с candidate APP_VERSION.
+
+### Reconciliation pass 28 — 2026-10-03
+
+- Same-scenario recheck was **NOT CLEAN** because additional already-implemented/accepted detail had to be restored to the exhaustive inventory: exact Games/Public status-group ordering, Product A7 hover/autoscroll semantics, D21 between-round format switching, and the historical timer/B1 visual provenance notes.
+- These are documentation precision/provenance corrections, not new feature identifiers and not new auto-authorized runtime work.
+- Current known accepted-scope runtime gaps remain **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**.
+- Current runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+- A new post-correction control pass is required before claiming a clean stop for this iteration.
+
