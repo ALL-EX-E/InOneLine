@@ -973,3 +973,48 @@ The project Drive root, Text Log, Screenshots, current/history roadmap/workflow 
 
 The twenty-sixth full pass itself was NOT clean because it recovered durable details. The twenty-seventh post-correction control is clean and satisfies the requested stop condition for this iteration. No product implementation scope is selected automatically.
 
+## Twenty-eighth same-scenario recheck — 2026-10-03
+
+The user requested another complete pass after the previously clean pass 27. The current GitHub documents and exact current source, Drive current/history/review records, and direct chat history were re-compared.
+
+### Newly recovered precision
+
+1. **Games/Public canonical sorting**
+   - later accepted/current grouping is `ПРОХОДИТСЯ` -> `ИГРАЛ + НЕ ИГРАЛ` -> `ПРОЙДЕНО` -> `ЗАБРОШЕНО`;
+   - this later grouping supersedes earlier separate `НЕ ИГРАЛ`/ `ИГРАЛ` wording;
+   - current shared SQL keeps Games/Public on the same order, with playing sorted date-first and the other status groups points-first.
+
+2. **Product A7 exact hover behavior**
+   - hovering a History card linked to a lot temporarily pauses Conduct autoscroll;
+   - the linked lot is scrolled into view and highlighted without changing operator selection;
+   - the revealed row remains fixed while the card is hovered;
+   - leaving History removes highlight and resumes normal autoscroll from the revealed position/direction instead of resetting to the top.
+   - Current 1.0.8 source already implements this exactly.
+
+3. **D21 / 1.0.6 between-round format switching**
+   - after any completed elimination round the operator may switch back to `Обычное` and continue ordinary weighted-wheel behavior;
+   - already archived lots remain archived/excluded;
+   - switching is blocked during spin and while the current elimination result awaits `В архив`;
+   - switching between formats is allowed again between rounds and is auditable;
+   - each actual spin has its own immutable verification snapshot.
+   - Release notes/source already implement this accepted contract.
+
+4. **Historical timer UX**
+   - direct 2026-08-21 decision excluded a separate `+2 минуты` shortcut and timer hotkey layer;
+   - later accepted timer controls standardized `-10/-1/+1/+10` minute actions.
+
+5. **Historical B1 visual status concept**
+   - early direct accepted concept used a green check in a square for healthy and red X in a square for errors, with the red error indicator still visible in compact/collapsed presentation;
+   - later B1 implementation was manually accepted with the current text-badge/status presentation;
+   - no later direct message explicitly re-opened the icon requirement.
+   - Therefore the icon concept is preserved as historical accepted provenance, not promoted into a new current QA defect.
+
+### Classification
+
+- No new D/A/W/B/E/R identifier.
+- No new future implementation candidate.
+- No new current QA finding beyond **QA-1.0.8-01 / 02 / 03**.
+- Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+Because durable accepted detail was restored, pass 28 is **NOT CLEAN**. A fresh post-correction control pass is required.
+
