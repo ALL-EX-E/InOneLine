@@ -350,3 +350,15 @@ The user requested another full chats -> Drive -> GitHub -> canonical-docs recon
 
 Current runtime already implements the relevant runtime behaviors above; the SmartScreen correction is public-documentation-only. No APP_VERSION/schema/migration/runtime change is authorized or made by this pass.
 
+## 2026-10-03 — Pass 28 precision recovery
+
+Another same-scenario cross-source recheck recovered direct accepted detail that pass 27 had not stated precisely enough:
+
+- Games/Public canonical order uses status groups `ПРОХОДИТСЯ` -> `ИГРАЛ + НЕ ИГРАЛ` -> `ПРОЙДЕНО` -> `ЗАБРОШЕНО`; the later grouped middle tier supersedes earlier wording that separated `НЕ ИГРАЛ` and `ИГРАЛ`. Current shared SQL is authoritative for the accepted released behavior.
+- Product A7 History hover is a temporary operator interaction: pause Conduct autoscroll, reveal/highlight the linked lot without changing selection, keep it fixed while hovered, then remove highlight and resume scrolling from the revealed position/direction.
+- D21/1.0.6 allows `Выбывание -> Обычное` (and later back again) only between completed rounds; switching is blocked during spin and while an elimination result awaits `В архив`; already archived lots stay archived/excluded. Each spin retains its own verification snapshot.
+- Historical timer UX explicitly rejected a separate `+2 минуты` shortcut/hotkey layer; later accepted controls standardized `-10/-1/+1/+10` minutes.
+- The 2026-08-21 B1 visual concept used a green check/red X square with collapsed-error visibility. Later B1 was manually accepted with the current text-badge presentation and no later direct message re-opened the icon requirement. Preserve the early icon design as historical accepted provenance, not as an automatic current defect.
+
+No runtime/source/schema/migration change and no new implementation scope is authorized by this documentation recovery.
+
