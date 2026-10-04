@@ -1012,6 +1012,8 @@ Alan Wake 2|0
   - Runtime/code не изменялись.
 
 - **SCREEN-005 — вкладка `Стрим / OBS` — 2026-10-03 — BASELINE CAPTURED.**
+- **SCREEN-006 — вкладка `Музыка` — 2026-10-04 — BASELINE CAPTURED.**
+  - Зафиксирован текущий released UI Music Player до нового цикла изменений: now-playing, seek/time, transport, режим очереди/repeat, output route, volume/mute, OBS URL actions, импорт, live-search и список `Библиотека / Очередность`.
   - Третья основная вкладка принята в детальный UI/function review после завершения `Список` и `Публичный список`.
   - По текущему экрану зафиксированы видимые разделы:
     - `Данные для OBS`;
