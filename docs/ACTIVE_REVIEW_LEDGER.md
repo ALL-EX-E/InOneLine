@@ -1465,7 +1465,7 @@ Alan Wake 2|0
     - wheel duration можно изменить только в clean `awaiting_wheel` до spin; mode/RNG уже locked;
     - после остановки spin появляется `Подтвердить победителя`; до подтверждения доступна общая Stop/Cancel-семантика.
   - **Weighted wheel / Выбывание (released D21 current):**
-    - current direct-start minimum = **1 lot** (в отличие от standard minimum=2);
+    - current 1.0.8 direct-start minimum = **1 lot** (в отличие от standard minimum=2); для будущей реализации это superseded UI-069: любой новый запуск колеса требует минимум 2 лота, а один оставшийся лот допустим только как финал уже идущего `Выбывания`;
     - каждый spin использует текущие active entries и отдельный immutable verification snapshot;
     - lot-actions/изменение points/title недоступны в wheel phase;
     - после завершённого elimination round формат можно намеренно переключить обратно в `Обычное`; switching blocked во время spin и пока выбранный loser ожидает `В архив`; это released D21 behavior, а не случайная лазейка;
@@ -1476,7 +1476,7 @@ Alan Wake 2|0
     - `Остановить аукцион` имеет одну принятую универсальную бизнес-семантику UI-065; контекст может менять только текст предупреждения;
     - presentation setting показа wheel chance не меняет RNG/math;
     - D26 разрешает менять выбранный event soundtrack live, включая wheel soundtrack во время spin; это намеренная audio-механика;
-    - в Games DB archive/delete/clear защищены от изменения участвующей игры во время open auction, **но generic Edit Game сейчас не блокирует title/sm_points/status/review edits** для такой persistent game. Auction использует snapshot/starting+bid values, поэтому внешний edit может разойтись с frozen session state. Это **NEEDS REVIEW** как cross-tab consistency dependency;
+    - в Games DB archive/delete/clear защищены от изменения участвующей игры во время open auction, а generic Edit Game в current 1.0.8 ещё допускает title/sm_points/status/review edits для такой persistent game. Эта cross-tab зависимость **закрыта UI-068**: название/баллы/статус участвующего лота через вкладку `Игры` блокируются до завершения сессии, отзыв остаётся редактируемым; post-00:00 corrections выполняются только внутри текущего аукциона по UI-064;
     - current integration core считает событие частью текущего аукциона только при status=`running`; paused/tie-setup/awaiting-wheel/winner-selected идут вне running-auction path или получают source-status rejection при явном hint. UI-064/UI-066 должны учитывать это, особенно для temporary title после 00:00.
   - **Критические зависимости будущего общего перехода Max Amount → Wheel (UI-065):**
     - exact-current умеет Max→Wheel только как tie-break; общего перехода всех Max lots пока нет;
@@ -1484,7 +1484,7 @@ Alan Wake 2|0
     - elimination action/DB archive path тоже требуют mode=`weighted_wheel`;
     - max_amount session при создании принудительно получает standard wheel_format;
     - следовательно, будущий same-session Max→Обычное/Выбывание нельзя реализовать простым показом новой кнопки: нужно аккуратно согласовать session phase/mode/format, не ломая tie-break и verification;
-    - RNG method сейчас фиксируется **при создании Max Amount session**, хотя случайное число может вообще не понадобиться. Это напрямую связано с UI-054/UI-063: если RNG-controls скрываются для Max Amount, нужно отдельно определить, где выбирается RNG при последующем `Провести колесо` или tie-wheel. До этого не считать вопрос закрытым.
+    - RNG method в current 1.0.8 фиксируется **при создании Max Amount session**, хотя случайное число может вообще не понадобиться. Эта зависимость **закрыта UI-070**: RNG выбирается только на clean boundary перед первым wheel spin при общем переходе Max Amount → Wheel или tie-wheel и затем фиксируется для всей wheel-chain.
   - Runtime/code не изменялись; это reference-аудит текущей state-machine и список зависимостей для дальнейшего review.
 
 - **UI-067 — ничья в Max Amount: `Дополнительное время` продолжает весь аукцион, `Колесо` остаётся только между лидерами — READY AFTER BATCH APPROVAL.**
@@ -1597,11 +1597,11 @@ Alan Wake 2|0
   - Не удалять сами routes/overlays; речь только о размещении UI-actions.
   - Окончательное решение принять при отдельном разборе пункта.
 
-- **UI-054 — привести RNG-блок к GLOBAL-UI-001 — NEEDS REVIEW.**
-  - На текущем baseline при `Максимальная сумма` скрываются `Генератор` и RNG combo при отсутствии Random.org key, но остаются `О методах` и `Данные проверки`.
-  - Кандидат: весь RNG/wheel-specific блок показывать только когда он действительно относится к выбранному режиму/состоянию.
-  - При `Взвешенное колесо` должны появляться только релевантные controls: generator/method help/verification/wheel format и связанные элементы.
-  - Точную матрицу видимости отдельно проверить перед утверждением.
+- **UI-054 — привести RNG-блок к GLOBAL-UI-001 — READY AFTER BATCH APPROVAL / RESOLVED BY UI-070.**
+  - Решение уточнено и закрыто UI-070.
+  - При `Максимальная сумма` весь RNG/wheel-specific блок скрыт: выбор генератора, `О методах`, `Данные проверки` и другие RNG-controls не показываются, пока пользователь фактически не переходит к колесу.
+  - При прямом `Взвешенном колесе` показываются только релевантные wheel/RNG controls.
+  - При переходе Max Amount → Wheel или tie-wheel выбор RNG появляется на clean boundary перед первым spin и затем фиксируется для всей wheel-chain по UI-070.
 
 - **UI-055 — сделать OBS audio-help аукциона контекстным — NEEDS REVIEW.**
   - Сейчас пояснение про OBS отображается даже при `Вывод музыки: В приложении`.
