@@ -1244,12 +1244,9 @@ Alan Wake 2|0
     - после UI-052/UI-060 верхние Rules actions удаляются/переносятся, поэтому освободившееся вертикальное место использовать для более высокой позиции timer block;
     - `Максимальная сумма` и `Взвешенное колесо` должны использовать одинаковый общий принцип верхней компоновки без искусственного пустого пространства.
   - Перенос не должен менять business logic таймера, колеса, winner selection, RNG или soundtrack ownership.
-  - Уточнение 2026-10-05 / wheel soundtrack layout — ACCEPTED:
-    - настройки `Музыка колеса` оставить непосредственно **над локальным колесом** в его новой верхней области;
-    - не переносить soundtrack controls в отдельный удалённый блок;
-    - переразложить controls более компактно по горизонтали и использовать доступную ширину блока, чтобы selector/кнопка добавления/громкость/без звука не создавали лишних вертикальных строк;
-    - цель: soundtrack controls не должны без необходимости увеличивать высоту wheel preview area и сдвигать нижние элементы страницы ещё ниже;
-    - при узком окне допустим перенос строк/scroll по общему GLOBAL-UI-002, но при нормальной ширине 1920×1080 блок должен использовать горизонтальное пространство эффективно.
+  - Уточнение 2026-10-05 / wheel soundtrack layout — **SUPERSEDED BY UI-071**:
+    - прежнее решение оставлять `Музыка колеса` непосредственно над локальным колесом отменено;
+    - актуальное размещение и контекстная видимость soundtrack controls определены UI-071.
   - Runtime/code пока не изменялись.
 
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
@@ -1561,6 +1558,107 @@ Alan Wake 2|0
     - Random.org+ продолжает получать отдельный one-use ticket для каждого нового spin в рамках той же цепочки по существующей verification semantics.
   - При Max Amount без перехода к колесу RNG вообще не нужен и не должен заранее фиксироваться в пользовательской модели.
   - Реализация должна изменить текущую техническую зависимость, где `rng_method` фиксируется уже при создании Max Amount session: источник выбора переносится к clean boundary перед первым wheel spin, без создания второй параллельной RNG-системы.
+  - Runtime/code пока не изменялись.
+
+- **AUCTION-TIMER-AUDIO-REF-001 — таймеры и soundtrack: exact-current reference map для дальнейшего разбора — CAPTURED / PARTIALLY RESOLVED.**
+  - Проверено по current 1.0.8 code paths: `views/auction.py`, `auction_parts/actions.py`, `auction_parts/state.py`, `auction_parts/audio.py`, `db/auction_session.py`, `db/wheel.py`, `views/settings.py`, `views/wheel.py`, `wheel_motion.py`, `audio.py`, `web/wheel_overlay.html`.
+  - Один и тот же большой `timer_edit` (`QLineEdit`) используется контекстно для Max Amount, tie overtime и Wheel.
+  - Пользователь уже может вводить время вручную прямо в поле:
+    - shorthand: ровно 6 цифр `ЧЧММСС`, например `000030` → `00:00:30.000`;
+    - полный формат: `ЧЧ:ММ:СС.мс`;
+    - Enter/focus loss нормализует значение.
+  - Current диапазоны:
+    - Max Amount / overtime: `00:00:01.000` … `24:00:00.000`;
+    - Wheel: `00:00:03.000` … `24:00:00.000` (superseded будущим UI-072).
+  - Поле времени editable:
+    - до запуска новой сессии;
+    - при подготовке дополнительного времени;
+    - в `awaiting_wheel` до spin.
+  - Во время `running` / `paused` Max Amount поле становится read-only; изменения остатка выполняются быстрыми кнопками времени.
+  - Одна и та же `start_btn` является контекстной:
+    - prestart Max Amount → `Старт`;
+    - Max Amount running → `Пауза`;
+    - Max Amount paused → `Продолжить`;
+    - wheel prestart / awaiting_wheel → `Крутить`.
+  - Отдельной кнопки Pause не существует: `handle_timer_action()` маршрутизирует running→pause и paused→resume через ту же кнопку.
+  - Wheel pause в current runtime отсутствует. Spin использует authoritative `wheel_started_at + wheel_duration_ms`; локальная анимация, OBS wheel и wheel soundtrack синхронизированы с этой временной шкалой.
+  - Быстрые `−10 / −1 / +1 / +10 мин` доступны только auction/overtime context; для Wheel специально скрыты. Это не означает, что wheel duration нельзя задать вручную: `timer_edit` остаётся editable до spin.
+  - Reset semantics current:
+    - prestart Max Amount → saved Max Amount default;
+    - active Max Amount running/paused → исходная `duration_ms` текущей сессии после подтверждения;
+    - awaiting Wheel → saved wheel default и запись его в session;
+    - prestart Wheel → saved wheel default;
+    - pending tie overtime → current code также использует **saved wheel default**.
+  - Найдено несоответствие текста: tooltip `Сбросить` говорит `колесо — 8 секунд`, хотя runtime реально возвращает **сохранённую пользовательскую wheel default duration**, которая может быть не 8 секунд. Требует отдельной правки текста.
+  - Найдена semantic dependency для дополнительного времени: `start_tie_overtime()` первоначально подставляет `_saved_wheel_default_duration_ms()`, и reset pending-overtime возвращает то же wheel-default. Это связывает default допвремени с default длительностью вращения колеса; продуктовый смысл отдельно не утверждён и требует дальнейшего разбора.
+  - BUG-006 сохраняется: после abort/cancel текущего wheel spin следующий новый spin должен получать полную сохранённую длительность, а не остаток прерванного spin.
+  - Current wheel animation имеет отдельный lead-in: `prepare_wheel_animation(..., lead_in_ms=1200)`, минимум фактического lead-in 300 ms. До `wheel_started_at` timer display показывает полную заданную длительность, soundtrack также стартует по тому же `started_at`. Для очень коротких wheel durations это может быть визуально заметно и требует отдельного UX-review, но само время spin не искажается.
+  - Wheel motion/runtime не имеет внутренней необходимости в минимуме 3 s:
+    - local/OBS motion functions работают с duration >= 1 ms;
+    - audio scheduler также нормализует duration минимум до 1 ms;
+    - ограничение 3 s сейчас является validation/product limit, а не техническим требованием animation/audio engine.
+  - Но при коротком spin current визуальная модель всё равно делает минимум 6–9 полных оборотов (`base_turns`), поэтому при 1 s колесо будет вращаться очень быстро. Решение менять ли количество оборотов отдельно не принято.
+  - Runtime/code пока не изменялись.
+
+- **UI-071 — перенести управление `Музыкой колеса` в общий контекстный блок таймера — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-05 — ACCEPTED.
+  - Current architecture уже использует общий audio-output route для музыки Max Amount и Wheel:
+    - `В приложении`; либо
+    - `Через OBS Browser Source таймера`.
+  - При OBS-режиме один `/timer-overlay` получает общий auction audio state и переключает `kind=auction/wheel`; локальные `auction_audio` и `wheel_audio` становятся transport-silent.
+  - Следовательно, настройки soundtrack должны визуально следовать за тем же контекстом большого таймера:
+    - Max Amount / overtime → внутри timer block показывать существующий `auction_soundtrack_widget` (`Музыка аукциона`);
+    - Wheel prestart/spin/result context → в этом же timer block показывать существующий `wheel_soundtrack_widget` (`Музыка колеса`).
+  - Не создавать второй soundtrack control set и не объединять два независимых saved selection/volume/mute набора: переиспользовать существующие controls и settings.
+  - Сохраняются существующие возможности обоих soundtrack: выбор media, импорт, status, volume, mute.
+  - Сохраняется D26 live-selection semantics: soundtrack можно менять во время соответствующей активной фазы; перенос UI сам по себе эту механику не меняет.
+  - Сохраняется существующая audio ownership-модель:
+    - Max Amount soundtrack играет в running, ставится на паузу вместе с auction pause;
+    - при wheel configuration Music Player может вернуть audible ownership до фактического `Крутить`;
+    - Wheel soundtrack захватывает ownership на actual spin и идёт по authoritative wheel animation clock.
+  - Ранее принятое уточнение UI-062 `Музыка колеса остаётся непосредственно над локальным колесом` **SUPERSEDED BY UI-071**. Локальный wheel widget по-прежнему переносится в верхнюю область по UI-062, но soundtrack controls больше не обязаны находиться над самим wheel preview.
+  - Runtime/code пока не изменялись.
+
+- **UI-072 — разрешить длительность вращения колеса от 1 секунды до 24 часов — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-05 — ACCEPTED.
+  - Новый пользовательский диапазон Wheel: **`00:00:01.000` … `24:00:00.000`**.
+  - Применяется одинаково:
+    - к прямому `Взвешенному колесу`;
+    - к Wheel после Max Amount;
+    - к tie-wheel;
+    - к каждому следующему elimination spin.
+  - Existing saved default `auction_wheel_default_duration_ms` использует тот же новый диапазон.
+  - Реализация должна изменить все current 3-second validation points, а не только UI:
+    - `AuctionSessionMixin.WHEEL_MIN_DURATION_MS`;
+    - validation `set_auction_wheel_duration_ms` / tie-wheel/session creation;
+    - `AuctionTab._wheel_timer_ms` и tooltip/range/error text;
+    - Settings saved-value fallback/validation/range help;
+    - связанные regression tests/workflows.
+  - Не создавать новую duration variable; сохраняется один source of truth `wheel_duration_ms`.
+  - Motion/audio engine уже способен работать с 1 s; отдельный review количества оборотов/lead-in остаётся независимым вопросом.
+  - Верхняя граница остаётся 24 часа.
+  - Runtime/code пока не изменялись.
+
+- **BUG-007 — tooltip `Сбросить` для wheel duration не соответствует реальному default — CAPTURED / NEEDS REVIEW.**
+  - Current tooltip: `колесо — 8 секунд`.
+  - Current runtime: reset использует `auction_wheel_default_duration_ms`, сохранённый пользователем в Settings.
+  - Если default = 5 s / 30 s / иное значение, tooltip врёт.
+  - Кандидат на будущую правку: описывать reset семантически (`вернуть сохранённую длительность колеса по умолчанию`) либо динамически показывать текущее default.
+  - Runtime/code пока не изменялись.
+
+- **AUCTION-TIMER-REVIEW-002 — default дополнительного времени сейчас связан с wheel default — NEEDS REVIEW.**
+  - Current `start_tie_overtime()` подставляет `_saved_wheel_default_duration_ms()`.
+  - Current reset во время pending overtime также возвращает `_saved_wheel_default_duration_ms()`.
+  - Это означает: изменение `Длительности вращения колеса по умолчанию` одновременно неявно меняет первоначальное/сбрасываемое дополнительное время Max Amount.
+  - Отдельного setting/default для overtime сейчас нет.
+  - Нужно отдельно решить продуктово: переиспользовать какой-то существующий default, создать явный overtime default, либо выбрать другое правило. До решения runtime не менять.
+
+- **AUCTION-TIMER-REVIEW-003 — короткий wheel spin и 1200 ms lead-in — NEEDS REVIEW.**
+  - Current animation preparation назначает `wheel_started_at` примерно через 1200 ms после подготовки (минимум 300 ms).
+  - До этой точки UI показывает полную длительность, wheel soundtrack ещё не стартует, затем начинается authoritative spin window.
+  - При обычных 8+ s это почти незаметно; при принятом минимуме 1 s задержка до движения может быть длиннее самого spin.
+  - Нужно отдельно решить, сохраняем ли current lead-in для 1 s, уменьшаем его для коротких spins или оставляем как есть.
+  - RNG/result semantics от этого не зависят; вопрос только визуально-аудио временной подачи.
   - Runtime/code пока не изменялись.
 
 - **UI-066 — глобальная прозрачность всех внешних начислений: что пришло, куда начислено или почему не начислено — READY AFTER BATCH APPROVAL.**
