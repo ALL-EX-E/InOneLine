@@ -1421,8 +1421,71 @@ Alan Wake 2|0
     - если у всех активных лотов исходные суммы равны `0`, effective weight каждого становится `1`, то есть шансы равные;
     - правило одинаково для обычного колеса и `Выбывания` после Max Amount;
     - не менять текущий RNG-алгоритм, verification snapshots или probability semantics из-за перехода Max Amount → Wheel.
+  - Граница фиксации состава/весов при переходе Max Amount → Wheel — ACCEPTED:
+    - ручные исправления состава, названий и сумм разрешаются только в принятой post-00:00 correction phase **до** действия `Провести колесо`;
+    - после перехода в wheel phase состав активных лотов и их проверенные веса считаются замороженными для этой wheel-цепочки;
+    - после `Провести колесо` не разрешать добавление/удаление лотов, изменение их названий или сумм;
+    - это соответствует уже существующей runtime-границе: операции `Добавить`, `Уменьшить`, новый лот и удаление temporary-lot сейчас разрешены только при status=`running`, а wheel phase использует `awaiting_wheel` / `winner_selected`.
   - Для реализации переиспользовать существующие `auction_entries`, starting/bid accounting, `games.sm_points`, audit/change_log и текущую cancel/promotion механику; не создавать параллельный второй набор сумм без необходимости.
   - Runtime/code пока не изменялись.
+
+- **AUCTION-MECHANICS-REF-001 — exact-current карта трёх способов определения победителя и зависимостей — REVIEWED 2026-10-05 / REFERENCE.**
+  - Назначение: использовать как обязательную reference-карту во время дальнейшего UI/business review, чтобы не предлагать изменения, которые уже запрещены/разрешены существующей state-machine. Runtime этим пунктом не меняется.
+  - Проверены exact-current файлы: `views/auction.py`, `views/auction_parts/state.py`, `actions.py`, `rng.py`, `audio.py`, `db/auction_session.py`, `db/wheel.py`, `db/services.py`, `db/games.py`, а также released D21/D26 decisions.
+  - Общая стартовая выборка: в новый аукцион попадают постоянные неархивные игры со статусами `ИГРАЛ` + `НЕ ИГРАЛ`; `ПРОХОДИТСЯ`, `ПРОЙДЕНО`, `ЗАБРОШЕНО`, архив и temporary `auction_only` в стартовую выборку не входят.
+  - До старта:
+    - можно выбрать `Максимальная сумма` или `Взвешенное колесо`;
+    - RNG = local / Random.org / Random.org+ (remote choices видны только при сохранённом API key);
+    - для weighted wheel выбирается `Обычное` / `Выбывание`;
+    - max-amount timer и wheel duration имеют отдельные сохранённые значения;
+    - после создания активной сессии `mode` и `rng_method` в UI блокируются.
+  - **Максимальная сумма / status=running:**
+    - текущие ручные lot-actions доступны только здесь: добавить баллы, уменьшить баллы, добавить новый temporary lot, удалить erroneous temporary lot;
+    - внешние integration events попадают в текущий аукцион только когда session status действительно `running`;
+    - Pause переводит session в `paused`: ручные lot-actions скрыты/недоступны, а новые external events больше не считаются ставками текущей сессии;
+    - таймер во время running/paused нельзя свободно печатать, но разрешены существующие +/- и Reset; `Завершить приём ставок` доступно и running, и paused;
+    - mode/RNG изменить нельзя;
+    - auction soundtrack по принятому D26 можно менять live; это presentation/audio behavior, не изменение бизнес-результата.
+  - **Завершение Max Amount в current 1.0.8:**
+    - один лидер → `winner_selected`;
+    - несколько лидеров → `tie_break_required`, активными для tie остаются только лидеры;
+    - нет лидеров → `finished_no_winner`;
+    - current runtime после 00:00 не даёт обычные bid/new/delete controls; принятая UI-064 correction phase является будущим изменением и должна переиспользовать accounting/audit, а не считаться уже существующей механикой.
+  - **Ничья Max Amount:**
+    - варианты: `Дополнительное время` или `Использовать колесо`;
+    - при выборе допвремени сначала настраивается timer; после фактического Start session снова становится `running`;
+    - следствие exact-current: после старта допвремени снова включаются все running-only manual lot-actions и integration intake;
+    - current help говорит «дополнительное время только лидерам», но generic running-path технически позволяет создать совершенно новый lot; попытка заново подключить уже существовавшего inactive non-leader упирается в текущую `UNIQUE(auction_id, game_id)` архитектуру. Это **отдельная обнаруженная зависимость/несогласованность, NEEDS REVIEW**, не авто-разрешение на fix;
+    - tie-wheel сохраняет session.mode=`max_amount`, использует только оставшихся tie-leaders, формат фактически standard, wheel duration можно задать перед spin, RNG берётся из уже сохранённого `rng_method` сессии.
+  - **Обычное взвешенное колесо:**
+    - direct weighted-wheel session создаётся сразу в `awaiting_wheel`, отдельного периода ставок нет;
+    - standard требует минимум 2 стартовых лота;
+    - состав/weights фиксируются в `auction_entries`; manual lot-actions недоступны;
+    - external events при `awaiting_wheel` / spin / `winner_selected` не меняют текущие wheel weights;
+    - wheel duration можно изменить только в clean `awaiting_wheel` до spin; mode/RNG уже locked;
+    - после остановки spin появляется `Подтвердить победителя`; до подтверждения доступна общая Stop/Cancel-семантика.
+  - **Weighted wheel / Выбывание (released D21 current):**
+    - current direct-start minimum = **1 lot** (в отличие от standard minimum=2);
+    - каждый spin использует текущие active entries и отдельный immutable verification snapshot;
+    - lot-actions/изменение points/title недоступны в wheel phase;
+    - после завершённого elimination round формат можно намеренно переключить обратно в `Обычное`; switching blocked во время spin и пока выбранный loser ожидает `В архив`; это released D21 behavior, а не случайная лазейка;
+    - wheel duration можно менять на каждом clean `awaiting_wheel` boundary между spins;
+    - RNG method остаётся одним и тем же для session; Random.org+ получает новый one-use ticket для нового spin;
+    - current released D21 архивирует даже последний lot и завершает без final winner; **UI-065 уже supersedes это для будущей реализации** правилом survivor-wins + `Подтвердить победителя`.
+  - **Общие зависимости, которые нельзя забывать при следующем review/implementation:**
+    - `Остановить аукцион` имеет одну принятую универсальную бизнес-семантику UI-065; контекст может менять только текст предупреждения;
+    - presentation setting показа wheel chance не меняет RNG/math;
+    - D26 разрешает менять выбранный event soundtrack live, включая wheel soundtrack во время spin; это намеренная audio-механика;
+    - в Games DB archive/delete/clear защищены от изменения участвующей игры во время open auction, **но generic Edit Game сейчас не блокирует title/sm_points/status/review edits** для такой persistent game. Auction использует snapshot/starting+bid values, поэтому внешний edit может разойтись с frozen session state. Это **NEEDS REVIEW** как cross-tab consistency dependency;
+    - current integration core считает событие частью текущего аукциона только при status=`running`; paused/tie-setup/awaiting-wheel/winner-selected идут вне running-auction path или получают source-status rejection при явном hint. UI-064/UI-066 должны учитывать это, особенно для temporary title после 00:00.
+  - **Критические зависимости будущего общего перехода Max Amount → Wheel (UI-065):**
+    - exact-current умеет Max→Wheel только как tie-break; общего перехода всех Max lots пока нет;
+    - `set_auction_wheel_format()` сейчас разрешён только для session.mode=`weighted_wheel`;
+    - elimination action/DB archive path тоже требуют mode=`weighted_wheel`;
+    - max_amount session при создании принудительно получает standard wheel_format;
+    - следовательно, будущий same-session Max→Обычное/Выбывание нельзя реализовать простым показом новой кнопки: нужно аккуратно согласовать session phase/mode/format, не ломая tie-break и verification;
+    - RNG method сейчас фиксируется **при создании Max Amount session**, хотя случайное число может вообще не понадобиться. Это напрямую связано с UI-054/UI-063: если RNG-controls скрываются для Max Amount, нужно отдельно определить, где выбирается RNG при последующем `Провести колесо` или tie-wheel. До этого не считать вопрос закрытым.
+  - Runtime/code не изменялись; это reference-аудит текущей state-machine и список зависимостей для дальнейшего review.
 
 - **UI-066 — глобальная прозрачность всех внешних начислений: что пришло, куда начислено или почему не начислено — READY AFTER BATCH APPROVAL.**
   - Это **общее правило интеграций для всей программы**, а не частный случай вкладки `Аукцион`.
