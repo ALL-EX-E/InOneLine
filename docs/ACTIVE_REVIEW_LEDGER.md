@@ -1980,7 +1980,7 @@ Alan Wake 2|0
     - saving a rate only moves eligible pending rows into manual-ready state;
     - user must still explicitly `Применить` each pending event;
     - changing a rate later never recalculates already applied contribution;
-    - missing/unusable target remains separate `Требует привязки` workflow under QA-1.0.8-03, not a conversion-pending row.
+    - обычный empty-message event во время running auction после UI-087 получает placeholder `Без текста N`; старый `Требует привязки` rule для этого стандартного случая superseded. Неизвестный курс остаётся отдельной conversion-pending проблемой.
   - Runtime/code пока не изменялись.
 
 - **UI-086 — pending-событие сохраняет source-time принадлежность аукциону и блокирует необратимое определение результата — READY AFTER BATCH APPROVAL.**
@@ -2039,6 +2039,48 @@ Alan Wake 2|0
   - **Stop/cancel safety.**
     - Универсальный explicit `Остановить аукцион` остаётся аварийным/осознанным выходом без победителя и не превращается в скрытое `Подтвердить результат`.
     - При unresolved pending перед stop показать контекстное предупреждение, что имеются необработанные поступления; exact post-stop settlement/materialization таких событий проверить при реализации вместе с UI-065 stop semantics, не теряя source target/provenance и не назначая победителя задним числом.
+  - Runtime/code пока не изменялись.
+
+- **UI-087 — пустое сообщение внешнего события во время аукциона создаёт последовательный служебный лот `Без текста N` — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Пользовательская терминология: в текущем продукте/аукционе использовать **`лот`**, а не `игра`. Internal DB identifiers вроде `games` можно сохранять как implementation detail; visible copy в новых/изменяемых auction/integration/conversion flows должна говорить `лот`.
+  - Existing B3 matching rule сохраняется:
+    - если непустой текст сообщения после обычной normalization точно совпадает с существующим лотом текущей session, external credit идёт в этот лот;
+    - fuzzy/AI matching не добавлять;
+    - если непустой текст не совпадает ни с одним текущим лотом, этот текст используется как название нового временного `auction_only` лота; оператор позже может исправить его через принятую `Изменить лот`/merge механику.
+  - **Новый empty-message rule:**
+    - если accepted external event пришло во время running auction, но message/lot text после trim пустой, не отправлять его в отдельный manual-binding workflow;
+    - автоматически создать **отдельный временный лот** с названием:
+      - `Без текста 1`;
+      - `Без текста 2`;
+      - `Без текста 3`;
+      - и далее по порядку в рамках этой auction session.
+    - Каждый empty-message event получает **свой** placeholder lot; несколько таких событий не агрегировать в один общий `Без текста`.
+    - Нумерация начинается с 1 для каждой новой auction session и должна быть монотонной по фактически принятым empty-message events этой session; уже использованный номер не переиспользовать после rename/delete, чтобы поиск `Без текста` сохранял хронологический счётчик поступлений.
+    - Dedup source+external_event_id применяется **до** выдачи нового номера: duplicate delivery не создаёт новый `Без текста N`.
+  - **Known-rate case.**
+    - Если курс source unit уже известен, после создания `Без текста N` баллы immediately/exactly-once начисляются этому лоту через общий B3 accounting path.
+    - Сохраняются все исходные данные event: source/provider, external event ID, contributor, исходная сумма/unit, provider timestamp/source-time context, исходный пустой message и audit provenance.
+    - `Без текста N` — обычное видимое название временного лота, а не замена/удаление оригинальных данных события.
+    - После credit это уже применённое событие; action `Не применять` к нему задним числом не относится.
+  - **Unknown-rate + empty-message case.**
+    - Placeholder `Без текста N` создаётся сразу, чтобы оператор видел факт/порядок поступления именно в текущем аукционе.
+    - Баллы пока не начисляются.
+    - Неизвестная unit одновременно появляется в `Курсы конвертации`, а конкретное event — в `Ожидают применения` по UI-085.
+    - Pending row сохраняет source-auction context и target placeholder lot.
+    - После задания курса preview `К зачислению` пересчитывается, но auto-apply не происходит.
+    - `Применить` начисляет рассчитанные баллы именно в уже созданный `Без текста N`.
+    - Пока event unresolved, UI-086 warning/hard-gate результата действует как обычно.
+    - `Не применять` существует только пока событие реально pending/uncredited; оно отклоняет pending credit, но не означает отмену уже состоявшегося известного-rate доната.
+  - **Редактирование placeholder.**
+    - Пользователь может переименовать `Без текста N` существующим `Изменить лот`.
+    - Если новое название совпадает с существующим лотом по общей normalization, использовать уже принятую confirmation+merge механику; не создавать отдельный placeholder merge path.
+    - Поиск по строке `Без текста` позволяет быстро найти такие автоматически созданные лоты до их переименования.
+  - **Supersession QA-1.0.8-03.**
+    - Раннее правило `missing/unusable target -> Требует привязки` **суперседено для обычного accepted external event, пришедшего во время аукциона с пустым message**: здесь теперь используется `Без текста N`.
+    - Current 1.0.8 всё ещё технически помечает `missing_target` как `inapplicable`; это не целевое поведение после batch implementation.
+    - Не создавать отдельный `Требует привязки` UI только ради стандартного empty-message donation в running auction.
+    - Иные provider-specific события, которые вообще нельзя безопасно представить как обычный lot-targeted credit, остаются отдельным будущим edge-case и не должны блокировать реализацию UI-087.
   - Runtime/code пока не изменялись.
 
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
