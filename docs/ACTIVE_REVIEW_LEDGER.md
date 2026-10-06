@@ -1580,6 +1580,64 @@ Alan Wake 2|0
     - Если позже пользователь захочет `СТАРТ / ФИНИШ` в completed history, правильный путь — сохранять final position snapshot при закрытии session; этот новый storage сейчас **не принят** и в UI-080 не входит.
   - Runtime/code пока не изменялись.
 
+- **UI-081 — привести вкладку `Журнал` к единому тёмному стилю и понятному русскому presentation — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Основа вкладки сохраняется: это общий read-only technical/audit view поверх authoritative `change_log`, а не второй журнал и не замена `Истории аукционов`.
+  - **PRESERVE current behavior:**
+    - newest-first по `change_log.id DESC`;
+    - без поиска показывать последние 500 событий;
+    - при непустом search читать полный `change_log`, чтобы старые совпадения не терялись за пределами 500-row window;
+    - live-search с debounce ~250 ms;
+    - поиск по отображаемым значениям и raw technical fields: entity/action/ID/before_json/after_json/timestamp;
+    - асинхронная загрузка/форматирование через existing `FunctionWorker/QThreadPool`, чтобы открытие вкладки не блокировало UI;
+    - tooltip полного текста в колонке `ПОДРОБНОСТИ`;
+    - read-only table и существующие размеры/структуру колонок `ВРЕМЯ / ОБЪЕКТ / ID / ДЕЙСТВИЕ / ПОДРОБНОСТИ`;
+    - dirty-tab/F5 refresh contract сохраняется; отдельный постоянный polling для Journal в рамках UI-081 не добавлять.
+  - **1. Исправить белые alternating rows — BUG / READY AFTER BATCH APPROVAL.**
+    - Exact CURRENT причина: `LogTab` использует `QTableView + QAbstractTableModel` и `setAlternatingRowColors(True)`, но общий dark stylesheet задаёт `background / alternate-background-color / selection...` только selector-у `QTableWidget`.
+    - Поэтому alternating `QTableView` берёт системный Windows `AlternateBase`, который на пользовательской системе получается почти белым.
+    - Исправление: распространить общий table-style на **`QTableView`** теми же dark colors, которые применяются к `QTableWidget`.
+    - Чередование строк сохранить: обычная тёмная / немного более светлая тёмная.
+    - Не добавлять отдельную уникальную тему только для Journal; использовать один общий table style, чтобы будущие `QTableView` не повторили дефект.
+  - **2. Обновить устаревшее описание вкладки.**
+    - Current text `Журнал локальных изменений. Новые интеграции позже будут писать события сюда же.` больше не соответствует runtime: integration events уже пишутся в общий `change_log`.
+    - Заменить на нейтральное актуальное описание, например:
+      **`Журнал изменений и событий программы, включая аукционы, настройки и подключённые интеграции.`**
+    - Это только UI-copy; backend scope не меняется.
+  - **3. Перевести technical presentation в понятный русский вид.**
+    - Raw `change_log` остаётся authoritative и не переписывается; меняется только read-only formatter.
+    - Колонка `ОБЪЕКТ` должна использовать понятные labels вместо technical entity_type, например:
+      - `game` -> `Игра`;
+      - `auction_lot` -> `Лот аукциона`;
+      - `auction_session` -> `Аукцион`;
+      - `auction_bid` -> `Ставка`;
+      - `setting` -> `Настройка`;
+      - `integration_event` -> `Интеграция`;
+      - `external_conversion` -> `Конвертация`;
+      - остальные известные entity-types переводить по тому же принципу; неизвестный future type может безопасно fall back к technical name.
+    - Колонка `ДЕЙСТВИЕ` должна использовать понятные русские labels:
+      - common `create/update/delete/add/decrease` сохраняют `СОЗДАНИЕ / ИЗМЕНЕНИЕ / УДАЛЕНИЕ / ДОБАВЛЕНИЕ / УМЕНЬШЕНИЕ`;
+      - auction actions `pause/resume/adjust_time/reset_timer/finish/cancel/wheel/... ` переводить через существующую auction formatter semantics;
+      - integration statuses/actions `apply/apply_pending/awaiting_rate/inapplicable/queue...` переводить в понятные оператору формулировки;
+      - неизвестный action может fall back к upper-case technical action, чтобы данные никогда не терялись.
+    - Колонка `ПОДРОБНОСТИ` не должна по умолчанию показывать сырой Python-dict/JSON там, где уже существует понятный formatter.
+    - **Reuse first:**
+      - для auction-related event presentation максимально переиспользовать `format_auction_history_event()`;
+      - для успешно применённых integration bet/event данных переиспользовать существующие label/amount/source formatting helpers из `format_integration_bet_event()` там, где payload достаточен;
+      - game formatter `LogTab._details()` сохранить и расширять, а не создавать второй independent game diff formatter.
+    - Для settings показывать понятный label/value там, где key известен UI; если friendly label ещё не определён, допустим technical key + formatted value вместо raw dict.
+    - Secret safety не менять: существующая redaction secret setting values остаётся обязательной; human-readable formatter не должен раскрывать credential/token payload.
+    - Raw данные не удалять и не терять:
+      - поиск продолжает индексировать raw entity/action/before_json/after_json;
+      - полный raw payload может оставаться доступным через tooltip/secondary readonly details path при необходимости, но основной row text должен быть человеческим.
+  - **Cross-feature audit rule.**
+    - UI-080 уже требует расширять `change_log`/auction formatter под новые auction mechanics. Journal должен автоматически получать те же новые понятные события через shared formatter/reuse, а не требовать вторую ручную таблицу переводов для каждого будущего auction action.
+    - Integration additions также должны писать в тот же `change_log`; отдельный provider-specific Journal backend не создавать.
+  - **Refresh boundary.**
+    - Current `LogTab` не имеет собственного polling timer. UI-081 это не меняет: вкладка обновляется через существующий dirty-tab lifecycle и global F5.
+    - Если позже понадобится live-update уже открытого Journal для external integration events, это рассматривать отдельно, чтобы не добавлять бессмысленный постоянный polling к тяжёлому audit view.
+  - Runtime/code пока не изменялись.
+
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
   - Экран: `Аукцион → Способ определения победителя`, режим `Взвешенное колесо`.
   - Кнопку `О методах` переименовать в **`Как выбирается случайное число?`**.
