@@ -1905,7 +1905,7 @@ Alan Wake 2|0
 
 - **UI-085 — `Настройки → Конвертация`: атомарные курсы и полноценная очередь неизвестного курса — READY AFTER BATCH APPROVAL.**
   - Решение пользователя 2026-10-06 — ACCEPTED.
-  - Existing S1 conversion architecture сохраняется: provider-neutral source units, integer points with positive-fraction ceiling, no reverse conversion, unknown rate -> Pending -> explicit manual apply, no retroactive rewrite of closed auction history.
+  - Existing S1 conversion architecture сохраняется: provider-neutral source units, integer points with positive-fraction ceiling, no reverse conversion, unknown rate -> Pending -> explicit manual apply. UI-086 уточняет auction boundary: source-auction pending сохраняет принадлежность исходной session и заранее блокирует необратимое завершение результата; уже закрытая legacy history автоматически не переписывается.
 
   - **1. Переименовать heading `Валюты` -> `Курсы конвертации`.**
     - Причина: этот блок содержит не только currency rows, но и service-specific/non-monetary units вроде Twitch Channel Points.
@@ -1938,7 +1938,7 @@ Alan Wake 2|0
       - enable/applicability `Применить` определяется тем же backend-validity contract, а не наличием current `games.id`;
       - outside-auction usable-title path при apply создаёт/reuses normal persistent game по existing normalized-title rules;
       - running-auction usable-title path может примениться к exact still-running source session по existing B3 rules;
-      - если source auction уже не принимает ставки, никакой новый/current auction не должен захватывать старое event; closed auction state не переписывать.
+      - если event было source-time привязано к этой auction session до 00:00, UI-086 сохраняет эту принадлежность и разрешает его позднее manual apply в post-00:00 correction phase до irreversible finalize; новый/current другой аукцион никогда не должен захватывать это event;
     - Не смешивать это с отдельным accepted QA-1.0.8-03 state `Требует привязки`: там usable target вообще отсутствует.
 
   - **5. Добавить время события в `Ожидают применения`.**
@@ -1973,6 +1973,64 @@ Alan Wake 2|0
     - user must still explicitly `Применить` each pending event;
     - changing a rate later never recalculates already applied contribution;
     - missing/unusable target remains separate `Требует привязки` workflow under QA-1.0.8-03, not a conversion-pending row.
+  - Runtime/code пока не изменялись.
+
+- **UI-086 — pending-событие сохраняет source-time принадлежность аукциону и блокирует необратимое определение результата — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Уточняет UI-064/UI-065/UI-085/S1: **неизвестный курс задерживает начисление, но не меняет принадлежность внешнего события.**
+  - Если допустимое внешнее событие было зафиксировано как относящееся к конкретной running auction session до закрытия приёма ставок и имеет конкретный target lot/game, то его source-auction context сохраняется вместе с pending conversion:
+    - `auction_id`/source-session identity;
+    - target game/lot/title;
+    - provider/source event ID + dedup provenance;
+    - source amount/unit/timestamp context.
+  - Позднее сохранение курса или ручное `Применить` **не переводит такое событие в основной список только потому, что timer уже дошёл до 00:00**.
+  - Оно остаётся начислением именно того аукциона/лота, которому принадлежало в момент source-time intake.
+  - Это принципиально отличается от **нового события, пришедшего уже после 00:00**: такое новое post-close event по UI-064 в текущий аукцион не входит и обрабатывается через persistent-list path.
+
+  - **Видимое предупреждение о необработанных событиях.**
+    - Как только у текущей session есть хотя бы одно unresolved pending external event, относящееся именно к ней, на `Аукцион → Проведение` показывать заметный non-modal warning, например:
+      **`Есть необработанные поступления этого аукциона: N. Они могут изменить результат.`**
+    - Рядом дать быстрый action **`Перейти к конвертации`**, который открывает `Настройки → Конвертация → Ожидают применения` и фокусирует/фильтрует соответствующие события текущей session, если фильтрация реализуется без отдельного data path.
+    - Во время обычного `running` warning информационный: аукцион продолжает принимать остальные ставки.
+    - Warning автоматически исчезает, когда для этой session не осталось unresolved pending events.
+    - Не показывать modal popup на каждое polling/refresh; warning должен быть устойчивым элементом состояния, а modal допустим только при попытке выполнить запрещённое необратимое действие.
+
+  - **После 00:00 unresolved source-auction pending становится hard gate результата.**
+    - UI-064 trading intake по-прежнему закрывается на 00:00 для **новых** external events.
+    - Но pre-00:00 pending events этой session остаются незавершённой частью её accounting.
+    - Пока хотя бы одно такое событие unresolved:
+      - текущий лидер/ничья показываются только как **предварительные**;
+      - нельзя `Подтвердить победителя`;
+      - нельзя `Провести колесо` / заморозить wheel composition+weights;
+      - нельзя переходить к tie-wheel или иной irreversible tie resolution, потому что pending credit может изменить сам факт лидера/ничьей;
+      - UI должен ясно объяснять причину блокировки и предлагать `Перейти к конвертации`.
+    - Оператор должен для каждого source-auction pending:
+      - задать/сохранить курс и нажать `Применить`; либо
+      - осознанно выбрать UI-085 `Не применять` с подтверждением.
+    - Оба исхода считаются resolved для gate; raw event/audit/provenance сохраняются.
+
+  - **Применение после 00:00 не является “новой ставкой после закрытия”.**
+    - Это позднее вычисление/разрешение события, которое уже принадлежало session до 00:00.
+    - При `Применить` начисление выполняется exactly-once в ту же source session/target lot по existing accounting/materialization rules.
+    - После apply пересчитать current totals, preliminary leader/tie и все зависимые presentation values.
+    - Если pending event изменил лидера — новый лидер становится предварительным.
+    - Если создал/снял ничью — дальше используется обычная принятая tie/overtime/wheel логика уже по пересчитанным итогам.
+    - Applying after 00:00 не должно resurrect/auto-extend уже истёкший timer: S2/UI-083 expired-timer rule сохраняется.
+    - Dedup сохраняется; одно source+external_event_id не может быть начислено дважды.
+
+  - **Max Amount → Wheel freeze boundary.**
+    - До `Провести колесо` все source-auction pending должны быть resolved.
+    - Только после этого вычисляются окончательные суммы/weights и фиксируется UI-065 immutable wheel chain.
+    - После freeze никакое старое unresolved event этой session не должно внезапно появиться; gate обязан предотвратить сам переход в freeze при наличии pending.
+
+  - **Closed-history compatibility boundary.**
+    - Для новых session после реализации UI-086 нормальный finalize-path не должен позволять оставить unresolved source-auction pending и затем закрыть session с победителем.
+    - Legacy/current-1.0.8 уже закрытые session с исторически оставшимися pending не переписывать задним числом автоматически: не менять состоявшийся winner/wheel RNG/history без отдельного recovery-review.
+    - То есть правило `не переписывать закрытую историю` сохраняется только как legacy/failsafe boundary; **основное новое решение — не допускать такого закрытия заранее.**
+
+  - **Stop/cancel safety.**
+    - Универсальный explicit `Остановить аукцион` остаётся аварийным/осознанным выходом без победителя и не превращается в скрытое `Подтвердить результат`.
+    - При unresolved pending перед stop показать контекстное предупреждение, что имеются необработанные поступления; exact post-stop settlement/materialization таких событий проверить при реализации вместе с UI-065 stop semantics, не теряя source target/provenance и не назначая победителя задним числом.
   - Runtime/code пока не изменялись.
 
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
