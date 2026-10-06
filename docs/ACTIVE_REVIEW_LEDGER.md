@@ -1795,6 +1795,114 @@ Alan Wake 2|0
     - После сохранения продолжать вызывать существующий `auction_settings_changed()`, чтобы вкладка `Аукцион` перечитала новые defaults без изменения уже идущей session.
   - Runtime/code пока не изменялись.
 
+- **UI-084 — `Настройки → Интеграции`: state-aware actions, безопасный disabled lifecycle и понятный provider UX — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Внешнюю карточную компоновку страницы сохранить. Меняется логика доступности действий, понятность текстов и несколько current defects; adapter architecture / provider-neutral event pipeline / protected credential storage не перестраивать.
+
+  - **1. State-aware connection actions вместо одновременного показа всех кнопок.**
+    - Exact CURRENT: каждая service-card всегда создаёт `Подключить / Проверить соединение / Переподключить / Отключить / Удалить подключение` независимо от состояния.
+    - Новое правило: показывать только действия, логически применимые к текущему lifecycle-state.
+    - `Не настроено` -> показать `Подключить <сервис>`; не показывать disconnect/remove/check/reconnect как будто соединение уже существует.
+    - `Подключено + enabled` -> показать `Проверить соединение`, `Переподключить`, `Отключить`, `Удалить подключение`; обычную `Подключить` скрыть.
+    - `Подключено, но использование отключено` -> показать явное **`Включить`** и `Удалить подключение`; отключённый сервис не должен выглядеть как ненастроенный.
+    - Error/requires-login состояния должны показывать только релевантные recovery actions: проверка/переподключение/отключение/удаление по фактическому состоянию конфигурации; не создавать вторую lifecycle-model.
+    - `Переподключить` остаётся fresh authorization flow; `Включить` должен переиспользовать сохранённый credential/config и существующий connect/check path, а fresh OAuth/Device Code запускать только если сохранённая авторизация уже невалидна.
+
+  - **2. Исправить реальный defect: `Проверить соединение` не должно самовольно включать отключённый сервис.**
+    - Exact CURRENT: `IntegrationManager.check_connection()` идёт через `_run_adapter_operation()`, а `_persist_result(... enabled=True)` после успешной проверки принудительно записывает `enabled=True`.
+    - Поэтому sequence `Отключить -> Проверить соединение` может вернуть интеграцию в активное использование без явного `Включить`.
+    - Новое правило: diagnostic/health check **сохраняет текущий `enabled` state** и никогда не является implicit enable operation.
+    - Enable должен происходить только через явное пользовательское действие `Включить/Подключить/Переподключить`, где это действительно требуется.
+    - Accepted B1 disabled lifecycle сохранить: disabled integration сохраняет config, protected credentials, account/capability metadata и историю; после restart остаётся disabled и не участвует в background provider validation до явного enable.
+
+  - **3. `Отключить` и `Удалить подключение` сохраняют разные semantics.**
+    - `Отключить`:
+      - перестаёт использовать integration для intake/runtime;
+      - сохраняет локальный account/config/credential;
+      - сохраняет provider/capability metadata;
+      - не удаляет `external_events / contributions / auction history`;
+      - для Twitch существующие app-managed rewards перед отключением переводятся в disabled state, но не удаляются.
+    - `Удалить подключение`:
+      - требует подтверждение;
+      - удаляет локальную connection config + protected credential reference/files согласно существующему B1 path;
+      - не удаляет исторические business records;
+      - для Twitch existing reward-deletion остаётся **отдельным** explicit action, а не побочным эффектом удаления подключения.
+    - Visible confirmation/copy перевести на понятный русский: не писать пользователю `credentials / donations/events/contributions` там, где можно сказать `данные авторизации / история событий и начислений`.
+
+  - **4. Twitch Channel Points actions должны учитывать eligibility/capability.**
+    - Exact CURRENT: кнопки remote reward management в основном зависят только от `view.status == connected && enabled`, хотя card уже знает `channel_points_custom_rewards_available`.
+    - Если Custom Rewards недоступны для данного канала, не оставлять активными действия, которые заведомо закончатся provider error.
+    - Remote actions `Сохранить и синхронизировать награды`, `Включить награды`, `Отключить награды`, `Удалить награды` должны учитывать:
+      - connection enabled/connected;
+      - `channel_points_custom_rewards_available`;
+      - необходимые permission/scope;
+      - наличие реально зарегистрированных reward IDs там, где операция требует существующих rewards.
+    - Причина недоступности остаётся видимой в card, например `Channel Points / Custom Rewards: недоступны для этого канала`.
+    - Backend `ensure_manage_scope()` и eligibility guards сохранить как последний authoritative safety gate; UI лишь перестаёт предлагать невозможную операцию.
+
+  - **5. `Включить награды` / `Отключить награды` — показывать контекстно.**
+    - Если `manual_rewards_enabled=True` -> показывать `Отключить награды`, `Включить награды` скрыть.
+    - Если `manual_rewards_enabled=False` -> показывать `Включить награды`, `Отключить награды` скрыть.
+    - `Удалить награды` показывать/разрешать только когда есть managed/retired Twitch reward IDs, которые действительно можно удалить.
+    - Accepted I1 semantics сохранить: availability наград не привязана к start/pause/finish аукциона; manual Settings control остаётся единственным availability switch.
+
+  - **6. Не терять несохранённый Twitch reward draft при обычной навигации.**
+    - Exact CURRENT: `_handle_settings_page_changed()` при каждом входе на `Интеграции` вызывает `_refresh_integrations()`, а тот уничтожает и заново строит все cards.
+    - Поэтому несохранённые edits `Общее название / Стоимость / Цвет / added-removed rows` могут молча исчезнуть после перехода `Интеграции -> Конвертация -> Интеграции`.
+    - Новое правило: ordinary internal-tab switching не должно уничтожать unsaved reward draft.
+    - Reuse pattern уже применён на `Конвертация`: rebuild only when underlying capability/connection state действительно изменился.
+    - Перед operation, которая требует реального rebuild card и может уничтожить изменённый draft, использовать единый dirty-state guard: сохранить / не сохранять / отмена либо эквивалентный safe-preserve flow; не вводить silent discard.
+    - Не создавать второй storage для draft в SQLite только ради навигации; draft остаётся UI-state до явного `Сохранить и синхронизировать награды`.
+
+  - **7. Уточнить atomic/failure boundary `Сохранить и синхронизировать награды`.**
+    - Exact CURRENT: handler сначала вызывает `save_configuration()` локально, затем `sync_rewards()`; provider failure может оставить локальную конфигурацию уже сохранённой при сообщении пользователю об ошибке sync.
+    - До remote mutation сначала проверить очевидные local validation + connection/eligibility/manage-scope prerequisites.
+    - Реализация должна дать пользователю однозначный результат:
+      - либо единая операция считается успешной только после completed remote sync;
+      - либо, если технически сохраняется staged local config до remote sync, failure-message обязан явно сказать, что локальные изменения сохранены, но Twitch не синхронизирован, и дать повторить sync.
+    - Не откатывать уже существующие remote rewards вслепую при частичной provider failure; сохранить существующие IDs/retired-ID safety semantics.
+    - Exact transaction/compensation strategy выбрать при реализации после code-level failure-path review, не создавая parallel reward model.
+
+  - **8. RANDOM.ORG — сохранить backend, уточнить unsaved-key state.**
+    - Existing Password field + protected `CredentialStore` + background `Проверить API` + requests/bits usage сохранить.
+    - Exact CURRENT: `Проверить API` использует текущий текст поля, даже если пользователь ещё не нажал `Сохранить ключ`.
+    - Не сохранять введённый ключ автоматически только из-за проверки.
+    - Если проверен ключ, отличающийся от persisted key, показать понятное состояние вроде **`API работает; ключ ещё не сохранён`**.
+    - После `Сохранить ключ` статус обновить как saved; очистка поля + Save по-прежнему удаляет persisted RANDOM.ORG credential.
+    - UI-063 quick navigation к этой card сохранить.
+
+  - **9. Убрать project/internal jargon из visible integration copy.**
+    - Сохранить внешний card-layout, но перевести technical labels:
+      - `CredentialStore` -> `защищённое хранилище данных авторизации`;
+      - `OAuth Device Code Grant Flow / Public client` -> короткое понятное объяснение `Авторизация через официальный вход Twitch; пароль и Client Secret программа не хранит`;
+      - `Centrifugo WebSocket` -> `события в реальном времени` в основном visible copy;
+      - `Права B4` -> **`Права на управление наградами`**;
+      - `DonationAlerts User ID` -> **`ID пользователя DonationAlerts`**;
+      - provider/internal protocol names допускаются только в advanced detail/diagnostic, если реально полезны.
+    - Не менять реальные protocol/auth implementations ради wording.
+
+  - **10. Provider timestamps показывать в локальном понятном формате.**
+    - `Последняя проверка` и `Последняя принятая активность` не показывать raw ISO UTC вроде `2026-10-06T08:18:36...+00:00`.
+    - Использовать общий local-time formatter программы, например `06.10.2026 15:18:36` для user-local timezone.
+    - В БД authoritative UTC timestamp не переписывать.
+    - Та же formatter semantics должна переиспользоваться в Conduct/status dialog по UI-061/QA-1.0.8-01, а не создавать второй parser.
+
+  - **11. Убрать/исправить мёртвую надпись `Подключённых сервисов пока нет.`.**
+    - Exact CURRENT: `IntegrationManager.views()` возвращает view для каждого registered adapter даже при `Не настроено`, поэтому `integration_empty_label.setVisible(not views)` практически никогда не срабатывает при наличии Twitch/DonationAlerts adapters.
+    - Предпочтительно убрать этот redundant label, поскольку cards самих поддерживаемых сервисов уже показывают `Не настроено`.
+    - Если label всё же сохраняется, его visibility считать по реально configured connections, а не по registry views.
+    - Не скрывать сами provider cards только потому, что они ещё не настроены: они нужны как точка подключения.
+
+  - **Preserve architecture/safety.**
+    - One Integration Center / one adapter per service.
+    - Multiple integrations may be active simultaneously.
+    - Secrets outside main SQLite; diagnostics sanitized.
+    - All provider network/auth work stays off GUI thread.
+    - Common B2/B3 provider-neutral normalized-event/conversion/dedup path stays authoritative.
+    - DonationAlerts OAuth browser flow и Twitch Device Code public-client flow сохраняются.
+    - Channel Points permanent-source/source-time routing сохраняется.
+  - Runtime/code пока не изменялись.
+
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
   - Экран: `Аукцион → Способ определения победителя`, режим `Взвешенное колесо`.
   - Кнопку `О методах` переименовать в **`Как выбирается случайное число?`**.
