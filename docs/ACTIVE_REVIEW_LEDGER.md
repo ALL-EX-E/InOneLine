@@ -862,6 +862,10 @@ Alan Wake 2|0
     - строку `Музыкальный плеер OBS: .../music-player-overlay` перенести под heading этого виджета;
     - существующие `Копировать URL плеера` и `Открыть предпросмотр` перенести перед настройками;
     - `Сохранить виджет плеера` оставить после настроек и существующий handler не менять.
+  - **Виджет колеса** (добавлен решением UI-078):
+    - URL: `/wheel-overlay`;
+    - существующие `Копировать URL колеса` и `Открыть предпросмотр колеса` доступны и в этом тематическом блоке; quick-access на `Аукцион` вызывает те же actions;
+    - show-mode и дальнейшие presentation settings сохраняются здесь по GLOBAL-OBS-VISIBILITY-001/UI-078.
   - **Виджет списка лотов аукциона**:
     - URL: `/auction-lots-overlay`;
     - строку `Список лотов OBS: .../auction-lots-overlay` перенести под heading этого виджета;
@@ -1330,7 +1334,7 @@ Alan Wake 2|0
     - `Максимальная сумма` → локальное колесо скрыто;
     - `Взвешенное колесо` → локальное колесо появляется в новой верхней области;
     - `Обычное / Выбывание` используют тот же один локальный wheel widget.
-  - Не создавать второй wheel renderer: переиспользовать существующий `AuctionWheelWidget`, его spin/result/center-image механику и синхронизацию с OBS.
+  - Не создавать второй **local** wheel renderer: переиспользовать существующий `AuctionWheelWidget`. Existing OBS HTML Canvas renderer сохраняется отдельно; оба используют один authoritative wheel payload/spin/result. Exact-current visibility mismatch и его исправление зафиксированы WHEEL-DISPLAY-AUDIT-001 / UI-078.
   - Нижняя content-row после переноса не должна резервировать отдельную правую колонку только ради визуального колеса; это должно уменьшить горизонтальное сжатие списка лотов и activity-panel.
   - Этим решением пока **не менять отдельно расположение/логику soundtrack controls колеса**, если они не обязаны технически находиться вместе с самим `AuctionWheelWidget`; их компоновку разбирать отдельно по указанию пользователя.
   - Таймер поднять выше **во всех режимах**:
@@ -1340,6 +1344,105 @@ Alan Wake 2|0
   - Уточнение 2026-10-05 / wheel soundtrack layout — **SUPERSEDED BY UI-071**:
     - прежнее решение оставлять `Музыка колеса` непосредственно над локальным колесом отменено;
     - актуальное размещение и контекстная видимость soundtrack controls определены UI-071.
+  - Runtime/code пока не изменялись.
+
+- **WHEEL-DISPLAY-AUDIT-001 — exact-current механика отображения колеса 1.0.8 — RECORDED / SOURCE FOR UI-078.**
+  - Перепроверено 2026-10-06 по exact-current коду, а не только по ранее записанным решениям.
+  - **Local Qt wheel и OBS wheel сейчас имеют разную visibility-policy.**
+    - Local `AuctionWheelWidget` использует `_wheel_context_relevant()`: без session показывается только если выбран `weighted_wheel`; при открытой session показывается для direct weighted-wheel либо когда status=`awaiting_wheel` / уже существует wheel spin.
+    - `/api/wheel` использует `current_wheel_payload()`: если open session нет, всегда строит weighted prestart-preview; если open session есть, даже `max_amount`, строит wheel payload из active `auction_entries`.
+    - В `_wheel_payload_from_conn()` current `visible` фактически равен `bool(sectors)`, поэтому normal `/wheel-overlay` способен показывать колесо во время чистой Max Amount session, хотя local wheel в этот момент скрыт.
+  - **Prestart OBS wheel в current 1.0.8 существует даже без session.**
+    - `_preview_wheel_payload_from_conn()` берёт обычные permanent games: `auction_only=0`, `archived=0`, statuses `ИГРАЛ + НЕ ИГРАЛ`;
+    - использует текущие `sm_points`, min-one/equal fallback текущего wheel algorithm и current center image;
+    - search/filter оператора не является источником состава preview.
+  - **`/wheel-overlay?preview=1` не является вторым тестовым wheel-state.**
+    - Он читает тот же `/api/wheel` payload;
+    - preview-mode добавляет preview presentation/background/label и принудительно позволяет увидеть stage для настройки;
+    - RNG/weights/result data не дублируются.
+  - После создания session local+OBS берут sectors из active `auction_entries`; logical sector order связан с authoritative draw ranges и не должен переопределяться presentation-сортировкой.
+  - В `Выбывании` выбранный лот остаётся в active wheel composition до явного `В архив`; после архива sectors перестраиваются без него. Future survivor-wins semantics UI-065 должны быть учтены при дальнейшей реализации, но этот audit их не меняет.
+  - Local и OBS используют один authoritative payload/spin result, но это **два существующих renderer-а**:
+    - local — Qt/QOpenGL `AuctionWheelWidget`;
+    - OBS — HTML Canvas `wheel_overlay.html`.
+    - Они синхронизируют sectors/weights/target rotation/winner/wheel format/center image/timing, но presentation не полностью одинаков: local имеет operator captions `Готово к вращению / Колесо вращается… / Победитель / Выбывает`; OBS имеет viewer result presentation и winner chance.
+  - D19 center media остаётся stationary поверх вращающегося sector layer и поддерживает static + animated media local/OBS before/during/after spin.
+  - Связанный сохранённый wheel-backlog не потерян:
+    - D16 local-only hover highlight — approved/deferred;
+    - D18 visual style selector — approved/deferred;
+    - D19 center image + quick picker — released;
+    - D20 visual sector fragmentation without probability change — approved/deferred;
+    - D27 optional physics/fair-wheel mode — future separate mechanics review.
+  - Главный найденный defect/UX inconsistency этого audit: normal OBS wheel не следует local contextual relevance и может быть видим в нерелевантном Max Amount контексте. Исправление определяется GLOBAL-OBS-VISIBILITY-001 + UI-078.
+  - Runtime/code пока не изменялись.
+
+- **GLOBAL-OBS-VISIBILITY-001 — единый persisted show-mode для всех пользовательских OBS Browser Source — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED: механику управления видимостью по принципу Music Player Overlay распространить на **все пользовательские виджеты**, а не поддерживать разрозненные checkbox/implicit visibility paths.
+  - Scope существующих standalone Browser Source:
+    - главный `/overlay`;
+    - `/list-overlay`;
+    - `/timer-overlay`;
+    - `/music-player-overlay`;
+    - `/auction-lots-overlay`;
+    - `/rules-overlay`;
+    - `/wheel-overlay` (добавляется в `Стрим / OBS` по UI-078).
+  - Общий architecture contract:
+    - **`Не показывать`** — normal Browser Source остаётся подключённым, но viewer content скрыт/transparent; data/API/business lifecycle не останавливаются;
+    - **контекстный/автоматический режим** — используется там, где у конкретного виджета есть реальный meaningful trigger; название среднего пункта должно объяснять этот trigger человеческим языком, а не обязательно называться буквально `Автоматически`;
+    - **`Показывать постоянно`** — viewer content остаётся видимым по обычному renderable/default state данного виджета.
+  - Не придумывать искусственный middle-mode для виджета, у которого нет meaningful context/event: общий механизм обязателен, но UI не должен содержать бессмысленную опцию только ради симметрии.
+  - Existing Music Player остаётся эталонным specialization:
+    - `Не показывать`;
+    - `При смене трека`;
+    - `Показывать постоянно`;
+    - duration/animation/direction относятся только к его event-mode и не копируются автоматически всем виджетам.
+  - Для остальных widgets existing simple visibility flags/checkboxes при реализации мигрировать в этот общий contract, а не хранить две конкурирующие настройки. Например current Rules `visible` становится presentation of common show-mode, а не вторым независимым switch.
+  - `?preview=1` для каждого виджета должен оставаться **настроечным preview override**:
+    - preview обязан быть видим даже если normal show-mode = `Не показывать` или текущий contextual trigger false;
+    - preview не меняет сохранённый show-mode и не создаёт synthetic business event;
+    - обычный URL без `preview=1` строго следует сохранённой visibility-policy.
+  - Изменение show-mode сохраняется между перезапусками и после `Сохранить` применяется к уже открытому Browser Source без смены URL/ручного refresh, используя существующий live settings/polling pattern.
+  - Visibility-setting не должна менять:
+    - RNG, auction state, timer state, списки/баллы;
+    - audio ownership/output route;
+    - наличие API endpoints;
+    - operator-local visibility, если для конкретного local UI отдельно не принято такое правило.
+  - Main `/overlay` embedded component switches (`Показывать на оверлее` для веб-камеры/list/info и т.п.) остаются content/layout controls и **не заменяются** standalone show-mode самого `/overlay`.
+  - Для widget-specific contextual triggers использовать один reusable visibility policy/helper + small per-widget predicate, а не копировать самостоятельные state machines в каждый HTML.
+  - Runtime/code пока не изменялись.
+
+- **UI-078 — добавить `Виджет колеса` в `Стрим / OBS` и подчинить OBS wheel общему show-mode — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - На вкладке `Стрим / OBS` добавить самостоятельный тематический блок **`Виджет колеса`** по общему UI-042 шаблону:
+    1. heading `Виджет колеса`;
+    2. URL `/wheel-overlay`;
+    3. `Копировать URL колеса`;
+    4. `Открыть предпросмотр колеса`;
+    5. настройки OBS wheel;
+    6. `Сохранить виджет колеса`.
+  - Existing quick actions на вкладке `Аукцион` не создавать заново: они должны вызывать тот же URL/preview path, как другие duplicate quick-access controls.
+  - Первой настройкой блока сделать **`Показ виджета`**:
+    - `Не показывать`;
+    - **`Когда колесо используется`** — contextual mode;
+    - `Показывать постоянно`.
+  - Для новой установки/отсутствующего saved wheel show-mode default = **`Когда колесо используется`**, чтобы normal OBS wheel по умолчанию соответствовал local semantic relevance и не появлялся сам по себе в Max Amount.
+  - Exact contextual predicate `Когда колесо используется`:
+    - clean prestart + выбран `Взвешенное колесо` → показывать canonical prestart wheel;
+    - clean prestart + выбран `Максимальная сумма` → скрывать;
+    - direct weighted-wheel session → показывать на `awaiting_wheel`, во время spin, на result/pending-confirm state и между elimination rounds;
+    - pure Max Amount phases (`running / paused / post-00:00 correction / overtime / ordinary tie setup`) → скрывать;
+    - Max Amount → wheel/tie-wheel → показывать только после фактического перехода в wheel-context; сам факт существования Max session не делает wheel видимым;
+    - после завершения/остановки session normal viewer возвращается к правилу clean prestart текущего выбранного способа определения победителя.
+  - `Показывать постоянно` намеренно позволяет пользователю видеть canonical wheel/prestart/current composition даже вне contextual wheel phase; это explicit opt-in equivalent current broad OBS behavior, а не default.
+  - `Не показывать` скрывает normal `/wheel-overlay`, но `?preview=1` всё равно показывает настраиваемый preview.
+  - OBS visibility должна использовать тот же wheel-context predicate, что local UI, **только в contextual mode**. `Always` не заставляет local operator wheel появляться в Max Amount; настройка относится к OBS viewer output.
+  - Не создавать новый wheel state/RNG/render pipeline:
+    - сохраняются current `/api/wheel`, authoritative sectors/weights/spin/winner;
+    - local Qt и existing HTML Canvas renderers остаются;
+    - меняется presentation visibility boundary normal Browser Source.
+  - D18 styles, D16 hover, D20 fragments и D27 physics этим пунктом автоматически не реализуются.
+  - D19 quick center picker и current center-image ownership сохраняются; вопрос переноса/дублирования full center-media settings в `Стрим / OBS` отдельно не решён этим пунктом.
+  - Последующие решения по внешнему виду wheel OBS должны добавляться внутрь этого блока, а не создавать ещё одно место настроек.
   - Runtime/code пока не изменялись.
 
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
