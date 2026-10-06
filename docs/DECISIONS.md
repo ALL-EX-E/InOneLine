@@ -159,6 +159,14 @@ Additional direct-chat comparison after the seventh pass recovered:
 - **B3 missing/unusable target text** was directly accepted as a distinct `Требует привязки` state. Such an event must not auto-create or auto-credit and must await manual operator binding to a game/lot; this is separate from `pending_conversions`, which is for unknown conversion rate/unit.
 - During a running auction, a usable unknown title follows the ordinary temporary `auction_only` path; outside auction, a usable unknown title creates a normal persistent game.
 - Current 1.0.8 handles usable-title paths correctly, but `missing_target` is marked `inapplicable` and there is no manual bind workflow. Track as **QA-1.0.8-03 / ACCEPTED B3 WORKFLOW OMISSION / NOT FIXED / NOT AUTO-AUTHORIZED**.
+
+### 2026-10-06 — UI-087 supersession for ordinary empty-message auction events
+
+- The earlier `Требует привязки` rule is **superseded for an ordinary accepted external event received during a running auction when message/lot text is empty**.
+- New accepted behavior: create a distinct temporary lot `Без текста N` (1, 2, 3...) in that auction session; numbering is monotonic per session and dedup happens before assigning the next number.
+- If the conversion rate is known, credit that placeholder immediately/exactly-once. If the unit/rate is unknown, create the placeholder immediately but keep the event pending and target that placeholder; UI-085/UI-086 then govern conversion, warning and result-gating.
+- User-facing terminology for these reviewed flows is `лот`; legacy/internal `game/games` identifiers remain implementation details only.
+- Current 1.0.8 `missing_target -> inapplicable` remains the current runtime behavior until the approved batch is implemented.
 - The accepted DonationAlerts built-in public OAuth Client ID is **20915**; the user should authorize, not create their own application or enter a Client Secret.
 - Rules viewer controls `Непрозрачность` and `Внутренний отступ` preserve the accepted wide external ▲/▼ + manual entry + hold/repeat UX; mouse wheel must not alter values while scrolling.
 
