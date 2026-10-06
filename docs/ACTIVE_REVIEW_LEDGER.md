@@ -1964,6 +1964,14 @@ Alan Wake 2|0
       - UI draft не надо сохранять в SQLite до явного `Сохранить курсы`.
     - Service-specific saved rate по accepted S1 visibility behavior остаётся в SQLite, когда row временно скрыта из-за disconnect, и возвращается при повторной доступности unit.
 
+  - **7.1. Explicit unknown-unit UI behavior.**
+    - Когда accepted external event приходит с новой/неизвестной currency или service unit, программа сразу делает **две связанные вещи**:
+      1. регистрирует unit и показывает её в `Курсы конвертации` как новую строку `1 <unit> = [курс не задан] баллов`;
+      2. показывает само event в `Ожидают применения` со source-time context/target и статусом ожидания курса.
+    - Это не две независимые сущности: rate-row относится к conversion unit, pending-row — к конкретному external event.
+    - Пока курс отсутствует, баллы не начисляются и `Применить` недоступно/показывает причину ожидания.
+    - После `Сохранить курсы` pending-row сразу пересчитывает preview `К зачислению`, но **не применяется автоматически**; explicit `Применить` остаётся обязательным.
+    - Если событие принадлежит текущей auction session по UI-086, его warning/count на `Аукцион → Проведение` существует параллельно и исчезает только после `Применить` либо `Не применять`.
   - **8. Preserve S1 boundary.**
     - positive source fractional result -> round up to whole point;
     - exact integer/zero semantics сохраняются;
