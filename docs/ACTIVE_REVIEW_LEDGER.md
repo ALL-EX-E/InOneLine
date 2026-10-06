@@ -1903,6 +1903,78 @@ Alan Wake 2|0
     - Channel Points permanent-source/source-time routing сохраняется.
   - Runtime/code пока не изменялись.
 
+- **UI-085 — `Настройки → Конвертация`: атомарные курсы и полноценная очередь неизвестного курса — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Existing S1 conversion architecture сохраняется: provider-neutral source units, integer points with positive-fraction ceiling, no reverse conversion, unknown rate -> Pending -> explicit manual apply, no retroactive rewrite of closed auction history.
+
+  - **1. Переименовать heading `Валюты` -> `Курсы конвертации`.**
+    - Причина: этот блок содержит не только currency rows, но и service-specific/non-monetary units вроде Twitch Channel Points.
+    - Формат строки `1 <единица> = <курс> баллов` сохранить.
+    - RUB остаётся permanently visible base row; остальные currency/service rows следуют existing registry/capability visibility rules.
+
+  - **2. Перенести `Сохранить курсы` непосредственно под список курсов.**
+    - Кнопка относится только к rate editors и не должна находиться после таблицы `Ожидают применения`.
+    - Ниже кнопки оставить explanatory visibility text/example, затем отдельный блок pending events.
+
+  - **3. Сделать сохранение всех курсов атомарным.**
+    - Exact CURRENT: `save_conversion_settings()` пишет rate rows последовательно; если поздняя строка invalid, ранние строки уже могли сохраниться.
+    - Новое правило:
+      - сначала parse/validate **все** видимые rate editors без mutation;
+      - затем сохранить весь validated set одной DB transaction;
+      - при любой validation/write ошибке не должен сохраниться ни один rate из текущего нажатия.
+    - RUB empty-value semantics сохранить: пустой RUB нормализуется к `1`; для остальных empty означает remove/unconfigured rate.
+    - После успешного commit одним проходом обновить pending status `awaiting_rate -> awaiting_manual_apply` для units, которые получили rate, и обратное состояние для очищенных rates.
+    - Не создавать второй conversion-rate storage.
+
+  - **4. Исправить current defect для unknown-rate event с новым usable title без existing `game_id`.**
+    - Accepted B3/S1 path: вне аукциона новое пригодное название **не создаёт игру заранее**, пока rate неизвестен; event остаётся Pending. После сохранения rate и explicit `Применить` backend имеет право создать normal persistent game и начислить points в той же transaction.
+    - Exact CURRENT UI defect:
+      - pending row получает `game_title` только через LEFT JOIN по `game_id`;
+      - для deliberately-not-yet-created game `game_id=NULL`, UI показывает `Игра недоступна`;
+      - `Применить` disabled по условию `bool(rate) && bool(game_title)`, хотя `apply_pending_conversion_event()` умеет использовать сохранённый normalized `lot_title`.
+    - Исправление:
+      - `_pending_row_to_dict()`/presentation должен извлекать сохранённый normalized `lot_title` из authoritative `external_events.payload_json` как fallback target title;
+      - pending table показывает фактическое пригодное название, даже если persistent game ещё не создана;
+      - enable/applicability `Применить` определяется тем же backend-validity contract, а не наличием current `games.id`;
+      - outside-auction usable-title path при apply создаёт/reuses normal persistent game по existing normalized-title rules;
+      - running-auction usable-title path может примениться к exact still-running source session по existing B3 rules;
+      - если source auction уже не принимает ставки, никакой новый/current auction не должен захватывать старое event; closed auction state не переписывать.
+    - Не смешивать это с отдельным accepted QA-1.0.8-03 state `Требует привязки`: там usable target вообще отсутствует.
+
+  - **5. Добавить время события в `Ожидают применения`.**
+    - Добавить колонку **`Время`**.
+    - Использовать shared local-time formatter из UI-084/других views; authoritative UTC `created_at` не менять.
+    - Для строки также сохранять context через tooltip/details: источник, contributor, external event ID, target title и source-auction context, если он был.
+    - Не превращать pending table в полный technical audit; для полного аудита остаётся `Журнал`.
+
+  - **6. Добавить explicit final action `Не применять` / `Отклонить`.**
+    - Pending queue не должна становиться вечным списком событий, которые оператор сознательно не хочет/уже не может применять.
+    - Рядом с `Применить` добавить **`Не применять`** (user-facing wording) с confirmation.
+    - Действие не удаляет raw `external_events`, `change_log` или provenance.
+    - Оно переводит pending/external event в final non-credit status (implementation naming может быть `rejected/discarded` после exact schema review) и пишет audit event с pending ID/source/event/target/reason.
+    - После rejection событие исчезает из active `Ожидают применения`, не создаёт contribution, не меняет game/auction points/timer/wheel/winner.
+    - Dedup по source+external_event_id сохраняется: rejected event не должен повторно прийти как новое начисление.
+
+  - **7. Защитить unsaved conversion-rate draft при изменении capability/service set.**
+    - Existing good behavior сохранить: ordinary tab switching не rebuild-ит rate rows, если unit signature не изменился.
+    - Current risk: connect/disconnect/reconnect integration может изменить visible unit signature и `_refresh_conversion_rate_rows()` rebuild-ит editors, silently losing unsaved rate text.
+    - Применить тот же dirty/preserve contract, что принят UI-084:
+      - underlying capability change не должен молча уничтожать edited rates;
+      - перед destructive rebuild — сохранить / не сохранять / отменить либо equivalent draft-preserve flow;
+      - UI draft не надо сохранять в SQLite до явного `Сохранить курсы`.
+    - Service-specific saved rate по accepted S1 visibility behavior остаётся в SQLite, когда row временно скрыта из-за disconnect, и возвращается при повторной доступности unit.
+
+  - **8. Preserve S1 boundary.**
+    - positive source fractional result -> round up to whole point;
+    - exact integer/zero semantics сохраняются;
+    - no reverse points-to-source conversion;
+    - unknown rate event never auto-credits merely because rate later appeared;
+    - saving a rate only moves eligible pending rows into manual-ready state;
+    - user must still explicitly `Применить` each pending event;
+    - changing a rate later never recalculates already applied contribution;
+    - missing/unusable target remains separate `Требует привязки` workflow under QA-1.0.8-03, not a conversion-pending row.
+  - Runtime/code пока не изменялись.
+
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
   - Экран: `Аукцион → Способ определения победителя`, режим `Взвешенное колесо`.
   - Кнопку `О методах` переименовать в **`Как выбирается случайное число?`**.
