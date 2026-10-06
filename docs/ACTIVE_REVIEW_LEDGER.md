@@ -1441,8 +1441,77 @@ Alan Wake 2|0
     - local Qt и existing HTML Canvas renderers остаются;
     - меняется presentation visibility boundary normal Browser Source.
   - D18 styles, D16 hover, D20 fragments и D27 physics этим пунктом автоматически не реализуются.
-  - D19 quick center picker и current center-image ownership сохраняются; вопрос переноса/дублирования full center-media settings в `Стрим / OBS` отдельно не решён этим пунктом.
-  - Последующие решения по внешнему виду wheel OBS должны добавляться внутрь этого блока, а не создавать ещё одно место настроек.
+  - D19 quick center picker и current center-image ownership сохраняются. UI-079 определяет center-size/default/Twitch-auto-selection/discoverability; full media library/import UI пока не дублировать в `Стрим / OBS`, использовать существующий D19 picker/Settings path.
+  - Последующие решения по внешнему виду wheel OBS должны добавляться внутрь этого блока, а не создавать ещё одно место настроек. UI-079 уже добавляет сюда `Светящийся контур`, `Цвет контура` и `Показывать лот под стрелкой`.
+  - Runtime/code пока не изменялись.
+
+- **UI-079 — внешний вид колеса, текущий лот под стрелкой и UX изображения в центре — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Scope: один и тот же authoritative wheel-state, существующий local `AuctionWheelWidget` и существующий OBS `/wheel-overlay`; RNG/probability/target/result semantics не менять.
+
+  - **Размер центра колеса.**
+    - Exact CURRENT local+OBS: радиус центрального круга = `0.12 * wheel radius`.
+    - Увеличить центр примерно в **2 раза**: целевой радиус = `0.24 * wheel radius`.
+    - Кликабельная область local center должна увеличиться вместе с визуальным кругом и использовать ту же геометрию.
+    - Отдельную пользовательскую настройку размера центра не добавлять; окончательную визуальную подгонку проверить на manual UI QA при разных размерах Browser Source.
+
+  - **Светящийся внешний контур колеса.**
+    - Внешняя граница колеса получает тот же общий glow-principle, который уже принят для других OBS-виджетов.
+    - В блоке `Стрим / OBS -> Виджет колеса` добавить persisted controls:
+      - **`Светящийся контур`** — ВКЛ/ВЫКЛ;
+      - **`Цвет контура`** — выбор цвета + существующий общий color-picker pattern.
+    - При выключенном glow тонкая конструктивная граница колеса остаётся, чтобы край не терялся; отключается именно свечение.
+    - Не добавлять отдельные controls радиуса/blur/intensity без отдельной необходимости: использовать общий стандарт свечения программы.
+    - Local wheel должен зеркалить эти appearance settings как операторский предпросмотр того же визуального стиля; OBS использует те же persisted values.
+
+  - **Читаемость названий внутри секторов.**
+    - Exact CURRENT local+OBS рисует названия фиксированным тёмным цветом `#111315`, поэтому на тёмном секторе текст может сливаться.
+    - Отдельные настройки font family / font size / font color для названий секторов **не добавлять**.
+    - Сохранить current automatic fit/wrap/full-title behavior.
+    - Сделать текст автоматически читаемым на любом цвете сектора: базовый целевой стиль — светлый/белый жирный текст с ровной тёмной обводкой/контрастным outline; local Qt и OBS Canvas должны визуально совпадать.
+    - Не использовать обводку, меняющую логическую геометрию сектора или его probability.
+
+  - **D42 — текущий лот/сектор под стрелкой теперь SELECTED.**
+    - Старый D42 `current lot/sector under pointer during spin` больше не `NOT SELECTED`; он входит в текущий batch как часть UI-079.
+    - Во время каждого визуального кадра spin вычислять **фактически находящийся под стрелкой сектор по текущему rendered rotation**, включая acceleration/cruise/deceleration; нельзя показывать заранее уже известного будущего winner.
+    - Переиспользовать существующие `sectors / game_id / weight / rotation geometry`; не создавать второй RNG, store или winner-path.
+    - В local wheel нижняя operator-area сохраняет текущий status и дополнительно показывает название сектора под стрелкой во время вращения.
+    - В OBS нижняя свободная область во время вращения показывает текущий лот под стрелкой; после остановки эта область естественно переходит в существующий final result:
+      - standard wheel -> `Победитель: <лот>`;
+      - elimination -> `Выбывает: <лот>`;
+      - существующая строка winner chance в OBS сохраняется после final result.
+    - Post-spin label больше не является открытым вопросом: final result остаётся видимым по существующей winner/result lifecycle до следующего соответствующего state change.
+    - Сохранить ранее принятую D42 возможность управления показом одной общей persisted настройкой **`Показывать лот под стрелкой`**, default ON; setting относится local+OBS presentation и не влияет на result/RNG.
+    - До начала spin отсутствие текущей moving-label допустимо; exact pre-spin wording/layout можно финально подогнать при реализации без изменения бизнес-механики.
+
+  - **UX выбора изображения в центре.**
+    - Current tooltip назначен всему `AuctionWheelWidget`, хотя кликабельна только центральная область; это заменить.
+    - Под local wheel добавить компактную постоянную muted-подсказку: **`Нажмите на центр колеса, чтобы изменить изображение`**.
+    - При наведении именно на центральный круг:
+      - использовать pointer/hand cursor;
+      - показывать поверх центра компактную надпись **`Изменить`** с полупрозрачной подложкой, чтобы не закрывать выбранную картинку постоянно.
+    - Подсказка и `Изменить` — только operator-local UI; в OBS их не выводить.
+    - Нажатие по центру продолжает открывать существующий D19 quick picker; не создавать второй picker/library.
+
+  - **Встроенная картинка по умолчанию и Twitch auto-selection.**
+    - Если пользователь ещё не выбрал D19 media asset, вместо пустого/тёмного центрального круга показывать canonical app icon `assets/InOneLine_icon_master.png`, обрезанный/замаскированный по кругу; квадратный фон/квадратную рамку не показывать.
+    - Built-in app icon — fallback, а не новая копия в media library.
+    - При успешном **новом подключении Twitch** (transition disconnected -> connected либо смена подключённого Twitch account) автоматически выбрать profile image именно подключённого канала:
+      - переиспользовать существующий Twitch authorized client / `get_current_user()` или existing profile-image resolver;
+      - переиспользовать D19 remote-image import/media pipeline;
+      - не создавать отдельный Twitch HTTP/credential path.
+    - Автоматический выбор Twitch-avatar сохраняется тем же existing persisted `WHEEL_CENTER_IMAGE_MEDIA_ID_KEY = wheel_center_image_media_id`.
+    - После авто-выбора пользователь может выбрать другую local/Twitch/7TV/BTTV/FFZ картинку; его явный выбор становится authoritative и сохраняется между перезапусками.
+    - Обычный startup, status-check или OAuth token refresh при уже подключённом Twitch **не должен перетирать** сохранённый ручной выбор.
+    - Отключение Twitch не удаляет уже сохранённую локальную media-копию выбранного avatar; она остаётся выбранной, пока пользователь её не сменит/очистит.
+    - Если profile image при подключении получить/импортировать не удалось, само подключение Twitch не должно считаться неуспешным: сохранить предыдущий center либо app-icon fallback и показать неблокирующее понятное сообщение.
+    - Если сохранённый center asset позже физически недоступен/повреждён, local+OBS безопасно используют app-icon fallback без влияния на wheel mechanics.
+
+  - Existing D19 contract сохраняется:
+    - одна выбранная center media для local+OBS;
+    - static media остаётся static;
+    - GIF/WebP продолжают анимироваться local+OBS before/during/after spin;
+    - center layer физически неподвижен, пока вращается sector layer.
   - Runtime/code пока не изменялись.
 
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
