@@ -1514,6 +1514,72 @@ Alan Wake 2|0
     - center layer физически неподвижен, пока вращается sector layer.
   - Runtime/code пока не изменялись.
 
+- **UI-080 — функциональная корректировка вкладки `История аукционов` — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Общая архитектура вкладки остаётся read-only archive; внешний вид пользователь подтвердил как устраивающий.
+  - **PRESERVE current functionality:**
+    - архив показывает только закрытые session: `confirmed / cancelled / finished_no_winner / finished(legacy)`;
+    - live-search с debounce ~250 ms;
+    - поиск по названию/ID аукциона и по названию любого неудалённого лота этой session;
+    - периоды `Всё время / Сегодня / Последние 7 дней / Последние 30 дней / Этот месяц / Произвольный период`;
+    - summary badges `Закрыто аукционов / С победителем / Отменено / Без победителя` пересчитываются с учётом текущего search + period;
+    - pagination/lazy loading по 50 session через `Загрузить ещё`;
+    - основная таблица остаётся read-only, single-row selection;
+    - вкладка `Общие` сохраняет ID/name/mode/status/start/finish/winner;
+    - вкладка `Лоты` сохраняет historical snapshot данных session и текущие колонки `СТАРТ / НАЗВАНИЕ / НА СТАРТЕ / ДОБАВЛЕНО / ИТОГ / РЕЗУЛЬТАТ`;
+    - ошибочно удалённый temporary lot с result=`removed` не входит в итоговый список лотов и lot_count, но его audit-события остаются доступны;
+    - вкладка `События` остаётся read-only audit presentation общего `change_log`;
+    - `Проверка результата` продолжает использовать immutable per-spin verification snapshots без повторного RNG и без изменения результата;
+    - для нескольких spin сохраняется выбор конкретного раунда; по умолчанию открывается последний snapshot;
+    - Random.org+ продолжает показывать Ticket ID/signature status и официальный verification URL;
+    - hidden-tab dirty refresh + global F5 refresh сохранить: после завершения/изменения аукциона история перечитывается при открытии вкладки либо принудительно по F5.
+  - **1. Удалить бесполезную сортировку по названию аукциона.**
+    - Удалить варианты `Название А → Я` и `Название Я → А`.
+    - Причина: current session name создаётся автоматически как `Аукцион #N` и пользователь его не редактирует; лексикографическая сортировка такого имени не даёт полезного workflow.
+    - Оставить `Новые → старые` и `Старые → новые`.
+    - DB support для obsolete `name_asc/name_desc` после exact-reference проверки можно удалить/упростить, если он больше нигде не нужен.
+  - **2. Поле `РЕЖИМ` должно показывать фактический путь определения победителя, а не только initial `session.mode`.**
+    - Не создавать второй history backend; использовать сохранённые session fields + wheel format + audit/verification data, которые уже описывают фактический lifecycle.
+    - Базовые понятные labels:
+      - pure Max Amount -> **`Максимальная сумма`**;
+      - direct standard weighted wheel -> **`Обычное колесо`**;
+      - direct elimination -> **`Выбывание`**;
+      - Max Amount -> standard wheel -> **`Максимальная сумма → Обычное колесо`**;
+      - Max Amount -> elimination -> **`Максимальная сумма → Выбывание`**;
+      - Max Amount tie resolved by wheel -> **`Максимальная сумма → Колесо при ничьей`**.
+    - Если в одной wheel-session были допустимые format transitions между elimination rounds, history label/details должны отражать реальный путь, а не притворяться одним исходным format; предпочтительно derive presentation из уже сохранённых `wheel_format` audit events / snapshots.
+    - Тот же human-readable path использовать в основной колонке `РЕЖИМ` и в `Общие -> Режим`, чтобы два представления не расходились.
+    - Не переписывать старые immutable session rows только ради нового текста; presentation derive on read.
+  - **3. Conditional visibility вкладки `Проверка результата`.**
+    - Для pure Max Amount session без фактического wheel spin вкладку **не показывать**: проверять там нечего.
+    - Если session содержит хотя бы один реально выполненный wheel spin / verification context, вкладку показывать.
+    - Direct standard wheel, elimination и Max→Wheel после фактического spin -> вкладка доступна.
+    - Для старых wheel-session, завершённых до появления immutable snapshots, вкладку можно показывать с существующим понятным сообщением `Verification snapshot отсутствует / точная проверка недоступна`; исторические данные задним числом не реконструировать.
+    - Если wheel был только выбран/настроен, но ни одного spin фактически не произошло, verification tab не должна появляться только из-за режима/наличия wheel controls.
+    - Exact predicate при реализации строить по существующим verification snapshots + wheel audit evidence, а не по одному `session.mode`.
+  - **4. Расширить `События` под все новые принятые auction mechanics.**
+    - Любая новая irreversible/corrective business mutation должна оставлять понятное read-only audit-событие через существующий `change_log`; отдельный журнал для History не создавать.
+    - Обязательно поддержать user-facing formatter для уже принятых будущих действий, включая:
+      - `Изменить лот` в post-00:00 correction phase;
+      - изменение названия лота;
+      - изменение абсолютной итоговой суммы и рассчитанный delta;
+      - подтверждённый merge/объединение по normalized title;
+      - общий same-session переход `Максимальная сумма → колесо`;
+      - фиксацию/freeze состава и весов после `Провести колесо`;
+      - materialization временного лота/баллов в постоянный список;
+      - автоматический survivor-winner в `Выбывании`;
+      - post-00:00 correction lifecycle;
+      - новые stop/finalize paths UI-065 и связанные точные outcome-состояния;
+      - full-auction overtime UI-067 и последующие новые tie cycles;
+      - любые новые user-visible actions, которые при реализации меняют session/entry/result state.
+    - Formatter должен использовать понятные русские названия и конкретные affected lot/title/points, но authoritative before/after payload остаётся в `change_log`.
+    - Existing events `start/pause/resume/adjust/reset/auto-extend/bids/new lot/delete/finish/tie overtime/tie wheel/wheel spin/wheel format/elimination archive/confirm/cancel` сохранить.
+  - **Historical position boundary — PRESERVE CURRENT.**
+    - В `Лоты` сейчас хранится `СТАРТ` через persisted `start_position`.
+    - Отдельного immutable `ФИНИШ` snapshot в current schema нет; задним числом вычислять его из нынешней БД не надо.
+    - Если позже пользователь захочет `СТАРТ / ФИНИШ` в completed history, правильный путь — сохранять final position snapshot при закрытии session; этот новый storage сейчас **не принят** и в UI-080 не входит.
+  - Runtime/code пока не изменялись.
+
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
   - Экран: `Аукцион → Способ определения победителя`, режим `Взвешенное колесо`.
   - Кнопку `О методах` переименовать в **`Как выбирается случайное число?`**.
