@@ -1714,6 +1714,87 @@ Alan Wake 2|0
   - Все backup/restore операции остаются background worker-based и mutually exclusive через существующий busy/disable contract.
   - Runtime/code пока не изменялись.
 
+- **UI-083 — `Настройки → Аукцион`: синхронизировать defaults, центр колеса и автопродление с принятыми решениями — READY AFTER BATCH APPROVAL.**
+  - Решение пользователя 2026-10-06 — ACCEPTED.
+  - Страница сохраняет три смысловых блока: значения времени по умолчанию, изображение в центре колеса и автопродление таймера. Не создавать параллельные настройки для тех же данных.
+
+  - **Значения времени по умолчанию — PRESERVE + UI-072 SYNC.**
+    - `Длительность аукциона «Максимальная сумма» по умолчанию` сохранить: диапазон **00:00:01.000 … 24:00:00.000**.
+    - `Длительность вращения колеса по умолчанию` сохранить как единственный saved default `auction_wheel_default_duration_ms`, но полностью синхронизировать с UI-072:
+      - новый диапазон **00:00:01.000 … 24:00:00.000**;
+      - изменить Settings help text;
+      - изменить `_saved_auction_wheel_duration_ms()` validation/fallback boundary;
+      - изменить `save_auction_settings()` validation/error text;
+      - не оставлять ни одного Settings-only ограничения 3 секунды.
+    - Эти поля остаются именно defaults для новых запусков; на вкладке `Аукцион` пользователь по-прежнему может изменить время конкретного запуска до соответствующего irreversible boundary.
+    - Новую duration variable не создавать.
+
+  - **`Изображение в центре колеса` — сохранить как полное место управления media library.**
+    - Этот блок не удалять: Settings остаётся полным management path, а клик по центру локального колеса по D19/UI-079 остаётся быстрым picker-path.
+    - Current item `— стандартный центр —` заменить на понятный fallback label **`— логотип InOneLine —`**.
+    - Current status `Используется стандартный центр колеса без пользовательского изображения` заменить на формулировку, что используется встроенный логотип InOneLine.
+    - Fallback и внешний вид центра следуют UI-079:
+      - canonical `assets/InOneLine_icon_master.png`;
+      - круглая mask/crop presentation;
+      - при новом подключении Twitch автоматический выбор profile image;
+      - последующий ручной выбор authoritative и сохраняется между перезапусками;
+      - недоступный выбранный asset безопасно падает обратно на app-logo без влияния на wheel mechanics.
+    - Сохранить существующие способы добавления:
+      - локальный файл;
+      - direct URL;
+      - Twitch channel/profile source;
+      - 7TV / BTTV / FFZ-supported remote sources;
+      - GIF/WebP animation support по D19.
+    - **Исправить фактически неверный UI-copy про `локальную PNG-копию`.**
+      - Current media pipeline сохраняет локальную managed-копию в поддерживаемом формате, а не обязательно PNG.
+      - PNG остаётся PNG; supported GIF/WebP сохраняют формат и animation semantics.
+      - Новый текст должен говорить примерно: `Внешние изображения проверяются и сохраняются как локальная копия в поддерживаемом формате. Анимированные GIF/WebP сохраняют анимацию.`
+    - Не менять существующие safety checks/download validation/media hash-dedup только ради текста.
+
+  - **Унифицировать сохранение center image с quick picker.**
+    - Exact CURRENT inconsistency:
+      - `Аукцион -> quick picker` сразу пишет `wheel_center_image_media_id` и применяет изображение;
+      - `Настройки -> Аукцион` импортирует/выбирает asset, но до нажатия общей кнопки сохраняет его только как UI selection.
+    - Новое правило: **любой подтверждённый выбор center image применяется и сохраняется сразу**.
+      - выбор existing managed asset в combo -> сразу persist/apply;
+      - успешный import локального/remote asset -> сразу select + persist/apply;
+      - выбор fallback `Логотип InOneLine` -> сразу очищает custom `wheel_center_image_media_id` и применяет fallback;
+      - quick picker и Settings используют один shared helper/setting path, а не две независимые semantics.
+    - Изменение должно сразу отражаться в local wheel и OBS wheel через существующий presentation refresh/event path; не ждать общей кнопки `Сохранить настройки аукциона`.
+    - `Сохранить настройки аукциона` после UI-083 отвечает за **defaults времени + автопродление**, но не является commit-кнопкой для center image.
+    - Не создавать второй persisted image field.
+
+  - **Автопродление таймера — EXISTING / PRESERVE.**
+    - Сохранить current S2 business mechanics без изменения:
+      - причины: actual `Смена лидера`, genuinely new temporary lot, accepted external incoming event;
+      - каждая включённая причина имеет своё persisted duration;
+      - одна исходная операция/event даёт максимум одно продление;
+      - если одновременно совпало несколько причин, применяется **самое большое** настроенное продление, durations не суммируются;
+      - threshold `Продлевать только если осталось не больше` persisted/configurable; равенство порогу допустимо;
+      - при выключенном threshold включённые причины могут срабатывать на всём протяжении running auction;
+      - paused/non-running session не автопродлевается;
+      - уже истёкший timer не resurrect;
+      - 24h ceiling сохраняется;
+      - external-event dedup сохраняется, один source+external_event_id не продлевает дважды;
+      - pending/неприменённые conversion events не должны давать фактическое продление до успешного общего apply-path;
+      - одна и та же common integration pipeline semantics сохраняется.
+    - `Новый временный лот` означает именно фактическое создание нового lot; increment существующего совпадения или manual correction сам по себе эту причину не вызывает.
+    - `Также учитывать неденежные единицы интеграций` сохранить как persisted child-option, default OFF; OFF — monetary/currency events, ON дополнительно provider-neutral service units вроде Twitch Channel Points.
+    - Existing conditional visibility duration editors сохранить: duration/child controls показываются только для включённой причины/порога.
+    - Диапазон duration/threshold сохранить **00:00:00.001 … 24:00:00.000**.
+
+  - **Переименовать только пользовательский label внешней причины.**
+    - `Внешнее пожертвование` → **`Внешнее поступление`**.
+    - Причина: родительская причина может охватывать не только денежные donation events, но и при включённой child-option неденежные service units.
+    - Internal keys/audit reason IDs `external_donation / external_service_unit` не переименовывать ради UI-copy; они остаются полезными для точного audit.
+    - Tooltip/описание child-option сохранить с понятными примерами.
+
+  - **Общая кнопка сохранения.**
+    - `Сохранить настройки аукциона` сохранить.
+    - После UI-083 она валидирует и сохраняет только значения времени по умолчанию и настройки автопродления; center image уже persisted immediately.
+    - После сохранения продолжать вызывать существующий `auction_settings_changed()`, чтобы вкладка `Аукцион` перечитала новые defaults без изменения уже идущей session.
+  - Runtime/code пока не изменялись.
+
 - **UI-063 — сделать справку RNG понятной и добавить переход к RANDOM.ORG настройкам — READY AFTER BATCH APPROVAL.**
   - Экран: `Аукцион → Способ определения победителя`, режим `Взвешенное колесо`.
   - Кнопку `О методах` переименовать в **`Как выбирается случайное число?`**.
