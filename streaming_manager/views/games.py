@@ -1247,7 +1247,7 @@ class GamesTab(QWidget):
 
     def _clear_all_worker_finished(self):
         self._clear_all_worker = None
-        self.clear_all_btn.setText("Очистить все игры…")
+        self.clear_all_btn.setText("Очистить список")
         self._update_action_state()
 
     def delete_selected(self):
