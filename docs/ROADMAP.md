@@ -1,6 +1,6 @@
 # InOneLine Roadmap
 
-Обновлено: **2026-10-02**
+Обновлено: **2026-10-07**
 
 Этот файл — короткий канонический inventory будущей работы. Он восстановлен после повторной сверки чатов «Программа для стрима» 1–31, исторических Drive-roadmap/reconciliation-файлов, GitHub Issues, release notes и exact current source.
 
@@ -19,11 +19,31 @@
 
 - **QA-1.0.8-01 — Conduct integration last-event visibility**. Это не новая feature idea и не меняет retained future dependency order. Перед runtime fix нужен fresh exact-CURRENT review и отдельное approval; исправление должно переиспользовать существующий `integration_connections.last_event_at`/B1 status infrastructure, без второго event/history backend.
 - **QA-1.0.8-02 — accepted B2 test-event safety contract is not represented generically in current normalized-event core**. Direct user acceptance exists: provider events explicitly marked test/sandbox/demo must never credit points, create/increment game/lot, change leader, extend timer or affect wheel/winner; diagnostics/history-only is allowed. Current 1.0.8 has no explicit normalized test-event field/gate. Classification: **ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**. No current supported-provider reproduction was established; implement only through fresh exact-current review and common B2/B3 reuse.
-- **QA-1.0.8-03 — B3 empty-message current-runtime gap — SUPERSEDED PRODUCT TARGET / STILL NOT FIXED IN 1.0.8**. The earlier generic manual `Требует привязки` target is superseded for an ordinary accepted external event received during a running auction with empty message. UI-087 now requires an automatic temporary lot `Без текста N`: each accepted empty-message event gets its own sequential placeholder within that auction session; a known-rate event credits it immediately, while an unknown-rate event creates the placeholder immediately but keeps the credit in `Ожидают применения` until the rate is saved and the operator presses `Применить`. Current 1.0.8 still marks `missing_target` as `inapplicable`, so the runtime remains out of contract until the review batch is implemented. A separate `Требует привязки` workflow must not be created just for standard empty-message donations; provider-specific events that cannot safely map to an ordinary lot-targeted credit remain separate edge cases.
+- **QA-1.0.8-03 — B3 empty-message current-runtime gap — TARGET APPROVED IN UI-087 / AWAITS REVIEW-BATCH IMPLEMENTATION**. The earlier generic manual `Требует привязки` target is superseded for an ordinary accepted external event received during a running auction with empty message. UI-087 requires an automatic temporary lot `Без текста N`: each accepted empty-message event gets its own sequential placeholder within that auction session; a known-rate event credits it immediately, while an unknown-rate event creates the placeholder immediately but keeps the credit in `Ожидают применения` until the rate is saved and the operator presses `Применить`. Current 1.0.8 still marks `missing_target` as `inapplicable`, so runtime remains out of contract until the approved review batch is implemented after the user's future `«всё делаем»` command. A separate `Требует привязки` workflow must not be created just for standard empty-message donations; provider-specific events that cannot safely map to an ordinary lot-targeted credit remain separate edge cases.
 
-## Ближайшие scope для fresh review
 
-Это **не pre-authorized implementation queue**. Каждый пункт перед кодом требует fresh exact-CURRENT review и отдельного решения пользователя.
+## Текущий утверждённый review-batch — не реализован
+
+Полный UI/function review завершён 2026-10-07. Детальный source of truth для накопленных решений — `docs/ACTIVE_REVIEW_LEDGER.md`.
+
+- Runtime/source остаётся **1.0.8 / schema 19 / 15 named migrations**.
+- Это уже не fresh-review candidate list: большинство UI/BUG-пунктов имеют принятый target и ждут общей команды пользователя `«всё делаем»`.
+- До этой команды **код не менять**.
+- Главные cross-cutting supersession текущего batch:
+  - UI-074: локальный список аукциона без автопрокрутки; persisted autoscroll только для Auction Lots OBS overlay;
+  - UI-087: empty message во время running auction → `Без текста N`;
+  - UI-088/UI-090: CSV/JSON/Excel file export переносится на `Публичный список`; legacy compatible export и внутренняя вкладка `Настройки → Экспорт` удаляются;
+  - UI-044 в прежнем виде не реализуется, потому что target `Настройки → Экспорт → Публичный API` исчезает вместе с вкладкой; `/api/public` сохраняется.
+- Не считать released 1.0.8 layout/behavior в исторических записях более поздним target, если оно явно superseded текущим ledger.
+- Перед dependency sorting остаются только три неразрешённых вопроса, для которых не найдено прямого пользовательского решения:
+  1. UI-053 — локальная `Открыть предпросмотр таймера` на странице `Аукцион`;
+  2. AUCTION-TIMER-REVIEW-002 — какой saved default использовать для дополнительного времени Max Amount tie;
+  3. AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
+- QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
+
+## Сохранённые future scope после текущего review-batch
+
+Эти пункты сохранены для будущего и **не являются следующей автоматической очередью**, пока текущий review-batch не сверён по зависимостям и не реализован/закрыт. Для каждого из них позже всё равно требуется fresh exact-CURRENT review и отдельное решение пользователя.
 
 1. **Global Multi-File Import** — текущий post-D26 candidate, tracking **#4**. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…», переиспользуя уже работающий D26 multi-select и существующие managed/external/duplicate rules.
 2. **D40 — ручной порядок soundtrack/music library** — сохранённая future-идея, не реализована D26. Должна переиспользовать D43/D26 audio/media/playback state, а не создавать второй player/library backend. Это **не восстановление** superseded pre-D26 Auction playlist/Loop-One модели: с D26 текущий Auction soundtrack — один выбранный зацикленный файл из shared soundtrack library.
