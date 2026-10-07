@@ -147,7 +147,7 @@ def main() -> int:
             raise AssertionError(f"cold-start window below minimum: {window.size()}")
 
         expected_tabs = [
-            "Игры",
+            "Список",
             "Публичный список",
             "Стрим / OBS",
             "Музыка",
