@@ -603,6 +603,82 @@ def main() -> int:
             raise AssertionError("legacy/incorrect add dialog field labels remain")
         if add_dialog.amount_edit.value() != 0:
             raise AssertionError("optional points default changed from 0")
+
+        def assert_date_caret_contract(dialog, mode):
+            # Directly exercise the formatter with a caret in the middle:
+            # auto-inserted separators must not force the caret to the end.
+            dialog.date_edit.setText("26012010")
+            dialog.date_edit.setCursorPosition(4)
+            dialog._format_date_while_typing(dialog.date_edit.text())
+            if dialog.date_edit.text() != "26.01.2010":
+                raise AssertionError(
+                    f"{mode} date auto-format changed: {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != 5:
+                raise AssertionError(
+                    f"{mode} date caret mapping mismatch after auto-format: "
+                    f"{dialog.date_edit.cursorPosition()}"
+                )
+
+            # Backspace in the middle previously reproduced BUG-002:
+            # the old code always jumped to len(formatted).
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setCursorPosition(4)
+            QTest.keyClick(dialog.date_edit, Qt.Key.Key_Backspace)
+            app.processEvents()
+            if dialog.date_edit.cursorPosition() != 3:
+                raise AssertionError(
+                    f"{mode} date Backspace moved caret unexpectedly: "
+                    f"{dialog.date_edit.cursorPosition()}, {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() == len(dialog.date_edit.text()):
+                raise AssertionError(f"{mode} date Backspace still jumps caret to end")
+
+            # Delete in the middle follows the same ordinary QLineEdit caret rule.
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setCursorPosition(3)
+            QTest.keyClick(dialog.date_edit, Qt.Key.Key_Delete)
+            app.processEvents()
+            if dialog.date_edit.cursorPosition() != 3:
+                raise AssertionError(
+                    f"{mode} date Delete moved caret unexpectedly: "
+                    f"{dialog.date_edit.cursorPosition()}, {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() == len(dialog.date_edit.text()):
+                raise AssertionError(f"{mode} date Delete still jumps caret to end")
+
+            # Replacing a selection should keep the ordinary collapsed caret
+            # directly after the replacement, just like the title field.
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setSelection(3, 2)
+            QTest.keyClicks(dialog.date_edit, "12")
+            app.processEvents()
+            if dialog.date_edit.text() != "26.12.2010":
+                raise AssertionError(
+                    f"{mode} date selection replacement changed text unexpectedly: "
+                    f"{dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != 5:
+                raise AssertionError(
+                    f"{mode} date selection replacement caret mismatch: "
+                    f"{dialog.date_edit.cursorPosition()}"
+                )
+
+            # Sequential compact input must retain the established auto-dot behavior.
+            dialog.date_edit.clear()
+            QTest.keyClicks(dialog.date_edit, "26012010")
+            app.processEvents()
+            if dialog.date_edit.text() != "26.01.2010":
+                raise AssertionError(
+                    f"{mode} sequential compact date formatting changed: "
+                    f"{dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != len(dialog.date_edit.text()):
+                raise AssertionError(
+                    f"{mode} sequential date caret should remain at the end"
+                )
+
+        assert_date_caret_contract(add_dialog, "add")
         add_dialog.deleteLater()
 
         edit_game = Game(
@@ -645,6 +721,7 @@ def main() -> int:
             or "Статус (необязательно):" in edit_dialog_labels
         ):
             raise AssertionError("legacy/incorrect edit dialog field labels remain")
+        assert_date_caret_contract(edit_dialog, "edit")
         edit_dialog.deleteLater()
         app.processEvents()
 
