@@ -69,16 +69,12 @@ class GameDialog(QDialog):
         self.existing_game_id: int | None = None
         self._closing_after_save = False
         self._original_state = None
-        self.setWindowTitle("Изменить игру" if game else "Добавить игру")
+        self.setWindowTitle("Изменить" if game else "Добавить")
         self.setMinimumSize(620, 500)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
-
-        title = QLabel("Редактирование записи" if game else "Новая игра")
-        title.setStyleSheet("font-size: 15pt; font-weight: 700;")
-        layout.addWidget(title)
 
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
