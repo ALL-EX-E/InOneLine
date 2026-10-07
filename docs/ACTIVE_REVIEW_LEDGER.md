@@ -2932,6 +2932,174 @@ Alan Wake 2|0
 - После применения precedence/supersession выше **логических конфликтов между утверждёнными current-review решениями не осталось**.
 - Основные implementation boundaries теперь определены: shared helpers сначала, затем dependent UI; точный порядок будет сформирован отдельно в пункте 3.
 - Runtime остаётся exact CURRENT 1.0.8 / schema 19 / 15 named migrations.
+## 4.7 Пункт 3 — окончательная очередь реализации — 2026-10-07
+
+- **IMPLEMENTATION-QUEUE-2026-10-07 — READY / RUNTIME NOT STARTED.**
+- Очередь построена после полного UI-review и dependency-аудита 4.6.
+- Правило исполнения: каждый пакет ниже реализуется **отдельным candidate**, затем выполняются автоматические проверки и обязательная ручная проверка пользователя. Следующий пакет не начинать до принятия предыдущего.
+- Accepted CURRENT `1.0.8` остаётся rollback baseline и не заменяется непроверенным candidate.
+- Внутри пакета сначала переиспользовать существующие helpers/state/data paths; новый subsystem вводить только если existing architecture объективно не покрывает contract.
+
+### P00 — pre-change gate / exact baseline
+- Перед первым runtime change: подтвердить clean working tree/branch, exact CURRENT version/schema/migrations, прогнать существующие regression/smoke проверки и зафиксировать baseline results.
+- Не менять product behavior. Это страховочная точка для сравнения каждого последующего candidate.
+
+### P01 — MainWindow shell cleanup — LOW
+- UI-001 / UI-002 / UI-003 / UI-004 / UI-005 / BUG-001 / UI-006.
+- Удалить дублирующие File/View actions и сами пустеющие menus; сохранить один глобальный F5 → `MainWindow.refresh_all()`; добавить принятую информационную строку.
+- Не затрагивать вкладки/данные/аукцион.
+- Manual QA: menu absence, F5 на каждой основной вкладке, title/info text, clean close.
+
+### P02 — базовые подписи и диалоги `Список` / Public — LOW
+- UI-010 / UI-011 / UI-012 / UI-013 / UI-015 / UI-022 / UI-024 / UI-029 / UI-030.
+- Только принятые labels/dialog wording/clear-list flow + removal Public local-JSON button; backend/API не переименовывать.
+- Validation-only: UI-014 (9-digit points limit preserve), UI-016/UI-017 (existing edit/archive/delete actions preserve).
+
+### P03 — CSV/import + ручной input correctness — LOW→MEDIUM
+- BUG-002 / UI-019 / UI-020 / UI-021.
+- Исправить caret/date editing без нового input subsystem; унифицировать user-facing CSV errors/help; принять новые headings с backward-compatible aliases.
+- Validation-only: UI-018 absorbed here; TEST-001 уже manual-pass и используется как regression matrix.
+
+### P04 — search / selection / hide-list cleanup / total points — MEDIUM
+- UI-007 / UI-008 / UI-009 / UI-025 / UI-028 / UI-076 / BUG-003 / BUG-004.
+- Сначала убрать obsolete hide/show-list state/hooks и fallback auto-selection; затем применить единый search/Enter/deselect contract.
+- `Всего баллов` — через existing `_game_stats_conn()`/snapshot, не по visible rows.
+- Validation-only: UI-023 filters preserve; clear-search возвращает выбранный filter.
+
+### P05 — Public file export + removal `Настройки → Экспорт` — LOW→MEDIUM
+- UI-088 / UI-089 / UI-090.
+- Перенести existing public CSV/JSON/XLSX actions на `Публичный список`; удалить legacy compatible-export UI и внутреннюю Settings Export tab.
+- Legacy `Название|Баллы` **import** сохранить; `/api/public` сохранить без нового visible entry point.
+- Validation-only: UI-044 superseded, не реализовывать.
+
+### P06 — MainWindow size/state/tab-order + full backup — MEDIUM
+- GLOBAL-UI-002 / UI-032 / UI-082.
+- Уменьшение окна/scroll выполнить уже без старого hide/show compact behavior.
+- Перестановка top-level tabs обязана иметь совместимое логическое восстановление старого numeric `main_window/tab_index`/stable key.
+- Full `.iolbackup` включает `data/ui_state.ini`; legacy backups без файла остаются валидны.
+- Manual QA обязательно включает upgrade со старым `ui_state.ini`, restore backup и запуск на каждой сдвинутой вкладке.
+
+### P07 — единая position policy + XLSX — MEDIUM
+- GLOBAL-POSITION-COLUMNS-001 / UI-050 / UI-058 / UI-077.
+- Один authoritative `_auction_position_map_conn()`/snapshot source; общие списки = `ПОЗИЦИЯ`, auction surfaces = adaptive `ПОЗИЦИЯ ↔ СТАРТ/ТЕКУЩАЯ`.
+- XLSX `ПОЗИЦИЯ` derived/read-only; import logical hash её игнорирует, presentation fingerprint учитывает.
+- Validation-only: UI-027/UI-031 preserve-with-exception. File exports P05 не получают `ПОЗИЦИЯ`.
+
+### P08 — shared media availability/dedup foundation — MEDIUM
+- BUG-005 / UI-039.
+- Исправить identity/dedup managed-vs-external и единый missing-file/source-of-truth behavior на существующей media library.
+- Это foundation до добавления timer/rules/lot custom backgrounds; не создавать новый registry.
+
+### P09 — Stream/OBS structural cleanup — MEDIUM
+- UI-033 / UI-034 / UI-035 / UI-036 / UI-037 / UI-038 / UI-040 / UI-041 / UI-042 / UI-043.
+- Собрать тематические blocks/save-actions и общий URL→copy/preview→settings pattern; удалить obsolete `Локальный API` user block/diagnostic controls, endpoints сохранить.
+- Использовать P08 media semantics для overlay background.
+- Validation-only: UI-026 quick list URL/preview preserve.
+
+### P10 — common OBS show-mode + timer/music widgets/audio help — MEDIUM→HIGH
+- GLOBAL-OBS-VISIBILITY-001 / UI-045 / UI-046 / UI-049 / UI-055.
+- Сначала reusable persisted show-mode policy + preview override; затем timer/music widget presentation.
+- Timer custom background использует P08 shared library; Music Player mechanics не переписывать.
+- Music/Auction OBS audio help переиспользуют один dialog/content pattern.
+
+### P11 — Rules composite editor/overlay — HIGH
+- UI-048 / UI-060.
+- Один composite `Шаблон правил`: text + rich text + OBS appearance. Separate style-preset subsystem не создавать.
+- Full Rules settings/save/actions находятся в rules editor; Stream/OBS не получает вторую settings copy.
+- Rules widget visibility следует P10 common show-mode; old checkbox не возвращать.
+- Existing template/session snapshot compatibility и sanitizer обязаны сохраниться.
+
+### P12 — единая страница `Аукцион` + lot search scope — HIGH
+- UI-051 / UI-052 / UI-056 / UI-059.
+- Сначала объединить `Лоты/Проведение` в одну страницу и одну lot-table при сохранении business state.
+- Затем наложить принятый prestart/session search scope и Enter behavior.
+- Validation-only: UI-057 `Ставки/История` остаётся постоянно видимым.
+
+### P13 — Auction layout / timer contextual UI / quick actions — HIGH
+- GLOBAL-UI-001 / OBS-QUICK-URL-001 / UI-053 / UI-062 / UI-071 / UI-073.
+- Перестроить верхние blocks после P12, но внутреннюю структуру timer сохранить.
+- Перенести существующие Auction/Wheel soundtrack controls в один contextual timer block без второго state set.
+- Добавить timer preview рядом с Copy URL; quick URL actions не удалять.
+- RNG/irrelevant controls скрывать только по принятой relevance policy; business RNG changes ещё не делать.
+
+### P14 — Auction Lots Overlay + OBS-only autoscroll/footer — HIGH
+- UI-047 / UI-074 / UI-075.
+- Использовать P07 position policy + P08 media + P10 show-mode + P12 one-table state.
+- Local lot table больше не autoscroll; persisted `Автопрокрутка оверлея` управляет только `/auction-lots-overlay`.
+- Добавить optional total-points footer без зависимости от local search.
+
+### P15 — Wheel OBS widget + appearance/center-image UX — MEDIUM→HIGH
+- UI-078 / UI-079.
+- Добавить Stream/OBS wheel block на existing `/wheel-overlay`, не создавая второй renderer/backend.
+- Использовать P10 show-mode и existing local/OBS common payload.
+- Center-image UX/appearance выполнить на existing image/media path с принятыми fallbacks.
+
+### P16 — authoritative timer/wheel/audio timing core — HIGH / TIMING-SENSITIVE
+- BUG-006 / UI-072 / BUG-007 / AUCTION-TIMER-REVIEW-002 / AUCTION-TIMER-REVIEW-003.
+- Один `wheel_duration_ms`, новый range 1 s…24 h во всех validators/tests.
+- Interrupted wheel next start возвращает full intended duration; tooltip reset не содержит ложные fixed 8 s.
+- Tie overtime default = saved Max Amount default; отдельного overtime setting нет.
+- ~1.2 s preparation — вне configured duration; actual timer/wheel/OBS/audio start = одна boundary; re-entry guarded.
+- Ordinary resume после pause не получает новый lead-in. Remote RNG/network wait не вычитается из spin duration.
+- Source-time running boundary и AudioCoordinator handoff должны соответствовать actual start.
+
+### P17 — `Настройки → Аукцион` поверх готовых wheel/timer foundations — MEDIUM
+- UI-083.
+- После P15/P16 синхронизировать wheel default range, center-image setting/fallback и сохранённую auto-extension UI без дублирования runtime state.
+- `Сохранить настройки аукциона` сохраняет только принятые defaults/auto-extension; center image применяется сразу общим path.
+
+### P18 — integration connection/state UX + Auction readiness/RNG navigation — MEDIUM→HIGH
+- UI-084 / UI-061 / UI-063.
+- Сначала один provider state/capability model в Settings; diagnostic check не re-enable disabled integration.
+- Затем Auction compact readiness использует тот же model, а RNG help навигирует в final RANDOM.ORG card.
+- Network/auth operations не блокируют GUI; protected credentials/history semantics preserve.
+
+### P19 — conversion/pending-rate workflow — HIGH
+- UI-085.
+- Atomic rate save + dynamic units + pending queue + rounding + explicit Apply/Не применять + unsaved-draft protection.
+- Переиспользовать existing `external_events`, `contributions`, `pending_conversions`; no auto-recalculation of already-applied contributions.
+- Это foundation для source-session gate P21.
+
+### P20 — Max Amount / Wheel business state machine — VERY HIGH
+- UI-054 / UI-064 / UI-065 / UI-067 / UI-068 / UI-069 / UI-070.
+- Реализовать post-00:00 correction phase, edit/merge semantics, idempotent materialization, universal Stop, min-two wheel rule, whole-auction overtime vs leaders-only tie-wheel, RNG choice only at wheel boundary.
+- Использовать P16 timer boundary/default semantics; после `Провести колесо` composition/weights immutable.
+- Не добавлять старый `Перенести баллы?` вопрос.
+
+### P21 — source-time pending gate + `Без текста N` — VERY HIGH / CROSS-CUTTING
+- UI-086 / UI-087; QA-1.0.8-03 закрывается здесь через UI-087.
+- Связать P19 pending conversion с P20 session lifecycle: pre-close pending сохраняет source-session target, hard-gates irreversible result, Apply exactly once.
+- Empty-message running-auction event создаёт отдельный sequential `Без текста N`; duplicate event отсекается до allocation.
+- Stop не auto-discard pending: materialize/close without winner; later Apply credits corresponding persistent target without reopening stopped session.
+
+### P22 — integration transparency + final History/Journal presentation — HIGH
+- UI-066 / UI-080 / UI-081.
+- После стабилизации authoritative accounting/session model улучшить operator presentation: applied/not-applied reason, destination, source/user/time/unit, session/history identity.
+- History/Journal читают существующие authoritative stores; второго audit/event backend не создавать.
+- UI-080 не должен presentation-layer'ом компенсировать незавершённую business logic — поэтому он идёт после P20/P21.
+
+### FINAL GATE — full regression / release candidate
+- Прогнать весь существующий automated suite + targeted tests каждого пакета + GUI/smoke/backup/migration/integration simulation paths.
+- Провести сквозные ручные сценарии: fresh install, upgrade from 1.0.8 state, Public/XLSX, OBS previews/show-modes/media missing files, Max Amount/overtime/wheel/elimination/Stop, pending conversion before/after 00:00, empty messages, history/journal.
+- Только после ручного принятия пользователем candidate может заменить CURRENT.
+
+### Validation-only / не отдельные implementation packages
+- UI-014 — current 9-digit points limit preserve.
+- UI-016 / UI-017 — existing main-list Edit/Archive/Delete preserve.
+- UI-018 — absorbed by P03 UI-019/020/021.
+- UI-023 — existing statistic filters preserve; P04 validates exception behavior.
+- UI-026 — existing list URL/preview preserve; P09 validates.
+- UI-027 / UI-031 — existing XLSX/Public mechanics preserve except P07 accepted position changes.
+- UI-044 — superseded by UI-090; do not implement.
+- UI-057 — Bets/History visibility preserve; validate during P12/P20.
+- TEST-001 — already COMPLETE / manual-pass; reuse as P03 regression set.
+- QA-1.0.8-01 / QA-1.0.8-02 — **outside this batch** until separate approval.
+- QA-1.0.8-03 — not separate: its ordinary empty-message gap is resolved by P21/UI-087.
+
+### Coverage control
+- Mechanical coverage check 2026-10-07: **UI-001…UI-090 = 90/90 accounted for; missing = 0; duplicate assignment = 0.**
+- BUG-001…BUG-007, GLOBAL rules, OBS quick-URL rule and both timer-review decisions are assigned to explicit packages or merged validation paths.
+- This queue is dependency order, not permission to start runtime automatically; implementation starts only on explicit user command.
 ## 5. Известные ранее найденные проблемы, которые нельзя потерять
 
 Эти пункты уже документированы в проекте. Они не считаются новой функциональностью и не начинают исправляться автоматически:
