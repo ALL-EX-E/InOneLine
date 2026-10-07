@@ -299,3 +299,13 @@ Release cadence считает **только принятые CURRENT/released 
 - Regression Foundation `37654068727` and wording gate `37654069253` = SUCCESS.
 - Drive manual-QA build: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`.
 - Do not start UI-007/UI-008/UI-009/UI-028/UI-076 until P04-B is manually accepted, clean-promoted, merged and post-merge verified.
+
+## P04-B CLOSED / P04-C candidate gate — 2026-10-07
+
+- P04-B / BUG-003 manually accepted by user («Работает. Идём дальше.»), promoted and merged as `f2cc6e9f0968eac1be75f7d5b91ead7afe7e76df`.
+- Exact post-merge Regression Foundation `37655810706` and wording gate `37655810503` = **SUCCESS**. P04-B = **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
+- P04-C / BUG-004 candidate: `candidate/p04-c-public-selection-v2`, head `68f11b92fe2dd5ebb91752cf8723a9d5c66a0e09`, draft PR #31.
+- Scope remains isolated: Public empty-area deselection + existing GUI regression only. Public ordinary refresh has no implicit selection fallback; Enter and `select_synced_search_result()` remain explicit selection actions.
+- Windows regression `37656101654` and wording checks = **SUCCESS**.
+- Drive manual-QA build: `InOneLine_P04_C_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`.
+- P04-C = **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. Do not begin the next P04 scope until manual acceptance.
