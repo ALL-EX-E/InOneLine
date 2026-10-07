@@ -3100,6 +3100,68 @@ Alan Wake 2|0
 - Mechanical coverage check 2026-10-07: **UI-001…UI-090 = 90/90 accounted for; missing = 0; duplicate assignment = 0.**
 - BUG-001…BUG-007, GLOBAL rules, OBS quick-URL rule and both timer-review decisions are assigned to explicit packages or merged validation paths.
 - This queue is dependency order, not permission to start runtime automatically; implementation starts only on explicit user command.
+## 4.8 P00 — exact baseline / regression gate — PASS — 2026-10-07
+
+- **P00 STATUS: COMPLETE / PASS. Runtime implementation has not started.**
+- Repository default branch: `main`.
+- Exact runtime contract reconfirmed from CURRENT source:
+  - `APP_VERSION = 1.0.8`;
+  - `SCHEMA_VERSION = 19`;
+  - named `_run_migration(...)` entries = **15**.
+- Accepted A9 runtime anchor: commit `74ad16c5772d5cc191f7e307203b6a574af7815c`.
+- Compare `74ad16c... → main` before P00 documentation showed only README/docs/QA-document changes; **no `app.py`, `streaming_manager/**`, `installer/**`, `tools/**`, workflow, dependency, data or asset runtime changes** after accepted A9.
+- The accepted A9 permanent-regression reference and current runtime were additionally checked at blob level for all A9-touched runtime/workflow files (`app.py`, installer, `ui_settings.py`, `single_instance.py`, `main_window.py`, A9 regression tools, permanent workflow): blobs are identical.
+
+### Fresh permanent Windows regression rerun
+- Existing permanent run `36972339831` / job was explicitly re-run on 2026-10-07 because P00 requires a fresh baseline gate.
+- Fresh job ID: **`112658659175`**.
+- Result: **completed / success**.
+- All workflow steps completed successfully:
+  - exact dependencies install;
+  - `compileall`;
+  - GitHub Actions version regression;
+  - publication-CI regression;
+  - A9 UI-settings / installer-user-area / single-instance regression;
+  - full backup/restore, rollback, legacy wheel-jingles, legacy full-backup, filesystem, media-sync and dependency smokes;
+  - clean source snapshot;
+  - fresh DB integrity;
+  - native GUI regression;
+  - frozen application build;
+  - frozen startup + Browser Source regression;
+  - Inno Setup 7.1.0 compile;
+  - silent installer startup + clean filesystem regression.
+
+### Key fresh PASS markers
+- `COMPILEALL=PASS`
+- `GITHUB_ACTIONS_MAJOR_REFRESH=PASS`
+- `PUBLICATION_CI_CONSOLIDATION=PASS`
+- `INSTALLER_ADMIN_MODE=PASS`
+- `INSTALLER_HKCU_FREE=PASS`
+- `UI_STATE_APP_OWNED=PASS`
+- `SINGLE_INSTANCE_BOOT_GUARD=PASS`
+- `SINGLE_INSTANCE_LOCK=PASS`
+- `1.0.8 FULL BACKUP/RESTORE REGRESSION SMOKE: OK`
+- `1.0.8 FULL RESTORE ROLLBACK REGRESSION SMOKE: OK`
+- `LEGACY_WHEEL_JINGLES_MIGRATION=PASS`
+- `LEGACY_1_0_6_FULL_BACKUP_RESTORE=PASS`
+- `RUNTIME_FILESYSTEM_CLEANUP=PASS`
+- `MEDIA_SYNC_SINGLE_TRANSACTION=PASS`
+- `RULE_TEMPLATE_CREATE_RENAME=PASS`
+- `RANDOM_ORG_RUNTIME_DEPENDENCY=PASS`
+- `CLEAN_SOURCE_SNAPSHOT=PASS` (`SOURCE_SNAPSHOT_BYTES=1441202`)
+- `FRESH_DB_1_0_8=PASS`
+- `1.0.8 GUI REGRESSION CORE: OK`
+- `FROZEN_STARTUP_BROWSER_REGRESSION=PASS`
+- `INNO_USER_AREAS_WARNING=NONE`
+- `SILENT_INSTALL_STARTUP_REGRESSION=PASS`
+- `CLEAN_INSTALL_FILESYSTEM=PASS`.
+
+Fresh regression-built installer was only a baseline test artifact, **not a new accepted release/CURRENT artifact**.
+
+### P00 conclusion
+- Exact CURRENT `1.0.8 / schema 19 / 15 migrations` is green and suitable as rollback/reference baseline for P01.
+- No source/runtime behavior was changed by P00; only the existing GitHub Actions regression was rerun and documentation is updated.
+- Next implementation package according to §4.7 is **P01 — MainWindow shell/menu/F5 cleanup**.
 ## 5. Известные ранее найденные проблемы, которые нельзя потерять
 
 Эти пункты уже документированы в проекте. Они не считаются новой функциональностью и не начинают исправляться автоматически:
