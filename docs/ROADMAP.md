@@ -309,3 +309,13 @@ Release cadence считает **только принятые CURRENT/released 
 - Windows regression `37656101654` and wording checks = **SUCCESS**.
 - Drive manual-QA build: `InOneLine_P04_C_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`.
 - P04-C = **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. Do not begin the next P04 scope until manual acceptance.
+
+## GLOBAL-FOCUS-001 — единое снятие focus/selection во всей программе — DEFERRED / RECORDED — 2026-10-07
+
+- Пользователь выявил общий UX-дефект после ручной проверки P04-C: если таблица полностью заполнена строками, для снятия selection может не существовать видимой пустой области; пользователь не должен прокручивать список до самого низа только ради deselect.
+- Та же проблема шире таблиц: после клика в поле ввода focus визуально/логически остаётся на нём, пока пользователь не выберет другой focusable control.
+- Это не дефект только Games/Public и не должен решаться набором локальных hacks по каждой вкладке.
+- Целевое продуктовое правило: должен существовать единый естественный способ убрать focus с поля и снять selection с таблицы независимо от наличия видимой пустой строки/области. Пользователь не должен искать другое поле или прокручивать длинный список вниз.
+- Предпочтительно сначала исследовать один общий механизм на уровне shared UI/MainWindow/event handling; не ломать обычный click/double-click, Enter-search, keyboard navigation, dialog validation, caret/selection semantics, buttons, combo/spin boxes и explicit programmatic focus/selection.
+- Конкретный жест/реализацию (например neutral-background click и/или универсальный keyboard escape fallback) утвердить при отдельном global UI review после проверки влияния на существующие widgets.
+- Не расширять текущий P04-C до глобального mouse/focus subsystem. Реализовывать отдельным изолированным шагом после сортировки зависимостей.
