@@ -1,6 +1,6 @@
 # InOneLine — Current Project State
 
-Обновлено: **2026-10-02**
+Обновлено: **2026-10-07**
 
 ## CURRENT / RELEASED
 
@@ -383,6 +383,27 @@ Permanent repository gate:
 - Open tracking remains Issues **#4 / #5** and stale PR **#9** repository hygiene.
 - No product implementation scope is selected automatically.
 - Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+
+## Completed UI review reconciliation — 2026-10-07
+
+- Подробный визуальный/функциональный разбор всех вкладок завершён. Рабочий target текущего review находится в `docs/ACTIVE_REVIEW_LEDGER.md`.
+- Runtime/source остаётся exact CURRENT **1.0.8 / schema 19 / 15 named migrations**. До команды пользователя `«всё делаем»` принятые UI/BUG-решения не реализуются.
+- Текущий review **не возвращает старую roadmap-очередь как автоматический следующий scope**: сначала должен быть завершён reconciliation текущего review, затем dependency sorting, и только потом — реализация по одному пункту после отдельной команды пользователя.
+- Ключевые поздние supersession, которые нельзя смешивать с released 1.0.8 baseline:
+  - **UI-074** заменяет future-target старой auction-autoscroll модели: локальная auction table больше не автопрокручивается; persisted switch управляет только `/auction-lots-overlay`.
+  - **UI-087** заменяет manual `Требует привязки` для обычного empty-message event во время running auction на отдельный временный `Без текста N`.
+  - **UI-088/UI-090** заменяют retained R1.0.9 UI organization как future target: file exports CSV/JSON/Excel возвращаются на `Публичный список`, legacy `Совместимый экспорт` удаляется, внутренняя `Настройки → Экспорт` удаляется целиком.
+  - **UI-044** в прежнем виде superseded: `Публичный API` не создаётся внутри удаляемой `Настройки → Экспорт`; endpoint `/api/public` сохраняется.
+- QA status после review:
+  - **QA-1.0.8-01** — остаётся documented finding без отдельного implementation approval;
+  - **QA-1.0.8-02** — остаётся documented safety finding без отдельного implementation approval;
+  - **QA-1.0.8-03** — target уже определён UI-087 и ждёт общей batch-команды, runtime 1.0.8 пока не соответствует этому target.
+- После сверки прошлых решений исправлены stale statuses UI-018/TEST-001/BUG-007/UI-055; UI-053 сужен до одного нерешённого timer-preview вопроса.
+- Три остаточных вопроса не имеют восстановленного прямого пользовательского решения и не должны быть молча включены в реализацию:
+  - `UI-053` — локальная `Открыть предпросмотр таймера` на рабочей странице `Аукцион`;
+  - `AUCTION-TIMER-REVIEW-002` — источник saved default для дополнительного времени Max Amount tie;
+  - `AUCTION-TIMER-REVIEW-003` — ~1200 ms lead-in при 1-second wheel spin.
 
 ## Active review / bugfix phase
 
