@@ -591,3 +591,13 @@ Permanent repository gate:
 - Artifact `11498364307`: ZIP SHA-256 `a8aae91a3edcef92e8ed95f5b9152182dd58b2d123da5730f7c3c1a348df4bf8`; installer SHA-256 `c5c64e75a53434d75de068d51747ab8c1175b8facc465fcbecd2d12f0bc628b1`.
 - Drive file ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`, 46,761,453 bytes.
 - **P04-C = AWAITING USER MANUAL QA / NOT MERGED.**
+
+## GLOBAL-FOCUS-001 — единое снятие focus/selection во всей программе — DEFERRED / RECORDED — 2026-10-07
+
+- Пользователь выявил общий UX-дефект после ручной проверки P04-C: если таблица полностью заполнена строками, для снятия selection может не существовать видимой пустой области; пользователь не должен прокручивать список до самого низа только ради deselect.
+- Та же проблема шире таблиц: после клика в поле ввода focus визуально/логически остаётся на нём, пока пользователь не выберет другой focusable control.
+- Это не дефект только Games/Public и не должен решаться набором локальных hacks по каждой вкладке.
+- Целевое продуктовое правило: должен существовать единый естественный способ убрать focus с поля и снять selection с таблицы независимо от наличия видимой пустой строки/области. Пользователь не должен искать другое поле или прокручивать длинный список вниз.
+- Предпочтительно сначала исследовать один общий механизм на уровне shared UI/MainWindow/event handling; не ломать обычный click/double-click, Enter-search, keyboard navigation, dialog validation, caret/selection semantics, buttons, combo/spin boxes и explicit programmatic focus/selection.
+- Конкретный жест/реализацию (например neutral-background click и/или универсальный keyboard escape fallback) утвердить при отдельном global UI review после проверки влияния на существующие widgets.
+- Не расширять текущий P04-C до глобального mouse/focus subsystem. Реализовывать отдельным изолированным шагом после сортировки зависимостей.
