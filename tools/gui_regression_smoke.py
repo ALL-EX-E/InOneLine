@@ -18,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMainWindow
 
@@ -158,6 +159,52 @@ def main() -> int:
         actual_tabs = [window.tabs.tabText(i) for i in range(window.tabs.count())]
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
+
+        # P01 shell contract: no top-level menus remain, the replacement hint
+        # is informational only, and exactly one direct MainWindow F5 action
+        # still performs the existing eager refresh_all() path.
+        menu_actions = window.menuBar().actions()
+        if menu_actions:
+            raise AssertionError(
+                f"unexpected top-level menu actions remain: "
+                f"{[action.text() for action in menu_actions]}"
+            )
+        if window.refresh_hint_label.text() != "F5 — обновить данные во всех разделах":
+            raise AssertionError(
+                f"refresh hint mismatch: {window.refresh_hint_label.text()!r}"
+            )
+        if not window.refresh_hint_label.testAttribute(Qt.WA_TransparentForMouseEvents):
+            raise AssertionError("refresh hint became interactive")
+
+        f5_actions = [
+            action
+            for action in window.actions()
+            if action.shortcut() == QKeySequence("F5")
+        ]
+        if len(f5_actions) != 1:
+            raise AssertionError(
+                f"expected one MainWindow F5 action, found {len(f5_actions)}"
+            )
+
+        original_games_refresh = window.games_tab.refresh
+        f5_refresh_calls = 0
+
+        def counted_games_refresh():
+            nonlocal f5_refresh_calls
+            f5_refresh_calls += 1
+            return original_games_refresh()
+
+        window.games_tab.refresh = counted_games_refresh
+        try:
+            f5_actions[0].trigger()
+            app.processEvents()
+        finally:
+            window.games_tab.refresh = original_games_refresh
+        if f5_refresh_calls != 1:
+            raise AssertionError(
+                f"F5 did not call refresh_all() exactly once: "
+                f"Games refresh count={f5_refresh_calls}"
+            )
 
         auction_tabs = [
             window.auction_tab.auction_tabs.tabText(i)
