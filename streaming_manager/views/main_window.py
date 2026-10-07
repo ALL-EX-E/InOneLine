@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QWidget
+from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QTabWidget, QWidget
 
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
@@ -527,30 +527,15 @@ class MainWindow(QMainWindow):
         self.settings_tab._refresh_integrations()
 
     def _make_menu(self):
-        file_menu = self.menuBar().addMenu("Файл")
-        file_menu.setMinimumWidth(260)
-
-        import_action = QAction("Импорт CSV…", self)
-        import_action.setShortcut(QKeySequence("Ctrl+I"))
-        import_action.triggered.connect(self.games_tab.import_csv)
-        file_menu.addAction(import_action)
-
-        backup = QAction("Резервная копия", self)
-        backup.setShortcut(QKeySequence("Ctrl+B"))
-        backup.triggered.connect(self.settings_tab.backup)
-        file_menu.addAction(backup)
-
-        file_menu.addSeparator()
-        exit_action = QAction("Выход", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        view_menu = self.menuBar().addMenu("Вид")
-        view_menu.setMinimumWidth(220)
         refresh_action = QAction("Обновить", self)
         refresh_action.setShortcut(QKeySequence("F5"))
         refresh_action.triggered.connect(self.refresh_all)
-        view_menu.addAction(refresh_action)
+        self.addAction(refresh_action)
+
+        self.refresh_hint_label = QLabel("F5 — обновить данные во всех разделах", self)
+        self.refresh_hint_label.setContentsMargins(8, 0, 8, 0)
+        self.refresh_hint_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.menuBar().setCornerWidget(self.refresh_hint_label, Qt.TopLeftCorner)
 
     def _show_restore_result(self):
         result = read_and_clear_restore_result(self.paths.root_dir)
