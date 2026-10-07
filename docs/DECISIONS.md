@@ -407,3 +407,11 @@ The full tab-by-tab UI/function review is complete. Runtime remains exact CURREN
 - Clean promotion PR #28 head `7fe09b7543b666ae6657377a9d782bac9442ec77`; promotion Regression Foundation `37652474014` and wording gate `37652474280` succeeded.
 - PR #28 merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`; exact merge-commit Regression Foundation `37653013085` and wording gate `37653013097` succeeded. Candidate PR #27 was closed without merge.
 - Next step P04-B is BUG-003 only: remove implicit first-row selection on normal refresh/filter when the previous selection is absent; allow deselection by clicking empty table space. Explicit Enter-search and `focus_game()` selection remain exceptions. Search/filter rule changes and total-points display stay outside this step.
+
+
+## P04-B candidate — BUG-003 — 2026-10-07
+
+- Keep selection only when the same record remains visible after ordinary refresh/filter. Never replace a missing/absent selection with row 0 implicitly.
+- Clicking empty space in the main list explicitly clears both selection and current row; current action-state logic handles the resulting no-selection state.
+- Enter search and `focus_game()` remain explicit selection commands.
+- Candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`, PR #29. Regression `37654068727` and wording `37654069253` succeeded. Await user manual QA before promotion.
