@@ -174,6 +174,12 @@ def main() -> int:
         add_dialog_labels = {label.text() for label in add_dialog.findChildren(QLabel)}
         if "Новая игра" in add_dialog_labels:
             raise AssertionError("legacy add dialog heading remains")
+        if "Название:" not in add_dialog_labels or "Дата:" not in add_dialog_labels:
+            raise AssertionError(
+                f"add dialog field labels mismatch: {sorted(add_dialog_labels)!r}"
+            )
+        if "Название игры:" in add_dialog_labels or "Дата выхода:" in add_dialog_labels:
+            raise AssertionError("legacy add dialog field labels remain")
         add_dialog.deleteLater()
 
         edit_game = Game(
@@ -194,6 +200,12 @@ def main() -> int:
         edit_dialog_labels = {label.text() for label in edit_dialog.findChildren(QLabel)}
         if "Редактирование записи" in edit_dialog_labels:
             raise AssertionError("legacy edit dialog heading remains")
+        if "Название:" not in edit_dialog_labels or "Дата:" not in edit_dialog_labels:
+            raise AssertionError(
+                f"edit dialog field labels mismatch: {sorted(edit_dialog_labels)!r}"
+            )
+        if "Название игры:" in edit_dialog_labels or "Дата выхода:" in edit_dialog_labels:
+            raise AssertionError("legacy edit dialog field labels remain")
         edit_dialog.deleteLater()
         app.processEvents()
 
