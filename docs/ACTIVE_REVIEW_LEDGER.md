@@ -3560,3 +3560,15 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Clean promotion PR #32 passed regression and wording gates, then merged as `7df4071088e8ef3f89b5f6d20caeab745a958d39`.
 - Exact post-merge Regression Foundation `37658841462` = SUCCESS; wording gate `37658841402` = SUCCESS.
 - P04-C remains limited to Public empty-area deselection and existing GUI regression. GLOBAL-FOCUS-001 remains DEFERRED / RECORDED as a later global UI task.
+
+## P04-D / UI-007 candidate — AUTOMATED PASS / AWAITING MANUAL QA — 2026-10-07
+
+- Branch `candidate/p04-d-search-scope`, head `943a26d76bbaf0784b9e38fed84076d9597e82e3`, draft PR #33; base at implementation start `948a577e558ac37d36a10679d12afc9dde3a4b79`.
+- Scope is UI-007 only. A non-empty main-list search reuses `games_refresh_snapshot/_list_games_conn` with effective `status_filter="all"` + `include_archived=True`, while `active_filter` itself remains unchanged.
+- Clearing search therefore immediately restores the currently selected statistic filter. Existing Unicode normalization and title/review matching are preserved; `auction_only=1` temporary lots remain excluded by the existing normal-list query.
+- UI-008/UI-009/UI-028/UI-076 and GLOBAL-FOCUS-001 are not included.
+- Exact diff: `streaming_manager/views/games.py` + existing `tools/gui_regression_smoke.py` only; 64 additions / 3 deletions.
+- Regression Foundation `37660389855` = SUCCESS; wording gate `37660389867` = SUCCESS.
+- Artifact `11501485064`, ZIP 46,756,657 bytes, SHA-256 `6e8d3d5d320c60fc75e882a7c53e00fefea6388fadae7081f3d97e29f812dad9`; contains exactly `InOneLine_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `2a6fa43681b535f14a4092693c975033863fe969b756e78cc994943fc6e682d7`.
+- Drive handoff: `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1o1BEOnoJqFCwkgTJVQoBgahGiVWYslSC`, verified 46,756,657 bytes.
+- **P04-D = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED.** Do not start UI-008/UI-009 or later P04 scopes before manual acceptance and technical closure.
