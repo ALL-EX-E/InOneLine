@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox, QPushButton
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -37,9 +37,10 @@ from streaming_manager.constants import (
     WHEEL_SOUNDTRACK_MUTE_KEY,
     WHEEL_SOUNDTRACK_VOLUME_KEY,
 )
-from streaming_manager.database import Database, Game
+from streaming_manager.database import Database, DuplicateGameError, Game
 from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
 from streaming_manager.ui import MainWindow
+from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 
 
 def free_local_port() -> int:
@@ -147,7 +148,7 @@ def main() -> int:
             raise AssertionError(f"cold-start window below minimum: {window.size()}")
 
         expected_tabs = [
-            "Игры",
+            "Список",
             "Публичный список",
             "Стрим / OBS",
             "Музыка",
@@ -159,6 +160,269 @@ def main() -> int:
         actual_tabs = [window.tabs.tabText(i) for i in range(window.tabs.count())]
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
+
+        public_descriptions = [
+            label.text()
+            for label in window.public_tab.findChildren(QLabel)
+            if label.text().startswith("Публичный список формируется напрямую")
+        ]
+        if len(public_descriptions) != 1:
+            raise AssertionError(
+                f"public-list description lookup mismatch: {public_descriptions!r}"
+            )
+        public_description = public_descriptions[0]
+        if "НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС" not in public_description:
+            raise AssertionError(
+                f"public-list description title label mismatch: {public_description!r}"
+            )
+        if "НАЗВАНИЕ ИГРЫ" in public_description:
+            raise AssertionError("legacy public-list description title label remains")
+        public_title_header = window.public_tab.table.horizontalHeaderItem(2)
+        if public_title_header is None or public_title_header.text() != "НАЗВАНИЕ":
+            raise AssertionError(
+                "public-list table title header mismatch: "
+                f"{public_title_header.text() if public_title_header else None!r}"
+            )
+
+        public_button_texts = {
+            button.text() for button in window.public_tab.findChildren(QPushButton)
+        }
+        if "Открыть локальный JSON" in public_button_texts:
+            raise AssertionError("legacy Public List local JSON button remains")
+
+        if window.games_tab.add_btn.text() != "Добавить":
+            raise AssertionError(
+                f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
+            )
+
+        games_title_header = window.games_tab.table.horizontalHeaderItem(3)
+        if games_title_header is None or games_title_header.text() != "НАЗВАНИЕ":
+            raise AssertionError(
+                "main-list title header mismatch: "
+                f"{games_title_header.text() if games_title_header else None!r}"
+            )
+        if window.games_tab.search_btn.toolTip() != (
+            "Показать список и перейти к первой найденной записи"
+        ):
+            raise AssertionError(
+                f"main-list search tooltip mismatch: {window.games_tab.search_btn.toolTip()!r}"
+            )
+        if window.public_tab.search_btn.toolTip() != (
+            "Показать список и перейти к первой найденной записи"
+        ):
+            raise AssertionError(
+                f"public-list search tooltip mismatch: {window.public_tab.search_btn.toolTip()!r}"
+            )
+
+        if window.games_tab.list_toggle_btn.toolTip() != "Скрыть таблицу списка":
+            raise AssertionError(
+                f"list-toggle tooltip mismatch: {window.games_tab.list_toggle_btn.toolTip()!r}"
+            )
+        duplicate_error = DuplicateGameError(1, "QA")
+        if str(duplicate_error) != "Запись «QA» уже существует в списке.":
+            raise AssertionError(
+                f"duplicate fallback wording mismatch: {str(duplicate_error)!r}"
+            )
+
+        terminology_sources = {
+            PROJECT_ROOT / "streaming_manager/views/main_window.py": (
+                "Игр в восстановленной копии:",
+            ),
+            PROJECT_ROOT / "streaming_manager/db/services.py": (
+                "Не удалось создать резервную копию перед очисткой игр.",
+                "Ни одна игра не была удалена.",
+                "Игры не были удалены.",
+            ),
+        }
+        for source_path, forbidden_terms in terminology_sources.items():
+            source_text = source_path.read_text(encoding="utf-8")
+            for forbidden in forbidden_terms:
+                if forbidden in source_text:
+                    raise AssertionError(
+                        f"legacy game wording remains in {source_path.name}: {forbidden!r}"
+                    )
+
+        if window.games_tab.clear_all_btn.text() != "Очистить список":
+            raise AssertionError(
+                f"clear-list button label mismatch: {window.games_tab.clear_all_btn.text()!r}"
+            )
+
+        original_messagebox_exec = QMessageBox.exec
+        sorting_rules_capture = {}
+
+        def capture_sorting_rules_exec(box):
+            sorting_rules_capture["title"] = box.windowTitle()
+            sorting_rules_capture["text"] = box.text()
+            sorting_rules_capture["informative"] = box.informativeText()
+            return QMessageBox.Ok
+
+        QMessageBox.exec = capture_sorting_rules_exec
+        try:
+            window.games_tab.show_sorting_rules()
+        finally:
+            QMessageBox.exec = original_messagebox_exec
+
+        if sorting_rules_capture.get("title") != "Правила сортировки":
+            raise AssertionError(
+                f"sorting-rules window title mismatch: {sorting_rules_capture!r}"
+            )
+        if sorting_rules_capture.get("text") != "Автоматическая сортировка списка":
+            raise AssertionError(
+                f"sorting-rules heading mismatch: {sorting_rules_capture!r}"
+            )
+        sorting_info = sorting_rules_capture.get("informative", "")
+        for expected_text in (
+            "Сначала список распределяется по статусу:",
+            "• В режиме «Всего» сначала идут все записи вне архива",
+            "• Архивные записи располагаются отдельным блоком в самом низу",
+        ):
+            if expected_text not in sorting_info:
+                raise AssertionError(
+                    f"sorting-rules wording missing {expected_text!r}: {sorting_info!r}"
+                )
+        for legacy_text in (
+            "Сначала игры распределяются по статусу:",
+            "• В режиме «Всего» все активные игры идут первыми",
+            "• Архивные игры располагаются отдельным блоком в самом низу",
+        ):
+            if legacy_text in sorting_info:
+                raise AssertionError(
+                    f"legacy sorting-rules wording remains {legacy_text!r}"
+                )
+
+        clear_dialog = DeleteAllGamesDialog(7)
+        if clear_dialog.windowTitle() != "Очистить список":
+            raise AssertionError(
+                f"clear-list dialog title mismatch: {clear_dialog.windowTitle()!r}"
+            )
+        clear_labels = {label.text() for label in clear_dialog.findChildren(QLabel)}
+        if "Будут удалены все записи: 7" not in clear_labels:
+            raise AssertionError(f"clear-list heading mismatch: {sorted(clear_labels)!r}")
+        expected_warning = (
+            "Операция удалит обычные, архивные и временные записи. "
+            "Завершённая история аукционов и Журнал сохранятся. Перед удалением "
+            "программа автоматически создаст резервную копию текущей базы."
+        )
+        if expected_warning not in clear_labels:
+            raise AssertionError(f"clear-list warning mismatch: {sorted(clear_labels)!r}")
+        if DeleteAllGamesDialog.CONFIRM_TEXT != "УДАЛИТЬ ЗАПИСИ":
+            raise AssertionError(
+                f"clear-list confirm text mismatch: {DeleteAllGamesDialog.CONFIRM_TEXT!r}"
+            )
+        if clear_dialog.confirm_edit.placeholderText() != "УДАЛИТЬ ЗАПИСИ":
+            raise AssertionError(
+                f"clear-list placeholder mismatch: {clear_dialog.confirm_edit.placeholderText()!r}"
+            )
+        if clear_dialog.delete_button.text() != "Удалить записи":
+            raise AssertionError(
+                f"clear-list destructive button mismatch: {clear_dialog.delete_button.text()!r}"
+            )
+        clear_dialog.confirm_edit.setText("УДАЛИТЬ ЗАПИСИ ")
+        app.processEvents()
+        if clear_dialog.delete_button.isEnabled():
+            raise AssertionError("clear-list destructive button enabled for inexact confirmation")
+        clear_dialog.confirm_edit.setText("УДАЛИТЬ ЗАПИСИ")
+        app.processEvents()
+        if not clear_dialog.delete_button.isEnabled():
+            raise AssertionError("clear-list destructive button not enabled for exact confirmation")
+        clear_dialog.confirm_edit.returnPressed.emit()
+        app.processEvents()
+        if clear_dialog.result() != QDialog.Accepted:
+            raise AssertionError("clear-list Enter confirmation semantics changed")
+        clear_dialog.deleteLater()
+
+        window.games_tab.clear_all_btn.setText("Очистка…")
+        window.games_tab._clear_all_worker_finished()
+        if window.games_tab.clear_all_btn.text() != "Очистить список":
+            raise AssertionError(
+                "clear-list button reverted to legacy text after worker completion"
+            )
+
+        add_dialog = GameDialog()
+        if add_dialog.windowTitle() != "Добавить":
+            raise AssertionError(
+                f"add dialog title mismatch: {add_dialog.windowTitle()!r}"
+            )
+
+        if add_dialog.title_edit.placeholderText() != "Введите название":
+            raise AssertionError(
+                f"add dialog title placeholder mismatch: {add_dialog.title_edit.placeholderText()!r}"
+            )
+        if add_dialog.review_edit.placeholderText() != "Отзыв — можно оставить пустым":
+            raise AssertionError(
+                f"add dialog review placeholder mismatch: {add_dialog.review_edit.placeholderText()!r}"
+            )
+        add_dialog_labels = {label.text() for label in add_dialog.findChildren(QLabel)}
+        if "Новая игра" in add_dialog_labels:
+            raise AssertionError("legacy add dialog heading remains")
+        expected_add_labels = {
+            "Название:",
+            "Дата (необязательно):",
+            "Баллы (необязательно):",
+            "Кооператив:",
+            "Статус:",
+            "Отзыв (необязательно):",
+        }
+        if not expected_add_labels.issubset(add_dialog_labels):
+            raise AssertionError(
+                f"add dialog field labels mismatch: {sorted(add_dialog_labels)!r}"
+            )
+        if (
+            "Название игры:" in add_dialog_labels
+            or "Дата выхода:" in add_dialog_labels
+            or "Дата:" in add_dialog_labels
+            or "Баллы:" in add_dialog_labels
+            or "Отзыв:" in add_dialog_labels
+            or "Кооператив (необязательно):" in add_dialog_labels
+            or "Статус (необязательно):" in add_dialog_labels
+        ):
+            raise AssertionError("legacy/incorrect add dialog field labels remain")
+        if add_dialog.amount_edit.value() != 0:
+            raise AssertionError("optional points default changed from 0")
+        add_dialog.deleteLater()
+
+        edit_game = Game(
+            1,
+            "QA",
+            None,
+            0,
+            0,
+            STATUS_NOT_PLAYED,
+            "",
+            updated_at=None,
+        )
+        edit_dialog = GameDialog(game=edit_game)
+        if edit_dialog.windowTitle() != "Изменить":
+            raise AssertionError(
+                f"edit dialog title mismatch: {edit_dialog.windowTitle()!r}"
+            )
+        edit_dialog_labels = {label.text() for label in edit_dialog.findChildren(QLabel)}
+        if "Редактирование записи" in edit_dialog_labels:
+            raise AssertionError("legacy edit dialog heading remains")
+        expected_edit_labels = {
+            "Название:",
+            "Дата (необязательно):",
+            "Баллы (необязательно):",
+            "Кооператив:",
+            "Статус:",
+            "Отзыв (необязательно):",
+        }
+        if not expected_edit_labels.issubset(edit_dialog_labels):
+            raise AssertionError(
+                f"edit dialog field labels mismatch: {sorted(edit_dialog_labels)!r}"
+            )
+        if (
+            "Название игры:" in edit_dialog_labels
+            or "Дата выхода:" in edit_dialog_labels
+            or "Дата:" in edit_dialog_labels
+            or "Баллы:" in edit_dialog_labels
+            or "Отзыв:" in edit_dialog_labels
+            or "Кооператив (необязательно):" in edit_dialog_labels
+            or "Статус (необязательно):" in edit_dialog_labels
+        ):
+            raise AssertionError("legacy/incorrect edit dialog field labels remain")
+        edit_dialog.deleteLater()
+        app.processEvents()
 
         # P01 shell contract: no top-level menus remain, the replacement hint
         # is informational only, and exactly one direct MainWindow F5 action

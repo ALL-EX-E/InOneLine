@@ -4,8 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
@@ -55,7 +54,7 @@ class PublicTab(QWidget):
 
         desc = QLabel(
             "Публичный список формируется напрямую из основной локальной базы: "
-            "СТАРТ / ТЕКУЩАЯ / НАЗВАНИЕ ИГРЫ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
+            "СТАРТ / ТЕКУЩАЯ / НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
             "Независимой копии данных нет. "
             "Архивные записи в публичный список не включаются."
         )
@@ -72,7 +71,7 @@ class PublicTab(QWidget):
 
         self.search_btn = QPushButton("Найти")
         self.search_btn.setToolTip(
-            "Показать список и перейти к первой найденной игре"
+            "Показать список и перейти к первой найденной записи"
         )
         self.search_btn.clicked.connect(self.activate_search)
 
@@ -85,12 +84,8 @@ class PublicTab(QWidget):
         layout.addLayout(top)
 
         bar = QHBoxLayout()
-        # R1.0.9: file-export actions moved to Settings -> Export.
-        # Public keeps search, local API JSON access, list visibility and its
-        # dedicated public-XLSX mirror controls.
-        open_json = QPushButton("Открыть локальный JSON")
-        open_json.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/api/public")))
-        bar.addWidget(open_json)
+        # Public keeps list visibility and its dedicated public-XLSX mirror controls.
+        # /api/public remains available for external/custom integrations.
 
         self.list_toggle_btn = QPushButton("Скрыть список")
         self.list_toggle_btn.setToolTip("Скрыть или показать таблицу публичного списка")
@@ -144,7 +139,7 @@ class PublicTab(QWidget):
         layout.addLayout(public_xlsx_form)
 
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
+        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)

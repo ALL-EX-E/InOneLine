@@ -1960,8 +1960,8 @@ class ServicesMixin:
             backup_path = self.backup_isolated(backup_dir)
         except Exception as exc:
             raise RuntimeError(
-                "Не удалось создать резервную копию перед очисткой игр. "
-                "Ни одна игра не была удалена.\n\n" + str(exc)
+                "Не удалось создать резервную копию перед очисткой списка. "
+                "Ни одна запись не была удалена.\n\n" + str(exc)
             ) from exc
 
         try:
@@ -1969,7 +1969,7 @@ class ServicesMixin:
         except Exception as exc:
             raise RuntimeError(
                 "Резервная копия создана, но не удалось очистить старые копии. "
-                "Игры не были удалены.\n\n"
+                "Записи не были удалены.\n\n"
                 f"Резервная копия: {backup_path}\n\n{exc}"
             ) from exc
 
@@ -1977,7 +1977,7 @@ class ServicesMixin:
             result = self.clear_all_games()
         except Exception as exc:
             raise RuntimeError(
-                f"Игры не были удалены: {exc}\n\n"
+                f"Записи не были удалены: {exc}\n\n"
                 f"Резервная копия перед попыткой очистки: {backup_path}"
             ) from exc
 

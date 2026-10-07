@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
 
-        self.tabs.addTab(self.games_tab, "Игры")
+        self.tabs.addTab(self.games_tab, "Список")
         self.tabs.addTab(self.public_tab, "Публичный список")
         self.tabs.addTab(self.stream_tab, "Стрим / OBS")
         self.tabs.addTab(self.music_tab, "Музыка")
@@ -552,7 +552,7 @@ class MainWindow(QMainWindow):
                     "Полное восстановление завершено",
                     "Полная резервная копия успешно восстановлена.\n\n"
                     f"Исходная schema: {schema}\n"
-                    f"Игр в восстановленной копии: {games}\n\n"
+                    f"Записей в восстановленной копии: {games}\n\n"
                     "Полное состояние непосредственно перед восстановлением сохранено здесь:\n"
                     f"{safety}",
                 )
@@ -562,7 +562,7 @@ class MainWindow(QMainWindow):
                     "Восстановление завершено",
                     "Резервная копия успешно восстановлена.\n\n"
                     f"Исходная schema: {schema}\n"
-                    f"Игр в восстановленной копии: {games}\n\n"
+                    f"Записей в восстановленной копии: {games}\n\n"
                     "Состояние базы непосредственно перед восстановлением сохранено здесь:\n"
                     f"{safety}",
                 )
