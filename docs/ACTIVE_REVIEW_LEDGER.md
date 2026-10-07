@@ -101,7 +101,8 @@
     - аукцион: **`лот`**, когда речь именно об объекте аукциона;
     - сообщения о постоянной записи/сохранении/удалении: **`запись`**;
     - OBS/list widgets: **`список`**, без `список игр`.
-  - Статусы `ИГРАЛ / НЕ ИГРАЛ` сами по себе этим правилом не переименовываются: это отдельные принятые status labels, а не noun-label объекта.
+  - Статусы **`ИГРАЛ / НЕ ИГРАЛ` не переименовывать**: пользователь отдельно подтвердил 2026-10-07, что они привязаны к принятой механике сортировки/status groups. Любое будущее изменение этих status labels возможно только как отдельная явно согласованная задача с проверкой сортировки, фильтров, импорта/экспорта и зависимых бизнес-правил.
+  - Терминологические правки выполнять **только точечно по user-facing строкам** после проверки контекста. Запрещён механический массовый search/replace по `игра/игры`: сначала убедиться, что строка не является status label, parser/header alias, DB/API key, integration contract, persisted value или частью логики.
   - Внутренние классы/идентификаторы/DB/API contract (`Game`, `GamesTab`, `game_id`, `title` и т. п.) не переименовывать автоматически: это техническая совместимость, не пользовательский текст.
   - Historical release notes и архивная документация не переписываются ради косметики.
   - Legacy import/parser compatibility может продолжать принимать старые `НАЗВАНИЕ ИГРЫ` / `Название игры|Баллы`, но обычная пользовательская справка и новые файлы должны использовать нейтральное `НАЗВАНИЕ` / `Название|Баллы`.
@@ -615,7 +616,8 @@ Alan Wake 2|0
   - Fresh candidate head `4bf4c7e2a4b15837e172073098dcf5595c227e8c`; Windows regression `37594380334` — **SUCCESS**, включая Native GUI, frozen build/startup, Browser Source, installer build и silent-install.
   - V2 artifact `11470436517`: ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`; inside `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
   - Google Drive V2: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, file ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
-  - **P02 automated re-gate = PASS / AWAITING REPEAT MANUAL QA.** P02 not accepted yet; P03 blocked.
+  - Repeat manual QA 2026-10-07: пользователь подтвердил **«Всё правильно. Всё работает.»** Терминологические исправления J1/J2 приняты; отдельное уточнение — `ИГРАЛ / НЕ ИГРАЛ` оставить без изменений из-за связи с сортировкой.
+  - **P02 = MANUALLY ACCEPTED.** Следующий обязательный этап — technical closeout/clean promotion + post-merge regression; P03 не начинать до зелёного post-merge gate.
 
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
