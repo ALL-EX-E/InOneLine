@@ -2812,6 +2812,30 @@ Alan Wake 2|0
     - `AUCTION-TIMER-REVIEW-003` — сохранять ли ~1200 ms lead-in при минимальном 1-second wheel spin.
   - Эти три остаточных вопроса **не разрешают менять runtime** и должны быть вынесены пользователю отдельно до сортировки окончательной implementation queue.
 
+## 4.4 Итог сводной сверки пункта 1 — 2026-10-07
+
+- Сверены `ACTIVE_REVIEW_LEDGER.md`, `PROJECT_STATE.md`, `ROADMAP.md`, `DECISIONS.md`, `IDEA_INVENTORY.md` и exact CURRENT 1.0.8.
+- Exact runtime подтверждён как **1.0.8 / schema 19 / 15 named migrations**; product/runtime code данным проходом не менялся.
+- Исправлены stale/documentation статусы:
+  - UI-018 закрыт последующими UI-019/UI-020/UI-021;
+  - TEST-001 отмечен как `COMPLETE / MANUAL QA PASS`;
+  - BUG-007 переведён в `READY AFTER BATCH APPROVAL`;
+  - UI-055 восстановлен как уже принятое решение и переведён в `READY AFTER BATCH APPROVAL`;
+  - UI-053 сужен до единственного неразрешённого вопроса о локальной кнопке предпросмотра таймера;
+  - stale QA-1.0.8-03 wording `Требует привязки` удалён как current target; authoritative target — UI-087 `Без текста N`.
+- Зафиксированы cross-document supersession:
+  - UI-074 supersedes future-target старой shared local/OBS auction-autoscroll модели;
+  - UI-088/UI-090 supersede future-target R1.0.9 export organization;
+  - UI-044 superseded as written because `Настройки → Экспорт` удаляется; `/api/public` сохраняется;
+  - UI-087 authoritative для стандартного empty-message donation/event during running auction.
+- Исторические released-записи не переписываются как будто их не было: они сохраняются как описание CURRENT/history, но явно отделены от более позднего pending target.
+- Механическая проверка ledger: UI-001…UI-090 присутствуют без пропусков и без duplicate IDs.
+- После этой сверки осталось ровно три вопроса без прямого решения пользователя:
+  1. UI-053 — локальная кнопка `Открыть предпросмотр таймера` на странице `Аукцион`;
+  2. AUCTION-TIMER-REVIEW-002 — saved default для дополнительного времени Max Amount tie;
+  3. AUCTION-TIMER-REVIEW-003 — ~1200 ms lead-in при минимальном 1-second wheel spin.
+- QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings без implementation approval; QA-1.0.8-03 имеет approved target через UI-087.
+- Следующий шаг перед dependency sorting — закрыть эти три вопроса прямыми решениями пользователя, чтобы к ним не возвращаться позднее.
 ## 5. Известные ранее найденные проблемы, которые нельзя потерять
 
 Эти пункты уже документированы в проекте. Они не считаются новой функциональностью и не начинают исправляться автоматически:
