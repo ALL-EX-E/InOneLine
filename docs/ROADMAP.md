@@ -87,7 +87,10 @@
 - GLOBAL-TERMINOLOGY-001 is now active across the project. P02-J1/J2 remove current List/Public/general fallback wording; CSV/import terminology moves with P03; export/XLSX P05/P07; Stream/OBS P09; Auction P12/P20; integrations P18/P19; Journal P22.
 - P02-J1 commits: `a49e7a41134479675fb558df6960319f45129d3f`, `1748a31d8606a513cbcb67d9ba1035e5861d98b7`, regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
 - P02-J2 commits: `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
-- Previous P02 installer is superseded. Fresh automated gate + new manual-QA installer required; P03 remains blocked.
+- Previous P02 installer is superseded.
+- Fresh P02-J head `4bf4c7e2a4b15837e172073098dcf5595c227e8c`; Windows regression `37594380334` — **SUCCESS**.
+- V2 manual-QA ZIP: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`; installer SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
+- **P02 automated re-gate PASS; repeat manual QA pending. P03 remains blocked.**
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
