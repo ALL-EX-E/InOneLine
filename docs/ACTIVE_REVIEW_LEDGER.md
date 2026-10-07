@@ -579,6 +579,12 @@ Alan Wake 2|0
   - Existing GUI regression проверяет отсутствие legacy JSON button; commit `655dc42510cd726eaa3098ab00ded28e49958bb5`.
   - Focused diff P02-I против P02-H: только `public.py` и regression smoke; `api_server.py` в diff отсутствует.
   - P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 теперь полностью реализован в candidate; acceptance ещё не было.
+  - Candidate-wide QA: draft PR #22, head `655dc42510cd726eaa3098ab00ded28e49958bb5`; Windows regression run `37590831341` — **SUCCESS**, включая Native GUI regression core со всеми P02 focused assertions, frozen build/startup, installer build и silent-install.
+  - Separate Publication wording gate `37590831319` failed only on pre-existing docs wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md`, `PROJECT_STATE.md`; P02 runtime/new regression files не были источником failure.
+  - GitHub artifact `11469195381` / `InOneLine_1.0.8_WINDOWS_QA`; ZIP SHA-256 `4602b57a8547075fe9362f0ffa970cd7a170c8082b6755da3846c9adad95301c`.
+  - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,609,680 bytes, SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
+  - Google Drive handoff: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`, verified size 46,749,709 bytes.
+  - **P02 automated candidate gate = PASS; manual QA pending; P02 not accepted yet.**
 
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
