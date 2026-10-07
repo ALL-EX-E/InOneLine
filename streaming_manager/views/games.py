@@ -337,23 +337,23 @@ class GameDialog(QDialog):
         }
 
 class DeleteAllGamesDialog(QDialog):
-    CONFIRM_TEXT = "УДАЛИТЬ ВСЕ ИГРЫ"
+    CONFIRM_TEXT = "УДАЛИТЬ ЗАПИСИ"
 
     def __init__(self, game_count: int, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Очистить все игры?")
+        self.setWindowTitle("Очистить список")
         self.setMinimumWidth(560)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
 
-        title = QLabel(f"Будут удалены все игры: {int(game_count)}")
+        title = QLabel(f"Будут удалены все записи: {int(game_count)}")
         title.setStyleSheet("font-size: 14pt; font-weight: 700;")
         layout.addWidget(title)
 
         warning = QLabel(
-            "Операция удалит обычные, архивные и временные игровые записи. "
+            "Операция удалит обычные, архивные и временные записи. "
             "Завершённая история аукционов и Журнал сохранятся. Перед удалением "
             "программа автоматически создаст резервную копию текущей базы."
         )
@@ -372,7 +372,7 @@ class DeleteAllGamesDialog(QDialog):
         layout.addWidget(self.confirm_edit)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
-        self.delete_button = QPushButton("Удалить все игры")
+        self.delete_button = QPushButton("Удалить записи")
         self.delete_button.setProperty("danger", True)
         self.delete_button.setEnabled(False)
         buttons.addButton(self.delete_button, QDialogButtonBox.DestructiveRole)
@@ -448,7 +448,7 @@ class GamesTab(QWidget):
         self.import_help_btn = QPushButton("?")
         self.import_help_btn.setFixedWidth(34)
         self.import_help_btn.setToolTip("Правила импорта CSV")
-        self.clear_all_btn = QPushButton("Очистить все игры…")
+        self.clear_all_btn = QPushButton("Очистить список")
         self.clear_all_btn.setProperty("danger", True)
         self.clear_all_btn.setToolTip(
             "Удалить все игровые записи после подтверждения и обязательного safety-backup"
