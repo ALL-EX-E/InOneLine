@@ -41,6 +41,14 @@
 - После этого неразрешённых timer-behavior вопросов перед dependency sorting не осталось.
 - QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
 
+## Dependency reconciliation — point 2 COMPLETE
+
+- All accepted current-review decisions have been cross-checked against each other and exact CURRENT 1.0.8.
+- Supersession/precedence is now explicit in `docs/ACTIVE_REVIEW_LEDGER.md`; no unresolved logical conflict remains in the approved review target.
+- Critical shared boundaries: one position policy, one media library/availability path, one OBS visibility policy, one auction session state machine, one integration/conversion provenance pipeline, one authoritative timer/wheel start boundary.
+- Rules Overlay is the main resolved exception case: UI-060 composite template owns Rules text/appearance; GLOBAL-OBS-VISIBILITY-001 later owns widget-level show-mode; Stream/OBS does not host a second Rules settings/save copy.
+- Stop with unresolved source-auction pending does not auto-discard it: Stop closes without winner/materializes lots; later explicit Apply can credit the corresponding persistent target exactly once without reopening session state.
+- Next plan step is point 3: sort implementation so shared foundations are changed before dependent UI and each accepted change can be manually verified in isolation.
 ## Сохранённые future scope после текущего review-batch
 
 Эти пункты сохранены для будущего и **не являются следующей автоматической очередью**, пока текущий review-batch не сверён по зависимостям и не реализован/закрыт. Для каждого из них позже всё равно требуется fresh exact-CURRENT review и отдельное решение пользователя.
