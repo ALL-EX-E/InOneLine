@@ -569,3 +569,15 @@ Permanent repository gate:
 - Add a lightweight empty-area click deselect behavior for the main list.
 - Existing explicit actions that intentionally select a row remain unchanged: Enter search and `focus_game()`.
 - Search-across-filters, removal of search/reset buttons, Public search changes, and total-points counter remain later P04 scopes.
+
+
+## P04-B / BUG-003 candidate gate — PASS / AWAITING MANUAL QA
+
+- Implementation `b059d9dc997b1df6af2b75a7f73de2db9d852694`; regression head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`; draft PR #29.
+- Ordinary refresh/filter no longer auto-selects a replacement first row. Selection is restored only for the same still-visible game; otherwise selection/current cell are cleared.
+- Left click on empty main-list table space clears selection/current cell through the existing viewport and action-state logic.
+- Explicit Enter search and `focus_game()` selection are preserved.
+- Windows regression `37654068727` = SUCCESS; wording gate `37654069253` = SUCCESS.
+- Artifact `11497079107`: ZIP SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`; installer SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
+- Drive: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`, 46,766,270 bytes.
+- **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.**
