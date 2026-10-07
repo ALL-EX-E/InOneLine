@@ -579,5 +579,5 @@ Permanent repository gate:
 - Explicit Enter search and `focus_game()` selection are preserved.
 - Windows regression `37654068727` = SUCCESS; wording gate `37654069253` = SUCCESS.
 - Artifact `11497079107`: ZIP SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`; installer SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
-- Drive: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`, 46,766,270 bytes.
+- Drive: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`, 46,766,270 bytes.
 - **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.**
