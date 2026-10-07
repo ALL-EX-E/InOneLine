@@ -228,12 +228,16 @@
   - P02-C ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-013 — сократить подписи полей GameDialog — READY AFTER BATCH APPROVAL.**
+- **UI-013 — сократить подписи полей GameDialog — IMPLEMENTED IN P02-D / CANDIDATE / NOT YET ACCEPTED.**
   - В обоих режимах общего окна — добавление и редактирование:
     - `Название игры:` -> **`Название:`**;
     - `Дата выхода:` -> **`Дата:`**.
   - Меняются только видимые labels; поля, payload keys `title/release_date`, БД и формат данных сохраняются.
-  - Runtime/code пока не изменялись.
+  - Реализация P02-D 2026-10-07: видимые labels `Название игры:` -> `Название:` и `Дата выхода:` -> `Дата:`; widgets, payload keys `title/release_date`, parsing, DB/storage semantics не менялись. Commit `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`.
+  - Existing GUI regression проверяет новые labels в add/edit режимах и отсутствие legacy labels; commit `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`.
+  - Focused diff P02-D против P02-C: `games.py` 2 additions / 2 deletions + 12 regression-only additions.
+  - P02-D ещё не принят пользователем; P02 batch продолжается.
+
 
 - **BUG-002 — поля ручного ввода должны вести себя при редактировании как `Название`; поле `Дата` сейчас нарушает это правило — READY AFTER BATCH APPROVAL.**
   - Эталон поведения пользователя: поле `Название`. Если поставить caret в середину введённого значения и вставить/удалить символ, caret остаётся у места редактирования и не прыгает самопроизвольно в конец.
