@@ -652,5 +652,6 @@ This section records the latest accepted review target while preserving all hist
 - **UI-088/UI-090** supersede R1.0.9 export organization as future target: public CSV/JSON/XLSX file exports live on `Публичный список`; legacy compatible export and `Настройки → Экспорт` are removed.
 - **UI-044** is superseded as written because its destination tab is removed; `/api/public` itself remains.
 - QA-1.0.8-01 and QA-1.0.8-02 remain findings without implementation approval; QA-1.0.8-03 has an approved target through UI-087.
-- Three questions remain explicitly unresolved and must not be inferred: UI-053 timer-preview action, AUCTION-TIMER-REVIEW-002 tie-overtime saved default, AUCTION-TIMER-REVIEW-003 short-spin lead-in.
+- UI-053 is resolved: add `Открыть предпросмотр таймера` next to `Копировать URL таймера` on `Аукцион`; the same action covers Max Amount and wheel contexts via existing `/timer-overlay?preview=1`.
+- Two timer-behavior questions remain explicitly unresolved and must not be inferred: AUCTION-TIMER-REVIEW-002 tie-overtime saved default and AUCTION-TIMER-REVIEW-003 short-spin lead-in.
 
