@@ -476,7 +476,13 @@ Permanent repository gate:
 - **P02-J1** fixes the screenshot-visible List/Public terminology: commits `a49e7a41134479675fb558df6960319f45129d3f` + `1748a31d8606a513cbcb67d9ba1035e5861d98b7`; regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
 - **P02-J2** fixes remaining safe current-package wording in list-toggle, restore counts, duplicate fallback and clear-list failure messages: commits `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
 - CSV/import wording is intentionally deferred to P03 so preferred neutral headers/messages and backward-compatible aliases are changed together. Remaining terminology is routed to P05/P07, P09, P12/P20, P18/P19 and P22.
-- Previous Drive artifact `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp` is superseded for acceptance. Fresh candidate-wide regression and a new installer are required before repeat manual QA.
+- Previous Drive artifact `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp` is superseded for acceptance.
+- Fresh P02-J candidate head: `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
+- Fresh candidate-wide Windows regression run `37594380334` — **SUCCESS**. Native GUI regression, frozen build/startup, Browser Source, installer build, silent-install and artifact preservation all passed.
+- New manual-QA artifact: GitHub artifact `11470436517`; ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
+- Google Drive V2 handoff: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
+- **P02 automated re-gate = PASS / AWAITING REPEAT MANUAL QA.** P03 remains blocked until explicit P02 acceptance.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
