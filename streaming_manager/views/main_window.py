@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QWidget
+from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QTabWidget, QWidget
 
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
@@ -531,6 +531,11 @@ class MainWindow(QMainWindow):
         refresh_action.setShortcut(QKeySequence("F5"))
         refresh_action.triggered.connect(self.refresh_all)
         self.addAction(refresh_action)
+
+        self.refresh_hint_label = QLabel("F5 — обновить данные во всех разделах", self)
+        self.refresh_hint_label.setContentsMargins(8, 0, 8, 0)
+        self.refresh_hint_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.menuBar().setCornerWidget(self.refresh_hint_label, Qt.TopLeftCorner)
 
     def _show_restore_result(self):
         result = read_and_clear_restore_result(self.paths.root_dir)
