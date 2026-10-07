@@ -327,6 +327,53 @@ def main() -> int:
                     f"legacy sorting-rules wording remains {legacy_text!r}"
                 )
 
+        original_information = QMessageBox.information
+        import_help_capture = {}
+
+        def capture_import_help(parent, title, message, *args, **kwargs):
+            import_help_capture["title"] = title
+            import_help_capture["message"] = message
+            return QMessageBox.Ok
+
+        QMessageBox.information = capture_import_help
+        try:
+            window.games_tab.show_import_csv_help()
+        finally:
+            QMessageBox.information = original_information
+
+        if import_help_capture.get("title") != "Правила импорта CSV":
+            raise AssertionError(
+                f"CSV help title mismatch: {import_help_capture!r}"
+            )
+        import_help = import_help_capture.get("message", "")
+        for expected_text in (
+            "Обязательный столбец:\n• НАЗВАНИЕ",
+            "• ДАТА",
+            "• СТАТУС: ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО или ЗАБРОШЕНО",
+            "Если баллов нет, рекомендуется указать 0.",
+            "2. Формат «Название|Баллы»",
+            "Файл без заголовка, одна запись в строке:",
+            "Для совместимости также принимаются старые названия столбцов:",
+            "• НАЗВАНИЕ ИГРЫ",
+            "• ДАТА ВЫХОДА",
+            "Если в файле найдена ошибка, импорт не применяется частично.",
+        ):
+            if expected_text not in import_help:
+                raise AssertionError(
+                    f"CSV help wording missing {expected_text!r}: {import_help!r}"
+                )
+        for legacy_text in (
+            "Обязателен только столбец «НАЗВАНИЕ ИГРЫ».",
+            "Для уже существующей игры",
+            "Для новой игры",
+            "одна игра в строке",
+            "Название игры|Баллы",
+        ):
+            if legacy_text in import_help:
+                raise AssertionError(
+                    f"legacy CSV help wording remains {legacy_text!r}"
+                )
+
         clear_dialog = DeleteAllGamesDialog(7)
         if clear_dialog.windowTitle() != "Очистить список":
             raise AssertionError(
