@@ -212,6 +212,13 @@ def main() -> int:
             raise AssertionError("clear-list Enter confirmation semantics changed")
         clear_dialog.deleteLater()
 
+        window.games_tab.clear_all_btn.setText("Очистка…")
+        window.games_tab._clear_all_worker_finished()
+        if window.games_tab.clear_all_btn.text() != "Очистить список":
+            raise AssertionError(
+                "clear-list button reverted to legacy text after worker completion"
+            )
+
         add_dialog = GameDialog()
         if add_dialog.windowTitle() != "Добавить":
             raise AssertionError(
