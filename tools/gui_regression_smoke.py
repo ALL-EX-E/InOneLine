@@ -432,6 +432,59 @@ def main() -> int:
             raise AssertionError("retiring list visibility changed saved tab persistence")
         window.tabs.setCurrentWidget(window.games_tab)
         app.processEvents()
+
+        # P04-B / BUG-003: ordinary refresh/filter must not invent a new
+        # selection. Explicit Enter/focus actions remain allowed to select.
+        games_tab = window.games_tab
+        if not games_tab._select_game_row(first_id):
+            raise AssertionError("P04-B fixture could not select the first game")
+        games_tab.apply_stat_filter(STATUS_NOT_PLAYED)
+        app.processEvents()
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("P04-B status filter fixture changed unexpectedly")
+        if games_tab.selected_game_id() is not None:
+            raise AssertionError("filter refresh auto-selected a replacement row")
+        if games_tab.edit_btn.isEnabled() or games_tab.delete_btn.isEnabled():
+            raise AssertionError("no-selection action buttons stayed enabled")
+        if games_tab.archive_btn.isVisible() or games_tab.restore_btn.isVisible():
+            raise AssertionError("no-selection archive/restore action stayed visible")
+
+        games_tab.apply_stat_filter("all")
+        app.processEvents()
+        if games_tab.selected_game_id() is not None:
+            raise AssertionError("refresh invented a selection after none was selected")
+
+        games_tab.search.setText("Smoke Game A")
+        QTest.keyClick(games_tab.search, Qt.Key_Return)
+        app.processEvents()
+        if games_tab.selected_game_id() != first_id:
+            raise AssertionError("explicit Enter search stopped selecting its target")
+        games_tab.search.clear()
+        app.processEvents()
+        if games_tab.selected_game_id() != first_id:
+            raise AssertionError("refresh failed to preserve a still-visible selection")
+
+        empty_point = games_tab.table.viewport().rect().bottomRight()
+        if games_tab.table.indexAt(empty_point).isValid():
+            raise AssertionError("P04-B fixture has no empty table area to click")
+        QTest.mouseClick(
+            games_tab.table.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=empty_point,
+        )
+        app.processEvents()
+        if games_tab.selected_game_id() is not None:
+            raise AssertionError("empty-area click did not clear the current row")
+        if games_tab.edit_btn.isEnabled() or games_tab.delete_btn.isEnabled():
+            raise AssertionError("empty-area deselection left row actions enabled")
+        if games_tab.archive_btn.isVisible() or games_tab.restore_btn.isVisible():
+            raise AssertionError("empty-area deselection left archive actions visible")
+
+        # Leave the remainder of the broad smoke in the same explicit-selection
+        # state it had before BUG-003 coverage was added.
+        if not games_tab._select_game_row(first_id):
+            raise AssertionError("P04-B fixture could not restore explicit selection")
+
         duplicate_error = DuplicateGameError(1, "QA")
         if str(duplicate_error) != "Запись «QA» уже существует в списке.":
             raise AssertionError(
