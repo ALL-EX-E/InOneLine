@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -83,18 +82,6 @@ class PublicTab(QWidget):
         top.addWidget(self.count_label)
         layout.addLayout(top)
 
-        bar = QHBoxLayout()
-        # Public keeps list visibility and its dedicated public-XLSX mirror controls.
-        # /api/public remains available for external/custom integrations.
-
-        self.list_toggle_btn = QPushButton("Скрыть список")
-        self.list_toggle_btn.setToolTip("Скрыть или показать таблицу публичного списка")
-        self.list_toggle_btn.clicked.connect(self.toggle_public_list)
-        bar.addWidget(self.list_toggle_btn)
-
-        bar.addStretch()
-        layout.addLayout(bar)
-
         public_xlsx_separator = QFrame()
         public_xlsx_separator.setFrameShape(QFrame.HLine)
         public_xlsx_separator.setFrameShadow(QFrame.Sunken)
@@ -155,16 +142,6 @@ class PublicTab(QWidget):
         header.setSectionResizeMode(4, QHeaderView.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         layout.addWidget(self.table, 1)
-
-        # Как на вкладке «Игры»: при скрытом списке свободную высоту
-        # забирает растягивающий spacer, поэтому верхняя панель не деформируется.
-        self.hidden_list_spacer = QWidget()
-        self.hidden_list_spacer.setSizePolicy(
-            QSizePolicy.Expanding,
-            QSizePolicy.Expanding,
-        )
-        self.hidden_list_spacer.hide()
-        layout.addWidget(self.hidden_list_spacer, 1)
 
         self._init_public_xlsx_mirror()
         self.refresh()
@@ -389,33 +366,6 @@ class PublicTab(QWidget):
         self._public_xlsx_write_timer.stop()
         self._public_xlsx_missing_timer.stop()
 
-    def set_public_list_visible(self, visible: bool, adjust_window: bool = True):
-        # R1.0.7: visibility changes stay inside the tab and never resize the
-        # outer MainWindow. ``adjust_window`` remains only for API compatibility.
-        _ = adjust_window
-
-        self.table.setVisible(visible)
-        self.hidden_list_spacer.setVisible(not visible)
-        self.list_toggle_btn.setText(
-            "Скрыть список" if visible else "Показать список"
-        )
-        self.list_toggle_btn.setToolTip(
-            "Скрыть таблицу публичного списка"
-            if visible
-            else "Показать таблицу публичного списка"
-        )
-
-    def toggle_public_list(self):
-        self.set_public_list_visible(self.table.isHidden())
-
-    def _show_synced_lists(self):
-        """Показывает оба синхронизированных списка через главное окно."""
-        window = self.window()
-        if hasattr(window, "set_synced_lists_visible"):
-            window.set_synced_lists_visible(True)
-        else:
-            self.set_public_list_visible(True)
-
     def _search_text_changed(self, text: str):
         """Refresh through MainWindow so hidden synchronized tables stay lazy."""
         window = self.window()
@@ -457,12 +407,9 @@ class PublicTab(QWidget):
         return False
 
     def activate_search(self):
-        """Показывает список и переходит к первой строке результата поиска."""
+        """Переходит к первой строке результата поиска."""
         query = self.search.text().strip()
 
-        # Как на вкладке «Игры»: Enter и кнопка «Найти» открывают
-        # обе синхронизированные таблицы.
-        self._show_synced_lists()
         self.refresh()
 
         if self.table.rowCount() == 0:
