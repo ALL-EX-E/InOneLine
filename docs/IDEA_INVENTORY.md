@@ -663,3 +663,10 @@ This section records the latest accepted review target while preserving all hist
 - UI-025 (remove `Скрыть список / Показать список`) is **MANUALLY ACCEPTED** on candidate head `3cdff95129d012729d1cfc8c7a74f4050f3231d0`.
 - The complete manual checklist passed: both tables visible, no hide/show buttons, no resize on tab switching, Enter navigation/sync preserved, F5 preserves visibility, restart preserves geometry/tab with both tables visible.
 - P04-A is not yet technically closed until clean promotion + merge + post-merge regression succeed. Remaining P04 search/filter/selection/total-points items are unchanged and have not been bundled into P04-A.
+
+
+# XXIII. P04-A closed; P04-B selected — 2026-10-07
+
+- UI-025 is fully closed after manual acceptance, clean promotion PR #28, merge `fddf49014ffb34ff48c6871027a817f1453edb9e`, and exact post-merge regression `37653013085` + wording `37653013097`.
+- Candidate PR #27 is historical and closed without merge.
+- The next isolated implementation item is BUG-003 only. Other accepted P04 ideas remain unchanged and unimplemented in this step.
