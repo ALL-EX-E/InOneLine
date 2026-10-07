@@ -436,6 +436,13 @@ Permanent repository gate:
 - Separate Publication wording gate `37586507550` failed on the already-known documentation wording issue; it did not invalidate the Windows runtime regression.
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - P02 is now unblocked.
+
+## P02 candidate progress — A complete — 2026-10-07
+- Branch: `candidate/p02-list-public-labels`.
+- **P02-A / UI-010** implementation commit `f6481b6668019b45af3d9d11040117baf2868f4c`: visible main tab label `Игры` -> `Список` only; internal `GamesTab/games_tab`, DB/API semantics and behavior unchanged.
+- Regression expectation commit `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`: existing GUI smoke now expects `Список`.
+- Diff against `main`: exactly 2 files, each 1 addition / 1 deletion; no other product changes.
+- **P02 is not accepted yet.** Next small step: UI-011 (`Добавить игру` -> `Добавить`).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
