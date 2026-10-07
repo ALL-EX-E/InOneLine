@@ -430,7 +430,9 @@ Permanent repository gate:
 - Google Drive handoff completed: `InOneLine_P01_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive file ID `1VvMjue9GOFet2XSN8PpttBkX1nyB03Gk`, verified size `46756638` bytes, stored in folder `Программа для стриминга`; ZIP contains `InOneLine_Setup_1.0.8.exe`.
 - Extracted installer: `InOneLine_P01_CANDIDATE_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
 - Product runtime remained the P01 candidate; the later branch commit only synchronized CI artifact-preservation infrastructure.
-- P01 automated candidate gate — **PASS**. Manual QA accepted by user on 2026-10-07: top `Файл`/`Вид` menus absent; F5 produced no error and its non-visual refresh behavior was accepted. **P01 = MANUALLY ACCEPTED**. Technical closeout/merge and post-merge regression follow before P02.
+- P01 automated candidate gate — **PASS**. Manual QA accepted by user on 2026-10-07: top `Файл`/`Вид` menus absent; F5 produced no error and its non-visual refresh behavior was accepted. **P01 = MANUALLY ACCEPTED**.
+- PR #19 merged into `main`: `d40c0dc7798aae3c9d7a8d7b8faab97756e06512`.
+- Post-merge regression: QA-only PR #21, run `37586507639` — IN PROGRESS. P02 remains blocked until PASS.
 - Manual QA observation (2026-10-07): user confirmed top File/View menus are absent. User pressed F5; no visible change was noticed and no error occurred. This is consistent with current `refresh_all()` behavior because it reloads the same data and `_update_status_bar()` hides/clears the status bar; automated P01 regression already proves the sole F5 action invokes the existing refresh path exactly once. Awaiting explicit user acceptance.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
