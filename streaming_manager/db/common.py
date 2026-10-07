@@ -96,7 +96,7 @@ class DuplicateGameError(ValueError):
     def __init__(self, existing_id: int, existing_title: str):
         self.existing_id = existing_id
         self.existing_title = existing_title
-        super().__init__(f"Игра «{existing_title}» уже существует в списке.")
+        super().__init__(f"Запись «{existing_title}» уже существует в списке.")
 
 
 RUSSIAN_MONTHS = {
