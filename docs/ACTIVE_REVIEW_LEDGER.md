@@ -1940,7 +1940,7 @@ Alan Wake 2|0
       - outside-auction usable-title path при apply создаёт/reuses normal persistent game по existing normalized-title rules;
       - running-auction usable-title path может примениться к exact still-running source session по existing B3 rules;
       - если event было source-time привязано к этой auction session до 00:00, UI-086 сохраняет эту принадлежность и разрешает его позднее manual apply в post-00:00 correction phase до irreversible finalize; новый/current другой аукцион никогда не должен захватывать это event;
-    - Не смешивать это с отдельным accepted QA-1.0.8-03 state `Требует привязки`: там usable target вообще отсутствует.
+    - Не смешивать usable-title pending с provider-specific edge cases, где вообще нет безопасно представимого lot-targeted target. После UI-087 стандартное пустое donation/event во время running auction к такому manual-binding случаю **не относится** и получает `Без текста N`.
 
   - **5. Добавить время события в `Ожидают применения`.**
     - Добавить колонку **`Время`**.
