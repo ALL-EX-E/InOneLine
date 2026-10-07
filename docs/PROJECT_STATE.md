@@ -489,6 +489,13 @@ Permanent repository gate:
 - Post-merge QA-only PR #24 from the exact merge commit completed Regression Foundation run `37597234911` — **SUCCESS** and was closed without merge. Historical candidate PR #22 also closed without merge.
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P03 is now unblocked.** GLOBAL-TERMINOLOGY-001 remains active, with `ИГРАЛ / НЕ ИГРАЛ` explicitly protected.
+
+## P03 candidate progress — A complete — 2026-10-07
+- Branch: `candidate/p03-csv-date-caret`.
+- **P03-A / UI-021** implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`: CSV importer now accepts canonical headers `НАЗВАНИЕ` and `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` and `ДАТА ВЫХОДА` remain accepted. Existing `БАЛЛЫ`, `БАЛЛЫ SM`, `СУММА`, `КООП/НЕ КООП`, `СТАТУС`, `ОТЗЫВ` behavior is unchanged. `ИГРАЛ / НЕ ИГРАЛ` status values are untouched.
+- P03-A regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`: existing GUI smoke uses an isolated DB to verify both neutral headers and legacy aliases map title/date/points correctly.
+- Focused diff from `main`: `streaming_manager/db/services.py` + `tools/gui_regression_smoke.py` only.
+- **P03 is not accepted yet.** Next small step: UI-020 CSV help text.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
