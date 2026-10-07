@@ -406,7 +406,7 @@ Permanent repository gate:
 ## Dependency reconciliation complete — 2026-10-07
 
 - Point 2 of the post-review plan is complete: all accepted UI/BUG/GLOBAL/timer decisions were cross-checked for shared backend dependencies, supersession and ordering hazards.
-- Final precedence corrections include: UI-025 over old hidden-list Enter behavior; UI-043 over stale `Локальный API` undecided text; UI-060 over the old Rules separate-style/save model; GLOBAL-OBS-VISIBILITY-001 over the earlier Rules no-program-visibility rule; AUCTION-TIMER-REVIEW-003 over the old unresolved short-spin lead-in note.
+- Final precedence corrections include: UI-025 over old hidden-list Enter behavior; UI-043 over stale `Локальный API` undecided text; UI-060 over the old Rules model with separate formatting and save actions; GLOBAL-OBS-VISIBILITY-001 over the earlier Rules no-program-visibility rule; AUCTION-TIMER-REVIEW-003 over the old unresolved short-spin lead-in note.
 - Rules final boundary: one composite rules template for text/appearance, no duplicate Rules settings in Stream/OBS, common widget show-mode remains a separate widget-level persisted policy, preview stays override.
 - Timer final boundary: ~1.2 s preparation is outside configured duration; actual timer/wheel/audio start is synchronized; source-time auction membership begins at the actual Max Amount/overtime start boundary; re-entry is blocked during preparation.
 - Max Amount/Conversion final dependency: pre-close pending gates irreversible result; post-close new events use persistent path; Stop remains no-winner emergency exit and does not implicitly discard pending events.
@@ -509,7 +509,7 @@ Permanent repository gate:
 - Manual-QA artifact: GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`.
 - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
 - Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified ZIP size 46,755,018 bytes.
-- **P03 automated candidate gate = PASS / AWAITING MANUAL QA.** P03 is not accepted yet.
+- **P03 automated candidate gate = PASS; user manual QA = PASS / ACCEPTED.** Merge and post-merge regression are pending.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
@@ -531,3 +531,12 @@ Permanent repository gate:
 Новые product features временно приостановлены по прямому решению пользователя. Текущий рабочий протокол и накопительная очередь замечаний находятся в `docs/ACTIVE_REVIEW_LEDGER.md`.
 
 Правило этапа: сначала разбор скриншота и запись замечаний без изменения runtime; реализация начинается только после команды пользователя **«всё делаем»**. После неё задачи сортируются по сложности/зависимостям и выполняются по одной; после каждого исправления обязательна отдельная ручная проверка пользователя. Existing-first/minimal-diff/stability-first invariant сохраняется.
+
+## P03 manual acceptance and current handoff
+
+- User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
+- Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
+- Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
+- **P03 = MANUALLY ACCEPTED / AWAITING MERGE AND POST-MERGE REGRESSION. P04 is not started yet.**
+
+- Current manual-QA format: issue the complete current-package checklist in one message; do not repeat already accepted scenarios without a reason. Other latest workflow and terminology rules remain active.

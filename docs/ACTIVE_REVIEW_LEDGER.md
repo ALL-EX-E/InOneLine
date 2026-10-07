@@ -25,6 +25,8 @@
 9. После каждого исправления пользователь вручную проверяет программу.
 10. Следующая задача начинается только после результата ручной проверки текущей задачи и явного принятия/указания на дальнейший фикс.
 
+**Формат ручной проверки — последнее решение пользователя:** весь чек-лист текущего candidate-пакета выдавать сразу целиком, с действиями и ожидаемыми результатами. Прежнее предпочтение выдавать по одному сценарию отменено. Уже подтверждённые сценарии отмечать PASS и не повторять без причины. Реализация по одному согласованному пакету, переиспользование существующего, стабильность, запись результатов и приёмка перед следующим пакетом сохраняются.
+
 ## 2. Постоянное инженерное правило этого этапа
 
 Для любого исправления действует прежний принцип проекта:
@@ -263,7 +265,7 @@
   - P02-D ещё не принят пользователем; P02 batch продолжается.
 
 
-- **BUG-002 — поля ручного ввода должны вести себя при редактировании как `Название`; поле `Дата` сейчас нарушает это правило — IMPLEMENTED IN P03-D / CANDIDATE / NOT YET ACCEPTED.**
+- **BUG-002 — поля ручного ввода должны вести себя при редактировании как `Название`; поле `Дата` сейчас нарушает это правило — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
   - Эталон поведения пользователя: поле `Название`. Если поставить caret в середину введённого значения и вставить/удалить символ, caret остаётся у места редактирования и не прыгает самопроизвольно в конец.
   - Это правило применяется к редактируемым полям GameDialog в обоих режимах — `Добавить` и `Изменить`: программная обработка не должна ломать обычные cursor/selection semantics поля ввода.
   - Repro для текущего дефекта: в существующей дате поставить caret между символами, удалить цифру — caret автоматически переносится в конец.
@@ -278,7 +280,8 @@
   - GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`; inside `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
   - Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified size 46,755,018 bytes.
   - Separate wording gate `37633288273` remains the known docs-only finding; P03 runtime/regression files are not cited.
-  - **P03 automated candidate gate = PASS / AWAITING MANUAL QA.**
+  - **P03 automated candidate gate = PASS; full user manual QA = PASS / ACCEPTED.**
+  - Прямое подтверждение на полный чек-лист: «Работает. Идём дальше.» Приёмка включает все CSV/help/error/atomicity/backup и date-editing сценарии; P03 ждёт merge и post-merge regression.
 
 
 - **UI-014 — поле `Баллы`: текущий 9-значный лимит сохранить — CANCELLED / PRESERVE CURRENT LIMIT.**
@@ -337,7 +340,7 @@
   - Пользовательская ручная проверка подтверждена 2026-10-03; результаты стали основанием для UI-019/UI-020/UI-021.
   - Runtime/code не изменялись.
 
-- **UI-019 — привести сообщения об ошибках CSV-импорта к единому понятному стилю — IMPLEMENTED IN P03-C / CANDIDATE / NOT YET ACCEPTED.**
+- **UI-019 — привести сообщения об ошибках CSV-импорта к единому понятному стилю — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
   - Основание: ручная проверка TEST-001 подтверждена пользователем 2026-10-03.
   - Ошибки duplicate title, invalid status, invalid coop и legacy missing points сейчас функционально корректны, но часть формулировок слишком техническая/не объясняет, что исправить.
   - Ошибки invalid date, invalid points и missing required header по смыслу понятны; их также привести к общему стилю без ухудшения конкретики.
@@ -348,10 +351,10 @@
   - Реализация P03-C 2026-10-07: duplicate/status/coop/date/points/missing-header/legacy `Название|Баллы` ошибки приведены к единой структуре `что не так -> строка/значение -> как исправить`. Commit `0f7f8b24b3b702607b9c1ef4b167745f714230c7`.
   - Duplicate validation теперь хранит номер первой строки только для более понятного сообщения; parsed payload, transaction/atomicity и merge semantics не менялись.
   - Existing GUI regression автоматизирует TEST-001 error scenarios, сохраняет allowed statuses `ПРОХОДИТСЯ / НЕ ИГРАЛ / ИГРАЛ / ПРОЙДЕНО / ЗАБРОШЕНО`, проверяет `0` guidance, safety-backup path и full-file atomicity; commits `2230c10a06a986389bff3ab546afbe011368730c` + `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`.
-  - P03-C ещё не принят пользователем; P03 batch продолжается.
+  - P03-C принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
 
 
-- **UI-020 — переписать окно `Правила импорта CSV` в более понятном пользовательском стиле — IMPLEMENTED IN P03-B / CANDIDATE / NOT YET ACCEPTED.**
+- **UI-020 — переписать окно `Правила импорта CSV` в более понятном пользовательском стиле — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
   - Решение пользователя: справка должна быть короче, единообразнее и прямо объяснять обязательные/необязательные поля и допустимые значения.
   - Везде, где возможно, использовать **`Название`** вместо `Название игры`.
   - Для баллов явно рекомендовать `0`, если баллов нет; в legacy `Название|Баллы` значение после `|` обязательно.
@@ -416,10 +419,10 @@ Alan Wake 2|0
   - Реализация P03-B 2026-10-07: окно `Правила импорта CSV` переписано по утверждённому draft — canonical `НАЗВАНИЕ`/`ДАТА`, явные optional fields, рекомендация/требование `0` для баллов, нейтральное `запись`, legacy aliases только в compatibility section, backup + atomicity explanation. Commit `a70f00688650638ff2173ba942b418db26ba8201`.
   - Parser/import mechanics на этом шаге не менялись.
   - Existing GUI regression перехватывает actual help QMessageBox и проверяет canonical wording, compatibility aliases, отсутствие старых user-facing phrases и сохранение status labels `НЕ ИГРАЛ / ИГРАЛ`; commit `ec74bed827edaa675f6360dd703326e442f38ee9`.
-  - P03-B ещё не принят пользователем; P03 batch продолжается.
+  - P03-B принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
 
 
-- **UI-021 — подогнать CSV importer под новые пользовательские заголовки без потери обратной совместимости — IMPLEMENTED IN P03-A / CANDIDATE / NOT YET ACCEPTED.**
+- **UI-021 — подогнать CSV importer под новые пользовательские заголовки без потери обратной совместимости — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
   - Основные новые headers: `НАЗВАНИЕ` и `ДАТА`.
   - Старые `НАЗВАНИЕ ИГРЫ` и `ДАТА ВЫХОДА` должны продолжать приниматься как aliases, чтобы существующие CSV не сломались.
   - `БАЛЛЫ` остаётся основным header; legacy aliases `БАЛЛЫ SM` и `СУММА` сохраняются.
@@ -429,7 +432,7 @@ Alan Wake 2|0
   - Реализация P03-A 2026-10-07: importer принимает canonical headers `НАЗВАНИЕ` и `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` / `ДАТА ВЫХОДА` сохраняются. `БАЛЛЫ`, `БАЛЛЫ SM`, `СУММА`, `КООП/НЕ КООП`, `СТАТУС`, `ОТЗЫВ` не менялись. Commit `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`.
   - Existing GUI regression на isolated DB проверяет новый и legacy варианты и соответствие title/date/points; commit `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
   - `ИГРАЛ / НЕ ИГРАЛ` status labels/values не менялись.
-  - P03-A ещё не принят пользователем; P03 batch продолжается.
+  - P03-A принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
 
 
 - **UI-022 — переименовать и упростить сценарий полной очистки списка — IMPLEMENTED IN P02-F / CANDIDATE / NOT YET ACCEPTED.**
@@ -1298,7 +1301,7 @@ Alan Wake 2|0
       - локальным live-preview оформления Rules Overlay;
     - `Сделать активным` активирует весь комплект целиком; live Rules Overlay сразу получает и текст, и оформление выбранного шаблона;
     - отдельной связи rules-template → reusable style-preset больше нет;
-    - прежние решения о двух selector'ах, отдельной библиотеке style presets и отдельном active-style state считать **SUPERSEDED**.
+    - прежние решения о двух selector'ах, отдельной библиотеке style presets и отдельном состоянии активного оформления считать **SUPERSEDED**.
   - DESIGN DECISION 2026-10-05 / shared Save + Activate actions — ACCEPTED:
     - не делать отдельные кнопки `Сохранить` для текста правил и для OBS-оформления;
     - не делать отдельные кнопки `Сделать активным` для двух строк шаблонов;
@@ -1355,7 +1358,7 @@ Alan Wake 2|0
   - DESIGN DECISION 2026-10-05 / local Rules Overlay preview — ACCEPTED:
     - большое поле редактора правил должно остаться редактируемым, но одновременно стать локальным live-preview конечного Rules Overlay;
     - в нём сразу отображаются не только rich-text параметры текста, но и presentation выбранного OBS-оформления: фон, прозрачность, media background, glow/контур, скругление и фактическая раскладка текста;
-    - принцип переиспользовать по аналогии с локальным AuctionWheelWidget: одна модель данных/состояния должна кормить локальный preview и Browser Source, без отдельной параллельной логики оформления;
+    - переиспользовать существующий локальный AuctionWheelWidget: одна модель данных/состояния должна кормить локальный preview и Browser Source, без отдельной параллельной логики оформления;
     - browser preview остаётся дополнительной контрольной проверкой реального Browser Source, а не основным рабочим окном настройки.
   - DESIGN REVIEW 2026-10-05 / custom background:
     - при переносе настроек Rules Overlay в редактор обязательно рассмотреть режим `Свой фон` по тому же принципу, что у основного overlay;
@@ -1363,7 +1366,7 @@ Alan Wake 2|0
     - selector должен видеть те же доступные background assets, что основной overlay/другие потребители общей категории;
     - добавление нового фона должно переиспользовать существующий managed/external import flow: `Копировать в программу` либо `Использовать исходный файл`;
     - missing-file/availability semantics должны совпадать с уже принятым UI-039/BUG-005 поведением общей media library, без отдельной repair-системы для Rules Overlay;
-    - выбранный custom background является частью reusable OBS-style preset и должен сразу отображаться в локальном preview редактора;
+    - выбранный custom background является частью переиспользуемого пресета оформления OBS и должен сразу отображаться в локальном preview редактора;
     - конкретную компоновку controls `Прозрачный / Цвет / Свой` и opacity в редакторе продолжаем разбирать; этот подпункт пока не закрыт.
   - DESIGN DECISION 2026-10-05 / text-format toolbar — ACCEPTED:
     - в строке форматирования текста сохранить текущие controls: стиль/тип текста, выбор шрифта, размер, увеличение/уменьшение размера, жирный, курсив, подчёркивание;
@@ -1695,7 +1698,7 @@ Alan Wake 2|0
   - **1. Исправить белые alternating rows — BUG / READY AFTER BATCH APPROVAL.**
     - Exact CURRENT причина: `LogTab` использует `QTableView + QAbstractTableModel` и `setAlternatingRowColors(True)`, но общий dark stylesheet задаёт `background / alternate-background-color / selection...` только selector-у `QTableWidget`.
     - Поэтому alternating `QTableView` берёт системный Windows `AlternateBase`, который на пользовательской системе получается почти белым.
-    - Исправление: распространить общий table-style на **`QTableView`** теми же dark colors, которые применяются к `QTableWidget`.
+    - Исправление: распространить общее оформление таблиц на **`QTableView`** теми же dark colors, которые применяются к `QTableWidget`.
     - Чередование строк сохранить: обычная тёмная / немного более светлая тёмная.
     - Не добавлять отдельную уникальную тему только для Journal; использовать один общий table style, чтобы будущие `QTableView` не повторили дефект.
   - **2. Обновить устаревшее описание вкладки.**
@@ -2481,7 +2484,7 @@ Alan Wake 2|0
   - При выборе `Использовать колесо` без допвремени:
     - участвуют только лоты, которые делят максимальную сумму в момент возникновения этой ничьей;
     - остальные лоты не возвращаются в tie-wheel;
-    - tie-wheel остаётся equal-chance между лидерами, как в current accepted behavior.
+    - tie-wheel остаётся equal-chance между лидерами с сохранением текущей принятой механики.
   - Реализация должна переиспользовать текущую session/auction_entries state-machine: не создавать отдельную «вторую сессию» для допвремени.
   - Runtime/code пока не изменялись.
 
@@ -2805,7 +2808,7 @@ Alan Wake 2|0
   - Persistence должна переиспользовать существующий механизм настроек/overlay settings; отдельную параллельную систему хранения не создавать.
   - Runtime/code пока не изменялись.
 
-- **UI-057 — блок `Ставки / История` оставить постоянно видимым как в current 1.0.8 — EXISTING / PRESERVE.**
+- **UI-057 — блок `Ставки / История` оставить постоянно видимым с сохранением поведения current 1.0.8 — EXISTING / PRESERVE.**
   - Решение пользователя 2026-10-06 — ACCEPTED / REFINED: прежнее решение о conditional hiding **ОТМЕНЕНО**.
   - Для этого блока сделать явное исключение из общего GLOBAL-UI-001: activity-panel **не скрывать ни до старта, ни после завершения аукциона**.
   - Сохранить current layout и обе вкладки `Ставки` + `История` постоянно видимыми.
@@ -2989,7 +2992,7 @@ Alan Wake 2|0
 - UI-049 и UI-055 должны переиспользовать один help/dialog content pattern для OBS audio explanation, а не две независимые справки.
 
 ### F. Rules Overlay — resolved precedence
-- UI-060 полностью supersedes раннюю separate-style-template модель UI-048: существует один composite `Шаблон правил` (text + rich text + OBS appearance).
+- UI-060 полностью supersedes раннюю модель отдельного шаблона оформления UI-048: существует один composite `Шаблон правил` (text + rich text + OBS appearance).
 - Generic UI-042 для Rules применяется **в редакторе правил**, где находятся actual settings; в `Стрим / OBS` остаётся только compact access, без второй копии Rules settings/save.
 - Старый `Сохранить виджет правил` не нужен: общая `Сохранить` composite template сохраняет text + appearance.
 - Поздний GLOBAL-OBS-VISIBILITY-001 supersedes UI-060 только в одном аспекте: старый checkbox `Показывать правила в OBS` не возвращается, но `/rules-overlay` получает общий persisted `Показ виджета` show-mode. Это widget-level policy, не второй boolean и не часть composite style state; preview остаётся override.
@@ -3481,3 +3484,12 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Если выясняется, что функция из реестра больше не существует или была superseded, не удалять её молча: сначала сверить `IDEA_INVENTORY.md`/историю/код и записать причину изменения.
 - Каждый принятый фикс после ручной проверки должен обновлять соответствующую запись задачи, а при изменении durable behavior — канонические project docs.
 - Перед ответом пользователю в рамках этого этапа сначала читать этот ledger, затем при необходимости `PROJECT_STATE.md`, `ROADMAP.md`, `DECISIONS.md`, `IDEA_INVENTORY.md` и текущий код.
+
+## P03 manual acceptance and complete-checklist rule
+
+- User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
+- Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
+- Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
+- **P03 = MANUALLY ACCEPTED / AWAITING MERGE AND POST-MERGE REGRESSION. P04 is not started yet.**
+
+- Publication wording preflight: ten existing documentation phrases were reworded without changing their contracts; no runtime or gate logic was modified.

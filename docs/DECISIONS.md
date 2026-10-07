@@ -383,3 +383,11 @@ The full tab-by-tab UI/function review is complete. Runtime remains exact CURREN
 - **AUCTION-TIMER-REVIEW-002 final user decision, 2026-10-07:** tie additional time after Max Amount uses the saved **Max Amount default duration**, not the wheel-duration default. Pending-overtime `Сбросить` returns that same Max Amount default. Do not create a separate overtime setting; preserve manual editing before `Старт`. Current 1.0.8 does not yet match this target.
 - **AUCTION-TIMER-REVIEW-003 final user decision, 2026-10-07:** keep the ~1.2 s delay as a technical preparation lead-in after `Старт` / `Крутить`; it is outside the user-configured duration. Until the lead-in ends, the timer remains at full duration, wheel motion has not started, and soundtrack has not started. At the common authoritative start boundary, timer + applicable local/OBS wheel animation + soundtrack begin together. A 1-second wheel therefore still receives a full 1-second actual spin after preparation. Repeated start/spin actions during lead-in must be prevented from creating duplicate starts/RNG/audio. No timer-review question remains unresolved.
 - **QA findings:** QA-1.0.8-01 and QA-1.0.8-02 remain documented findings without implementation approval. QA-1.0.8-03 now has an approved target through UI-087 and waits for the future review-batch implementation command.
+
+## Complete manual checklist per current candidate package
+
+- Direct latest user instruction: «И ручную проверку можешь скидывать всю полностью сразу и работаем по ранее установленным последним правилам.»
+- Issue the complete current-package manual checklist together, with actions and expected results. This supersedes the former one-scenario-at-a-time preference.
+- Already accepted scenarios are not repeated without a reason; implementation remains one agreed small scope at a time, reuse-first, stability-first, with recorded outcomes and manual acceptance before the next package.
+- The later reply «Работает. Идём дальше.» to the complete P03 checklist accepts that checklist in full. It does not remove automated merge/post-merge gates.
+- Preserve `ИГРАЛ / НЕ ИГРАЛ` and targeted terminology-only edits; parser/DB/API/status/sort/integration contracts remain protected.
