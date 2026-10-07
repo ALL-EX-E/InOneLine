@@ -195,6 +195,25 @@ def main() -> int:
                 f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
             )
 
+        games_title_header = window.games_tab.table.horizontalHeaderItem(3)
+        if games_title_header is None or games_title_header.text() != "НАЗВАНИЕ":
+            raise AssertionError(
+                "main-list title header mismatch: "
+                f"{games_title_header.text() if games_title_header else None!r}"
+            )
+        if window.games_tab.search_btn.toolTip() != (
+            "Показать список и перейти к первой найденной записи"
+        ):
+            raise AssertionError(
+                f"main-list search tooltip mismatch: {window.games_tab.search_btn.toolTip()!r}"
+            )
+        if window.public_tab.search_btn.toolTip() != (
+            "Показать список и перейти к первой найденной записи"
+        ):
+            raise AssertionError(
+                f"public-list search tooltip mismatch: {window.public_tab.search_btn.toolTip()!r}"
+            )
+
         if window.games_tab.clear_all_btn.text() != "Очистить список":
             raise AssertionError(
                 f"clear-list button label mismatch: {window.games_tab.clear_all_btn.text()!r}"
@@ -295,6 +314,15 @@ def main() -> int:
         if add_dialog.windowTitle() != "Добавить":
             raise AssertionError(
                 f"add dialog title mismatch: {add_dialog.windowTitle()!r}"
+            )
+
+        if add_dialog.title_edit.placeholderText() != "Введите название":
+            raise AssertionError(
+                f"add dialog title placeholder mismatch: {add_dialog.title_edit.placeholderText()!r}"
+            )
+        if add_dialog.review_edit.placeholderText() != "Отзыв — можно оставить пустым":
+            raise AssertionError(
+                f"add dialog review placeholder mismatch: {add_dialog.review_edit.placeholderText()!r}"
             )
         add_dialog_labels = {label.text() for label in add_dialog.findChildren(QLabel)}
         if "Новая игра" in add_dialog_labels:
