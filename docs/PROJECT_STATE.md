@@ -421,6 +421,9 @@ Permanent repository gate:
 - P01-C `0845c3c624edd907acd68a0f7e5f669f5b96a0f4`: added non-clickable `F5 — обновить данные во всех разделах` label in the existing menu-bar area.
 - P01-D `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`: added focused shell assertions to the existing GUI regression smoke for no menus, exact/noninteractive hint, exactly one F5 action and real `refresh_all()` dispatch.
 - Candidate source diff now contains `streaming_manager/views/main_window.py` plus `tools/gui_regression_smoke.py`; product/runtime behavior is still changed only in `main_window.py`.
+- P01-E QA trigger: draft PR #19 opened only to run existing PR-gated automation against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; no merge/publication authorized.
+- Main Windows regression run: `37582729729`, job `112665869659` — **IN PROGRESS** at recording time.
+- Automatic `Publication wording gate` run `37582729787` failed on pre-existing documentation wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md` and `PROJECT_STATE.md`; no P01 runtime/new-regression file was cited, so this is recorded separately and not patched inside P01.
 - P01 is **not accepted yet**: automated candidate checks + user manual QA remain.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
