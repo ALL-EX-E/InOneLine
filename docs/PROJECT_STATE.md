@@ -413,6 +413,14 @@ Permanent repository gate:
 - UI-088/UI-090 final export boundary: public file exports move to Public List; Settings Export and legacy compatible-export UI disappear; `/api/public` remains but has no new visible access point in this batch.
 - QA-1.0.8-01/02 remain outside the implementation batch unless separately approved.
 - No unresolved logical conflict remains inside the accepted current-review target. Point 3 can now sort implementation by shared foundations/dependencies.
+## P00 exact baseline verification — PASS — 2026-10-07
+
+- Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
+- No runtime/source change occurred during P00.
+- Accepted A9 runtime anchor is `74ad16c5772d5cc191f7e307203b6a574af7815c`; post-A9 changes before this gate were documentation/README only.
+- Permanent Windows regression was freshly rerun: run `36972339831`, fresh job `112658659175`, conclusion **success**.
+- Key green areas: compile, fresh DB integrity, native GUI, frozen startup/Browser Source, full backup/restore and rollback, A9 UI-state migration/single-instance, media/filesystem, Inno Setup and silent-install startup/filesystem.
+- CURRENT 1.0.8 is therefore the verified rollback/reference baseline for the first implementation candidate P01.
 ## Implementation planning complete — 2026-10-07
 
 - Point 3 is complete: the accepted review batch is sorted into P00–P22 + FINAL GATE in dependency order.
