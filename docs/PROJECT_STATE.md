@@ -490,12 +490,14 @@ Permanent repository gate:
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P03 is now unblocked.** GLOBAL-TERMINOLOGY-001 remains active, with `ИГРАЛ / НЕ ИГРАЛ` explicitly protected.
 
-## P03 candidate progress — A complete — 2026-10-07
+## P03 candidate progress — A/B complete — 2026-10-07
 - Branch: `candidate/p03-csv-date-caret`.
-- **P03-A / UI-021** implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`: CSV importer now accepts canonical headers `НАЗВАНИЕ` and `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` and `ДАТА ВЫХОДА` remain accepted. Existing `БАЛЛЫ`, `БАЛЛЫ SM`, `СУММА`, `КООП/НЕ КООП`, `СТАТУС`, `ОТЗЫВ` behavior is unchanged. `ИГРАЛ / НЕ ИГРАЛ` status values are untouched.
-- P03-A regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`: existing GUI smoke uses an isolated DB to verify both neutral headers and legacy aliases map title/date/points correctly.
-- Focused diff from `main`: `streaming_manager/db/services.py` + `tools/gui_regression_smoke.py` only.
-- **P03 is not accepted yet.** Next small step: UI-020 CSV help text.
+- **P03-A / UI-021** implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`: CSV importer accepts canonical headers `НАЗВАНИЕ` and `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` and `ДАТА ВЫХОДА` remain accepted. Existing points/coop/status/review semantics are unchanged and `ИГРАЛ / НЕ ИГРАЛ` values are untouched.
+- P03-A regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`: isolated DB verifies new and legacy title/date headers map correctly.
+- **P03-B / UI-020** implementation `a70f00688650638ff2173ba942b418db26ba8201`: rewrites only `Правила импорта CSV` using the accepted user-facing draft: canonical `НАЗВАНИЕ / ДАТА`, explicit optional fields, `0` guidance, neutral `запись` wording, legacy aliases listed only in the compatibility section, and atomic-import/backup explanation. Parser logic is unchanged in this step.
+- P03-B regression `ec74bed827edaa675f6360dd703326e442f38ee9`: captures the actual help QMessageBox; verifies canonical wording, compatibility aliases, preserved `НЕ ИГРАЛ / ИГРАЛ` status labels, and absence of old user-facing phrases.
+- Focused P03-B diff versus P03-A: `games.py` help text + regression-only changes.
+- **P03 is not accepted yet.** Next small step: UI-019 CSV error wording.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
