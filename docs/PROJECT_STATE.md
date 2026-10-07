@@ -601,3 +601,11 @@ Permanent repository gate:
 - Предпочтительно сначала исследовать один общий механизм на уровне shared UI/MainWindow/event handling; не ломать обычный click/double-click, Enter-search, keyboard navigation, dialog validation, caret/selection semantics, buttons, combo/spin boxes и explicit programmatic focus/selection.
 - Конкретный жест/реализацию (например neutral-background click и/или универсальный keyboard escape fallback) утвердить при отдельном global UI review после проверки влияния на существующие widgets.
 - Не расширять текущий P04-C до глобального mouse/focus subsystem. Реализовывать отдельным изолированным шагом после сортировки зависимостей.
+
+## P04-C / BUG-004 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-07
+
+- User manual result: `Работает`. Separate cross-app focus/selection limitation was recorded as GLOBAL-FOCUS-001 and intentionally excluded from P04-C.
+- Exact accepted candidate head: `68f11b92fe2dd5ebb91752cf8723a9d5c66a0e09`.
+- Clean promotion PR #32 passed regression and wording gates, then merged as `7df4071088e8ef3f89b5f6d20caeab745a958d39`.
+- Exact post-merge Regression Foundation `37658841462` = SUCCESS; wording gate `37658841402` = SUCCESS.
+- P04-C remains limited to Public empty-area deselection and existing GUI regression. GLOBAL-FOCUS-001 remains DEFERRED / RECORDED as a later global UI task.
