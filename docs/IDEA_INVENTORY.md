@@ -670,3 +670,11 @@ This section records the latest accepted review target while preserving all hist
 - UI-025 is fully closed after manual acceptance, clean promotion PR #28, merge `fddf49014ffb34ff48c6871027a817f1453edb9e`, and exact post-merge regression `37653013085` + wording `37653013097`.
 - Candidate PR #27 is historical and closed without merge.
 - The next isolated implementation item is BUG-003 only. Other accepted P04 ideas remain unchanged and unimplemented in this step.
+
+
+# XXIV. P04-B / BUG-003 candidate — 2026-10-07
+
+- BUG-003 is implemented as an isolated candidate, not yet accepted.
+- Runtime change is limited to main-list selection semantics and empty-area deselection; explicit Enter/focus selection is preserved.
+- Automated Windows gate passed. Manual-QA build is on Drive as `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip` (ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`).
+- UI-007/UI-008/UI-009/UI-028/UI-076 remain separate later P04 items.
