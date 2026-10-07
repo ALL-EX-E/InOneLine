@@ -437,7 +437,7 @@ Permanent repository gate:
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - P02 is now unblocked.
 
-## P02 candidate progress — A/B/C/D complete — 2026-10-07
+## P02 candidate progress — A/B/C/D/E complete — 2026-10-07
 - Branch: `candidate/p02-list-public-labels`.
 - **P02-A / UI-010** implementation commit `f6481b6668019b45af3d9d11040117baf2868f4c`: visible main tab label `Игры` -> `Список` only; internal `GamesTab/games_tab`, DB/API semantics and behavior unchanged.
 - P02-A regression expectation commit `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`: existing GUI smoke expects `Список`.
@@ -447,8 +447,10 @@ Permanent repository gate:
 - P02-C regression commit `57789c7dbbc1202f000cf8c74f04239f8772c4d9`: GUI smoke instantiates both dialog modes and checks titles/headings.
 - **P02-D / UI-013** implementation commit `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`: visible field labels only: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`. Widgets, payload keys, parsing, DB and storage semantics unchanged.
 - P02-D regression commit `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`: both add/edit GameDialog modes assert new labels and absence of legacy labels.
-- Focused P02-D diff versus P02-C: `games.py` 2 additions / 2 deletions; `gui_regression_smoke.py` 12 regression-only additions.
-- **P02 is not accepted yet.** Next small step: UI-015 (mark `Дата`, `Баллы`, `Отзыв` as optional for manual input).
+- **P02-E / UI-015** implementation commit `635e4405ffd12ed35f8c0385616ff1f1193a689f`: visible labels only: `Дата (необязательно):`, `Баллы (необязательно):`, `Отзыв (необязательно):`. `Название` remains required; `Кооператив` and `Статус` keep their current default selections and are not marked optional.
+- P02-E regression commit `1f73618165e5e3f1cd3acad833209cc4cef58f45`: add/edit dialogs assert the optional labels, absence of incorrect optional markers on `Кооператив/Статус`, and preserved default `Баллы = 0`.
+- Focused P02-E diff versus P02-D: `games.py` 3 additions / 3 deletions; remaining changes are regression-only.
+- **P02 is not accepted yet.** Next small step: UI-022 (rename/simplify the full-list clear flow).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
