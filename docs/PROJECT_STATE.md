@@ -450,7 +450,11 @@ Permanent repository gate:
 - **P02-E / UI-015** implementation commit `635e4405ffd12ed35f8c0385616ff1f1193a689f`: visible labels only: `Дата (необязательно):`, `Баллы (необязательно):`, `Отзыв (необязательно):`. `Название` remains required; `Кооператив` and `Статус` keep their current default selections and are not marked optional.
 - P02-E regression commit `1f73618165e5e3f1cd3acad833209cc4cef58f45`: add/edit dialogs assert the optional labels, absence of incorrect optional markers on `Кооператив/Статус`, and preserved default `Баллы = 0`.
 - Focused P02-E diff versus P02-D: `games.py` 3 additions / 3 deletions; remaining changes are regression-only.
-- **P02 is not accepted yet.** Next small step: UI-022 (rename/simplify the full-list clear flow).
+- **P02-F / UI-022** implementation commits `8781b4bafbfdfdafcbfd960f6d667924ca08f822` + `6a7746c956460ca9464951551f5b7242af174958`: main button `Очистить список`; dialog title `Очистить список`; heading `Будут удалены все записи: N`; warning uses `обычные, архивные и временные записи`; exact confirm text `УДАЛИТЬ ЗАПИСИ`; destructive button `Удалить записи`; worker completion also restores `Очистить список` instead of the legacy label.
+- P02-F regression commits `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`: verify exact texts, inexact/exact confirmation enablement, Enter acceptance, and post-worker label persistence.
+- Existing open-auction guard, isolated safety-backup, background worker, completed-auction history/Journal preservation and destructive workflow logic are unchanged.
+- Focused P02-F diff versus P02-E: `games.py` 7 additions / 7 deletions; remaining changes are regression-only.
+- **P02 is not accepted yet.** Next small step: UI-024 (simplify sorting-rules wording).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
