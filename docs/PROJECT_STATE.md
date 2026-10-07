@@ -499,7 +499,10 @@ Permanent repository gate:
 - **P03-C / UI-019** implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`: CSV validation errors now follow `что не так -> строка/значение -> как исправить` for duplicate title, status, coop, date, points, missing headers and legacy `Название|Баллы`. Duplicate tracking now remembers the first source line only to improve the error message; parsed data and transaction semantics are unchanged.
 - P03-C regression `2230c10a06a986389bff3ab546afbe011368730c` + cleanup `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`: existing GUI smoke verifies the TEST-001 error set, preserves explicit `ИГРАЛ / НЕ ИГРАЛ` allowed statuses, checks `0` guidance, confirms safety-backup path survives wrapper errors, and confirms full-file atomicity.
 - Focused P03-C runtime diff versus P03-B is limited to `streaming_manager/db/services.py`; regression changes remain in existing `gui_regression_smoke.py`.
-- **P03 is not accepted yet.** Next small step: BUG-002 date-field caret preservation.
+- **P03-D / BUG-002** implementation `7872121a09c740e99073053d9b1ee9e776296202`: `_format_date_while_typing()` keeps the existing auto-dot formatter but restores caret using the formatted prefix left of the current caret instead of forcing `len(formatted)`. No new widget; `normalize_date_text()` and accepted date formats are unchanged.
+- P03-D regression `2fd76ae1260738fdf289b36de084ac2b15234e19`: both Add/Edit GameDialog modes verify middle-of-field formatting, Backspace, Delete, selection replacement and sequential compact input; caret no longer jumps to the end.
+- Focused P03-D diff versus P03-C: `games.py` caret-preservation logic + regression-only changes in existing `gui_regression_smoke.py`.
+- **P03 implementation scope is now complete as candidate.** Next: candidate-wide regression/review preparation; P03 is not accepted yet.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
