@@ -413,6 +413,14 @@ Permanent repository gate:
 - UI-088/UI-090 final export boundary: public file exports move to Public List; Settings Export and legacy compatible-export UI disappear; `/api/public` remains but has no new visible access point in this batch.
 - QA-1.0.8-01/02 remain outside the implementation batch unless separately approved.
 - No unresolved logical conflict remains inside the accepted current-review target. Point 3 can now sort implementation by shared foundations/dependencies.
+## P01 candidate progress — A/B/C complete — 2026-10-07
+
+- Candidate branch: `candidate/p01-mainwindow-shell-cleanup`; CURRENT/main runtime remains unchanged.
+- P01-A `8d50ef21f5e05cebce1ba70866e71369f93b893c`: removed duplicate `Файл` menu/actions only.
+- P01-B `183c6accb3f974058ac3abbd1949da558f7f6c9f`: removed `Вид` menu and retained one direct MainWindow `F5 → refresh_all()` action.
+- P01-C `0845c3c624edd907acd68a0f7e5f669f5b96a0f4`: added non-clickable `F5 — обновить данные во всех разделах` label in the existing menu-bar area.
+- Source checks passed; cumulative candidate runtime diff is still only `streaming_manager/views/main_window.py`.
+- P01 is **not accepted yet**: focused regression + candidate automation + user manual QA remain.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
