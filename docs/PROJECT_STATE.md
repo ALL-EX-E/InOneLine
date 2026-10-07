@@ -426,7 +426,9 @@ Permanent repository gate:
 - PASS includes compile, Actions/publication regressions, A9 UI-state/installer checks, backup/restore/media regressions, source snapshot, fresh DB integrity, the P01-focused Native GUI regression, frozen application build/startup/browser-source checks, Inno Setup, installer build and silent-install startup/filesystem regression.
 - Automatic `Publication wording gate` run `37582729787` failed only on pre-existing documentation wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md` and `PROJECT_STATE.md`; no P01 runtime/new-regression file was cited, so it remains a separate documentation finding outside P01.
 - P01 manual-QA artifact attempt: temporary QA branch `qa/p01-windows-artifact` and draft PR #20 were created from exact tested runtime commit `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; the newly introduced artifact workflow did not trigger from the API-created QA event. PR #20 was closed **without merge**. Candidate runtime remained unchanged.
-- Manual QA therefore uses the exact candidate source branch `candidate/p01-mainwindow-shell-cleanup`; no installer artifact is required for this shell-only scope.
+- Manual QA artifact was subsequently produced by permanent Windows regression run `37583488177` — **SUCCESS** after adding artifact preservation to the existing regression workflow. GitHub artifact: `11465802252` / `InOneLine_1.0.8_WINDOWS_QA`.
+- Extracted installer: `InOneLine_P01_CANDIDATE_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
+- Product runtime remained the P01 candidate; the later branch commit only synchronized CI artifact-preservation infrastructure.
 - P01 automated candidate gate is **PASS**. P01 is **not accepted yet**: user manual QA remains.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
