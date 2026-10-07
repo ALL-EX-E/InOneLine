@@ -37,7 +37,8 @@
 - Не считать released 1.0.8 layout/behavior в исторических записях более поздним target, если оно явно superseded текущим ledger.
 - UI-053 закрыт 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`; действие работает и для Max Amount, и для wheel context и переиспользует существующий `/timer-overlay?preview=1`.
 - AUCTION-TIMER-REVIEW-002 закрыт решением пользователя 2026-10-07: tie overtime Max Amount использует saved Max Amount duration default; pending-overtime reset возвращает тот же default; отдельной overtime-настройки нет. Current 1.0.8 требует изменения, потому что сейчас использует wheel default.
-- Перед dependency sorting остаётся один неразрешённый timer-behavior вопрос: AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
+- AUCTION-TIMER-REVIEW-003 закрыт решением пользователя 2026-10-07: сохранить ~1.2 s как отдельный preparation lead-in; до его окончания установленная длительность не расходуется, затем timer / применимое wheel motion / soundtrack стартуют одновременно от общей authoritative start boundary; repeated Start/Spin during lead-in must be re-entry protected.
+- После этого неразрешённых timer-behavior вопросов перед dependency sorting не осталось.
 - QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
 
 ## Сохранённые future scope после текущего review-batch
