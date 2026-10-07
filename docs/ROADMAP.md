@@ -62,6 +62,7 @@
 - Separate publication-wording gate failed only on pre-existing docs wording; keep outside P01 runtime scope unless separately selected.
 - Temporary installer-artifact PR #20 was closed unused/no-merge after its newly added QA workflow did not trigger; P01 runtime candidate was not changed.
 - Manual QA installer produced successfully by Windows regression run `37583488177`; artifact `11465802252`.
+- Google Drive package ready for user QA: `InOneLine_P01_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1VvMjue9GOFet2XSN8PpttBkX1nyB03Gk`, verified size `46756638` bytes.
 - Installer SHA-256: `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
 - Next: user manual QA using the produced P01 candidate installer.
 - Automated P01 candidate gate is complete. Next: user manual QA only. P01 is not accepted yet.
