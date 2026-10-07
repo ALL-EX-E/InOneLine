@@ -581,3 +581,13 @@ Permanent repository gate:
 - Artifact `11497079107`: ZIP SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`; installer SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
 - Drive: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`, 46,766,270 bytes.
 - **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.**
+
+## P04-B CLOSED / P04-C automated candidate — 2026-10-07
+
+- P04-B / BUG-003 is fully closed: user manual PASS, merge `f2cc6e9f0968eac1be75f7d5b91ead7afe7e76df`, post-merge regression `37655810706` SUCCESS and wording `37655810503` SUCCESS.
+- P04-C / BUG-004 is implemented only on candidate head `68f11b92fe2dd5ebb91752cf8723a9d5c66a0e09` / PR #31.
+- Candidate changes only Public empty-area deselection and its existing GUI-smoke coverage; search/data/sort/Public XLSX and other P04 scopes remain unchanged.
+- Regression Foundation `37656101654` = SUCCESS; wording checks = SUCCESS.
+- Artifact `11498364307`: ZIP SHA-256 `a8aae91a3edcef92e8ed95f5b9152182dd58b2d123da5730f7c3c1a348df4bf8`; installer SHA-256 `c5c64e75a53434d75de068d51747ab8c1175b8facc465fcbecd2d12f0bc628b1`.
+- Drive file ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`, 46,761,453 bytes.
+- **P04-C = AWAITING USER MANUAL QA / NOT MERGED.**
