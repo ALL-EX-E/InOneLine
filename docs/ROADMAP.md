@@ -57,9 +57,10 @@
 - C: add exact non-clickable hint `F5 — обновить данные во всех разделах` in existing top menu-bar area — source check PASS.
 - D: lock the shell contract in the existing GUI regression smoke — commit `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; source/diff check PASS.
 - Candidate now changes `streaming_manager/views/main_window.py` plus the regression assertion in `tools/gui_regression_smoke.py`; runtime behavior change remains isolated to MainWindow.
-- E: draft PR #19 opened as QA-only trigger; Windows regression run `37582729729` / job `112665869659` started against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`.
+- E: draft PR #19 opened as QA-only trigger; Windows regression run `37582729729` / job `112665869659` against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c` — **SUCCESS**.
+- P01-focused Native GUI regression, frozen build/startup, installer build and silent-install regression all passed.
 - Separate publication-wording gate failed only on pre-existing docs wording; keep outside P01 runtime scope unless separately selected.
-- Next: finish/read automated candidate result, then manual QA. P01 is not accepted yet.
+- Automated P01 candidate gate is complete. Next: user manual QA only. P01 is not accepted yet.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
