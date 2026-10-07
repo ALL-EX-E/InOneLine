@@ -527,12 +527,10 @@ class MainWindow(QMainWindow):
         self.settings_tab._refresh_integrations()
 
     def _make_menu(self):
-        view_menu = self.menuBar().addMenu("Вид")
-        view_menu.setMinimumWidth(220)
         refresh_action = QAction("Обновить", self)
         refresh_action.setShortcut(QKeySequence("F5"))
         refresh_action.triggered.connect(self.refresh_all)
-        view_menu.addAction(refresh_action)
+        self.addAction(refresh_action)
 
     def _show_restore_result(self):
         result = read_and_clear_restore_result(self.paths.root_dir)
