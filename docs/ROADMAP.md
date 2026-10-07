@@ -64,11 +64,12 @@
 - Manual QA installer produced successfully by Windows regression run `37583488177`; artifact `11465802252`.
 - Google Drive package ready for user QA: `InOneLine_P01_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1VvMjue9GOFet2XSN8PpttBkX1nyB03Gk`, verified size `46756638` bytes.
 - Installer SHA-256: `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
-- Next: user manual QA using the produced P01 candidate installer.
-- P01 manual QA accepted by user on 2026-10-07. **P01 = MANUALLY ACCEPTED**.
+- P01 manual QA accepted by user on 2026-10-07.
 - PR #19 merged to `main` as `d40c0dc7798aae3c9d7a8d7b8faab97756e06512`.
-- Post-merge regression is running as QA-only PR #21; run `37586507639` — IN PROGRESS. P02 remains blocked until PASS.
-- Manual QA partial result: menus absent confirmed; F5 produced no error and no obvious visual change, which is expected because refresh has no visible success indicator. Automated F5 invocation regression is PASS. Await explicit user acceptance.
+- Post-merge verification run `37586507639` — **SUCCESS**; QA-only PR #21 closed without merge.
+- Separate Publication wording gate `37586507550` remains an unrelated known documentation finding.
+- **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P02 is next and unblocked.**
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
