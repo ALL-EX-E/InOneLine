@@ -454,7 +454,10 @@ Permanent repository gate:
 - P02-F regression commits `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`: verify exact texts, inexact/exact confirmation enablement, Enter acceptance, and post-worker label persistence.
 - Existing open-auction guard, isolated safety-backup, background worker, completed-auction history/Journal preservation and destructive workflow logic are unchanged.
 - Focused P02-F diff versus P02-E: `games.py` 7 additions / 7 deletions; remaining changes are regression-only.
-- **P02 is not accepted yet.** Next small step: UI-024 (simplify sorting-rules wording).
+- **P02-G / UI-024** implementation commit `99ecc55ef2556957f0957c61098a4ae6df03c2d6`: sorting-rules wording only — heading `Автоматическая сортировка списка`; intro `Сначала список распределяется по статусу:`; archive wording `В режиме «Всего» сначала идут все записи вне архива` and `Архивные записи располагаются отдельным блоком в самом низу`. Sorting semantics and order are unchanged.
+- P02-G regression commit `7b03ca8786ec81b507a0ad4c265dcf07928cc4bd`: GUI smoke captures the actual QMessageBox and asserts exact new wording plus absence of legacy wording.
+- Focused P02-G diff versus P02-F: `games.py` 4 additions / 4 deletions; remaining changes are regression-only.
+- **P02 is not accepted yet.** Next small step: UI-029 (Public List `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ`).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
