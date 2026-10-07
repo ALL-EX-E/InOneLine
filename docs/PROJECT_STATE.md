@@ -413,6 +413,14 @@ Permanent repository gate:
 - UI-088/UI-090 final export boundary: public file exports move to Public List; Settings Export and legacy compatible-export UI disappear; `/api/public` remains but has no new visible access point in this batch.
 - QA-1.0.8-01/02 remain outside the implementation batch unless separately approved.
 - No unresolved logical conflict remains inside the accepted current-review target. Point 3 can now sort implementation by shared foundations/dependencies.
+## Implementation planning complete — 2026-10-07
+
+- Point 3 is complete: the accepted review batch is sorted into P00–P22 + FINAL GATE in dependency order.
+- Detailed queue and package membership are canonical in `docs/ACTIVE_REVIEW_LEDGER.md` §4.7; `docs/ROADMAP.md` contains the compact sequence.
+- Mechanical coverage verified: UI-001…UI-090 all accounted for, no missing IDs and no duplicate package assignment.
+- Ordering principle: low-risk UI first; then shared list/state/position/media foundations; then OBS/Rules/Auction structure; then timing; then Settings/integrations/conversion; then auction business/accounting cross-links; History/Journal last.
+- Every package is a separate candidate with automated checks and mandatory user manual acceptance before the next package.
+- Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**. No implementation package has started yet.
 ## Active review / bugfix phase
 
 Новые product features временно приостановлены по прямому решению пользователя. Текущий рабочий протокол и накопительная очередь замечаний находятся в `docs/ACTIVE_REVIEW_LEDGER.md`.
