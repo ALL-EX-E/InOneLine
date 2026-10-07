@@ -360,7 +360,7 @@
 
 - **E1 — production EXE/PyInstaller readiness** — **IMPLEMENTED / ACCEPTED**. Historical native-EXE acceptance gate required the exact `build_exe.bat` run to visibly reach `[9/9] BUILD EXE: OK`; an auto-closing console was not accepted, so the run was repeated from CMD/PowerShell with the console left open (`pause` / `Press any key to continue...`) and full output visible. Build success itself still did not equal release acceptance: exact binary/manual EXE verification + explicit user approval remained mandatory.
 - **E2 — stale OBS Browser Source version-handshake/cache-busting reload** — **IMPLEMENTED / ACCEPTED**.
-- **E3 — tie extra-time default using existing duration model** — **IMPLEMENTED / ACCEPTED**; отдельная лишняя настройка не создаётся.
+- **E3 — tie extra-time default using existing duration model** — **IMPLEMENTED CURRENT / USER-ACCEPTANCE PROVENANCE NOT CONFIRMED**. Current runtime reuses an existing duration default, but the 2026-10-07 direct-chat recheck did not recover an explicit user statement approving that exact choice; do not treat E3 as authoritative future target until AUCTION-TIMER-REVIEW-002 is decided.
 - **E4 — Windows Long Path/deep path deployment contract** — **IMPLEMENTED / ACCEPTED** в поддерживаемом <260 path contract. Arbitrary >=260 direct portable launch — out of scope/new separate scope, не unfinished E4.
 - **Default install root `C:\InOneLine` + user-selectable destination/drive** — **IMPLEMENTED / ACCEPTED**.
 - **No portable-user migration** — **USER DECISION / PRESERVE**.
@@ -561,7 +561,7 @@
 - **0.3.00 — Settings → General/Auction split + persisted default wheel-spin duration** — **IMPLEMENTED / ACCEPTED**.
 - **0.3.01 — six-digit HHMMSS shorthand normalized to HH:MM:SS.000** — **IMPLEMENTED / ACCEPTED**.
 - **0.3.02 — persisted default max-amount duration, independent from current live session** — **IMPLEMENTED / ACCEPTED**.
-- Historical proposal for a separate tie-overtime default existed at this stage; later E3 decision **SUPERSEDED** it by reusing the existing duration model instead of creating another independent setting.
+- Historical proposal for a separate tie-overtime default existed at this stage. Earlier documentation claimed a later E3 decision superseded it, but the 2026-10-07 direct-chat provenance recheck did not confirm explicit user acceptance of that exact rule; AUCTION-TIMER-REVIEW-002 therefore remains open.
 
 ---
 
@@ -653,6 +653,6 @@ This section records the latest accepted review target while preserving all hist
 - **UI-044** is superseded as written because its destination tab is removed; `/api/public` itself remains.
 - QA-1.0.8-01 and QA-1.0.8-02 remain findings without implementation approval; QA-1.0.8-03 has an approved target through UI-087.
 - UI-053 is resolved: add `Открыть предпросмотр таймера` next to `Копировать URL таймера` on `Аукцион`; the same action covers Max Amount and wheel contexts via existing `/timer-overlay?preview=1`.
-- AUCTION-TIMER-REVIEW-002 is resolved by the earlier accepted E3 decision: tie overtime reuses the saved wheel-duration default; no separate overtime setting is created; current 1.0.8 already implements this.
-- One timer-behavior question remains explicitly unresolved: AUCTION-TIMER-REVIEW-003 short-spin lead-in.
+- AUCTION-TIMER-REVIEW-002 is reopened: current 1.0.8 reuses the saved wheel-duration default, but explicit user acceptance of that exact product rule was not recovered.
+- Two timer-behavior questions remain explicitly unresolved: AUCTION-TIMER-REVIEW-002 tie-overtime default and AUCTION-TIMER-REVIEW-003 short-spin lead-in.
 
