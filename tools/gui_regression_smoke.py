@@ -160,6 +160,11 @@ def main() -> int:
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
 
+        if window.games_tab.add_btn.text() != "Добавить":
+            raise AssertionError(
+                f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
+            )
+
         # P01 shell contract: no top-level menus remain, the replacement hint
         # is informational only, and exactly one direct MainWindow F5 action
         # still performs the existing eager refresh_all() path.
