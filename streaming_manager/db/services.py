@@ -2036,7 +2036,7 @@ class ServicesMixin:
     def import_csv(self, path: str | Path, merge: bool = True) -> dict[str, int]:
         """Import games from a flexible CSV or legacy pipe-delimited CSV.
 
-        Normal CSV requires only the ``НАЗВАНИЕ ИГРЫ`` header. Other supported
+        Normal CSV requires only the ``НАЗВАНИЕ`` header (legacy ``НАЗВАНИЕ ИГРЫ`` is also accepted). Other supported
         columns are optional, may be in any order, and blank cells mean
         "value not provided". Unknown columns are ignored. For existing games
         only the non-empty values that were actually provided are updated.
@@ -2089,7 +2089,7 @@ class ServicesMixin:
                     )
                 payload["coop"] = COOP_FROM_LABEL[coop_key]
 
-            date_text = values.get("ДАТА ВЫХОДА", "").strip()
+            date_text = values.get("ДАТА", "").strip() or values.get("ДАТА ВЫХОДА", "").strip()
             if date_text:
                 try:
                     payload["release_date"] = parse_date(date_text)
@@ -2123,7 +2123,9 @@ class ServicesMixin:
             return {"created": 0, "updated": 0, "skipped": 0}
 
         supported_headers = {
+            "НАЗВАНИЕ",
             "НАЗВАНИЕ ИГРЫ",
+            "ДАТА",
             "ДАТА ВЫХОДА",
             "БАЛЛЫ",
             "БАЛЛЫ SM",
@@ -2189,7 +2191,14 @@ class ServicesMixin:
                 for header in reader.fieldnames
                 if header is not None and str(header).strip()
             }
-            if "НАЗВАНИЕ ИГРЫ" not in norm:
+            title_header = (
+                "НАЗВАНИЕ"
+                if "НАЗВАНИЕ" in norm
+                else "НАЗВАНИЕ ИГРЫ"
+                if "НАЗВАНИЕ ИГРЫ" in norm
+                else None
+            )
+            if title_header is None:
                 raise ValueError(
                     "Не найден обязательный столбец: НАЗВАНИЕ ИГРЫ. "
                     "Либо используйте формат «Название игры|Баллы»."
@@ -2197,7 +2206,7 @@ class ServicesMixin:
 
             available = supported_headers.intersection(norm)
             for line_no, row in enumerate(reader, start=2):
-                title = str(row.get(norm["НАЗВАНИЕ ИГРЫ"], "") or "").strip()
+                title = str(row.get(norm[title_header], "") or "").strip()
                 if not title:
                     skipped_empty += 1
                     continue
@@ -2205,7 +2214,7 @@ class ServicesMixin:
                 values = {
                     header: str(row.get(norm[header], "") or "")
                     for header in available
-                    if header != "НАЗВАНИЕ ИГРЫ"
+                    if header not in {"НАЗВАНИЕ", "НАЗВАНИЕ ИГРЫ"}
                 }
                 parsed_rows.append(
                     (title, parse_optional_payload(title, line_no, values))
