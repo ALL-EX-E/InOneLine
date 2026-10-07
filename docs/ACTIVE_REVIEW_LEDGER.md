@@ -2036,7 +2036,11 @@ Alan Wake 2|0
 
   - **Stop/cancel safety.**
     - Универсальный explicit `Остановить аукцион` остаётся аварийным/осознанным выходом без победителя и не превращается в скрытое `Подтвердить результат`.
-    - При unresolved pending перед stop показать контекстное предупреждение, что имеются необработанные поступления; exact post-stop settlement/materialization таких событий проверить при реализации вместе с UI-065 stop semantics, не теряя source target/provenance и не назначая победителя задним числом.
+    - При unresolved pending перед stop показать контекстное предупреждение, что имеются необработанные поступления.
+    - Dependency resolution 2026-10-07 из UI-085/UI-086 + универсального UI-065 Stop rule: `Остановить аукцион` **не считается** неявным `Не применять` и не удаляет pending-события.
+    - Stop материализует/сохраняет лоты по обычным UI-065 rules и закрывает session без победителя; unresolved event сохраняет source-session/target provenance и остаётся в `Ожидают применения`.
+    - Если позже оператор задаёт курс и нажимает `Применить`, начислить exactly-once в соответствующий уже материализованный persistent target lot; закрытую stopped-session, её winner/timer/wheel state не открывать и не пересчитывать задним числом.
+    - Если событие учитывать не нужно, только явное `Не применять` из UI-085 окончательно закрывает его без начисления.
   - Runtime/code пока не изменялись.
 
 - **UI-087 — пустое сообщение внешнего события во время аукциона создаёт последовательный служебный лот `Без текста N` — READY AFTER BATCH APPROVAL.**
@@ -2846,6 +2850,88 @@ Alan Wake 2|0
 - После этой сверки изначально оставалось три вопроса. Все три закрыты прямыми решениями пользователя 2026-10-07: UI-053 — добавить локальный timer preview; AUCTION-TIMER-REVIEW-002 — tie overtime использует saved Max Amount default; AUCTION-TIMER-REVIEW-003 — сохранить ~1,2 s как отдельный preparation lead-in и запускать timer/wheel/audio одновременно только после него, не расходуя пользовательскую длительность.
 - QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings без implementation approval; QA-1.0.8-03 имеет approved target через UI-087.
 - После этих решений незавершённых вопросов текущего tab-by-tab review не осталось; можно переходить к следующему этапу сверки/зависимостей без возврата к timer-review.
+## 4.6 Пункт 2 — карта зависимостей и конфликтов решений — 2026-10-07
+
+- **DEPENDENCY-AUDIT-2026-10-07 — COMPLETE / NO UNRESOLVED CURRENT-REVIEW CONFLICTS.**
+- Сверены все UI-001…UI-090, BUG-пункты, GLOBAL rules, timer-review, exact CURRENT 1.0.8 и общие backend paths. Runtime/code не менялся.
+
+### A. MainWindow / persisted UI state
+- UI-001…UI-006 образуют один shell-cleanup bundle: сначала/одновременно удалить дублирующие menu actions, затем удалить пустые `Файл`/`Вид` и оставить один F5 → `MainWindow.refresh_all()` + информационную строку.
+- UI-025 удаляет synchronized hide/show lists и obsolete persisted keys. UI-008/UI-028 после этого не должны содержать ветку «показать скрытую таблицу».
+- UI-032 меняет порядок top-level tabs, а exact CURRENT хранит числовой `main_window/tab_index`. Нужна совместимая логическая миграция индекса/стабильный tab key; старый restored `ui_state.ini` из UI-082 backup тоже должен корректно проходить эту миграцию. Не связывать миграцию с geometry/list-visibility cleanup.
+- GLOBAL-UI-002 (уменьшение окна/scroll) должен применяться к уже итоговой компоновке после удаления hide/show hacks; старый compact auto-resize не возвращать.
+
+### B. `Список` / `Публичный список` / selection / search
+- UI-007 + UI-008 + UI-009 + UI-023 — единая search/filter contract: непустой search на основном `Список` временно использует full ordinary DB + archive, но выбранный statistic filter не сбрасывается; clear возвращает именно этот filter.
+- BUG-003 и BUG-004 используют один reusable deselect-on-empty-area подход. Ordinary refresh не создаёт selection; explicit Enter/focus/sync actions могут выбирать строку по смыслу.
+- UI-025 должен быть учтён до финализации Enter behavior: hidden-table restoration удаляется полностью.
+- UI-076 total points идёт через `_game_stats_conn()` и **не зависит** от search/filter/selection; не вычислять сумму из отображаемых строк.
+- UI-010 меняет только user-facing название `Игры` → `Список`; internal `games/GamesTab` не переименовывать массово.
+
+### C. Position policy + XLSX
+- GLOBAL-POSITION-COLUMNS-001 является единственным presentation policy для position columns.
+- UI-050/UI-058 — только специализированные auction surfaces; UI-077 — внешние XLSX; UI-029/UI-031 — общие списки. Не создавать четыре независимых расчёта позиции.
+- `_auction_position_map_conn()` / snapshot position-map остаётся authoritative source. XLSX `ПОЗИЦИЯ` derived/read-only и не входит в import logical hash; presentation fingerprint её учитывает.
+- File exports UI-088 намеренно **не получают** `ПОЗИЦИЯ`: это отдельный static public-export contract, не ошибка относительно UI-077.
+
+### D. Public export / API cleanup
+- UI-088 переносит CSV/JSON/XLSX actions на `Публичный список` с reuse существующих `PublicTab.export_*` + `exporters.py`; UI-090 после этого удаляет `Настройки → Экспорт` целиком.
+- UI-089/UI-090 удаляют legacy pipe-export UI, но legacy `Название|Баллы` importer остаётся совместимым.
+- UI-030 + UI-043 удаляют visible Public JSON/API diagnostics из ordinary UI. UI-044 superseded UI-090: `/api/public` endpoint сохраняется, но новый visible access point в текущем batch **не создаётся**. Это осознанный итог, не потерянная зависимость.
+- Hidden former Auction Export UI/helpers удалять только после exact reference/test audit; importer compatibility не связывать с export-helper deletion.
+
+### E. OBS/media common infrastructure
+- UI-039 + BUG-005 формируют общий media availability/dedup contract. UI-045, UI-047, UI-060 и другие custom-background users должны переиспользовать одну media library/import/availability path, без отдельных папок/registries.
+- UI-042 задаёт общий URL → copy/preview → settings → save визуальный pattern; UI-043 удаляет obsolete `Локальный API` UI, но endpoints остаются.
+- GLOBAL-OBS-VISIBILITY-001 имеет приоритет над более ранними разрозненными visible-checkbox decisions. Один reusable show-mode policy + widget predicate; `?preview=1` всегда preview override.
+- UI-078 Wheel widget использует тот же `/wheel-overlay` и те же quick actions, что `Аукцион`; второго wheel renderer/backend не создавать.
+- UI-049 и UI-055 должны переиспользовать один help/dialog content pattern для OBS audio explanation, а не две независимые справки.
+
+### F. Rules Overlay — resolved precedence
+- UI-060 полностью supersedes раннюю separate-style-template модель UI-048: существует один composite `Шаблон правил` (text + rich text + OBS appearance).
+- Generic UI-042 для Rules применяется **в редакторе правил**, где находятся actual settings; в `Стрим / OBS` остаётся только compact access, без второй копии Rules settings/save.
+- Старый `Сохранить виджет правил` не нужен: общая `Сохранить` composite template сохраняет text + appearance.
+- Поздний GLOBAL-OBS-VISIBILITY-001 supersedes UI-060 только в одном аспекте: старый checkbox `Показывать правила в OBS` не возвращается, но `/rules-overlay` получает общий persisted `Показ виджета` show-mode. Это widget-level policy, не второй boolean и не часть composite style state; preview остаётся override.
+- Rich-text typography остаётся только WYSIWYG/composite content; отдельные global Rules font controls не создавать.
+
+### G. Auction page/layout/presentation
+- UI-051 сначала логически объединяет `Лоты / Проведение` в одну page/model; UI-056/UI-059/UI-074/GLOBAL-POSITION-COLUMNS-001 должны работать уже с одной lot-table, а не поддерживать старые две ветки.
+- UI-062 переставляет крупные blocks; UI-073 сохраняет внутренний timer layout. Не смешивать «перенести весь блок» с «переписать controls внутри».
+- UI-071 перемещает существующие soundtrack widgets в contextual timer block; не создавать второй set настроек/selection/volume/mute.
+- OBS-QUICK-URL-001 + UI-053 сохраняют локальные quick URL actions; timer preview добавляется рядом с timer Copy URL, list/wheel preview остаются существующими.
+
+### H. Timer / wheel / audio
+- UI-072 меняет один existing `wheel_duration_ms` диапазон во всех validation points: 1 s…24 h. Отдельную duration variable не создавать.
+- BUG-007 tooltip должен отражать saved wheel default, а AUCTION-TIMER-REVIEW-002 отделяет tie-overtime default от wheel: overtime использует saved Max Amount default.
+- AUCTION-TIMER-REVIEW-003 задаёт общий actual-start boundary. ~1.2 s — preparation **outside configured duration**. Max Amount/overtime timer+soundtrack и Wheel timer+local/OBS motion+soundtrack стартуют только на boundary.
+- Lead-in применяется к `Старт` новой Max Amount/overtime phase и к каждому `Крутить`; ordinary `Продолжить` после pause не превращать в новый preparation start.
+- Для Max Amount/overtime source-time membership внешних событий начинается с фактической authoritative start boundary, а не с момента первого click: во время lead-in session ещё не должна принимать события как running auction.
+- AudioCoordinator handoff должен происходить на той же boundary: не останавливать Music Player на ~1.2 s раньше нового soundtrack без необходимости.
+- Для remote RNG wheel сначала получить/зафиксировать required RNG result и spin payload, затем назначить final synchronization lead-in/start boundary; network wait не вычитать из `wheel_duration_ms`. Re-entry guard действует с первого запуска action.
+
+### I. Max Amount / Wheel state machine
+- UI-064 post-00:00 correction остаётся editable operator phase, но new external events после close идут persistent path.
+- UI-086 — исключение только по source-time: pre-close pending event остаётся частью original session даже если Apply происходит после 00:00. Это не противоречит UI-064.
+- UI-086 hard-gate должен стоять **до** UI-065 freeze/materialization/winner confirmation: unresolved source-auction pending нельзя пропустить в `Провести колесо`, tie-wheel или final confirm.
+- UI-065 отменяет старый вопрос `Перенести баллы?`: Max Amount accounting материализуется автоматически/idempotently по принятой обычной/elimination/Stop семантике.
+- UI-067 overtime снова открывает весь Max Amount auction для всех актуальных лотов; tie-wheel — только между текущими лидерами. AUCTION-TIMER-REVIEW-002 определяет только стартовое значение overtime timer и не меняет этот business rule.
+- UI-068 manual lot editing, UI-069 min two lots, UI-070 RNG selection и GLOBAL-POSITION-COLUMNS-001 должны использовать одну session state machine; после UI-065 wheel freeze lot composition/weights immutable.
+- Stop + unresolved pending: Stop остаётся разрешённым emergency exit без winner; pending не auto-reject. После materialization later explicit Apply credits corresponding persistent lot exactly once, не reopening stopped session; explicit `Не применять` остаётся единственным conscious discard.
+
+### J. Integrations / conversion / visibility of events
+- UI-084 provider-card state и UI-061 compact Auction readiness должны строиться из одного integration state/capability model; не поддерживать независимые трактовки `connected/enabled/ready/error`.
+- UI-085/086/087 — одна цепочка: intake → source-time target → conversion/pending → explicit Apply/Не применять → exactly-once contribution → result gate release. Placeholder `Без текста N` создаётся до conversion only для принятого running-auction empty-message case UI-087.
+- UI-066 presentation не создаёт второй event log: использует `external_events + contributions + pending_conversions + change_log`; reason mapping должен применяться одинаково в Auction/Journal/detail views.
+- QA-1.0.8-01 и QA-1.0.8-02 **не включать автоматически** в implementation batch: они используют те же integration paths, но остаются отдельными documented findings без runtime approval.
+
+### K. History / Journal
+- UI-080 History должен читать уже authoritative final/session/accounting data; не компенсировать presentation-слоем ещё не реализованные UI-064…UI-087 rules.
+- UI-081 Journal presentation выполняется поверх существующего `change_log`/integration provenance; не создавать второй audit store.
+
+### Итог пункта 2
+- После применения precedence/supersession выше **логических конфликтов между утверждёнными current-review решениями не осталось**.
+- Основные implementation boundaries теперь определены: shared helpers сначала, затем dependent UI; точный порядок будет сформирован отдельно в пункте 3.
+- Runtime остаётся exact CURRENT 1.0.8 / schema 19 / 15 named migrations.
 ## 5. Известные ранее найденные проблемы, которые нельзя потерять
 
 Эти пункты уже документированы в проекте. Они не считаются новой функциональностью и не начинают исправляться автоматически:
