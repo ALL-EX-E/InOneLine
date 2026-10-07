@@ -104,6 +104,183 @@ def main() -> int:
 
     sys.excepthook = capture
     try:
+        import_db = Database(root / "p03_import_aliases.db")
+        neutral_csv = root / "p03_neutral_headers.csv"
+        neutral_csv.write_text(
+            "НАЗВАНИЕ;ДАТА;БАЛЛЫ\n"
+            "P03 Neutral;27.08.2019;1500\n",
+            encoding="utf-8",
+        )
+        neutral_result = import_db.import_csv(neutral_csv)
+        if neutral_result["created"] != 1:
+            raise AssertionError(f"neutral CSV import result mismatch: {neutral_result!r}")
+        neutral_game = import_db.find_game_by_title("P03 Neutral")
+        if neutral_game is None:
+            raise AssertionError("neutral CSV title header was not accepted")
+        if neutral_game.release_date != "2019-08-27" or neutral_game.amount != 1500:
+            raise AssertionError(
+                "neutral CSV field mapping mismatch: "
+                f"{neutral_game.release_date!r}, {neutral_game.amount!r}"
+            )
+
+        legacy_csv = root / "p03_legacy_headers.csv"
+        legacy_csv.write_text(
+            "НАЗВАНИЕ ИГРЫ;ДАТА ВЫХОДА;БАЛЛЫ\n"
+            "P03 Legacy;28.08.2019;1600\n",
+            encoding="utf-8",
+        )
+        legacy_result = import_db.import_csv(legacy_csv)
+        if legacy_result["created"] != 1:
+            raise AssertionError(f"legacy CSV import result mismatch: {legacy_result!r}")
+        legacy_game = import_db.find_game_by_title("P03 Legacy")
+        if legacy_game is None:
+            raise AssertionError("legacy CSV title alias stopped working")
+        if legacy_game.release_date != "2019-08-28" or legacy_game.amount != 1600:
+            raise AssertionError(
+                "legacy CSV alias mapping mismatch: "
+                f"{legacy_game.release_date!r}, {legacy_game.amount!r}"
+            )
+
+        def expect_csv_error(name, content, expected_parts, *, with_backup=False):
+            csv_path = root / name
+            csv_path.write_text(content, encoding="utf-8")
+            try:
+                if with_backup:
+                    import_db.import_csv_with_backup(
+                        csv_path,
+                        root / "p03_error_backups",
+                        merge=True,
+                        keep_backups=3,
+                    )
+                else:
+                    import_db.import_csv(csv_path)
+            except Exception as exc:
+                message = str(exc)
+            else:
+                raise AssertionError(f"CSV error case unexpectedly passed: {name}")
+            for expected in expected_parts:
+                if expected not in message:
+                    raise AssertionError(
+                        f"CSV error wording missing {expected!r} for {name}: {message!r}"
+                    )
+            return message
+
+        expect_csv_error(
+            "p03_duplicate.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Duplicate;10\n"
+            " p03 duplicate ;20\n",
+            (
+                "Повторяется название «p03 duplicate» (строка 3).",
+                "Ранее это же название указано в строке 2 как «P03 Duplicate».",
+                "Оставьте в CSV только одну запись с этим названием.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_status.csv",
+            "НАЗВАНИЕ;СТАТУС\n"
+            "P03 Bad Status;НЕИЗВЕСТНО\n",
+            (
+                "Некорректное значение в поле «СТАТУС»",
+                "строка 2",
+                "«НЕИЗВЕСТНО»",
+                "ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО или ЗАБРОШЕНО",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_coop.csv",
+            "НАЗВАНИЕ;КООП/НЕ КООП\n"
+            "P03 Bad Coop;ДА\n",
+            (
+                "Некорректное значение в поле «КООП/НЕ КООП»",
+                "строка 2",
+                "«ДА»",
+                "Допустимо: КООП или НЕ КООП.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_date.csv",
+            "НАЗВАНИЕ;ДАТА\n"
+            "P03 Bad Date;31.02.2019\n",
+            (
+                "Некорректное значение в поле «ДАТА»",
+                "строка 2",
+                "«31.02.2019»",
+                "например 27.08.2019",
+                "или оставьте поле пустым.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_points.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Bad Points;abc\n",
+            (
+                "Некорректное значение в поле «БАЛЛЫ»",
+                "строка 2",
+                "«abc»",
+                "Укажите целое число; если баллов нет, укажите 0.",
+            ),
+        )
+
+        missing_header_message = expect_csv_error(
+            "p03_missing_title_header.csv",
+            "БАЛЛЫ;ДАТА\n"
+            "10;27.08.2019\n",
+            (
+                "Не найден обязательный столбец «НАЗВАНИЕ».",
+                "старое «НАЗВАНИЕ ИГРЫ» также принимается",
+                "«Название|Баллы»",
+            ),
+        )
+        if "Название игры|Баллы" in missing_header_message:
+            raise AssertionError(
+                "missing-header error exposes legacy game-centric format wording"
+            )
+
+        expect_csv_error(
+            "p03_legacy_missing_points.csv",
+            "P03 Legacy Missing|\n",
+            (
+                "Не указаны баллы у «P03 Legacy Missing» (строка 1).",
+                "значение после «|» обязательно",
+                "если баллов нет, укажите 0.",
+            ),
+        )
+
+        atomic_message = expect_csv_error(
+            "p03_atomicity.csv",
+            "НАЗВАНИЕ;СТАТУС\n"
+            "P03 Atomic Good;НЕ ИГРАЛ\n"
+            "P03 Atomic Bad;НЕИЗВЕСТНО\n",
+            (
+                "Некорректное значение в поле «СТАТУС»",
+                "P03 Atomic Bad",
+                "строка 3",
+            ),
+        )
+        if import_db.find_game_by_title("P03 Atomic Good") is not None:
+            raise AssertionError(
+                f"CSV atomicity changed after error wording update: {atomic_message!r}"
+            )
+
+        backup_error = expect_csv_error(
+            "p03_backup_path_error.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Backup Error;abc\n",
+            (
+                "Импорт не выполнен:",
+                "Некорректное значение в поле «БАЛЛЫ»",
+                "Резервная копия перед попыткой импорта:",
+            ),
+            with_backup=True,
+        )
+        if "Резервная копия перед попыткой импорта:" not in backup_error:
+            raise AssertionError("CSV error lost safety-backup path")
+
         db = Database(paths.database_path)
         db.set_setting("api_port", str(free_local_port()))
 
@@ -290,6 +467,53 @@ def main() -> int:
                     f"legacy sorting-rules wording remains {legacy_text!r}"
                 )
 
+        original_information = QMessageBox.information
+        import_help_capture = {}
+
+        def capture_import_help(parent, title, message, *args, **kwargs):
+            import_help_capture["title"] = title
+            import_help_capture["message"] = message
+            return QMessageBox.Ok
+
+        QMessageBox.information = capture_import_help
+        try:
+            window.games_tab.show_import_csv_help()
+        finally:
+            QMessageBox.information = original_information
+
+        if import_help_capture.get("title") != "Правила импорта CSV":
+            raise AssertionError(
+                f"CSV help title mismatch: {import_help_capture!r}"
+            )
+        import_help = import_help_capture.get("message", "")
+        for expected_text in (
+            "Обязательный столбец:\n• НАЗВАНИЕ",
+            "• ДАТА",
+            "• СТАТУС: ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО или ЗАБРОШЕНО",
+            "Если баллов нет, рекомендуется указать 0.",
+            "2. Формат «Название|Баллы»",
+            "Файл без заголовка, одна запись в строке:",
+            "Для совместимости также принимаются старые названия столбцов:",
+            "• НАЗВАНИЕ ИГРЫ",
+            "• ДАТА ВЫХОДА",
+            "Если в файле найдена ошибка, импорт не применяется частично.",
+        ):
+            if expected_text not in import_help:
+                raise AssertionError(
+                    f"CSV help wording missing {expected_text!r}: {import_help!r}"
+                )
+        for legacy_text in (
+            "Обязателен только столбец «НАЗВАНИЕ ИГРЫ».",
+            "Для уже существующей игры",
+            "Для новой игры",
+            "одна игра в строке",
+            "Название игры|Баллы",
+        ):
+            if legacy_text in import_help:
+                raise AssertionError(
+                    f"legacy CSV help wording remains {legacy_text!r}"
+                )
+
         clear_dialog = DeleteAllGamesDialog(7)
         if clear_dialog.windowTitle() != "Очистить список":
             raise AssertionError(
@@ -379,6 +603,82 @@ def main() -> int:
             raise AssertionError("legacy/incorrect add dialog field labels remain")
         if add_dialog.amount_edit.value() != 0:
             raise AssertionError("optional points default changed from 0")
+
+        def assert_date_caret_contract(dialog, mode):
+            # Directly exercise the formatter with a caret in the middle:
+            # auto-inserted separators must not force the caret to the end.
+            dialog.date_edit.setText("26012010")
+            dialog.date_edit.setCursorPosition(4)
+            dialog._format_date_while_typing(dialog.date_edit.text())
+            if dialog.date_edit.text() != "26.01.2010":
+                raise AssertionError(
+                    f"{mode} date auto-format changed: {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != 5:
+                raise AssertionError(
+                    f"{mode} date caret mapping mismatch after auto-format: "
+                    f"{dialog.date_edit.cursorPosition()}"
+                )
+
+            # Backspace in the middle previously reproduced BUG-002:
+            # the old code always jumped to len(formatted).
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setCursorPosition(4)
+            QTest.keyClick(dialog.date_edit, Qt.Key.Key_Backspace)
+            app.processEvents()
+            if dialog.date_edit.cursorPosition() != 3:
+                raise AssertionError(
+                    f"{mode} date Backspace moved caret unexpectedly: "
+                    f"{dialog.date_edit.cursorPosition()}, {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() == len(dialog.date_edit.text()):
+                raise AssertionError(f"{mode} date Backspace still jumps caret to end")
+
+            # Delete in the middle follows the same ordinary QLineEdit caret rule.
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setCursorPosition(3)
+            QTest.keyClick(dialog.date_edit, Qt.Key.Key_Delete)
+            app.processEvents()
+            if dialog.date_edit.cursorPosition() != 3:
+                raise AssertionError(
+                    f"{mode} date Delete moved caret unexpectedly: "
+                    f"{dialog.date_edit.cursorPosition()}, {dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() == len(dialog.date_edit.text()):
+                raise AssertionError(f"{mode} date Delete still jumps caret to end")
+
+            # Replacing a selection should keep the ordinary collapsed caret
+            # directly after the replacement, just like the title field.
+            dialog.date_edit.setText("26.01.2010")
+            dialog.date_edit.setSelection(3, 2)
+            QTest.keyClicks(dialog.date_edit, "12")
+            app.processEvents()
+            if dialog.date_edit.text() != "26.12.2010":
+                raise AssertionError(
+                    f"{mode} date selection replacement changed text unexpectedly: "
+                    f"{dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != 5:
+                raise AssertionError(
+                    f"{mode} date selection replacement caret mismatch: "
+                    f"{dialog.date_edit.cursorPosition()}"
+                )
+
+            # Sequential compact input must retain the established auto-dot behavior.
+            dialog.date_edit.clear()
+            QTest.keyClicks(dialog.date_edit, "26012010")
+            app.processEvents()
+            if dialog.date_edit.text() != "26.01.2010":
+                raise AssertionError(
+                    f"{mode} sequential compact date formatting changed: "
+                    f"{dialog.date_edit.text()!r}"
+                )
+            if dialog.date_edit.cursorPosition() != len(dialog.date_edit.text()):
+                raise AssertionError(
+                    f"{mode} sequential date caret should remain at the end"
+                )
+
+        assert_date_caret_contract(add_dialog, "add")
         add_dialog.deleteLater()
 
         edit_game = Game(
@@ -421,6 +721,7 @@ def main() -> int:
             or "Статус (необязательно):" in edit_dialog_labels
         ):
             raise AssertionError("legacy/incorrect edit dialog field labels remain")
+        assert_date_caret_contract(edit_dialog, "edit")
         edit_dialog.deleteLater()
         app.processEvents()
 
