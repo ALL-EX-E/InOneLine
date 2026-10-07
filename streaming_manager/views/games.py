@@ -82,7 +82,7 @@ class GameDialog(QDialog):
         form.setVerticalSpacing(10)
 
         self.title_edit = QLineEdit()
-        self.title_edit.setPlaceholderText("Например: Control")
+        self.title_edit.setPlaceholderText("Введите название")
         self.title_edit.setClearButtonEnabled(True)
 
         self.date_edit = QLineEdit()
@@ -121,7 +121,7 @@ class GameDialog(QDialog):
         self.status_combo.setMaximumWidth(220)
 
         self.review_edit = QTextEdit()
-        self.review_edit.setPlaceholderText("Отзыв по игре — можно оставить пустым")
+        self.review_edit.setPlaceholderText("Отзыв — можно оставить пустым")
         self.review_edit.setMinimumHeight(150)
 
         form.addRow("Название:", self.title_edit)
@@ -241,7 +241,7 @@ class GameDialog(QDialog):
         self._normalize_date_field()
 
         if not self.title_edit.text().strip():
-            QMessageBox.warning(self, "Проверка", "Введите название игры.")
+            QMessageBox.warning(self, "Проверка", "Введите название.")
             return
         try:
             parse_date(self.date_edit.text())
@@ -259,14 +259,14 @@ class GameDialog(QDialog):
             existing = self.duplicate_lookup(self.title_edit.text())
             if existing is not None:
                 archive_note = (
-                    "\n\nИгра находится в архиве."
+                    "\n\nЗапись находится в архиве."
                     if existing.archived
                     else ""
                 )
                 QMessageBox.warning(
                     self,
-                    "Игра уже существует",
-                    f"Данная игра уже есть в списке:\n\n«{existing.title}»"
+                    "Запись уже существует",
+                    f"Такая запись уже есть в списке:\n\n«{existing.title}»"
                     f"{archive_note}",
                 )
                 if self.game is None:
@@ -294,7 +294,7 @@ class GameDialog(QDialog):
         prompt = (
             "Точно сохранить изменения?"
             if self.game
-            else "Точно сохранить новую игру?"
+            else "Точно сохранить новую запись?"
         )
         if not self._ask_yes_no("Подтверждение сохранения", prompt):
             return
@@ -418,13 +418,13 @@ class GamesTab(QWidget):
 
         self.search_btn = QPushButton("Найти")
         self.search_btn.setToolTip(
-            "Показать список и перейти к первой найденной игре"
+            "Показать список и перейти к первой найденной записи"
         )
         self.search_btn.clicked.connect(self.activate_search)
 
         self.reset_filters_btn = QPushButton("Сбросить фильтры")
         self.reset_filters_btn.setToolTip(
-            "Очистить поиск и показать все игры, включая архив"
+            "Очистить поиск и показать все записи, включая архив"
         )
         self.reset_filters_btn.clicked.connect(self.reset_filters)
 
@@ -442,16 +442,16 @@ class GamesTab(QWidget):
         self.restore_btn = QPushButton("Восстановить из архива")
         self.delete_btn = QPushButton("Удалить")
         self.delete_btn.setProperty("danger", True)
-        self.delete_btn.setToolTip("Безвозвратно удалить выбранную игру и все связанные с ней данные")
+        self.delete_btn.setToolTip("Безвозвратно удалить выбранную запись и все связанные с ней данные")
         self.import_btn = QPushButton("Импорт CSV")
-        self.import_btn.setToolTip("Импортировать игры из CSV. Правила формата — кнопка ?")
+        self.import_btn.setToolTip("Импортировать записи из CSV. Правила формата — кнопка ?")
         self.import_help_btn = QPushButton("?")
         self.import_help_btn.setFixedWidth(34)
         self.import_help_btn.setToolTip("Правила импорта CSV")
         self.clear_all_btn = QPushButton("Очистить список")
         self.clear_all_btn.setProperty("danger", True)
         self.clear_all_btn.setToolTip(
-            "Удалить все игровые записи после подтверждения и обязательного safety-backup"
+            "Удалить все записи после подтверждения и обязательного safety-backup"
         )
 
         self.add_btn.clicked.connect(self.add_game)
@@ -498,35 +498,35 @@ class GamesTab(QWidget):
 
         self.total_badge = make_stat_button(
             "all",
-            "Показать все игры в базе, включая архив. Архивные записи идут внизу.",
+            "Показать все записи, включая архив. Архивные записи идут внизу.",
         )
         self.playing_badge = make_stat_button(
             STATUS_PLAYING,
-            "Показать только игры со статусом ПРОХОДИТСЯ",
+            "Показать только записи со статусом ПРОХОДИТСЯ",
         )
         self.auction_badge = make_stat_button(
             "middle",
-            "Показать игры со статусами ИГРАЛ и НЕ ИГРАЛ",
+            "Показать записи со статусами ИГРАЛ и НЕ ИГРАЛ",
         )
         self.played_badge = make_stat_button(
             STATUS_PLAYED,
-            "Показать только игры со статусом ИГРАЛ",
+            "Показать только записи со статусом ИГРАЛ",
         )
         self.not_played_badge = make_stat_button(
             STATUS_NOT_PLAYED,
-            "Показать только игры со статусом НЕ ИГРАЛ",
+            "Показать только записи со статусом НЕ ИГРАЛ",
         )
         self.completed_badge = make_stat_button(
             STATUS_COMPLETED,
-            "Показать только игры со статусом ПРОЙДЕНО",
+            "Показать только записи со статусом ПРОЙДЕНО",
         )
         self.abandoned_badge = make_stat_button(
             STATUS_ABANDONED,
-            "Показать только игры со статусом ЗАБРОШЕНО",
+            "Показать только записи со статусом ЗАБРОШЕНО",
         )
         self.archived_badge = make_stat_button(
             "archive",
-            "Показать только игры из архива",
+            "Показать только записи из архива",
         )
 
         # Ранее КООП / НЕ КООП были вариантами выпадающего меню.
@@ -534,11 +534,11 @@ class GamesTab(QWidget):
         # они также становятся кликабельными статистическими фильтрами.
         self.coop_badge = make_stat_button(
             "coop",
-            "Показать только кооперативные игры",
+            "Показать только кооперативные записи",
         )
         self.noncoop_badge = make_stat_button(
             "noncoop",
-            "Показать только некооперативные игры",
+            "Показать только некооперативные записи",
         )
 
         stats.addStretch()
@@ -553,7 +553,7 @@ class GamesTab(QWidget):
         self.sorting_rules_btn.clicked.connect(self.show_sorting_rules)
 
         self.list_toggle_btn = QPushButton("Скрыть список")
-        self.list_toggle_btn.setToolTip("Скрыть или показать таблицу со списком игр")
+        self.list_toggle_btn.setToolTip("Скрыть или показать таблицу списка")
         self.list_toggle_btn.clicked.connect(self.toggle_games_list)
 
         self.copy_list_overlay_url_btn = QPushButton("Копировать URL списка")
@@ -576,7 +576,7 @@ class GamesTab(QWidget):
 
         self.table = QTableWidget(0, 9)
         self.table.setHorizontalHeaderLabels([
-            "ID", "СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ ИГРЫ", "ДАТА ВЫХОДА",
+            "ID", "СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "ДАТА ВЫХОДА",
             "БАЛЛЫ", "КООП/НЕ КООП", "СТАТУС", "ОТЗЫВ",
         ])
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -657,7 +657,7 @@ class GamesTab(QWidget):
         section_layout.addWidget(title)
 
         description = QLabel(
-            "Обычный XLSX с основным списком игр. Файл можно хранить в папке "
+            "Обычный XLSX с основным списком. Файл можно хранить в папке "
             "Google Drive Desktop и редактировать через Google Таблицы. Все "
             "подключённые экземпляры In one line равноправны; применяется "
             "последняя полученная версия файла."
@@ -687,12 +687,12 @@ class GamesTab(QWidget):
             self.layout().insertWidget(table_index, section)
 
     def _game_title_header_min_width(self) -> int:
-        """Return a DPI-aware floor that always fits ``НАЗВАНИЕ ИГРЫ``."""
+        """Return a DPI-aware floor that always fits ``НАЗВАНИЕ``."""
         header = self.table.horizontalHeader()
         self.table.ensurePolished()
         header.ensurePolished()
         item = self.table.horizontalHeaderItem(3)
-        text = item.text() if item is not None else "НАЗВАНИЕ ИГРЫ"
+        text = item.text() if item is not None else "НАЗВАНИЕ"
         metrics = header.fontMetrics()
         padding = max(44, metrics.horizontalAdvance("MMMM"))
         return max(
@@ -1050,8 +1050,8 @@ class GamesTab(QWidget):
             except DuplicateGameError as exc:
                 QMessageBox.warning(
                     self,
-                    "Игра уже существует",
-                    f"Данная игра уже есть в списке:\n\n«{exc.existing_title}»",
+                    "Запись уже существует",
+                    f"Такая запись уже есть в списке:\n\n«{exc.existing_title}»",
                 )
                 self.focus_game(exc.existing_id)
                 return
@@ -1129,8 +1129,8 @@ class GamesTab(QWidget):
             except DuplicateGameError as exc:
                 QMessageBox.warning(
                     self,
-                    "Игра уже существует",
-                    f"Данная игра уже есть в списке:\n\n«{exc.existing_title}»",
+                    "Запись уже существует",
+                    f"Такая запись уже есть в списке:\n\n«{exc.existing_title}»",
                 )
                 self.focus_game(exc.existing_id)
                 return
@@ -1159,7 +1159,7 @@ class GamesTab(QWidget):
             answer = QMessageBox.question(
                 self,
                 "Архив",
-                f"Переместить «{game.title}» в архив?\n\nДанные игры не будут удалены.",
+                f"Переместить «{game.title}» в архив?\n\nДанные записи не будут удалены.",
             )
             if answer != QMessageBox.Yes:
                 return
@@ -1191,7 +1191,7 @@ class GamesTab(QWidget):
 
         game_count = self.db.count_all_games()
         if game_count <= 0:
-            QMessageBox.information(self, "Очистить все игры", "Список игр уже пуст.")
+            QMessageBox.information(self, "Очистить список", "Список уже пуст.")
             self._update_action_state()
             return
 
@@ -1235,8 +1235,8 @@ class GamesTab(QWidget):
 
         QMessageBox.information(
             self,
-            "Игры удалены",
-            f"Удалено игр: {result['deleted_games']}.\n"
+            "Записи удалены",
+            f"Удалено записей: {result['deleted_games']}.\n"
             f"Сохранено записей истории аукционов: "
             f"{result['preserved_auction_entries']}.\n\n"
             f"Резервная копия перед очисткой:\n{result['backup_path']}",
@@ -1277,11 +1277,11 @@ class GamesTab(QWidget):
 
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Warning)
-        box.setWindowTitle("Удалить игру навсегда?")
+        box.setWindowTitle("Удалить запись навсегда?")
         box.setText(f"Удалить «{game.title}» полностью?")
         box.setInformativeText(
-            "Будут безвозвратно удалены сама игра и связанные с ней рабочие данные.\n\n"
-            "Предыдущая подробная история этой игры будет очищена; в журнале останется "
+            "Будут безвозвратно удалены сама запись и связанные с ней рабочие данные.\n\n"
+            "Предыдущая подробная история этой записи будет очищена; в журнале останется "
             "только факт удаления. Перед удалением программа автоматически создаст "
             "резервную копию базы."
         )
@@ -1349,7 +1349,7 @@ class GamesTab(QWidget):
 
         QMessageBox.information(
             self,
-            "Игра удалена",
+            "Запись удалена",
             f"«{title}» удалена полностью.\n\n"
             f"Резервная копия перед удалением:\n{result['backup_path']}",
         )
