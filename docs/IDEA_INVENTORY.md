@@ -1,6 +1,6 @@
 # InOneLine — Полный реестр пользовательских идей
 
-Обновлено: **2026-10-02**
+Обновлено: **2026-10-07**
 
 Этот файл — долговременный инвентарь продуктовых идей и решений пользователя по InOneLine / Streaming Manager. Он не заменяет `PROJECT_STATE.md` и `ROADMAP.md`: здесь сохраняется **полная история идей**, включая уже выполненные, отложенные, отклонённые и superseded.
 
@@ -98,7 +98,7 @@
 - **Wheel OBS Overlay и Timer Overlay** — **IMPLEMENTED / ACCEPTED**.
 - **Winner confirmation lifecycle сохраняется** — **EXISTING / PRESERVE**.
 - **Cross-surface data synchronization invariant** — **IMPLEMENTED / ACCEPTED**: изменение статуса/баллов через аукцион должно без ручного F5 обновлять authoritative DB и связанные представления `Игры`, `Публичный список`, `Аукцион`, `Журнал` и применимые OBS/API surfaces; перенос temporary lots после completion/cancel следует тому же правилу.
-- **Auction autoscroll boundary** — **IMPLEMENTED / ACCEPTED / PRESERVE**: Auction → Lots, Auction → Conduct and the dedicated Auction Lots OBS overlay share one current-session autoscroll state. It starts **OFF on every application launch**, is intentionally **not persisted**, and does not inherit Games/List presentation persistence. This existing auction-specific behavior must not be revived as a separate Games/List autoscroll backlog item.
+- **Auction autoscroll boundary** — **IMPLEMENTED / ACCEPTED CURRENT 1.0.8; FUTURE TARGET SUPERSEDED BY UI-074**: released 1.0.8 shares one non-persisted current-session autoscroll state across Auction → Lots, Auction → Conduct and Auction Lots OBS. This remains historical/current-runtime truth, but it is no longer the pending review target. UI-074 requires the future local auction table to stop autoscrolling entirely and a persisted `Автопрокрутка оверлея` switch to control only `/auction-lots-overlay`. This still must not be revived as a separate Games/List autoscroll backlog item.
 - **Open-auction / selected-winner persistence across restart** — **IMPLEMENTED / ACCEPTED**: поддерживаемые open-session states и уже выбранный winner/frozen result должны восстанавливаться после перезапуска, а не вычисляться заново.
 
 ## Product S/A MAIN items
@@ -616,6 +616,7 @@ These identifiers are **not** Product A1–A8 and **not** Maintenance A1–A10 f
   - Public List keeps search/Public XLSX but loses duplicate CSV/JSON/Excel buttons;
   - shared main-list XLSX controls move to Games;
   - auction time editors receive explicit readable width floors.
+  - **Later target supersession, 2026-10-07:** this remains the historical released organization only. UI-088/UI-090 move public CSV/JSON/XLSX actions back to `Публичный список`, remove the legacy compatible-export block and remove the inner `Настройки → Экспорт` tab entirely.
 - **R1.0.10 — cold-start auction-duration field height floor**: minimum 34 px avoids first-layout vertical clipping at saved 1100×700 without reintroducing automatic window resizing — **MANUALLY ACCEPTED / RELEASED as 1.0.0**.
 - R1.0.7, R1.0.8 and R1.0.9 candidate statuses themselves remain **SUPERSEDED / NOT ACCEPTED**; only their retained corrected behavior is part of final accepted 1.0.0.
 
@@ -638,3 +639,18 @@ The original early-pass conclusions were superseded by repeated user-requested f
 Canonical current selection: `PROJECT_STATE.md` + `ROADMAP.md`.
 Full exhaustive idea/history ledger: this file.
 Detailed reconciliation trail: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
+
+
+# XXI. 2026-10-07 completed UI-review target
+
+This section records the latest accepted review target while preserving all historical implemented/rejected/deferred entries above.
+
+- Full tab-by-tab UI/function review is complete; detailed implementation target lives in `docs/ACTIVE_REVIEW_LEDGER.md`.
+- Runtime/source remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations** until the user later says `«всё делаем»`.
+- **UI-087** is the authoritative future target for ordinary empty-message external events during a running auction: create sequential temporary lots `Без текста N`; standard empty-message donations do not use a generic `Требует привязки` workflow.
+- **UI-074** supersedes the old auction-autoscroll behavior as future target: no local auction-table autoscroll; persisted OBS-only overlay autoscroll.
+- **UI-088/UI-090** supersede R1.0.9 export organization as future target: public CSV/JSON/XLSX file exports live on `Публичный список`; legacy compatible export and `Настройки → Экспорт` are removed.
+- **UI-044** is superseded as written because its destination tab is removed; `/api/public` itself remains.
+- QA-1.0.8-01 and QA-1.0.8-02 remain findings without implementation approval; QA-1.0.8-03 has an approved target through UI-087.
+- Three questions remain explicitly unresolved and must not be inferred: UI-053 timer-preview action, AUCTION-TIMER-REVIEW-002 tie-overtime saved default, AUCTION-TIMER-REVIEW-003 short-spin lead-in.
+
