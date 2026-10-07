@@ -562,10 +562,6 @@ class GamesTab(QWidget):
         )
         self.sorting_rules_btn.clicked.connect(self.show_sorting_rules)
 
-        self.list_toggle_btn = QPushButton("Скрыть список")
-        self.list_toggle_btn.setToolTip("Скрыть или показать таблицу списка")
-        self.list_toggle_btn.clicked.connect(self.toggle_games_list)
-
         self.copy_list_overlay_url_btn = QPushButton("Копировать URL списка")
         self.copy_list_overlay_url_btn.setToolTip(
             "Скопировать URL отдельного OBS-списка с Top-3 и прокручиваемым списком"
@@ -578,7 +574,6 @@ class GamesTab(QWidget):
         )
 
         sorting_actions.addWidget(self.sorting_rules_btn)
-        sorting_actions.addWidget(self.list_toggle_btn)
         sorting_actions.addWidget(self.copy_list_overlay_url_btn)
         sorting_actions.addWidget(self.open_list_overlay_preview_btn)
         sorting_actions.addStretch()
@@ -625,14 +620,6 @@ class GamesTab(QWidget):
         self.table.doubleClicked.connect(self.edit_game)
         self.table.itemSelectionChanged.connect(self._update_action_state)
         layout.addWidget(self.table, 1)
-
-        # Когда таблица скрыта в развёрнутом/растянутом окне, это растяжение
-        # забирает свободную высоту на себя. Панель управления остаётся сверху
-        # и не деформируется.
-        self.hidden_list_spacer = QWidget()
-        self.hidden_list_spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.hidden_list_spacer.hide()
-        layout.addWidget(self.hidden_list_spacer, 1)
 
         self.shortcuts = []
         for key, handler in (
@@ -726,39 +713,6 @@ class GamesTab(QWidget):
         if new_size < required:
             self.table.setColumnWidth(3, required)
 
-    def set_games_list_visible(self, visible: bool, adjust_window: bool = True):
-        # R1.0.7: list visibility is a child-layout concern only. The previous
-        # compact-window implementation changed MainWindow minimumHeight/resize
-        # here, which caused tab jumps and the confirmed duplicate-game shrink.
-        _ = adjust_window
-
-        if not visible:
-            self.table.clearSelection()
-            self.table.setCurrentCell(-1, -1)
-
-        self.table.setVisible(visible)
-        self.hidden_list_spacer.setVisible(not visible)
-        self.list_toggle_btn.setText(
-            "Скрыть список" if visible else "Показать список"
-        )
-        self.list_toggle_btn.setToolTip(
-            "Скрыть таблицу списка"
-            if visible
-            else "Показать таблицу списка"
-        )
-        self._update_action_state()
-
-    def toggle_games_list(self):
-        self.set_games_list_visible(self.table.isHidden())
-
-    def _show_synced_lists(self):
-        """Показывает оба синхронизированных списка через главное окно."""
-        window = self.window()
-        if hasattr(window, "set_synced_lists_visible"):
-            window.set_synced_lists_visible(True)
-        else:
-            self.set_games_list_visible(True)
-
     def _search_text_changed(self, text: str):
         """Refresh the visible source once and synchronize hidden search views."""
         window = self.window()
@@ -813,12 +767,9 @@ class GamesTab(QWidget):
         self._select_game_row(game_id)
 
     def activate_search(self):
-        """Показывает список и переходит к первой строке результата поиска."""
+        """Переходит к первой строке результата поиска."""
         query = self.search.text().strip()
 
-        # Если список скрыт — поиск по Enter или кнопке «Найти»
-        # раскрывает обе синхронизированные таблицы.
-        self._show_synced_lists()
         self.refresh()
 
         if self.table.rowCount() == 0:
@@ -1100,10 +1051,6 @@ class GamesTab(QWidget):
         game = self.db.get_game(game_id)
         if not game:
             return
-
-        # Если список был скрыт, показываем обе синхронизированные таблицы,
-        # иначе состояние кнопок на двух вкладках разойдётся.
-        self._show_synced_lists()
 
         # Поиск и статистический фильтр могут скрывать найденную запись.
         self.search.blockSignals(True)

@@ -91,6 +91,11 @@ def main() -> int:
     settings.setValue("main_window/geometry", probe.saveGeometry())
     settings.setValue("main_window/maximized", False)
     settings.setValue("main_window/tab_index", 0)
+    obsolete_list_keys = (
+        "lists/visible", "games/list_visible", "public/list_visible",
+    )
+    for key in obsolete_list_keys:
+        settings.setValue(key, False)
     settings.sync()
     probe.deleteLater()
 
@@ -391,10 +396,42 @@ def main() -> int:
                 f"public-list search tooltip mismatch: {window.public_tab.search_btn.toolTip()!r}"
             )
 
-        if window.games_tab.list_toggle_btn.toolTip() != "Скрыть таблицу списка":
-            raise AssertionError(
-                f"list-toggle tooltip mismatch: {window.games_tab.list_toggle_btn.toolTip()!r}"
-            )
+        # P04-A: upgrading from hidden-list preferences must still show both
+        # tables, preserve window state and keep explicit Enter navigation.
+        original_size = window.size()
+        if window.tabs.currentIndex() != 0:
+            raise AssertionError("retiring list visibility changed the restored tab")
+        for tab in (window.games_tab, window.public_tab):
+            window.tabs.setCurrentWidget(tab)
+            app.processEvents()
+            if not tab.table.isVisible() or tab.table.rowCount() != 2:
+                raise AssertionError("legacy hidden-list preference hid or changed a table")
+            buttons = {button.text() for button in tab.findChildren(QPushButton)}
+            if {"Скрыть список", "Показать список"} & buttons:
+                raise AssertionError("retired list-hiding action remains in the UI")
+            tab.search.setText("Smoke Game A")
+            QTest.keyClick(tab.search, Qt.Key_Return)
+            app.processEvents()
+            if tab.selected_game_id() != first_id:
+                raise AssertionError("Enter navigation failed after list-hiding removal")
+            if window.games_tab.selected_game_id() != first_id:
+                raise AssertionError("Enter selection stopped synchronizing with the main list")
+            if window.public_tab.selected_game_id() != first_id:
+                raise AssertionError("Enter selection stopped synchronizing with Public")
+            tab.search.clear()
+            app.processEvents()
+            if window.size() != original_size:
+                raise AssertionError("list tab/search changed the outer window size")
+        window._save_ui_state()
+        reopened = open_ui_settings(paths.data_dir, migrate_native=False)
+        if any(reopened.contains(key) for key in obsolete_list_keys):
+            raise AssertionError("obsolete list visibility survived or was re-created on save")
+        if not reopened.contains("main_window/geometry"):
+            raise AssertionError("retiring list visibility removed saved window geometry")
+        if reopened.value("main_window/tab_index", -1, type=int) != 1:
+            raise AssertionError("retiring list visibility changed saved tab persistence")
+        window.tabs.setCurrentWidget(window.games_tab)
+        app.processEvents()
         duplicate_error = DuplicateGameError(1, "QA")
         if str(duplicate_error) != "Запись «QA» уже существует в списке.":
             raise AssertionError(

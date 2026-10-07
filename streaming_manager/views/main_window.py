@@ -164,21 +164,6 @@ class MainWindow(QMainWindow):
             self.settings_tab._refresh_wheel_center_image_library
         )
 
-        # Одно состояние списка для вкладок «Игры» и «Публичный список».
-        self._lists_visible = True
-        self.games_tab.list_toggle_btn.clicked.disconnect(
-            self.games_tab.toggle_games_list
-        )
-        self.games_tab.list_toggle_btn.clicked.connect(
-            self.toggle_synced_lists
-        )
-        self.public_tab.list_toggle_btn.clicked.disconnect(
-            self.public_tab.toggle_public_list
-        )
-        self.public_tab.list_toggle_btn.clicked.connect(
-            self.toggle_synced_lists
-        )
-
         # Синхронизированный поиск маршрутизируется самими вкладками через
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
@@ -271,8 +256,6 @@ class MainWindow(QMainWindow):
 
     def sync_search_result(self, game_id: int, source: str):
         """Synchronize the first explicit Find/Enter result between game lists."""
-        self.set_synced_lists_visible(True)
-
         game = self.db.get_game(game_id)
         if game is None:
             return
@@ -299,29 +282,8 @@ class MainWindow(QMainWindow):
         self._refresh_dirty_search_target(self.auction_tab, force=True)
         self.auction_tab.select_synced_search_result(game_id)
 
-    def set_synced_lists_visible(
-        self,
-        visible: bool,
-        adjust_window: bool = True,
-    ):
-        """Синхронно показывает/скрывает списки без изменения размера окна."""
-        self._lists_visible = bool(visible)
-
-        # ``adjust_window`` is kept for call-site compatibility with the
-        # accepted pre-1.0 code, but R1.0.7 deliberately ignores it. Hiding or
-        # showing a child table is not a user request to resize MainWindow.
-        _ = adjust_window
-        self.games_tab.set_games_list_visible(
-            self._lists_visible,
-            adjust_window=False,
-        )
-        self.public_tab.set_public_list_visible(
-            self._lists_visible,
-            adjust_window=False,
-        )
-
     def _handle_tab_changed(self, index: int):
-        """Компактная высота используется только на вкладках со скрытой таблицей."""
+        """Refresh the selected tab without changing the outer window geometry."""
         if index < 0 or index >= self.tabs.count():
             return
 
@@ -362,36 +324,19 @@ class MainWindow(QMainWindow):
             lambda: self.tabs.setFocus(Qt.OtherFocusReason),
         )
 
-        # R1.0.7: tab changes may refresh/reflow child widgets but never change
-        # the outer window geometry. The former compact-height mode caused
-        # visible jumps between tabs and also interacted with modal workflows.
-        if current is self.stream_tab and not self._lists_visible:
-            QTimer.singleShot(0, self._scroll_stream_to_top)
-
-    def _scroll_stream_to_top(self):
-        bar = self.stream_tab.stream_scroll.verticalScrollBar()
-        bar.setValue(bar.minimum())
-
-    def toggle_synced_lists(self):
-        """Одна кнопка на любой из двух вкладок переключает оба списка."""
-        self.set_synced_lists_visible(not self._lists_visible)
-
     def _restore_ui_state(self):
-        """Восстанавливает окно и единое состояние списков."""
+        """Restore window state and discard obsolete list-hiding preferences."""
         settings = self._ui_settings
 
-        # Состояние списков восстанавливается независимо от геометрии.
-        # R1.0.7 больше не имеет автоматического компактного размера окна.
-        legacy_games_visible = settings.value(
-            "games/list_visible",
-            True,
-            type=bool,
-        )
-        list_visible = settings.value(
+        # UI-025 keeps both tables visible. Remove only the retired preferences;
+        # geometry, selected tab and the legacy migration backup remain intact.
+        for key in (
             "lists/visible",
-            legacy_games_visible,
-            type=bool,
-        )
+            "games/list_visible",
+            "public/list_visible",
+        ):
+            settings.remove(key)
+        settings.sync()
 
         geometry = settings.value("main_window/geometry")
         if geometry is not None:
@@ -400,11 +345,6 @@ class MainWindow(QMainWindow):
         tab_index = settings.value("main_window/tab_index", 0, type=int)
         if 0 <= tab_index < self.tabs.count():
             self.tabs.setCurrentIndex(tab_index)
-
-        self.set_synced_lists_visible(
-            list_visible,
-            adjust_window=False,
-        )
 
         # Синхронизируем runtime-видимость текущей вкладки после restoreGeometry,
         # но обработчик больше не меняет размеры MainWindow.
@@ -424,19 +364,6 @@ class MainWindow(QMainWindow):
         settings.setValue("main_window/maximized", self.isMaximized())
         settings.setValue("main_window/tab_index", self.tabs.currentIndex())
 
-        settings.setValue(
-            "lists/visible",
-            self._lists_visible,
-        )
-        # Дублируем значение в старые ключи для совместимости.
-        settings.setValue(
-            "games/list_visible",
-            self._lists_visible,
-        )
-        settings.setValue(
-            "public/list_visible",
-            self._lists_visible,
-        )
         settings.sync()
 
     def _integration_runtime_health_snapshot(self) -> dict[str, dict]:
