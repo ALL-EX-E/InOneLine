@@ -49,6 +49,38 @@
 - Rules Overlay is the main resolved exception case: UI-060 composite template owns Rules text/appearance; GLOBAL-OBS-VISIBILITY-001 later owns widget-level show-mode; Stream/OBS does not host a second Rules settings/save copy.
 - Stop with unresolved source-auction pending does not auto-discard it: Stop closes without winner/materializes lots; later explicit Apply can credit the corresponding persistent target exactly once without reopening session state.
 - Next plan step is point 3: sort implementation so shared foundations are changed before dependent UI and each accepted change can be manually verified in isolation.
+## Final implementation queue — point 3 COMPLETE
+
+Detailed source of truth: `docs/ACTIVE_REVIEW_LEDGER.md` §4.7.
+
+Execution rule: each package below is one candidate/review gate. Do not start the next package before automated checks + user manual acceptance of the previous package. Exact CURRENT 1.0.8 remains rollback baseline until a candidate is accepted.
+
+1. **P00** — exact baseline/regression gate.
+2. **P01** — MainWindow shell/menu/F5 cleanup.
+3. **P02** — low-risk List/Public labels/dialogs.
+4. **P03** — CSV/import + date/caret correctness.
+5. **P04** — search/filter/selection/hide-list cleanup + total points.
+6. **P05** — Public file export relocation + remove Settings Export.
+7. **P06** — window sizing/state/tab-order migration + full backup ui_state.
+8. **P07** — one position policy + XLSX derived position.
+9. **P08** — shared media dedup/availability foundation.
+10. **P09** — Stream/OBS structural cleanup and API-control removal.
+11. **P10** — common OBS show-mode + timer/music widget presentation/audio help.
+12. **P11** — Rules composite editor/overlay.
+13. **P12** — single Auction page + lot-search scope.
+14. **P13** — Auction layout/timer contextual UI/quick actions.
+15. **P14** — Auction Lots Overlay + OBS-only autoscroll/footer.
+16. **P15** — Wheel OBS widget + appearance/center-image UX.
+17. **P16** — authoritative timer/wheel/audio timing core.
+18. **P17** — Auction Settings over final timer/wheel foundations.
+19. **P18** — integration connection/state UX + Auction readiness/RNG navigation.
+20. **P19** — conversion/pending-rate workflow.
+21. **P20** — Max Amount/Wheel business state machine.
+22. **P21** — source-time pending gate + `Без текста N`.
+23. **P22** — integration transparency + final History/Journal presentation.
+24. **FINAL GATE** — complete automated/manual regression and release acceptance.
+
+Mechanical coverage: UI-001…UI-090 = 90/90 accounted for, no missing IDs, no duplicate package assignment. UI-014/016/017/018/023/026/027/031/044/057 are preserve/resolved/superseded validation-only items; QA-1.0.8-01/02 remain outside this batch; QA-1.0.8-03 is handled by P21/UI-087.
 ## Сохранённые future scope после текущего review-batch
 
 Эти пункты сохранены для будущего и **не являются следующей автоматической очередью**, пока текущий review-batch не сверён по зависимостям и не реализован/закрыт. Для каждого из них позже всё равно требуется fresh exact-CURRENT review и отдельное решение пользователя.
