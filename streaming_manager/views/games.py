@@ -124,8 +124,8 @@ class GameDialog(QDialog):
         self.review_edit.setPlaceholderText("Отзыв по игре — можно оставить пустым")
         self.review_edit.setMinimumHeight(150)
 
-        form.addRow("Название игры:", self.title_edit)
-        form.addRow("Дата выхода:", self.date_edit)
+        form.addRow("Название:", self.title_edit)
+        form.addRow("Дата:", self.date_edit)
         form.addRow("Баллы:", self.amount_edit)
         form.addRow("Кооператив:", self.coop_combo)
         form.addRow("Статус:", self.status_combo)
