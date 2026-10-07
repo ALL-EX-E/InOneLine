@@ -316,3 +316,11 @@ jobs:
           Write-Host "CLEAN_INSTALL_DATA_DIRS=$($actualDirs -join ',')"
           Write-Host "CLEAN_INSTALL_DATA_FILES=$($actualFiles -join ',')"
           Write-Host "CLEAN_INSTALL_FILESYSTEM=PASS"
+
+      - name: Preserve Windows installer for manual QA
+        uses: actions/upload-artifact@v7
+        with:
+          name: InOneLine_1.0.8_WINDOWS_QA
+          path: installer/output/InOneLine_Setup_1.0.8.exe
+          if-no-files-found: error
+          retention-days: 7
