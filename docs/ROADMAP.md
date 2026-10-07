@@ -99,7 +99,8 @@
 - P03-A / UI-021 complete on `candidate/p03-csv-date-caret`: canonical CSV headers `НАЗВАНИЕ` + `ДАТА` are accepted while legacy `НАЗВАНИЕ ИГРЫ` + `ДАТА ВЫХОДА` remain aliases. Implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`; regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
 - P03-B / UI-020 complete: CSV help rewritten to the accepted neutral/canonical wording while explicitly preserving legacy aliases and `ИГРАЛ / НЕ ИГРАЛ` status labels. Implementation `a70f00688650638ff2173ba942b418db26ba8201`; GUI regression `ec74bed827edaa675f6360dd703326e442f38ee9`.
 - P03-C / UI-019 complete: CSV error messages now state the problem, source row/value and correction guidance; TEST-001 error scenarios + atomicity + backup-path preservation are automated in the existing GUI smoke. Implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`; regression `2230c10a06a986389bff3ab546afbe011368730c` + `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`.
-- P03 remains a candidate; next small step is BUG-002 only.
+- P03-D / BUG-002 complete: existing date auto-format now preserves logical caret position instead of jumping to the end. Implementation `7872121a09c740e99073053d9b1ee9e776296202`; regression `2fd76ae1260738fdf289b36de084ac2b15234e19` covers Add/Edit, Backspace, Delete, selection replacement and sequential input.
+- P03 implementation scope is complete as candidate. Next: candidate-wide regression/review preparation; P03 is not accepted yet.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
