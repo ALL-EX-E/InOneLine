@@ -3533,5 +3533,5 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Draft PR #29, candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`; exact diff vs base is only `streaming_manager/views/games.py` and existing `tools/gui_regression_smoke.py` (72 additions / 3 deletions). UI-007/UI-008/UI-009/UI-028/UI-076 are not included.
 - Candidate Windows Regression Foundation `37654068727` — **SUCCESS**, including Native GUI, frozen startup/Browser Source, installer build and silent install. Publication wording gate `37654069253` — **SUCCESS**.
 - Artifact `11497079107`, ZIP size 46,766,270 bytes, SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`. ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,626,429 bytes, SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
-- Drive handoff: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`, verified Drive size 46,766,270 bytes.
+- Drive handoff: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`, verified Drive size 46,766,270 bytes.
 - **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.** Do not start another P04 implementation item until this candidate is manually accepted and promoted.
