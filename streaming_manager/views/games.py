@@ -162,7 +162,7 @@ class GameDialog(QDialog):
         self.title_edit.setFocus()
 
     def _format_date_while_typing(self, text: str):
-        """Ставит точки автоматически при обычном цифровом вводе."""
+        """Ставит точки автоматически, не перенося caret в конец поля."""
         if not text:
             return
 
@@ -171,29 +171,39 @@ class GameDialog(QDialog):
         if any(ch not in "0123456789." for ch in text):
             return
 
+        def format_numeric_date(value: str) -> str:
+            digits = "".join(ch for ch in value if ch.isdigit())
+            trailing_dot = value.endswith(".")
+
+            if len(digits) <= 2:
+                result = digits
+                if trailing_dot and len(digits) == 2:
+                    result += "."
+                return result
+            if len(digits) <= 4:
+                result = f"{digits[:2]}.{digits[2:]}"
+                if trailing_dot and len(digits) == 4:
+                    result += "."
+                return result
+            return f"{digits[:2]}.{digits[2:4]}.{digits[4:]}"
+
         digits = "".join(ch for ch in text if ch.isdigit())
         if len(digits) > 8:
             return
 
-        trailing_dot = text.endswith(".")
-
-        if len(digits) <= 2:
-            formatted = digits
-            if trailing_dot and len(digits) == 2:
-                formatted += "."
-        elif len(digits) <= 4:
-            formatted = f"{digits[:2]}.{digits[2:]}"
-            if trailing_dot and len(digits) == 4:
-                formatted += "."
-        else:
-            formatted = f"{digits[:2]}.{digits[2:4]}.{digits[4:]}"
-
+        cursor_position = self.date_edit.cursorPosition()
+        formatted = format_numeric_date(text)
         if formatted == text:
             return
 
+        # Форматируем также только часть строки слева от caret. Её длина
+        # после вставки точек даёт логическую позицию caret в новой строке.
+        formatted_prefix = format_numeric_date(text[:cursor_position])
+        restored_cursor = min(len(formatted), len(formatted_prefix))
+
         self.date_edit.blockSignals(True)
         self.date_edit.setText(formatted)
-        self.date_edit.setCursorPosition(len(formatted))
+        self.date_edit.setCursorPosition(restored_cursor)
         self.date_edit.blockSignals(False)
 
     def _normalize_date_field(self):
@@ -1367,27 +1377,43 @@ class GamesTab(QWidget):
             self,
             "Правила импорта CSV",
             "Поддерживаются два варианта CSV.\n\n"
-            "1. Обычный CSV с заголовками\n"
-            "Обязателен только столбец «НАЗВАНИЕ ИГРЫ».\n"
-            "Дополнительные поддерживаемые столбцы: «ДАТА ВЫХОДА», «БАЛЛЫ» (старые «БАЛЛЫ SM» и «СУММА» тоже принимаются), "
-            "«КООП/НЕ КООП», «СТАТУС», «ОТЗЫВ».\n"
-            "Они могут идти в любом порядке. Отсутствующие столбцы не считаются ошибкой.\n"
-            "Неизвестные дополнительные столбцы игнорируются.\n"
-            "Пустая ячейка означает «значение не предоставлено» и не стирает уже "
-            "существующие данные игры.\n\n"
+            "1. Обычный CSV с заголовками\n\n"
+            "Обязательный столбец:\n"
+            "• НАЗВАНИЕ\n\n"
+            "Дополнительные столбцы:\n"
+            "• ДАТА\n"
+            "• БАЛЛЫ\n"
+            "• КООП/НЕ КООП\n"
+            "• СТАТУС\n"
+            "• ОТЗЫВ\n\n"
+            "Столбцы можно располагать в любом порядке.\n"
+            "Неизвестные дополнительные столбцы будут проигнорированы.\n\n"
+            "Допустимые значения:\n"
+            "• КООП/НЕ КООП: КООП или НЕ КООП\n"
+            "• СТАТУС: ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО или ЗАБРОШЕНО\n\n"
+            "Дата может быть пустой.\n"
+            "Отзыв может быть пустым.\n"
+            "Если баллов нет, рекомендуется указать 0.\n\n"
+            "Для уже существующей записи изменяются только переданные непустые значения.\n"
+            "Пустая ячейка не стирает уже сохранённое значение.\n"
+            "Для новой записи отсутствующие поля получают значения по умолчанию.\n\n"
             "Пример:\n"
-            "НАЗВАНИЕ ИГРЫ;БАЛЛЫ;ДАТА ВЫХОДА\n"
-            "Control;1500;27.08.2019\n\n"
-            "2. CSV формата «Название игры|Баллы»\n"
-            "Файл без заголовка, одна игра в строке:\n"
-            "Название игры|Баллы\n\n"
-            "Пример:\n"
+            "НАЗВАНИЕ;БАЛЛЫ;ДАТА\n"
+            "Control;1500;27.08.2019\n"
+            "Alan Wake 2;0;\n\n"
+            "2. Формат «Название|Баллы»\n\n"
+            "Файл без заголовка, одна запись в строке:\n\n"
             "Control|1500\n"
-            "Alan Wake 2|2500\n\n"
-            "Для уже существующей игры изменяются только реально переданные непустые "
-            "значения. Для новой игры отсутствующие поля создаются с безопасными "
-            "значениями по умолчанию и их можно заполнить позже в программе.\n\n"
-            "Перед любым импортом In one line автоматически создаёт резервную копию базы.",
+            "Alan Wake 2|0\n\n"
+            "В этом формате значение баллов обязательно.\n"
+            "Если баллов нет, укажите 0.\n\n"
+            "Для совместимости также принимаются старые названия столбцов:\n"
+            "• НАЗВАНИЕ ИГРЫ\n"
+            "• ДАТА ВЫХОДА\n"
+            "• БАЛЛЫ SM\n"
+            "• СУММА\n\n"
+            "Перед любым импортом In one line автоматически создаёт резервную копию базы.\n"
+            "Если в файле найдена ошибка, импорт не применяется частично.",
         )
 
     def import_csv(self):
