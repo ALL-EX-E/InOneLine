@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
 
-        self.tabs.addTab(self.games_tab, "Игры")
+        self.tabs.addTab(self.games_tab, "Список")
         self.tabs.addTab(self.public_tab, "Публичный список")
         self.tabs.addTab(self.stream_tab, "Стрим / OBS")
         self.tabs.addTab(self.music_tab, "Музыка")
