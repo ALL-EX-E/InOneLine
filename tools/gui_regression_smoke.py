@@ -174,12 +174,30 @@ def main() -> int:
         add_dialog_labels = {label.text() for label in add_dialog.findChildren(QLabel)}
         if "Новая игра" in add_dialog_labels:
             raise AssertionError("legacy add dialog heading remains")
-        if "Название:" not in add_dialog_labels or "Дата:" not in add_dialog_labels:
+        expected_add_labels = {
+            "Название:",
+            "Дата (необязательно):",
+            "Баллы (необязательно):",
+            "Кооператив:",
+            "Статус:",
+            "Отзыв (необязательно):",
+        }
+        if not expected_add_labels.issubset(add_dialog_labels):
             raise AssertionError(
                 f"add dialog field labels mismatch: {sorted(add_dialog_labels)!r}"
             )
-        if "Название игры:" in add_dialog_labels or "Дата выхода:" in add_dialog_labels:
-            raise AssertionError("legacy add dialog field labels remain")
+        if (
+            "Название игры:" in add_dialog_labels
+            or "Дата выхода:" in add_dialog_labels
+            or "Дата:" in add_dialog_labels
+            or "Баллы:" in add_dialog_labels
+            or "Отзыв:" in add_dialog_labels
+            or "Кооператив (необязательно):" in add_dialog_labels
+            or "Статус (необязательно):" in add_dialog_labels
+        ):
+            raise AssertionError("legacy/incorrect add dialog field labels remain")
+        if add_dialog.amount_edit.value() != 0:
+            raise AssertionError("optional points default changed from 0")
         add_dialog.deleteLater()
 
         edit_game = Game(
@@ -200,12 +218,28 @@ def main() -> int:
         edit_dialog_labels = {label.text() for label in edit_dialog.findChildren(QLabel)}
         if "Редактирование записи" in edit_dialog_labels:
             raise AssertionError("legacy edit dialog heading remains")
-        if "Название:" not in edit_dialog_labels or "Дата:" not in edit_dialog_labels:
+        expected_edit_labels = {
+            "Название:",
+            "Дата (необязательно):",
+            "Баллы (необязательно):",
+            "Кооператив:",
+            "Статус:",
+            "Отзыв (необязательно):",
+        }
+        if not expected_edit_labels.issubset(edit_dialog_labels):
             raise AssertionError(
                 f"edit dialog field labels mismatch: {sorted(edit_dialog_labels)!r}"
             )
-        if "Название игры:" in edit_dialog_labels or "Дата выхода:" in edit_dialog_labels:
-            raise AssertionError("legacy edit dialog field labels remain")
+        if (
+            "Название игры:" in edit_dialog_labels
+            or "Дата выхода:" in edit_dialog_labels
+            or "Дата:" in edit_dialog_labels
+            or "Баллы:" in edit_dialog_labels
+            or "Отзыв:" in edit_dialog_labels
+            or "Кооператив (необязательно):" in edit_dialog_labels
+            or "Статус (необязательно):" in edit_dialog_labels
+        ):
+            raise AssertionError("legacy/incorrect edit dialog field labels remain")
         edit_dialog.deleteLater()
         app.processEvents()
 
