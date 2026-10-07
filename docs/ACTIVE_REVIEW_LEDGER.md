@@ -497,7 +497,7 @@ Alan Wake 2|0
   - P02-G ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-025 — удалить функцию `Скрыть список / Показать список` — MANUALLY ACCEPTED IN P04-A / AWAITING CLEAN PROMOTION AND POST-MERGE QA.**
+- **UI-025 — удалить функцию `Скрыть список / Показать список` — ACCEPTED / MERGED / POST-MERGE PASS.**
   - Исторический замысел функции был связан с compact-window mode, но автоматическое изменение геометрии MainWindow ранее удалено из-за подтверждённых geometry/shrink defects.
   - Решение пользователя 2026-10-03: текущая возможность временно скрывать таблицы больше не нужна и должна быть удалена целиком.
   - Удалить видимые toggle-кнопки на вкладках `Список` и `Публичный список`.
@@ -3514,4 +3514,12 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Artifact `11495357287`, ZIP size 46,751,606 bytes, GitHub SHA-256 digest `1eb7e5f9589f71fae4cf778d6da90f06e5d08badea0fd67035fd8d3f900bfcee`. Installer CI SHA-256 `086ed75bf046036a0d7d74efff677626f460d6346c5a849249d3fd53d229bdc0`.
 - Drive handoff: `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`; uploaded directly from the GitHub artifact reference, verified Drive size 46,751,606 bytes.
 - Complete manual checklist issued together: (1) both lists and existing records visible, hide/show buttons absent; (2) repeated tab switches do not resize the window or hide either table; (3) Enter search on both tabs selects/navigates to an active existing record and synchronizes selection; (4) F5 keeps both tables visible and data accessible; (5) restart restores window position/size and selected tab, both tables remain visible.
-- **P04-A = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION / NOT MERGED. P04 remains open.** The accepted candidate is frozen at `3cdff95129d012729d1cfc8c7a74f4050f3231d0`; next code scope starts only after clean promotion, merge and exact post-merge regression. Full search/filter/deselect/total-points changes remain later scopes.
+- **P04-A = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04 remains open.** Clean promotion PR #28 head `7fe09b7543b666ae6657377a9d782bac9442ec77`; promotion regression `37652474014` and wording gate `37652474280` = SUCCESS; merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`; exact merge-commit regression `37653013085` and wording gate `37653013097` = SUCCESS. Historical candidate PR #27 closed without merge. Next small scope: P04-B / BUG-003 only.
+
+
+## P04-B start — BUG-003 only
+
+- P04-A is closed. The next implementation step is intentionally limited to BUG-003: ordinary refresh/filter changes must never auto-select row 0 when the previous selection is absent, and the user must be able to clear selection by clicking the empty area of the main list.
+- Preserve explicit selection actions: Enter search and `focus_game()` may still select a specific row by design.
+- Preserve current action-button state logic when no row is selected.
+- Do not bundle UI-007/UI-008/UI-009/UI-028 or UI-076 into this step.
