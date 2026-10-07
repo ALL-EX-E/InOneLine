@@ -612,7 +612,10 @@ Alan Wake 2|0
   - **P02-J1** candidate commits `a49e7a41134479675fb558df6960319f45129d3f` + `1748a31d8606a513cbcb67d9ba1035e5861d98b7`: neutral List/Public wording, including screenshot findings; regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
   - **P02-J2** candidate commits `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`: remaining safe P02 wording in list-toggle, restore count, duplicate fallback and clear-list failure messages; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
   - CSV/import-specific `игра` wording deliberately remains for P03 so preferred headers/messages and backward compatibility are changed together.
-  - P02 requires fresh candidate-wide regression + new installer + short repeat manual QA before acceptance.
+  - Fresh candidate head `4bf4c7e2a4b15837e172073098dcf5595c227e8c`; Windows regression `37594380334` — **SUCCESS**, включая Native GUI, frozen build/startup, Browser Source, installer build и silent-install.
+  - V2 artifact `11470436517`: ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`; inside `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
+  - Google Drive V2: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, file ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
+  - **P02 automated re-gate = PASS / AWAITING REPEAT MANUAL QA.** P02 not accepted yet; P03 blocked.
 
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
