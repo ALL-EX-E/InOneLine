@@ -732,9 +732,9 @@ class GamesTab(QWidget):
             "Скрыть список" if visible else "Показать список"
         )
         self.list_toggle_btn.setToolTip(
-            "Скрыть таблицу со списком игр"
+            "Скрыть таблицу списка"
             if visible
-            else "Показать таблицу со списком игр"
+            else "Показать таблицу списка"
         )
         self._update_action_state()
 
