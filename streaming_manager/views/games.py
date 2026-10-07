@@ -162,7 +162,7 @@ class GameDialog(QDialog):
         self.title_edit.setFocus()
 
     def _format_date_while_typing(self, text: str):
-        """Ставит точки автоматически при обычном цифровом вводе."""
+        """Ставит точки автоматически, не перенося caret в конец поля."""
         if not text:
             return
 
@@ -171,29 +171,39 @@ class GameDialog(QDialog):
         if any(ch not in "0123456789." for ch in text):
             return
 
+        def format_numeric_date(value: str) -> str:
+            digits = "".join(ch for ch in value if ch.isdigit())
+            trailing_dot = value.endswith(".")
+
+            if len(digits) <= 2:
+                result = digits
+                if trailing_dot and len(digits) == 2:
+                    result += "."
+                return result
+            if len(digits) <= 4:
+                result = f"{digits[:2]}.{digits[2:]}"
+                if trailing_dot and len(digits) == 4:
+                    result += "."
+                return result
+            return f"{digits[:2]}.{digits[2:4]}.{digits[4:]}"
+
         digits = "".join(ch for ch in text if ch.isdigit())
         if len(digits) > 8:
             return
 
-        trailing_dot = text.endswith(".")
-
-        if len(digits) <= 2:
-            formatted = digits
-            if trailing_dot and len(digits) == 2:
-                formatted += "."
-        elif len(digits) <= 4:
-            formatted = f"{digits[:2]}.{digits[2:]}"
-            if trailing_dot and len(digits) == 4:
-                formatted += "."
-        else:
-            formatted = f"{digits[:2]}.{digits[2:4]}.{digits[4:]}"
-
+        cursor_position = self.date_edit.cursorPosition()
+        formatted = format_numeric_date(text)
         if formatted == text:
             return
 
+        # Форматируем также только часть строки слева от caret. Её длина
+        # после вставки точек даёт логическую позицию caret в новой строке.
+        formatted_prefix = format_numeric_date(text[:cursor_position])
+        restored_cursor = min(len(formatted), len(formatted_prefix))
+
         self.date_edit.blockSignals(True)
         self.date_edit.setText(formatted)
-        self.date_edit.setCursorPosition(len(formatted))
+        self.date_edit.setCursorPosition(restored_cursor)
         self.date_edit.blockSignals(False)
 
     def _normalize_date_field(self):
