@@ -75,7 +75,8 @@
 - P02-C / UI-012 complete: GameDialog titles -> `Добавить` / `Изменить`, internal headings removed; implementation `dc4197fc05f9eec7885705f77eda1ed7053962b3`, GUI regression `57789c7dbbc1202f000cf8c74f04239f8772c4d9`.
 - P02-D / UI-013 complete: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`; implementation `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`, GUI regression `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`.
 - P02-E / UI-015 complete: `Дата`, `Баллы`, `Отзыв` explicitly marked `(необязательно)`; `Кооператив/Статус` unchanged. Implementation `635e4405ffd12ed35f8c0385616ff1f1193a689f`, GUI regression `1f73618165e5e3f1cd3acad833209cc4cef58f45`.
-- P02 remains a candidate; next small step is UI-022 only.
+- P02-F / UI-022 complete: full-list clear UI now uses `Очистить список`, `Будут удалены все записи: N`, `УДАЛИТЬ ЗАПИСИ`, `Удалить записи`; worker completion preserves the new button label. Implementation `8781b4bafbfdfdafcbfd960f6d667924ca08f822` + `6a7746c956460ca9464951551f5b7242af174958`; GUI regression `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`.
+- P02 remains a candidate; next small step is UI-024 only.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
