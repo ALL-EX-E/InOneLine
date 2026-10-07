@@ -141,6 +141,147 @@ def main() -> int:
                 f"{legacy_game.release_date!r}, {legacy_game.amount!r}"
             )
 
+        def expect_csv_error(name, content, expected_parts, *, with_backup=False):
+            csv_path = root / name
+            csv_path.write_text(content, encoding="utf-8")
+            try:
+                if with_backup:
+                    import_db.import_csv_with_backup(
+                        csv_path,
+                        root / "p03_error_backups",
+                        merge=True,
+                        keep_backups=3,
+                    )
+                else:
+                    import_db.import_csv(csv_path)
+            except Exception as exc:
+                message = str(exc)
+            else:
+                raise AssertionError(f"CSV error case unexpectedly passed: {name}")
+            for expected in expected_parts:
+                if expected not in message:
+                    raise AssertionError(
+                        f"CSV error wording missing {expected!r} for {name}: {message!r}"
+                    )
+            return message
+
+        expect_csv_error(
+            "p03_duplicate.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Duplicate;10\n"
+            " p03 duplicate ;20\n",
+            (
+                "Повторяется название «p03 duplicate» (строка 3).",
+                "Ранее это же название указано в строке 2 как «P03 Duplicate».",
+                "Оставьте в CSV только одну запись с этим названием.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_status.csv",
+            "НАЗВАНИЕ;СТАТУС\n"
+            "P03 Bad Status;НЕИЗВЕСТНО\n",
+            (
+                "Некорректное значение в поле «СТАТУС»",
+                "строка 2",
+                "«НЕИЗВЕСТНО»",
+                "ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО или ЗАБРОШЕНО",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_coop.csv",
+            "НАЗВАНИЕ;КООП/НЕ КООП\n"
+            "P03 Bad Coop;ДА\n",
+            (
+                "Некорректное значение в поле «КООП/НЕ КООП»",
+                "строка 2",
+                "«ДА»",
+                "Допустимо: КООП или НЕ КООП.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_date.csv",
+            "НАЗВАНИЕ;ДАТА\n"
+            "P03 Bad Date;31.02.2019\n",
+            (
+                "Некорректное значение в поле «ДАТА»",
+                "строка 2",
+                "«31.02.2019»",
+                "например 27.08.2019",
+                "или оставьте поле пустым.",
+            ),
+        )
+
+        expect_csv_error(
+            "p03_invalid_points.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Bad Points;abc\n",
+            (
+                "Некорректное значение в поле «БАЛЛЫ»",
+                "строка 2",
+                "«abc»",
+                "Укажите целое число; если баллов нет, укажите 0.",
+            ),
+            with_backup=True,
+        )
+
+        missing_header_message = expect_csv_error(
+            "p03_missing_title_header.csv",
+            "БАЛЛЫ;ДАТА\n"
+            "10;27.08.2019\n",
+            (
+                "Не найден обязательный столбец «НАЗВАНИЕ».",
+                "старое «НАЗВАНИЕ ИГРЫ» также принимается",
+                "«Название|Баллы»",
+            ),
+        )
+        if "Название игры|Баллы" in missing_header_message:
+            raise AssertionError(
+                "missing-header error exposes legacy game-centric format wording"
+            )
+
+        expect_csv_error(
+            "p03_legacy_missing_points.csv",
+            "P03 Legacy Missing|\n",
+            (
+                "Не указаны баллы у «P03 Legacy Missing» (строка 1).",
+                "значение после «|» обязательно",
+                "если баллов нет, укажите 0.",
+            ),
+        )
+
+        atomic_message = expect_csv_error(
+            "p03_atomicity.csv",
+            "НАЗВАНИЕ;СТАТУС\n"
+            "P03 Atomic Good;НЕ ИГРАЛ\n"
+            "P03 Atomic Bad;НЕИЗВЕСТНО\n",
+            (
+                "Некорректное значение в поле «СТАТУС»",
+                "P03 Atomic Bad",
+                "строка 3",
+            ),
+        )
+        if import_db.find_game_by_title("P03 Atomic Good") is not None:
+            raise AssertionError(
+                f"CSV atomicity changed after error wording update: {atomic_message!r}"
+            )
+
+        backup_error = expect_csv_error(
+            "p03_backup_path_error.csv",
+            "НАЗВАНИЕ;БАЛЛЫ\n"
+            "P03 Backup Error;abc\n",
+            (
+                "Импорт не выполнен:",
+                "Некорректное значение в поле «БАЛЛЫ»",
+                "Резервная копия перед попыткой импорта:",
+            ),
+            with_backup=True,
+        )
+        if "Резервная копия перед попыткой импорта:" not in backup_error:
+            raise AssertionError("CSV error lost safety-backup path")
+
         db = Database(paths.database_path)
         db.set_setting("api_port", str(free_local_port()))
 
