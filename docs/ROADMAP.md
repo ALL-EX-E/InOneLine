@@ -79,7 +79,11 @@
 - P02-G / UI-024 complete: sorting-rules window wording simplified without changing sort semantics. Implementation `99ecc55ef2556957f0957c61098a4ae6df03c2d6`; GUI regression `7b03ca8786ec81b507a0ad4c265dcf07928cc4bd`.
 - P02-H / UI-029 complete: Public List explanatory text and read-only table header now use `НАЗВАНИЕ`; data/API/XLSX/export semantics unchanged. Implementation `282ca506ad6376c5ee165009bff8bfa1c9969f44`; GUI regression `6566370f056feaa2063f0bed5f6164877d62b34a`.
 - P02-I / UI-030 complete: visible `Открыть локальный JSON` button removed from Public List; `/api/public` remains unchanged. Implementation `a82154e53ad61a25c7026de64592ad1ba422a802`; GUI regression `655dc42510cd726eaa3098ab00ded28e49958bb5`.
-- P02 implementation items are now complete as a candidate. Next: candidate-wide regression/review preparation. P02 is not accepted yet.
+- P02 implementation items are complete as candidate.
+- Draft PR #22 / candidate SHA `655dc42510cd726eaa3098ab00ded28e49958bb5`: candidate-wide regression run `37590831341` — **SUCCESS**, including Native GUI, frozen build/startup, installer and silent-install gates.
+- Manual-QA ZIP uploaded to Drive: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`; installer SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
+- Separate wording gate failure remains the known docs-only finding.
+- **P02 automated gate PASS; next is user manual QA. P02 is not accepted yet.**
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
