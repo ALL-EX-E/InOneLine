@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -40,6 +40,7 @@ from streaming_manager.constants import (
 from streaming_manager.database import Database, Game
 from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
 from streaming_manager.ui import MainWindow
+from streaming_manager.views.games import GameDialog
 
 
 def free_local_port() -> int:
@@ -164,6 +165,37 @@ def main() -> int:
             raise AssertionError(
                 f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
             )
+
+        add_dialog = GameDialog()
+        if add_dialog.windowTitle() != "Добавить":
+            raise AssertionError(
+                f"add dialog title mismatch: {add_dialog.windowTitle()!r}"
+            )
+        add_dialog_labels = {label.text() for label in add_dialog.findChildren(QLabel)}
+        if "Новая игра" in add_dialog_labels:
+            raise AssertionError("legacy add dialog heading remains")
+        add_dialog.deleteLater()
+
+        edit_game = Game(
+            1,
+            "QA",
+            None,
+            0,
+            0,
+            STATUS_NOT_PLAYED,
+            "",
+            updated_at=None,
+        )
+        edit_dialog = GameDialog(game=edit_game)
+        if edit_dialog.windowTitle() != "Изменить":
+            raise AssertionError(
+                f"edit dialog title mismatch: {edit_dialog.windowTitle()!r}"
+            )
+        edit_dialog_labels = {label.text() for label in edit_dialog.findChildren(QLabel)}
+        if "Редактирование записи" in edit_dialog_labels:
+            raise AssertionError("legacy edit dialog heading remains")
+        edit_dialog.deleteLater()
+        app.processEvents()
 
         # P01 shell contract: no top-level menus remain, the replacement hint
         # is informational only, and exactly one direct MainWindow F5 action
