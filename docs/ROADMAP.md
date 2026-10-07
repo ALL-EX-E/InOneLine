@@ -49,6 +49,13 @@
 - Rules Overlay is the main resolved exception case: UI-060 composite template owns Rules text/appearance; GLOBAL-OBS-VISIBILITY-001 later owns widget-level show-mode; Stream/OBS does not host a second Rules settings/save copy.
 - Stop with unresolved source-auction pending does not auto-discard it: Stop closes without winner/materializes lots; later explicit Apply can credit the corresponding persistent target exactly once without reopening session state.
 - Next plan step is point 3: sort implementation so shared foundations are changed before dependent UI and each accepted change can be manually verified in isolation.
+## P00 baseline gate — PASS — 2026-10-07
+
+- Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
+- Accepted A9 runtime anchor `74ad16c5772d5cc191f7e307203b6a574af7815c`; subsequent `main` changes before P00 were docs/README only.
+- Fresh rerun of permanent Windows regression: run `36972339831`, fresh job `112658659175` — **SUCCESS**.
+- Compile, DB integrity, GUI, frozen Browser Source, backup/restore, A9 migration/single-instance, Inno Setup and silent-install regressions all passed.
+- P00 changed no runtime/product behavior. **P01 is the next implementation package.**
 ## Final implementation queue — point 3 COMPLETE
 
 Detailed source of truth: `docs/ACTIVE_REVIEW_LEDGER.md` §4.7.
