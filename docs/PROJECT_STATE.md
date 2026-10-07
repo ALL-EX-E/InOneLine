@@ -490,14 +490,16 @@ Permanent repository gate:
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P03 is now unblocked.** GLOBAL-TERMINOLOGY-001 remains active, with `ИГРАЛ / НЕ ИГРАЛ` explicitly protected.
 
-## P03 candidate progress — A/B complete — 2026-10-07
+## P03 candidate progress — A/B/C complete — 2026-10-07
 - Branch: `candidate/p03-csv-date-caret`.
 - **P03-A / UI-021** implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`: CSV importer accepts canonical headers `НАЗВАНИЕ` and `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` and `ДАТА ВЫХОДА` remain accepted. Existing points/coop/status/review semantics are unchanged and `ИГРАЛ / НЕ ИГРАЛ` values are untouched.
 - P03-A regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`: isolated DB verifies new and legacy title/date headers map correctly.
-- **P03-B / UI-020** implementation `a70f00688650638ff2173ba942b418db26ba8201`: rewrites only `Правила импорта CSV` using the accepted user-facing draft: canonical `НАЗВАНИЕ / ДАТА`, explicit optional fields, `0` guidance, neutral `запись` wording, legacy aliases listed only in the compatibility section, and atomic-import/backup explanation. Parser logic is unchanged in this step.
-- P03-B regression `ec74bed827edaa675f6360dd703326e442f38ee9`: captures the actual help QMessageBox; verifies canonical wording, compatibility aliases, preserved `НЕ ИГРАЛ / ИГРАЛ` status labels, and absence of old user-facing phrases.
-- Focused P03-B diff versus P03-A: `games.py` help text + regression-only changes.
-- **P03 is not accepted yet.** Next small step: UI-019 CSV error wording.
+- **P03-B / UI-020** implementation `a70f00688650638ff2173ba942b418db26ba8201`: rewrites only `Правила импорта CSV` using canonical `НАЗВАНИЕ / ДАТА`, explicit optional fields, `0` guidance, neutral `запись` wording, compatibility aliases, and atomic-import/backup explanation.
+- P03-B regression `ec74bed827edaa675f6360dd703326e442f38ee9`: captures the actual help QMessageBox and checks canonical wording, compatibility aliases and preserved `НЕ ИГРАЛ / ИГРАЛ` status labels.
+- **P03-C / UI-019** implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`: CSV validation errors now follow `что не так -> строка/значение -> как исправить` for duplicate title, status, coop, date, points, missing headers and legacy `Название|Баллы`. Duplicate tracking now remembers the first source line only to improve the error message; parsed data and transaction semantics are unchanged.
+- P03-C regression `2230c10a06a986389bff3ab546afbe011368730c` + cleanup `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`: existing GUI smoke verifies the TEST-001 error set, preserves explicit `ИГРАЛ / НЕ ИГРАЛ` allowed statuses, checks `0` guidance, confirms safety-backup path survives wrapper errors, and confirms full-file atomicity.
+- Focused P03-C runtime diff versus P03-B is limited to `streaming_manager/db/services.py`; regression changes remain in existing `gui_regression_smoke.py`.
+- **P03 is not accepted yet.** Next small step: BUG-002 date-field caret preservation.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
