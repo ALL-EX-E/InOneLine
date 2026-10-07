@@ -437,16 +437,18 @@ Permanent repository gate:
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - P02 is now unblocked.
 
-## P02 candidate progress — A/B/C complete — 2026-10-07
+## P02 candidate progress — A/B/C/D complete — 2026-10-07
 - Branch: `candidate/p02-list-public-labels`.
 - **P02-A / UI-010** implementation commit `f6481b6668019b45af3d9d11040117baf2868f4c`: visible main tab label `Игры` -> `Список` only; internal `GamesTab/games_tab`, DB/API semantics and behavior unchanged.
 - P02-A regression expectation commit `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`: existing GUI smoke expects `Список`.
 - **P02-B / UI-011** implementation commit `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`: only the main-list button label `Добавить игру` -> `Добавить`; existing `GamesTab.add_game` action unchanged.
 - P02-B regression commit `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`: GUI smoke asserts the button text is exactly `Добавить`.
-- **P02-C / UI-012** implementation commit `dc4197fc05f9eec7885705f77eda1ed7053962b3`: common GameDialog window title is now exactly `Добавить` or `Изменить`; internal headings `Новая игра` and `Редактирование записи` are removed. Shared dialog logic is unchanged.
-- P02-C regression commit `57789c7dbbc1202f000cf8c74f04239f8772c4d9`: GUI smoke instantiates both add/edit modes, asserts exact window titles, and asserts legacy internal headings are absent.
-- Focused P02-C diff versus P02-B: `games.py` 1 addition / 5 deletions; `gui_regression_smoke.py` regression-only coverage. Candidate readback confirms all four legacy strings are absent from candidate GameDialog.
-- **P02 is not accepted yet.** Next small step: UI-013 (field labels `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`).
+- **P02-C / UI-012** implementation commit `dc4197fc05f9eec7885705f77eda1ed7053962b3`: common GameDialog window title is exactly `Добавить` or `Изменить`; internal headings `Новая игра` and `Редактирование записи` removed.
+- P02-C regression commit `57789c7dbbc1202f000cf8c74f04239f8772c4d9`: GUI smoke instantiates both dialog modes and checks titles/headings.
+- **P02-D / UI-013** implementation commit `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`: visible field labels only: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`. Widgets, payload keys, parsing, DB and storage semantics unchanged.
+- P02-D regression commit `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`: both add/edit GameDialog modes assert new labels and absence of legacy labels.
+- Focused P02-D diff versus P02-C: `games.py` 2 additions / 2 deletions; `gui_regression_smoke.py` 12 regression-only additions.
+- **P02 is not accepted yet.** Next small step: UI-015 (mark `Дата`, `Баллы`, `Отзыв` as optional for manual input).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
