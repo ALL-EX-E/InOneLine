@@ -617,7 +617,11 @@ Alan Wake 2|0
   - V2 artifact `11470436517`: ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`; inside `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
   - Google Drive V2: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, file ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
   - Repeat manual QA 2026-10-07: пользователь подтвердил **«Всё правильно. Всё работает.»** Терминологические исправления J1/J2 приняты; отдельное уточнение — `ИГРАЛ / НЕ ИГРАЛ` оставить без изменений из-за связи с сортировкой.
-  - **P02 = MANUALLY ACCEPTED.** Следующий обязательный этап — technical closeout/clean promotion + post-merge regression; P03 не начинать до зелёного post-merge gate.
+  - Clean promotion PR #23 merged into `main`: `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
+  - Pre-merge clean-promotion regression `37596838501` — **SUCCESS**.
+  - Post-merge QA-only PR #24 from exact merge commit: Regression Foundation `37597234911` — **SUCCESS**; closed without merge. Superseded historical PR #22 also closed without merge.
+  - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+  - **P03 разблокирован.** GLOBAL-TERMINOLOGY-001 продолжает действовать; `ИГРАЛ / НЕ ИГРАЛ` защищены от терминологических переименований.
 
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
