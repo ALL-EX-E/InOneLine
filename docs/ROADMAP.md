@@ -35,10 +35,10 @@
   - UI-088/UI-090: CSV/JSON/Excel file export переносится на `Публичный список`; legacy compatible export и внутренняя вкладка `Настройки → Экспорт` удаляются;
   - UI-044 в прежнем виде не реализуется, потому что target `Настройки → Экспорт → Публичный API` исчезает вместе с вкладкой; `/api/public` сохраняется.
 - Не считать released 1.0.8 layout/behavior в исторических записях более поздним target, если оно явно superseded текущим ledger.
-- Перед dependency sorting остаются только три неразрешённых вопроса, для которых не найдено прямого пользовательского решения:
-  1. UI-053 — локальная `Открыть предпросмотр таймера` на странице `Аукцион`;
-  2. AUCTION-TIMER-REVIEW-002 — какой saved default использовать для дополнительного времени Max Amount tie;
-  3. AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
+- UI-053 закрыт 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`; действие работает и для Max Amount, и для wheel context и переиспользует существующий `/timer-overlay?preview=1`.
+- Перед dependency sorting остаются только два неразрешённых timer-behavior вопроса:
+  1. AUCTION-TIMER-REVIEW-002 — какой saved default использовать для дополнительного времени Max Amount tie;
+  2. AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
 - QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
 
 ## Сохранённые future scope после текущего review-batch
