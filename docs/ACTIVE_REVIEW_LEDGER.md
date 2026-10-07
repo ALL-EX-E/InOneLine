@@ -567,14 +567,19 @@ Alan Wake 2|0
   - P02-H ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-030 — убрать кнопку `Открыть локальный JSON` со вкладки `Публичный список`, endpoint сохранить — READY AFTER BATCH APPROVAL.**
+- **UI-030 — убрать кнопку `Открыть локальный JSON` со вкладки `Публичный список`, endpoint сохранить — IMPLEMENTED IN P02-I / CANDIDATE / NOT YET ACCEPTED.**
   - Пользователь подтвердил 2026-10-03: видимая кнопка `Открыть локальный JSON` на вкладке `Публичный список` не нужна.
   - Удалить только этот UI-вход и его click connection.
   - Сам локальный endpoint `/api/public` **не удалять**: он остаётся доступным для внешних/custom integrations и диагностики.
   - Built-in Public List data model, read-only table, XLSX mirror и API payload не менять.
   - В exact CURRENT `/api/public` также отображается текстовой строкой `Публичный JSON: ...` в блоке `Локальный API` вкладки `Стрим / OBS`; later UI-043 уже решил удалить эту строку из обычного UI при сохранении endpoint.
   - UI-044 затем был superseded UI-090: после удаления `Настройки → Экспорт` новый видимый вход к `/api/public` в рамках текущего batch не создаётся.
-  - Runtime/code пока не изменялись.
+  - Реализация P02-I 2026-10-07: со вкладки `Публичный список` удалены только видимая кнопка `Открыть локальный JSON` и её click connection; после reference check удалены dead imports `QDesktopServices` / `QUrl`. Commit `a82154e53ad61a25c7026de64592ad1ba422a802`.
+  - Endpoint `/api/public` в `api_server.py` не менялся; data model, read-only table, XLSX mirror, API payload и exports сохранены.
+  - Existing GUI regression проверяет отсутствие legacy JSON button; commit `655dc42510cd726eaa3098ab00ded28e49958bb5`.
+  - Focused diff P02-I против P02-H: только `public.py` и regression smoke; `api_server.py` в diff отсутствует.
+  - P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 теперь полностью реализован в candidate; acceptance ещё не было.
+
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
   - Пользователь подтвердил 2026-10-03 сохранение остальной механики Public List.
