@@ -49,14 +49,15 @@
 - Rules Overlay is the main resolved exception case: UI-060 composite template owns Rules text/appearance; GLOBAL-OBS-VISIBILITY-001 later owns widget-level show-mode; Stream/OBS does not host a second Rules settings/save copy.
 - Stop with unresolved source-auction pending does not auto-discard it: Stop closes without winner/materializes lots; later explicit Apply can credit the corresponding persistent target exactly once without reopening session state.
 - Next plan step is point 3: sort implementation so shared foundations are changed before dependent UI and each accepted change can be manually verified in isolation.
-## P01 progress — A/B/C source changes complete
+## P01 progress — A/B/C/D source + regression assertion complete
 
 - Candidate `candidate/p01-mainwindow-shell-cleanup`.
 - A: remove `Файл` menu/actions — source check PASS.
 - B: remove `Вид` menu; keep one direct F5 → `refresh_all()` — source check PASS.
 - C: add exact non-clickable hint `F5 — обновить данные во всех разделах` in existing top menu-bar area — source check PASS.
-- Runtime candidate touches only `streaming_manager/views/main_window.py` so far.
-- Next: focused regression assertion, automated candidate checks, then manual QA. P01 is not accepted yet.
+- D: lock the shell contract in the existing GUI regression smoke — commit `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; source/diff check PASS.
+- Candidate now changes `streaming_manager/views/main_window.py` plus the regression assertion in `tools/gui_regression_smoke.py`; runtime behavior change remains isolated to MainWindow.
+- Next: automated candidate checks, then manual QA. P01 is not accepted yet.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
