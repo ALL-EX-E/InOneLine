@@ -656,3 +656,10 @@ This section records the latest accepted review target while preserving all hist
 - AUCTION-TIMER-REVIEW-002 is resolved by direct user decision 2026-10-07: tie overtime uses saved Max Amount default; no separate overtime setting; pending reset returns Max Amount default; manual pre-start editing remains.
 - AUCTION-TIMER-REVIEW-003 is resolved by direct user decision 2026-10-07: preserve ~1.2 s as preparation outside the configured duration; after it, timer + applicable local/OBS wheel motion + soundtrack start simultaneously from one authoritative boundary; repeated actions during lead-in are re-entry protected. No timer-review question remains unresolved.
 
+
+
+# XXII. P04-A accepted implementation progress — 2026-10-07
+
+- UI-025 (remove `Скрыть список / Показать список`) is **MANUALLY ACCEPTED** on candidate head `3cdff95129d012729d1cfc8c7a74f4050f3231d0`.
+- The complete manual checklist passed: both tables visible, no hide/show buttons, no resize on tab switching, Enter navigation/sync preserved, F5 preserves visibility, restart preserves geometry/tab with both tables visible.
+- P04-A is not yet technically closed until clean promotion + merge + post-merge regression succeed. Remaining P04 search/filter/selection/total-points items are unchanged and have not been bundled into P04-A.
