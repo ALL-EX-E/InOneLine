@@ -557,7 +557,7 @@ Alan Wake 2|0
   - Уточнение 2026-10-06: формат создаваемого/синхронизируемого XLSX дополняется первым столбцом `ПОЗИЦИЯ` по UI-077.
   - Двустороннюю data-sync семантику остальных полей не менять.
   - Runtime/code пока не изменялись.
-- **BUG-003 — выбор строки в основном списке нельзя нормально снять; фильтры принудительно выбирают первую строку — READY AFTER BATCH APPROVAL.**
+- **BUG-003 — выбор строки в основном списке нельзя нормально снять; фильтры принудительно выбирают первую строку — IMPLEMENTED IN P04-B / CANDIDATE / AWAITING MANUAL QA.**
   - Внешний вид таблицы, сортировку, статусы, цвета и остальные функции списка **сохранить как есть**, кроме отдельно принятого позже GLOBAL-POSITION-COLUMNS-001 для адаптивного отображения position columns.
   - Current table uses `SelectRows + SingleSelection`; отдельного обработчика, снимающего выбор при клике по пустой области таблицы, нет.
   - Exact CURRENT refresh behavior:
@@ -3523,3 +3523,15 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Preserve explicit selection actions: Enter search and `focus_game()` may still select a specific row by design.
 - Preserve current action-button state logic when no row is selected.
 - Do not bundle UI-007/UI-008/UI-009/UI-028 or UI-076 into this step.
+
+
+## P04-B / BUG-003 candidate gate — AUTOMATED PASS / AWAITING MANUAL QA
+
+- Implementation commit `b059d9dc997b1df6af2b75a7f73de2db9d852694`: `GamesTab.refresh()` now restores selection only when the same game ID remains visible; otherwise it clears both selection and current cell instead of selecting row 0. The existing Enter-search and `focus_game()` explicit selection paths are unchanged.
+- Empty-area deselection reuses the existing table viewport through a lightweight event filter: a left click where `indexAt(...)` is invalid clears selection/current cell and reuses the existing action-state update. No new table widget or selection subsystem was created.
+- Regression commit `f3740181a9f161c3c56965d075a2d3c2ae3d0762` covers: selected row disappears under filter -> no replacement selection; no-selection survives return to `Всего`; explicit Enter still selects; a still-visible selection survives refresh; empty-area click clears selection and disables/hides row actions.
+- Draft PR #29, candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`; exact diff vs base is only `streaming_manager/views/games.py` and existing `tools/gui_regression_smoke.py` (72 additions / 3 deletions). UI-007/UI-008/UI-009/UI-028/UI-076 are not included.
+- Candidate Windows Regression Foundation `37654068727` — **SUCCESS**, including Native GUI, frozen startup/Browser Source, installer build and silent install. Publication wording gate `37654069253` — **SUCCESS**.
+- Artifact `11497079107`, ZIP size 46,766,270 bytes, SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`. ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,626,429 bytes, SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
+- Drive handoff: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`, verified Drive size 46,766,270 bytes.
+- **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.** Do not start another P04 implementation item until this candidate is manually accepted and promoted.
