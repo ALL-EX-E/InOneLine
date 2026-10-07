@@ -70,6 +70,8 @@
 - Separate Publication wording gate `37586507550` remains an unrelated known documentation finding.
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P02 is next and unblocked.**
+- P02-A / UI-010 complete on `candidate/p02-list-public-labels`: main tab `Игры` -> `Список`; implementation `f6481b6668019b45af3d9d11040117baf2868f4c`, regression expectation `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`.
+- P02 remains a candidate; next small step is UI-011 only.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
