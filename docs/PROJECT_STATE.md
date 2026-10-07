@@ -464,7 +464,14 @@ Permanent repository gate:
 - `/api/public` remains unchanged in `api_server.py`; Public List data model, read-only table, XLSX mirror, API payload and exports are untouched.
 - P02-I regression commit `655dc42510cd726eaa3098ab00ded28e49958bb5`: GUI smoke asserts the legacy Public List JSON button is absent.
 - Focused P02-I diff versus P02-H: only `public.py` and regression smoke; `api_server.py` is not in the diff.
-- **P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 is now complete as candidate.** Next step is P02 candidate-wide regression/review preparation; P02 is not accepted yet.
+- **P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 is complete as candidate.**
+- Draft PR #22 opened for QA only; candidate SHA `655dc42510cd726eaa3098ab00ded28e49958bb5`, 20 small commits, 4 changed files (`games.py`, `main_window.py`, `public.py`, existing `gui_regression_smoke.py`).
+- Candidate-wide Windows regression run `37590831341` — **SUCCESS**. Passed compile, Actions-version, publication CI consolidation, A9 UI-state/installer checks, backup/restore/media, clean source snapshot, fresh DB integrity, **Native GUI regression core with all P02 focused assertions**, frozen build/startup/browser-source, Inno Setup, installer build, silent-install startup and installer artifact preservation.
+- Separate Publication wording gate `37590831319` failed only on pre-existing documentation wording in `docs/ACTIVE_REVIEW_LEDGER.md`, `docs/IDEA_INVENTORY.md`, `docs/PROJECT_STATE.md`; P02 runtime/new GUI regression files were not cited.
+- Manual-QA artifact: GitHub artifact `11469195381` / `InOneLine_1.0.8_WINDOWS_QA`; ZIP SHA-256 `4602b57a8547075fe9362f0ffa970cd7a170c8082b6755da3846c9adad95301c`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,609,680 bytes, SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
+- Google Drive handoff complete: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`, verified size 46,749,709 bytes in folder `Программа для стриминга`.
+- **P02 automated candidate gate = PASS. P02 is not accepted yet; user manual QA is next.**
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
