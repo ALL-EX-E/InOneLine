@@ -92,7 +92,10 @@
 - V2 manual-QA ZIP: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`; installer SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
 - Repeat manual QA PASS 2026-10-07: P02 works as intended and J1/J2 terminology cleanup is accepted.
 - `ИГРАЛ / НЕ ИГРАЛ` are explicitly protected because they participate in sorting/status mechanics; terminology changes must be context-checked and user-facing only.
-- **P02 = MANUALLY ACCEPTED.** Next: technical closeout/clean promotion + post-merge regression. P03 stays blocked until green.
+- Clean accepted promotion PR #23 merged as `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
+- Clean-promotion regression `37596838501` — **SUCCESS**; post-merge regression `37597234911` — **SUCCESS**. QA PR #24 and superseded PR #22 closed without merge.
+- **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P03 is next and unblocked.**
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
