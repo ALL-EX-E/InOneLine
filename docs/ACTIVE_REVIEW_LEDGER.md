@@ -3162,6 +3162,43 @@ Fresh regression-built installer was only a baseline test artifact, **not a new 
 - Exact CURRENT `1.0.8 / schema 19 / 15 migrations` is green and suitable as rollback/reference baseline for P01.
 - No source/runtime behavior was changed by P00; only the existing GitHub Actions regression was rerun and documentation is updated.
 - Next implementation package according to §4.7 is **P01 — MainWindow shell/menu/F5 cleanup**.
+## 4.9 P01 implementation log — IN PROGRESS — 2026-10-07
+
+- Candidate branch: `candidate/p01-mainwindow-shell-cleanup`.
+- Base: verified P00 main `8751a87c160e3aae3b8cee04833d3f22dc45927d`.
+- CURRENT/main runtime is not replaced by this candidate.
+
+### P01-A — remove duplicate `Файл` menu — COMPLETE / SOURCE CHECK PASS
+- Commit: `8d50ef21f5e05cebce1ba70866e71369f93b893c`.
+- Removed only the `Файл` menu and its duplicate actions: `Импорт CSV…`, `Резервная копия`, `Выход`.
+- `Вид → Обновить`, F5 and `refresh_all()` were intentionally untouched at this step.
+- Diff after P01-A: only `streaming_manager/views/main_window.py`, 18 deletions, 0 additions.
+- Source check: `addMenu("Файл")` absent; `addMenu("Вид")` and F5 still present.
+
+### P01-B — remove `Вид` menu but preserve one global F5 action — COMPLETE / SOURCE CHECK PASS
+- Commit: `183c6accb3f974058ac3abbd1949da558f7f6c9f`.
+- Removed visible `Вид` menu / `Обновить` menu item.
+- Reused the existing QAction: `F5` remains connected to `MainWindow.refresh_all()` and is registered directly on MainWindow via `self.addAction(refresh_action)`.
+- Source check: no `menuBar().addMenu(...)` remains in MainWindow; F5 shortcut and its `refresh_all` connection remain.
+
+### P01-C — add non-clickable F5 information hint — COMPLETE / SOURCE CHECK PASS
+- Commit: `0845c3c624edd907acd68a0f7e5f669f5b96a0f4`.
+- Added exact accepted UI text: `F5 — обновить данные во всех разделах`.
+- Implemented as plain `QLabel` in the existing QMenuBar top-left corner; it is mouse-transparent and does not create a second refresh action.
+- No backend/state mechanism added.
+- Candidate cumulative diff after P01-C: only `streaming_manager/views/main_window.py`, 7 additions / 22 deletions.
+- Source checks PASS:
+  - `Файл` menu absent;
+  - `Вид` menu absent;
+  - no MainWindow menu actions remain;
+  - exactly the intended F5 shortcut path remains (`QAction → refresh_all()`);
+  - approved hint text present;
+  - hint is non-clickable (`WA_TransparentForMouseEvents`);
+  - hint is placed in existing menu-bar area.
+
+### P01 current status
+- P01-A/B/C source changes are complete, but **P01 is not accepted yet**.
+- Next step: add/adjust a focused regression assertion for the shell contract, then run candidate automated checks. After green automation, provide a candidate for user manual QA.
 ## 5. Известные ранее найденные проблемы, которые нельзя потерять
 
 Эти пункты уже документированы в проекте. Они не считаются новой функциональностью и не начинают исправляться автоматически:
