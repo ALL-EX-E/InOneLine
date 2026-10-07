@@ -438,7 +438,7 @@ class GamesTab(QWidget):
         layout.addLayout(filters)
 
         actions = QHBoxLayout()
-        self.add_btn = QPushButton("Добавить игру")
+        self.add_btn = QPushButton("Добавить")
         self.add_btn.setProperty("primary", True)
         self.edit_btn = QPushButton("Изменить")
         self.archive_btn = QPushButton("В архив")
