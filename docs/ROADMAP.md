@@ -61,7 +61,9 @@
 - P01-focused Native GUI regression, frozen build/startup, installer build and silent-install regression all passed.
 - Separate publication-wording gate failed only on pre-existing docs wording; keep outside P01 runtime scope unless separately selected.
 - Temporary installer-artifact PR #20 was closed unused/no-merge after its newly added QA workflow did not trigger; P01 runtime candidate was not changed.
-- Manual QA will be performed directly from exact candidate branch `candidate/p01-mainwindow-shell-cleanup`.
+- Manual QA installer produced successfully by Windows regression run `37583488177`; artifact `11465802252`.
+- Installer SHA-256: `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
+- Next: user manual QA using the produced P01 candidate installer.
 - Automated P01 candidate gate is complete. Next: user manual QA only. P01 is not accepted yet.
 ## P00 baseline gate — PASS — 2026-10-07
 
