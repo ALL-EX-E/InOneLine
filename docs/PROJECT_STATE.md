@@ -471,7 +471,12 @@ Permanent repository gate:
 - Manual-QA artifact: GitHub artifact `11469195381` / `InOneLine_1.0.8_WINDOWS_QA`; ZIP SHA-256 `4602b57a8547075fe9362f0ffa970cd7a170c8082b6755da3846c9adad95301c`.
 - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,609,680 bytes, SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
 - Google Drive handoff complete: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`, verified size 46,749,709 bytes in folder `Программа для стриминга`.
-- **P02 automated candidate gate = PASS. P02 is not accepted yet; user manual QA is next.**
+- Manual QA 2026-10-07: user confirmed the rest of P02 looks/works as intended, but found remaining user-facing game terminology in screenshots. **P02 = REOPENED / MANUAL QA FAIL ON TERMINOLOGY ONLY.**
+- New global rule: **GLOBAL-TERMINOLOGY-001** — user-facing object terminology must be neutral (`список / запись / название / лот` by context); internal `Game/GamesTab/game_id` and legacy compatibility remain technical contracts.
+- **P02-J1** fixes the screenshot-visible List/Public terminology: commits `a49e7a41134479675fb558df6960319f45129d3f` + `1748a31d8606a513cbcb67d9ba1035e5861d98b7`; regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
+- **P02-J2** fixes remaining safe current-package wording in list-toggle, restore counts, duplicate fallback and clear-list failure messages: commits `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
+- CSV/import wording is intentionally deferred to P03 so preferred neutral headers/messages and backward-compatible aliases are changed together. Remaining terminology is routed to P05/P07, P09, P12/P20, P18/P19 and P22.
+- Previous Drive artifact `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp` is superseded for acceptance. Fresh candidate-wide regression and a new installer are required before repeat manual QA.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
