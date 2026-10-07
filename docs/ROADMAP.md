@@ -90,7 +90,9 @@
 - Previous P02 installer is superseded.
 - Fresh P02-J head `4bf4c7e2a4b15837e172073098dcf5595c227e8c`; Windows regression `37594380334` — **SUCCESS**.
 - V2 manual-QA ZIP: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`; installer SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
-- **P02 automated re-gate PASS; repeat manual QA pending. P03 remains blocked.**
+- Repeat manual QA PASS 2026-10-07: P02 works as intended and J1/J2 terminology cleanup is accepted.
+- `ИГРАЛ / НЕ ИГРАЛ` are explicitly protected because they participate in sorting/status mechanics; terminology changes must be context-checked and user-facing only.
+- **P02 = MANUALLY ACCEPTED.** Next: technical closeout/clean promotion + post-merge regression. P03 stays blocked until green.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
