@@ -460,7 +460,11 @@ Permanent repository gate:
 - **P02-H / UI-029** implementation commit `282ca506ad6376c5ee165009bff8bfa1c9969f44`: on `Публичный список` only, the top explanatory text and read-only table title header change `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ`. Data field `title`, API/JSON keys, public XLSX headers/mapping, CSV/XLSX exporters and sorting remain unchanged.
 - P02-H regression commit `6566370f056feaa2063f0bed5f6164877d62b34a`: GUI smoke asserts the explanatory text uses `НАЗВАНИЕ`, contains no legacy `НАЗВАНИЕ ИГРЫ`, and table column 3 is exactly `НАЗВАНИЕ`.
 - Focused P02-H diff versus P02-G: `public.py` 2 additions / 2 deletions; remaining changes are regression-only.
-- **P02 is not accepted yet.** Next small step: UI-030 (remove visible `Открыть локальный JSON` button while preserving `/api/public`).
+- **P02-I / UI-030** implementation commit `a82154e53ad61a25c7026de64592ad1ba422a802`: removed only the visible `Открыть локальный JSON` button and its click connection from `Публичный список`; dead imports `QDesktopServices` / `QUrl` removed after reference check.
+- `/api/public` remains unchanged in `api_server.py`; Public List data model, read-only table, XLSX mirror, API payload and exports are untouched.
+- P02-I regression commit `655dc42510cd726eaa3098ab00ded28e49958bb5`: GUI smoke asserts the legacy Public List JSON button is absent.
+- Focused P02-I diff versus P02-H: only `public.py` and regression smoke; `api_server.py` is not in the diff.
+- **P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 is now complete as candidate.** Next step is P02 candidate-wide regression/review preparation; P02 is not accepted yet.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
