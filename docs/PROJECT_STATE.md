@@ -400,8 +400,8 @@ Permanent repository gate:
   - **QA-1.0.8-02** — остаётся documented safety finding без отдельного implementation approval;
   - **QA-1.0.8-03** — target уже определён UI-087 и ждёт общей batch-команды, runtime 1.0.8 пока не соответствует этому target.
 - После сверки прошлых решений исправлены stale statuses UI-018/TEST-001/BUG-007/UI-055; UI-053 закрыт решением 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`, доступный и для Max Amount, и для wheel context через существующий `/timer-overlay?preview=1`.
-- Повторная provenance-проверка 2026-10-07 показала, что для AUCTION-TIMER-REVIEW-002 нет подтверждённого прямого пользовательского решения. Current 1.0.8 использует saved wheel-duration default для tie overtime, но это поведение снова считается `NEEDS REVIEW`, а не approved target.
-- Остаются два timer-behavior вопроса без прямого решения пользователя: `AUCTION-TIMER-REVIEW-002` (default tie overtime) и `AUCTION-TIMER-REVIEW-003` (~1200 ms lead-in при 1-second wheel spin).
+- AUCTION-TIMER-REVIEW-002 закрыт прямым решением пользователя 2026-10-07: tie overtime Max Amount должен использовать saved Max Amount duration default; current 1.0.8 пока ошибочно использует wheel-duration default. Отдельный overtime setting не создаётся; pending-overtime `Сбросить` также возвращает Max Amount default; ручное изменение времени до `Старт` сохраняется.
+- Остаётся один timer-behavior вопрос без прямого решения пользователя: `AUCTION-TIMER-REVIEW-003` (~1200 ms lead-in при 1-second wheel spin).
 
 ## Active review / bugfix phase
 
