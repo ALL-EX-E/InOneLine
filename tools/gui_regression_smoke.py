@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox, QPushButton
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -183,6 +183,12 @@ def main() -> int:
                 "public-list table title header mismatch: "
                 f"{public_title_header.text() if public_title_header else None!r}"
             )
+
+        public_button_texts = {
+            button.text() for button in window.public_tab.findChildren(QPushButton)
+        }
+        if "Открыть локальный JSON" in public_button_texts:
+            raise AssertionError("legacy Public List local JSON button remains")
 
         if window.games_tab.add_btn.text() != "Добавить":
             raise AssertionError(
