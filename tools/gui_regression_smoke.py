@@ -224,7 +224,6 @@ def main() -> int:
                 "«abc»",
                 "Укажите целое число; если баллов нет, укажите 0.",
             ),
-            with_backup=True,
         )
 
         missing_header_message = expect_csv_error(
