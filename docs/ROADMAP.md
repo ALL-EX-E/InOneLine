@@ -66,6 +66,7 @@
 - Installer SHA-256: `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
 - Next: user manual QA using the produced P01 candidate installer.
 - Automated P01 candidate gate is complete. Next: user manual QA only. P01 is not accepted yet.
+- Manual QA partial result: menus absent confirmed; F5 produced no error and no obvious visual change, which is expected because refresh has no visible success indicator. Automated F5 invocation regression is PASS. Await explicit user acceptance.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
