@@ -457,7 +457,10 @@ Permanent repository gate:
 - **P02-G / UI-024** implementation commit `99ecc55ef2556957f0957c61098a4ae6df03c2d6`: sorting-rules wording only — heading `Автоматическая сортировка списка`; intro `Сначала список распределяется по статусу:`; archive wording `В режиме «Всего» сначала идут все записи вне архива` and `Архивные записи располагаются отдельным блоком в самом низу`. Sorting semantics and order are unchanged.
 - P02-G regression commit `7b03ca8786ec81b507a0ad4c265dcf07928cc4bd`: GUI smoke captures the actual QMessageBox and asserts exact new wording plus absence of legacy wording.
 - Focused P02-G diff versus P02-F: `games.py` 4 additions / 4 deletions; remaining changes are regression-only.
-- **P02 is not accepted yet.** Next small step: UI-029 (Public List `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ`).
+- **P02-H / UI-029** implementation commit `282ca506ad6376c5ee165009bff8bfa1c9969f44`: on `Публичный список` only, the top explanatory text and read-only table title header change `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ`. Data field `title`, API/JSON keys, public XLSX headers/mapping, CSV/XLSX exporters and sorting remain unchanged.
+- P02-H regression commit `6566370f056feaa2063f0bed5f6164877d62b34a`: GUI smoke asserts the explanatory text uses `НАЗВАНИЕ`, contains no legacy `НАЗВАНИЕ ИГРЫ`, and table column 3 is exactly `НАЗВАНИЕ`.
+- Focused P02-H diff versus P02-G: `public.py` 2 additions / 2 deletions; remaining changes are regression-only.
+- **P02 is not accepted yet.** Next small step: UI-030 (remove visible `Открыть локальный JSON` button while preserving `/api/public`).
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
