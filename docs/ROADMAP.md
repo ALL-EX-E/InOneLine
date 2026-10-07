@@ -74,7 +74,8 @@
 - P02-B / UI-011 complete: button `Добавить игру` -> `Добавить`; implementation `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`, GUI assertion `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`.
 - P02-C / UI-012 complete: GameDialog titles -> `Добавить` / `Изменить`, internal headings removed; implementation `dc4197fc05f9eec7885705f77eda1ed7053962b3`, GUI regression `57789c7dbbc1202f000cf8c74f04239f8772c4d9`.
 - P02-D / UI-013 complete: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`; implementation `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`, GUI regression `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`.
-- P02 remains a candidate; next small step is UI-015 only.
+- P02-E / UI-015 complete: `Дата`, `Баллы`, `Отзыв` explicitly marked `(необязательно)`; `Кооператив/Статус` unchanged. Implementation `635e4405ffd12ed35f8c0385616ff1f1193a689f`, GUI regression `1f73618165e5e3f1cd3acad833209cc4cef58f45`.
+- P02 remains a candidate; next small step is UI-022 only.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
