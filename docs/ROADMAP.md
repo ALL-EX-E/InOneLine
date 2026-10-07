@@ -97,7 +97,8 @@
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P03 is next and unblocked.**
 - P03-A / UI-021 complete on `candidate/p03-csv-date-caret`: canonical CSV headers `НАЗВАНИЕ` + `ДАТА` are accepted while legacy `НАЗВАНИЕ ИГРЫ` + `ДАТА ВЫХОДА` remain aliases. Implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`; regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
-- P03 remains a candidate; next small step is UI-020 only.
+- P03-B / UI-020 complete: CSV help rewritten to the accepted neutral/canonical wording while explicitly preserving legacy aliases and `ИГРАЛ / НЕ ИГРАЛ` status labels. Implementation `a70f00688650638ff2173ba942b418db26ba8201`; GUI regression `ec74bed827edaa675f6360dd703326e442f38ee9`.
+- P03 remains a candidate; next small step is UI-019 only.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
