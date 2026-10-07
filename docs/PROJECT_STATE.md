@@ -482,7 +482,9 @@ Permanent repository gate:
 - New manual-QA artifact: GitHub artifact `11470436517`; ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`.
 - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
 - Google Drive V2 handoff: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
-- **P02 automated re-gate = PASS / AWAITING REPEAT MANUAL QA.** P03 remains blocked until explicit P02 acceptance.
+- Repeat manual QA 2026-10-07: user confirmed **everything is correct and works**. P02 terminology fixes J1/J2 accepted.
+- Safety clarification accepted: **do not change `ИГРАЛ / НЕ ИГРАЛ`**; they are coupled to sorting/status mechanics. Terminology changes must be targeted user-facing substitutions only, never bulk renames that may alter parsers, persisted/API keys, status values or business logic.
+- **P02 = MANUALLY ACCEPTED.** Technical closeout/clean promotion and post-merge regression are next; P03 remains blocked until that gate passes.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
