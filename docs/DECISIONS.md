@@ -370,3 +370,15 @@ Another same-scenario cross-source recheck recovered direct accepted detail that
 
 No runtime/source/schema/migration change and no new implementation scope is authorized by this documentation recovery.
 
+
+## 2026-10-07 — completed UI review supersession map
+
+The full tab-by-tab UI/function review is complete. Runtime remains exact CURRENT 1.0.8; the items below are accepted future-target decisions for the pending review batch, not implemented behavior yet.
+
+- **Auction autoscroll target supersession:** historical/released 1.0.8 behavior where local Auction lists and Auction Lots OBS share one non-persisted session-only autoscroll state remains valid as CURRENT history, but it is **not the future target**. UI-074 supersedes it for the pending batch: the local auction table no longer autoscrolls; a persisted `Автопрокрутка оверлея` switch controls only `/auction-lots-overlay`.
+- **Settings Export target supersession:** retained R1.0.9 organization (`Settings → Export` centralizes public file export + legacy compatible export) remains historical released behavior only. UI-088/UI-090 supersede it for the pending batch: public CSV/JSON/XLSX file-export actions move to `Публичный список`, the legacy compatible-export block is removed, and the inner `Настройки → Экспорт` tab is removed entirely.
+- **UI-044 supersession:** the previously accepted plan to add `Публичный API` inside `Настройки → Экспорт` must not be implemented there because UI-090 removes that tab. Existing `/api/public` stays available; a future visible access point, if needed, requires a separate decision.
+- **B3 empty-message supersession:** UI-087 remains authoritative for ordinary accepted empty-message events during a running auction: create a distinct `Без текста N` temporary lot, rather than a standard `Требует привязки` workflow.
+- **Review-status reconciliation:** UI-018 is closed by UI-019/UI-020/UI-021; TEST-001 manual CSV QA is complete/pass; BUG-007 and UI-055 are ready for the batch; UI-053 is narrowed to the still-undecided local timer-preview action.
+- **Still unresolved, do not infer:** no direct user decision was recovered for AUCTION-TIMER-REVIEW-002 (tie-overtime saved default), AUCTION-TIMER-REVIEW-003 (~1200 ms lead-in for 1-second spins), or the remaining UI-053 timer-preview action. Preserve CURRENT behavior until explicitly decided.
+- **QA findings:** QA-1.0.8-01 and QA-1.0.8-02 remain documented findings without implementation approval. QA-1.0.8-03 now has an approved target through UI-087 and waits for the future review-batch implementation command.
