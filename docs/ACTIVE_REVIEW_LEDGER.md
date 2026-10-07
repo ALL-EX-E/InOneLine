@@ -273,7 +273,12 @@
   - После реализации обязательная ручная проверка: вставка, Backspace, Delete, выделение и замена текста в начале/середине/конце `Дата`; сравнить с обычным поведением `Название`. Также проверить обычный последовательный ввод даты.
   - Реализация P03-D 2026-10-07: `_format_date_while_typing()` сохраняет существующий auto-dot formatter, но после `setText(formatted)` восстанавливает caret по длине отформатированного префикса слева от исходной позиции вместо безусловного переноса в конец. Новый widget не создавался; `normalize_date_text()` и допустимые форматы даты не менялись. Commit `7872121a09c740e99073053d9b1ee9e776296202`.
   - Existing GUI regression проверяет оба режима `Добавить`/`Изменить`: форматирование при caret в середине, Backspace, Delete, замену выделения и последовательный compact-ввод; commit `2fd76ae1260738fdf289b36de084ac2b15234e19`.
-  - P03-D ещё не принят пользователем; P03 batch implementation scope теперь завершён и ждёт общего automated gate.
+  - P03 implementation scope завершён. Clean review branch `candidate/p03-review`, head `9fb64bc0d0867f439b0866f82826b406c22ef012`, draft PR #25; exact diff — `services.py`, `games.py`, existing `gui_regression_smoke.py`.
+  - Candidate-wide Windows regression `37633288322` — **SUCCESS**, включая Native GUI P03 checks, frozen build/startup, Browser Source, installer build и silent-install.
+  - GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`; inside `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
+  - Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified size 46,755,018 bytes.
+  - Separate wording gate `37633288273` remains the known docs-only finding; P03 runtime/regression files are not cited.
+  - **P03 automated candidate gate = PASS / AWAITING MANUAL QA.**
 
 
 - **UI-014 — поле `Баллы`: текущий 9-значный лимит сохранить — CANCELLED / PRESERVE CURRENT LIMIT.**
