@@ -537,7 +537,7 @@ Permanent repository gate:
 - User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
 - Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
 - Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
-- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-A / UI-025 is MANUALLY ACCEPTED and awaits clean promotion/merge/post-merge QA.**
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-A / UI-025 is CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-B / BUG-003 is next.**
 
 - Current manual-QA format: issue the complete current-package checklist in one message; do not repeat already accepted scenarios without a reason. Other latest workflow and terminology rules remain active.
 
@@ -551,7 +551,7 @@ Permanent repository gate:
 - **P04-A / UI-025 = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION.** Accepted scope removes obsolete hide/show-list buttons, spacers, MainWindow/Enter visibility hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys while preserving the existing tables, `ui_state.ini` geometry/tab restoration, data, filters and explicit search navigation. Selection/search/total-points follow-up scopes remain separate later steps.
 - P04 remains open. Do not start the next implementation step until P04-A is clean-promoted, merged and exact post-merge regression passes.
 
-## P04-A / UI-025 manual acceptance — PASS / AWAITING CLEAN PROMOTION
+## P04-A / UI-025 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS
 
 - Branch `candidate/p04-a-list-visibility`, head `3cdff95129d012729d1cfc8c7a74f4050f3231d0`, draft PR #27. Exactly four changed files: MainWindow, Games, Public and existing GUI regression smoke; 53 additions / 195 deletions. Published blobs match the locally tested files.
 - Removed only obsolete hide/show controls, empty spacers and MainWindow/search visibility hooks. `_restore_ui_state()` removes `lists/visible`, `games/list_visible`, `public/list_visible`; save no longer recreates them. Window geometry/maximized/tab state and the native-QSettings migration backup remain intact. Existing tables, data, filters, explicit selection synchronization, statuses, schema and accepted P03 CSV/date behavior are preserved.
@@ -560,4 +560,12 @@ Permanent repository gate:
 - Artifact `11495357287`, ZIP size 46,751,606 bytes, GitHub SHA-256 digest `1eb7e5f9589f71fae4cf778d6da90f06e5d08badea0fd67035fd8d3f900bfcee`. Installer CI SHA-256 `086ed75bf046036a0d7d74efff677626f460d6346c5a849249d3fd53d229bdc0`.
 - Drive handoff: `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`; uploaded directly from the GitHub artifact reference, verified Drive size 46,751,606 bytes.
 - Complete manual checklist issued together: (1) both lists and existing records visible, hide/show buttons absent; (2) repeated tab switches do not resize the window or hide either table; (3) Enter search on both tabs selects/navigates to an active existing record and synchronizes selection; (4) F5 keeps both tables visible and data accessible; (5) restart restores window position/size and selected tab, both tables remain visible.
-- **P04-A = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION / NOT MERGED. P04 remains open.** User accepted the complete checklist with «Работает. Записывай. Пока дальше не идём.» Freeze candidate head `3cdff95129d012729d1cfc8c7a74f4050f3231d0`; do not start the next P04 code step until promotion, merge and exact post-merge regression succeed. Full search/filter/deselect/total-points changes remain later scopes.
+- **P04-A = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04 remains open.** User accepted the complete checklist with «Работает. Записывай. Пока дальше не идём.» Clean promotion PR #28 (`7fe09b7543b666ae6657377a9d782bac9442ec77`) passed regression `37652474014` + wording `37652474280`, merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`, and exact post-merge regression `37653013085` + wording `37653013097` succeeded. Candidate PR #27 closed without merge. **Next: P04-B / BUG-003 only.**
+
+
+## P04-B / BUG-003 start
+
+- Scope is intentionally small: ordinary refresh/filter must preserve selection only when the same row remains visible; otherwise leave no row selected. If nothing was selected before refresh, keep no selection.
+- Add a lightweight empty-area click deselect behavior for the main list.
+- Existing explicit actions that intentionally select a row remain unchanged: Enter search and `focus_game()`.
+- Search-across-filters, removal of search/reset buttons, Public search changes, and total-points counter remain later P04 scopes.
