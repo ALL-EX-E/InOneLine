@@ -555,12 +555,17 @@ Alan Wake 2|0
   - Предпочтительный minimal-diff: удалить только `search_btn` и его click connection; существующие `textChanged`, `returnPressed`, `activate_search()` и selection sync переиспользовать.
   - Runtime/code пока не изменялись.
 
-- **UI-029 — вкладка `Публичный список`: `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ` — READY AFTER BATCH APPROVAL.**
+- **UI-029 — вкладка `Публичный список`: `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ` — IMPLEMENTED IN P02-H / CANDIDATE / NOT YET ACCEPTED.**
   - Пользователь подтвердил 2026-10-03 распространение принятой терминологии `Название` на Public List.
   - В верхнем пояснении `НАЗВАНИЕ ИГРЫ` заменить на `НАЗВАНИЕ`; position-part после GLOBAL-POSITION-COLUMNS-001 всегда показывается одним столбцом `ПОЗИЦИЯ`.
   - В заголовке основной read-only таблицы `НАЗВАНИЕ ИГРЫ` заменить на **`НАЗВАНИЕ`**.
   - Меняются только пользовательские подписи. Поле данных `title`, API/JSON keys, XLSX mapping, сортировка и содержимое списка не переименовывать автоматически.
-  - Runtime/code пока не изменялись.
+  - Реализация P02-H 2026-10-07: только на вкладке `Публичный список` верхнее пояснение и third read-only table header используют `НАЗВАНИЕ` вместо `НАЗВАНИЕ ИГРЫ`; commit `282ca506ad6376c5ee165009bff8bfa1c9969f44`.
+  - Поле данных `title`, API/JSON keys, public XLSX headers/mapping, CSV/XLSX exporters, shared XLSX и sorting semantics не менялись.
+  - Existing GUI regression проверяет explanatory text, отсутствие legacy `НАЗВАНИЕ ИГРЫ` в нём и exact table header `НАЗВАНИЕ`; commit `6566370f056feaa2063f0bed5f6164877d62b34a`.
+  - Focused runtime diff P02-H против P02-G: `public.py` 2 additions / 2 deletions; остальные изменения regression-only.
+  - P02-H ещё не принят пользователем; P02 batch продолжается.
+
 
 - **UI-030 — убрать кнопку `Открыть локальный JSON` со вкладки `Публичный список`, endpoint сохранить — READY AFTER BATCH APPROVAL.**
   - Пользователь подтвердил 2026-10-03: видимая кнопка `Открыть локальный JSON` на вкладке `Публичный список` не нужна.
