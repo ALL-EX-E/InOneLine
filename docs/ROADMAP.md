@@ -36,8 +36,8 @@
   - UI-044 в прежнем виде не реализуется, потому что target `Настройки → Экспорт → Публичный API` исчезает вместе с вкладкой; `/api/public` сохраняется.
 - Не считать released 1.0.8 layout/behavior в исторических записях более поздним target, если оно явно superseded текущим ledger.
 - UI-053 закрыт 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`; действие работает и для Max Amount, и для wheel context и переиспользует существующий `/timer-overlay?preview=1`.
-- AUCTION-TIMER-REVIEW-002 закрыт: восстановлено ранее принятое E3-решение — tie overtime использует saved `Длительность вращения колеса по умолчанию`; отдельный overtime default не создаётся, current 1.0.8 уже соответствует.
-- Перед dependency sorting остаётся один неразрешённый timer-behavior вопрос: AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
+- AUCTION-TIMER-REVIEW-002 повторно открыт после provenance-проверки: current 1.0.8 использует saved wheel-duration default, но подтверждённого прямого пользовательского решения, что это целевая семантика, не найдено.
+- Перед dependency sorting остаются два неразрешённых timer-behavior вопроса: AUCTION-TIMER-REVIEW-002 — какой default использовать для tie overtime; AUCTION-TIMER-REVIEW-003 — что делать с ~1200 ms lead-in при 1-second wheel spin.
 - QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
 
 ## Сохранённые future scope после текущего review-batch
