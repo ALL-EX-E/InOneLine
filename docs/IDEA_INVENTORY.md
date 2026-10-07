@@ -676,5 +676,5 @@ This section records the latest accepted review target while preserving all hist
 
 - BUG-003 is implemented as an isolated candidate, not yet accepted.
 - Runtime change is limited to main-list selection semantics and empty-area deselection; explicit Enter/focus selection is preserved.
-- Automated Windows gate passed. Manual-QA build is on Drive as `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip` (ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`).
+- Automated Windows gate passed. Manual-QA build is on Drive as `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip` (ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`).
 - UI-007/UI-008/UI-009/UI-028/UI-076 remain separate later P04 items.
