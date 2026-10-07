@@ -403,6 +403,16 @@ Permanent repository gate:
 - AUCTION-TIMER-REVIEW-002 закрыт прямым решением пользователя 2026-10-07: tie overtime Max Amount должен использовать saved Max Amount duration default; current 1.0.8 пока ошибочно использует wheel-duration default. Отдельный overtime setting не создаётся; pending-overtime `Сбросить` также возвращает Max Amount default; ручное изменение времени до `Старт` сохраняется.
 - AUCTION-TIMER-REVIEW-003 закрыт решением пользователя 2026-10-07: ~1.2 s остаётся отдельным technical preparation lead-in после `Старт`/`Крутить`; пользовательская длительность до его окончания не расходуется. После lead-in timer + applicable wheel animation + soundtrack стартуют от одной общей authoritative boundary. Повторный action во время подготовки должен быть re-entry protected. Неразрешённых timer-review вопросов не осталось.
 
+## Dependency reconciliation complete — 2026-10-07
+
+- Point 2 of the post-review plan is complete: all accepted UI/BUG/GLOBAL/timer decisions were cross-checked for shared backend dependencies, supersession and ordering hazards.
+- Final precedence corrections include: UI-025 over old hidden-list Enter behavior; UI-043 over stale `Локальный API` undecided text; UI-060 over the old Rules separate-style/save model; GLOBAL-OBS-VISIBILITY-001 over the earlier Rules no-program-visibility rule; AUCTION-TIMER-REVIEW-003 over the old unresolved short-spin lead-in note.
+- Rules final boundary: one composite rules template for text/appearance, no duplicate Rules settings in Stream/OBS, common widget show-mode remains a separate widget-level persisted policy, preview stays override.
+- Timer final boundary: ~1.2 s preparation is outside configured duration; actual timer/wheel/audio start is synchronized; source-time auction membership begins at the actual Max Amount/overtime start boundary; re-entry is blocked during preparation.
+- Max Amount/Conversion final dependency: pre-close pending gates irreversible result; post-close new events use persistent path; Stop remains no-winner emergency exit and does not implicitly discard pending events.
+- UI-088/UI-090 final export boundary: public file exports move to Public List; Settings Export and legacy compatible-export UI disappear; `/api/public` remains but has no new visible access point in this batch.
+- QA-1.0.8-01/02 remain outside the implementation batch unless separately approved.
+- No unresolved logical conflict remains inside the accepted current-review target. Point 3 can now sort implementation by shared foundations/dependencies.
 ## Active review / bugfix phase
 
 Новые product features временно приостановлены по прямому решению пользователя. Текущий рабочий протокол и накопительная очередь замечаний находятся в `docs/ACTIVE_REVIEW_LEDGER.md`.
