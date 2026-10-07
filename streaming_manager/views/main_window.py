@@ -527,24 +527,6 @@ class MainWindow(QMainWindow):
         self.settings_tab._refresh_integrations()
 
     def _make_menu(self):
-        file_menu = self.menuBar().addMenu("Файл")
-        file_menu.setMinimumWidth(260)
-
-        import_action = QAction("Импорт CSV…", self)
-        import_action.setShortcut(QKeySequence("Ctrl+I"))
-        import_action.triggered.connect(self.games_tab.import_csv)
-        file_menu.addAction(import_action)
-
-        backup = QAction("Резервная копия", self)
-        backup.setShortcut(QKeySequence("Ctrl+B"))
-        backup.triggered.connect(self.settings_tab.backup)
-        file_menu.addAction(backup)
-
-        file_menu.addSeparator()
-        exit_action = QAction("Выход", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
         view_menu = self.menuBar().addMenu("Вид")
         view_menu.setMinimumWidth(220)
         refresh_action = QAction("Обновить", self)
