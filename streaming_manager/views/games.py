@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Callable
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer
+from PySide6.QtCore import QEvent, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -619,6 +619,7 @@ class GamesTab(QWidget):
 
         self.table.doubleClicked.connect(self.edit_game)
         self.table.itemSelectionChanged.connect(self._update_action_state)
+        self.table.viewport().installEventFilter(self)
         layout.addWidget(self.table, 1)
 
         self.shortcuts = []
@@ -712,6 +713,20 @@ class GamesTab(QWidget):
         required = self._game_title_header_min_width()
         if new_size < required:
             self.table.setColumnWidth(3, required)
+
+    def eventFilter(self, watched, event):
+        if (
+            watched is self.table.viewport()
+            and event.type() == QEvent.Type.MouseButtonPress
+            and event.button() == Qt.MouseButton.LeftButton
+            and not self.table.indexAt(event.position().toPoint()).isValid()
+        ):
+            self.table.clearSelection()
+            self.table.setCurrentCell(-1, -1)
+            self.table.setFocus(Qt.MouseFocusReason)
+            self._update_action_state()
+            return True
+        return super().eventFilter(watched, event)
 
     def _search_text_changed(self, text: str):
         """Refresh the visible source once and synchronize hidden search views."""
@@ -969,8 +984,9 @@ class GamesTab(QWidget):
             post_started = time.perf_counter()
             if selected_row >= 0:
                 self.table.selectRow(selected_row)
-            elif games:
-                self.table.selectRow(0)
+            else:
+                self.table.clearSelection()
+                self.table.setCurrentCell(-1, -1)
             self._update_stats(stats)
         finally:
             if not self.table.updatesEnabled():
