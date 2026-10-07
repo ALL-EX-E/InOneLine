@@ -2050,16 +2050,19 @@ class ServicesMixin:
         path = Path(path)
         parsed_rows: list[tuple[str, dict[str, Any]]] = []
         skipped_empty = 0
-        seen_titles: dict[str, str] = {}
+        seen_titles: dict[str, tuple[str, int]] = {}
 
-        def register_title(title: str) -> None:
+        def register_title(title: str, line_no: int) -> None:
             title_key = normalize_title_key(title)
             if title_key in seen_titles:
+                previous_title, previous_line = seen_titles[title_key]
                 raise ValueError(
-                    f"Дубликат названия в CSV: «{title}» "
-                    f"(ранее встречалось как «{seen_titles[title_key]}»)."
+                    f"Повторяется название «{title}» (строка {line_no}). "
+                    f"Ранее это же название указано в строке {previous_line} "
+                    f"как «{previous_title}». Оставьте в CSV только одну запись "
+                    "с этим названием."
                 )
-            seen_titles[title_key] = title
+            seen_titles[title_key] = (title, line_no)
 
         def parse_optional_payload(
             title: str,
@@ -2073,8 +2076,10 @@ class ServicesMixin:
                 status_key = status_text.upper()
                 if status_key not in STATUS_FROM_LABEL:
                     raise ValueError(
-                        f"Неизвестный статус у «{title}» (строка {line_no}): "
-                        f"{status_text!r}"
+                        f"Некорректное значение в поле «СТАТУС» у «{title}» "
+                        f"(строка {line_no}): «{status_text}». "
+                        "Допустимо: ПРОХОДИТСЯ, НЕ ИГРАЛ, ИГРАЛ, ПРОЙДЕНО "
+                        "или ЗАБРОШЕНО."
                     )
                 payload["status"] = STATUS_FROM_LABEL[status_key]
 
@@ -2083,8 +2088,8 @@ class ServicesMixin:
                 coop_key = coop_text.upper()
                 if coop_key not in COOP_FROM_LABEL:
                     raise ValueError(
-                        f"Неизвестное значение КООП/НЕ КООП у «{title}» "
-                        f"(строка {line_no}): {coop_text!r}. "
+                        f"Некорректное значение в поле «КООП/НЕ КООП» у «{title}» "
+                        f"(строка {line_no}): «{coop_text}». "
                         "Допустимо: КООП или НЕ КООП."
                     )
                 payload["coop"] = COOP_FROM_LABEL[coop_key]
@@ -2095,7 +2100,10 @@ class ServicesMixin:
                     payload["release_date"] = parse_date(date_text)
                 except ValueError as exc:
                     raise ValueError(
-                        f"Некорректная дата у «{title}» (строка {line_no})."
+                        f"Некорректное значение в поле «ДАТА» у «{title}» "
+                        f"(строка {line_no}): «{date_text}». "
+                        "Укажите существующую дату, например 27.08.2019, "
+                        "или оставьте поле пустым."
                     ) from exc
 
             points_text = values.get("БАЛЛЫ", "").strip() or values.get("БАЛЛЫ SM", "").strip()
@@ -2106,7 +2114,9 @@ class ServicesMixin:
                     payload["sm_points"] = points_from_text(amount_text)
                 except (TypeError, ValueError) as exc:
                     raise ValueError(
-                        f"Некорректное значение баллов у «{title}» (строка {line_no})."
+                        f"Некорректное значение в поле «БАЛЛЫ» у «{title}» "
+                        f"(строка {line_no}): «{amount_text}». "
+                        "Укажите целое число; если баллов нет, укажите 0."
                     ) from exc
 
             review_text = values.get("ОТЗЫВ", "").strip()
@@ -2151,8 +2161,10 @@ class ServicesMixin:
                     continue
                 if "|" not in text:
                     raise ValueError(
-                        f"Некорректная строка формата «Название|Баллы» (строка {line_no}): "
-                        "ожидается формат Название игры|Баллы."
+                        f"Некорректная строка формата «Название|Баллы» "
+                        f"(строка {line_no}): «{text}». "
+                        "Каждая строка должна иметь вид Название|Баллы, "
+                        "например Control|0."
                     )
                 title, amount_text = text.rsplit("|", 1)
                 title = title.strip()
@@ -2162,14 +2174,18 @@ class ServicesMixin:
                     continue
                 if not amount_text:
                     raise ValueError(
-                        f"Не указаны баллы у «{title}» (строка {line_no})."
+                        f"Не указаны баллы у «{title}» (строка {line_no}). "
+                        "В формате «Название|Баллы» значение после «|» обязательно; "
+                        "если баллов нет, укажите 0."
                     )
-                register_title(title)
+                register_title(title, line_no)
                 try:
                     sm_points = points_from_text(amount_text)
                 except (TypeError, ValueError) as exc:
                     raise ValueError(
-                        f"Некорректное значение баллов у «{title}» (строка {line_no})."
+                        f"Некорректное значение в поле «БАЛЛЫ» у «{title}» "
+                        f"(строка {line_no}): «{amount_text}». "
+                        "Укажите целое число; если баллов нет, укажите 0."
                     ) from exc
                 parsed_rows.append(
                     (title, {"title": title, "sm_points": sm_points})
@@ -2184,7 +2200,11 @@ class ServicesMixin:
 
             reader = csv.DictReader(raw_text.splitlines(), dialect=dialect)
             if not reader.fieldnames:
-                raise ValueError("CSV не содержит заголовков.")
+                raise ValueError(
+                    "CSV не содержит строки заголовков. Добавьте заголовки, "
+                    "минимум столбец «НАЗВАНИЕ», либо используйте формат "
+                    "«Название|Баллы» без заголовка."
+                )
 
             norm = {
                 str(header).strip().upper(): header
@@ -2200,8 +2220,10 @@ class ServicesMixin:
             )
             if title_header is None:
                 raise ValueError(
-                    "Не найден обязательный столбец: НАЗВАНИЕ ИГРЫ. "
-                    "Либо используйте формат «Название игры|Баллы»."
+                    "Не найден обязательный столбец «НАЗВАНИЕ». "
+                    "Добавьте столбец «НАЗВАНИЕ» "
+                    "(старое «НАЗВАНИЕ ИГРЫ» также принимается) "
+                    "или используйте формат «Название|Баллы»."
                 )
 
             available = supported_headers.intersection(norm)
@@ -2210,7 +2232,7 @@ class ServicesMixin:
                 if not title:
                     skipped_empty += 1
                     continue
-                register_title(title)
+                register_title(title, line_no)
                 values = {
                     header: str(row.get(norm[header], "") or "")
                     for header in available
