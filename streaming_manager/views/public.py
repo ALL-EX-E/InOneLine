@@ -71,7 +71,7 @@ class PublicTab(QWidget):
 
         self.search_btn = QPushButton("Найти")
         self.search_btn.setToolTip(
-            "Показать список и перейти к первой найденной игре"
+            "Показать список и перейти к первой найденной записи"
         )
         self.search_btn.clicked.connect(self.activate_search)
 
