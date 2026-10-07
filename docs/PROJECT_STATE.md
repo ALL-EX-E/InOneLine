@@ -484,7 +484,11 @@ Permanent repository gate:
 - Google Drive V2 handoff: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
 - Repeat manual QA 2026-10-07: user confirmed **everything is correct and works**. P02 terminology fixes J1/J2 accepted.
 - Safety clarification accepted: **do not change `ИГРАЛ / НЕ ИГРАЛ`**; they are coupled to sorting/status mechanics. Terminology changes must be targeted user-facing substitutions only, never bulk renames that may alter parsers, persisted/API keys, status values or business logic.
-- **P02 = MANUALLY ACCEPTED.** Technical closeout/clean promotion and post-merge regression are next; P03 remains blocked until that gate passes.
+- Clean promotion PR #23 merged into `main`: merge commit `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
+- Pre-merge clean-promotion regression `37596838501` — **SUCCESS**.
+- Post-merge QA-only PR #24 from the exact merge commit completed Regression Foundation run `37597234911` — **SUCCESS** and was closed without merge. Historical candidate PR #22 also closed without merge.
+- **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P03 is now unblocked.** GLOBAL-TERMINOLOGY-001 remains active, with `ИГРАЛ / НЕ ИГРАЛ` explicitly protected.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
