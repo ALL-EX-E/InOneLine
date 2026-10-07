@@ -388,7 +388,7 @@ Alan Wake 2|0
   - Не добавлять `АРХИВ` в список допустимых значений `СТАТУС`: archive в current data model является отдельным состоянием записи, а не одним из импортируемых STATUS values.
   - Runtime/code пока не изменялись.
 
-- **UI-022 — переименовать и упростить сценарий полной очистки списка — READY AFTER BATCH APPROVAL.**
+- **UI-022 — переименовать и упростить сценарий полной очистки списка — IMPLEMENTED IN P02-F / CANDIDATE / NOT YET ACCEPTED.**
   - Current main button: `Очистить все игры…`.
   - Решение пользователя 2026-10-03: main button -> **`Очистить список`**.
   - Current dialog window title: `Очистить все игры?`; изменить на **`Очистить список`**.
@@ -399,7 +399,12 @@ Alan Wake 2|0
   - Confirm enable/Enter semantics сохраняются: destructive button становится доступной только при точном совпадении введённой строки с новым `CONFIRM_TEXT`.
   - Existing safeguards **не менять**: open-auction guard, обязательный isolated safety-backup, background worker, сохранение завершённой истории аукционов и Журнала.
   - Во время worker существующее временное состояние `Очистка…` сохраняется; после завершения main button должна возвращаться уже к новому тексту `Очистить список`, а не к старому `Очистить все игры…`.
-  - Runtime/code пока не изменялись.
+  - Реализация P02-F 2026-10-07: main button `Очистить список`; dialog title `Очистить список`; heading `Будут удалены все записи: N`; warning `Операция удалит обычные, архивные и временные записи.`; confirm text/placeholder `УДАЛИТЬ ЗАПИСИ`; destructive button `Удалить записи`. Commit `8781b4bafbfdfdafcbfd960f6d667924ca08f822`.
+  - Связанный reset после worker также обновлён на `Очистить список`, иначе кнопка после первой очистки возвращалась бы к legacy text; commit `6a7746c956460ca9464951551f5b7242af174958`.
+  - Existing open-auction guard, isolated safety-backup, background worker, completed-auction history/Journal preservation и destructive logic не менялись.
+  - Existing GUI regression проверяет exact texts, inexact/exact confirmation enablement, Enter semantics и post-worker label persistence; commits `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`.
+  - P02-F ещё не принят пользователем; P02 batch продолжается.
+
 
 - **UI-023 — статистические фильтры вкладки `Список` — EXISTING / PRESERVE.**
   - Пользователь подтвердил 2026-10-03: весь ряд фильтров оставить как есть.
