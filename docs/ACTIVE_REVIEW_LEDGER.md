@@ -92,6 +92,29 @@
   - Проверить минимум на экране 1920×1080 и дополнительно сценарии с более узким окном; критические действия должны оставаться достижимыми через прокрутку.
   - Runtime/code пока не изменялись.
 
+## 3.3 Глобальный принцип нейтральной терминологии объектов списка
+
+- **GLOBAL-TERMINOLOGY-001 — пользовательский UI не должен привязывать программу к «играм», если это не требуется точной внешней совместимостью — ACTIVE REVIEW RULE.**
+  - Прямое решение пользователя 2026-10-07 после ручной QA P02: во всех возможных пользовательских местах убрать существительные и словосочетания вида `игра / игры / название игры / список игр / данные игры` и заменять по смыслу.
+  - Предпочтительная терминология:
+    - основная и публичная таблица: **`список` / `запись` / `название`**;
+    - аукцион: **`лот`**, когда речь именно об объекте аукциона;
+    - сообщения о постоянной записи/сохранении/удалении: **`запись`**;
+    - OBS/list widgets: **`список`**, без `список игр`.
+  - Статусы `ИГРАЛ / НЕ ИГРАЛ` сами по себе этим правилом не переименовываются: это отдельные принятые status labels, а не noun-label объекта.
+  - Внутренние классы/идентификаторы/DB/API contract (`Game`, `GamesTab`, `game_id`, `title` и т. п.) не переименовывать автоматически: это техническая совместимость, не пользовательский текст.
+  - Historical release notes и архивная документация не переписываются ради косметики.
+  - Legacy import/parser compatibility может продолжать принимать старые `НАЗВАНИЕ ИГРЫ` / `Название игры|Баллы`, но обычная пользовательская справка и новые файлы должны использовать нейтральное `НАЗВАНИЕ` / `Название|Баллы`.
+  - Implementation routing:
+    - **P02-J** — текущие List/Public/GameDialog/restore/clear-list wording;
+    - **P03** — CSV/import help, errors и preferred headers при сохранении legacy aliases;
+    - **P05/P07** — export/public/shared XLSX visible headers и новые output-файлы;
+    - **P09** — Stream/OBS labels/tooltips;
+    - **P12/P20** — Auction/lots/winner wording;
+    - **P18/P19** — Settings integrations/conversion wording;
+    - **P22** — Journal human-readable create/delete wording.
+  - При реализации каждого указанного пакета правило применяется автоматически; отдельное повторное подтверждение не требуется.
+
 ## 4. Очередь замечаний по скриншотам
 
 Подробный разбор всех вкладок завершён 2026-10-07. Накопленные решения ниже являются рабочим implementation target после будущей команды пользователя `«всё делаем»`; runtime 1.0.8 пока не изменён.
@@ -584,7 +607,12 @@ Alan Wake 2|0
   - GitHub artifact `11469195381` / `InOneLine_1.0.8_WINDOWS_QA`; ZIP SHA-256 `4602b57a8547075fe9362f0ffa970cd7a170c8082b6755da3846c9adad95301c`.
   - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,609,680 bytes, SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
   - Google Drive handoff: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`, verified size 46,749,709 bytes.
-  - **P02 automated candidate gate = PASS; manual QA pending; P02 not accepted yet.**
+  - Manual QA 2026-10-07: пользователь подтвердил, что остальные P02-изменения выглядят и работают как задумано, но выявил единый terminology defect — оставшиеся user-facing упоминания `игра/игры` (включая `Отзыв по игре`, `основной список игр`, `НАЗВАНИЕ ИГРЫ`).
+  - **P02 = REOPENED / MANUAL QA FAIL ON TERMINOLOGY ONLY.** Старый QA artifact `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp` больше не является кандидатом для acceptance.
+  - **P02-J1** candidate commits `a49e7a41134479675fb558df6960319f45129d3f` + `1748a31d8606a513cbcb67d9ba1035e5861d98b7`: neutral List/Public wording, including screenshot findings; regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
+  - **P02-J2** candidate commits `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`: remaining safe P02 wording in list-toggle, restore count, duplicate fallback and clear-list failure messages; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
+  - CSV/import-specific `игра` wording deliberately remains for P03 so preferred headers/messages and backward compatibility are changed together.
+  - P02 requires fresh candidate-wide regression + new installer + short repeat manual QA before acceptance.
 
 
 - **UI-031 — остальная часть вкладки `Публичный список` — EXISTING / PRESERVE WITH SINGLE `ПОЗИЦИЯ` + UI-077 EXCEPTIONS.**
