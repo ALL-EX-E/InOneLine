@@ -497,7 +497,7 @@ Alan Wake 2|0
   - P02-G ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-025 — удалить функцию `Скрыть список / Показать список` — IMPLEMENTED IN P04-A / CANDIDATE / AWAITING MANUAL QA.**
+- **UI-025 — удалить функцию `Скрыть список / Показать список` — MANUALLY ACCEPTED IN P04-A / AWAITING CLEAN PROMOTION AND POST-MERGE QA.**
   - Исторический замысел функции был связан с compact-window mode, но автоматическое изменение геометрии MainWindow ранее удалено из-за подтверждённых geometry/shrink defects.
   - Решение пользователя 2026-10-03: текущая возможность временно скрывать таблицы больше не нужна и должна быть удалена целиком.
   - Удалить видимые toggle-кнопки на вкладках `Список` и `Публичный список`.
@@ -507,7 +507,7 @@ Alan Wake 2|0
   - Backend данных, сами таблицы, поиск, фильтры, selection sync и содержимое вкладок не менять.
   - Не возвращать старый compact-window auto-resize.
   - Реализация P04-A: obsolete visibility controls/spacers/hooks удалены; только три устаревших UI-state ключа очищаются при восстановлении окна и больше не сохраняются. Existing tables/data, geometry/tab persistence, native migration backup и явная search/selection sync сохраняются. Head `3cdff95129d012729d1cfc8c7a74f4050f3231d0`.
-  - Existing GUI regression + Windows regression `37648861189` = PASS / SUCCESS. Drive build `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`. Полный чек-лист выдан сразу; ручная приёмка ещё ожидается.
+  - Existing GUI regression + Windows regression `37648861189` = PASS / SUCCESS. Drive build `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`. Полный чек-лист выдан сразу; пользователь подтвердил его целиком: «Работает. Записывай. Пока дальше не идём.» Ручная приёмка P04-A = PASS.
 
 - **UI-026 — кнопки `Копировать URL списка` и `Открыть предпросмотр списка` — EXISTING / PRESERVE.**
   - Пользователь подтвердил 2026-10-03: обе кнопки оставить как есть.
@@ -3514,4 +3514,4 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Artifact `11495357287`, ZIP size 46,751,606 bytes, GitHub SHA-256 digest `1eb7e5f9589f71fae4cf778d6da90f06e5d08badea0fd67035fd8d3f900bfcee`. Installer CI SHA-256 `086ed75bf046036a0d7d74efff677626f460d6346c5a849249d3fd53d229bdc0`.
 - Drive handoff: `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`; uploaded directly from the GitHub artifact reference, verified Drive size 46,751,606 bytes.
 - Complete manual checklist issued together: (1) both lists and existing records visible, hide/show buttons absent; (2) repeated tab switches do not resize the window or hide either table; (3) Enter search on both tabs selects/navigates to an active existing record and synchronizes selection; (4) F5 keeps both tables visible and data accessible; (5) restart restores window position/size and selected tab, both tables remain visible.
-- **P04-A = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED. P04 remains open.** Do not start the next P04 implementation step until this candidate is accepted. Full search/filter/deselect/total-points changes remain later scopes.
+- **P04-A = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION / NOT MERGED. P04 remains open.** The accepted candidate is frozen at `3cdff95129d012729d1cfc8c7a74f4050f3231d0`; next code scope starts only after clean promotion, merge and exact post-merge regression. Full search/filter/deselect/total-points changes remain later scopes.
