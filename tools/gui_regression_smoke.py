@@ -37,7 +37,7 @@ from streaming_manager.constants import (
     WHEEL_SOUNDTRACK_MUTE_KEY,
     WHEEL_SOUNDTRACK_VOLUME_KEY,
 )
-from streaming_manager.database import Database, Game
+from streaming_manager.database import Database, DuplicateGameError, Game
 from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
@@ -213,6 +213,34 @@ def main() -> int:
             raise AssertionError(
                 f"public-list search tooltip mismatch: {window.public_tab.search_btn.toolTip()!r}"
             )
+
+        if window.games_tab.list_toggle_btn.toolTip() != "Скрыть таблицу списка":
+            raise AssertionError(
+                f"list-toggle tooltip mismatch: {window.games_tab.list_toggle_btn.toolTip()!r}"
+            )
+        duplicate_error = DuplicateGameError(1, "QA")
+        if str(duplicate_error) != "Запись «QA» уже существует в списке.":
+            raise AssertionError(
+                f"duplicate fallback wording mismatch: {str(duplicate_error)!r}"
+            )
+
+        terminology_sources = {
+            PROJECT_ROOT / "streaming_manager/views/main_window.py": (
+                "Игр в восстановленной копии:",
+            ),
+            PROJECT_ROOT / "streaming_manager/db/services.py": (
+                "Не удалось создать резервную копию перед очисткой игр.",
+                "Ни одна игра не была удалена.",
+                "Игры не были удалены.",
+            ),
+        }
+        for source_path, forbidden_terms in terminology_sources.items():
+            source_text = source_path.read_text(encoding="utf-8")
+            for forbidden in forbidden_terms:
+                if forbidden in source_text:
+                    raise AssertionError(
+                        f"legacy game wording remains in {source_path.name}: {forbidden!r}"
+                    )
 
         if window.games_tab.clear_all_btn.text() != "Очистить список":
             raise AssertionError(
