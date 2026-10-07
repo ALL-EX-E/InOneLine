@@ -289,3 +289,13 @@ Release cadence считает **только принятые CURRENT/released 
 - Add empty-area click deselection to the main list without a new selection subsystem.
 - Preserve explicit Enter-search and `focus_game()` selection.
 - Do not include UI-007/UI-008/UI-009/UI-028 or UI-076 in P04-B.
+
+
+## P04-B / BUG-003 candidate — AUTOMATED PASS / AWAITING MANUAL QA
+
+- Candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`, draft PR #29; only main-list selection runtime + existing GUI regression changed.
+- Removed implicit first-row fallback from ordinary refresh; still-visible selection is preserved, missing/no selection remains empty.
+- Empty-area left click clears selection/current cell; explicit Enter search and `focus_game()` remain selection commands.
+- Regression Foundation `37654068727` and wording gate `37654069253` = SUCCESS.
+- Drive manual-QA build: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1ing59fdLVUj15Wu3lKe-MeyRqOMH0iU7`.
+- Do not start UI-007/UI-008/UI-009/UI-028/UI-076 until P04-B is manually accepted, clean-promoted, merged and post-merge verified.
