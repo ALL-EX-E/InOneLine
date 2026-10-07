@@ -653,5 +653,6 @@ This section records the latest accepted review target while preserving all hist
 - **UI-044** is superseded as written because its destination tab is removed; `/api/public` itself remains.
 - QA-1.0.8-01 and QA-1.0.8-02 remain findings without implementation approval; QA-1.0.8-03 has an approved target through UI-087.
 - UI-053 is resolved: add `Открыть предпросмотр таймера` next to `Копировать URL таймера` on `Аукцион`; the same action covers Max Amount and wheel contexts via existing `/timer-overlay?preview=1`.
-- Two timer-behavior questions remain explicitly unresolved and must not be inferred: AUCTION-TIMER-REVIEW-002 tie-overtime saved default and AUCTION-TIMER-REVIEW-003 short-spin lead-in.
+- AUCTION-TIMER-REVIEW-002 is resolved by the earlier accepted E3 decision: tie overtime reuses the saved wheel-duration default; no separate overtime setting is created; current 1.0.8 already implements this.
+- One timer-behavior question remains explicitly unresolved: AUCTION-TIMER-REVIEW-003 short-spin lead-in.
 
