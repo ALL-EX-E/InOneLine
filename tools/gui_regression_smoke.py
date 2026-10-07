@@ -485,6 +485,47 @@ def main() -> int:
         if not games_tab._select_game_row(first_id):
             raise AssertionError("P04-B fixture could not restore explicit selection")
 
+        # P04-C / BUG-004: Public keeps explicit selection actions, but a click
+        # on empty table space clears the current selection and ordinary refresh
+        # must not invent a replacement selection.
+        public_tab = window.public_tab
+        window.tabs.setCurrentWidget(public_tab)
+        app.processEvents()
+        if not public_tab.select_synced_search_result(first_id):
+            raise AssertionError("P04-C fixture could not select the public row")
+        if public_tab.selected_game_id() != first_id:
+            raise AssertionError("P04-C explicit public selection did not stick")
+
+        public_empty_point = public_tab.table.viewport().rect().bottomRight()
+        if public_tab.table.indexAt(public_empty_point).isValid():
+            raise AssertionError("P04-C fixture has no empty Public table area to click")
+        QTest.mouseClick(
+            public_tab.table.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=public_empty_point,
+        )
+        app.processEvents()
+        if public_tab.selected_game_id() is not None:
+            raise AssertionError("Public empty-area click did not clear selection")
+
+        public_tab.refresh()
+        app.processEvents()
+        if public_tab.selected_game_id() is not None:
+            raise AssertionError("Public refresh invented a selection after deselection")
+
+        public_tab.search.setText("Smoke Game A")
+        QTest.keyClick(public_tab.search, Qt.Key_Return)
+        app.processEvents()
+        if public_tab.selected_game_id() != first_id:
+            raise AssertionError("Public Enter search stopped selecting its target")
+        public_tab.search.clear()
+        app.processEvents()
+
+        if not public_tab.select_synced_search_result(first_id):
+            raise AssertionError("P04-C fixture could not restore explicit Public selection")
+        window.tabs.setCurrentWidget(window.games_tab)
+        app.processEvents()
+
         duplicate_error = DuplicateGameError(1, "QA")
         if str(duplicate_error) != "Запись «QA» уже существует в списке.":
             raise AssertionError(

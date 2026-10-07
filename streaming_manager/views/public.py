@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer
+from PySide6.QtCore import QEvent, Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
@@ -141,11 +141,24 @@ class PublicTab(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.Stretch)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.table.viewport().installEventFilter(self)
         layout.addWidget(self.table, 1)
 
         self._init_public_xlsx_mirror()
         self.refresh()
 
+    def eventFilter(self, watched, event):
+        if (
+            watched is self.table.viewport()
+            and event.type() == QEvent.Type.MouseButtonPress
+            and event.button() == Qt.MouseButton.LeftButton
+            and not self.table.indexAt(event.position().toPoint()).isValid()
+        ):
+            self.table.clearSelection()
+            self.table.setCurrentCell(-1, -1)
+            self.table.setFocus(Qt.MouseFocusReason)
+            return True
+        return super().eventFilter(watched, event)
 
     def _init_public_xlsx_mirror(self) -> None:
         self._public_xlsx_path: Path | None = None
