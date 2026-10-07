@@ -391,3 +391,11 @@ The full tab-by-tab UI/function review is complete. Runtime remains exact CURREN
 - Already accepted scenarios are not repeated without a reason; implementation remains one agreed small scope at a time, reuse-first, stability-first, with recorded outcomes and manual acceptance before the next package.
 - The later reply «Работает. Идём дальше.» to the complete P03 checklist accepts that checklist in full. It does not remove automated merge/post-merge gates.
 - Preserve `ИГРАЛ / НЕ ИГРАЛ` and targeted terminology-only edits; parser/DB/API/status/sort/integration contracts remain protected.
+
+
+## P04-A manual acceptance — 2026-10-07
+
+- User accepted the complete P04-A / UI-025 manual checklist: «Работает. Записывай. Пока дальше не идём.»
+- Accepted behavior: both `Список` and `Публичный список` tables remain permanently visible; obsolete hide/show controls and visibility preferences are gone; tab switching/F5/restart do not hide tables or resize the main window; Enter navigation/selection synchronization remains intact.
+- Exact accepted candidate head: `3cdff95129d012729d1cfc8c7a74f4050f3231d0`; candidate Windows regression `37648861189` and wording gate `37648861211` were SUCCESS.
+- Acceptance does not bypass release gates. Clean promotion from current `main`, fresh promotion regression, merge, and exact merge-commit regression are required before the next P04 code step.
