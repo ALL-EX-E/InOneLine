@@ -71,8 +71,9 @@
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - **P02 is next and unblocked.**
 - P02-A / UI-010 complete on `candidate/p02-list-public-labels`: main tab `Игры` -> `Список`; implementation `f6481b6668019b45af3d9d11040117baf2868f4c`, regression expectation `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`.
-- P02-B / UI-011 complete: button `Добавить игру` -> `Добавить`; implementation `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`, GUI assertion `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`. GameDialog title remains unchanged for UI-012.
-- P02 remains a candidate; next small step is UI-012 only.
+- P02-B / UI-011 complete: button `Добавить игру` -> `Добавить`; implementation `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`, GUI assertion `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`.
+- P02-C / UI-012 complete: GameDialog titles -> `Добавить` / `Изменить`, internal headings removed; implementation `dc4197fc05f9eec7885705f77eda1ed7053962b3`, GUI regression `57789c7dbbc1202f000cf8c74f04239f8772c4d9`.
+- P02 remains a candidate; next small step is UI-013 only.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
