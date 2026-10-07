@@ -55,7 +55,7 @@ class PublicTab(QWidget):
 
         desc = QLabel(
             "Публичный список формируется напрямую из основной локальной базы: "
-            "СТАРТ / ТЕКУЩАЯ / НАЗВАНИЕ ИГРЫ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
+            "СТАРТ / ТЕКУЩАЯ / НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
             "Независимой копии данных нет. "
             "Архивные записи в публичный список не включаются."
         )
@@ -144,7 +144,7 @@ class PublicTab(QWidget):
         layout.addLayout(public_xlsx_form)
 
         self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
+        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
