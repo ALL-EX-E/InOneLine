@@ -526,6 +526,59 @@ def main() -> int:
         window.tabs.setCurrentWidget(window.games_tab)
         app.processEvents()
 
+        # P04-D / UI-007: non-empty main-list search ignores the active
+        # statistic filter and includes archived normal records, but the
+        # selected statistic filter itself remains unchanged and resumes after
+        # the search is cleared.
+        search_scope_id = db.add_game(
+            Game(
+                None,
+                "P04 Search Archived",
+                "2026-03-01",
+                7_500,
+                0,
+                STATUS_PLAYED,
+                "P04 archived search fixture",
+            )
+        )
+        db.archive_game(search_scope_id, True)
+        games_tab.apply_stat_filter(STATUS_NOT_PLAYED)
+        app.processEvents()
+        if games_tab.active_filter != STATUS_NOT_PLAYED:
+            raise AssertionError("P04-D fixture failed to activate the statistic filter")
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("P04-D pre-search filter fixture changed unexpectedly")
+
+        games_tab.search.setText("P04 Search Archived")
+        app.processEvents()
+        if games_tab.active_filter != STATUS_NOT_PLAYED:
+            raise AssertionError("search changed the selected statistic filter")
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("search did not ignore the active statistic filter")
+        searched_title = games_tab.table.item(0, 3)
+        if searched_title is None or searched_title.text() != "P04 Search Archived":
+            raise AssertionError("search did not include the archived matching record")
+        if not games_tab.filter_buttons[STATUS_NOT_PLAYED].isChecked():
+            raise AssertionError("search visually reset the selected statistic filter")
+
+        games_tab.search.clear()
+        app.processEvents()
+        if games_tab.active_filter != STATUS_NOT_PLAYED:
+            raise AssertionError("clearing search lost the selected statistic filter")
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("clearing search did not restore the active statistic filter")
+        restored_title = games_tab.table.item(0, 3)
+        if restored_title is None or restored_title.text() != "Smoke Game B":
+            raise AssertionError("clearing search restored the wrong filtered result")
+
+        db.delete_game(search_scope_id)
+        games_tab.apply_stat_filter("all")
+        app.processEvents()
+        if games_tab.table.rowCount() != 2:
+            raise AssertionError("P04-D fixture cleanup changed the normal list")
+        if not games_tab._select_game_row(first_id):
+            raise AssertionError("P04-D fixture could not restore explicit selection")
+
         duplicate_error = DuplicateGameError(1, "QA")
         if str(duplicate_error) != "Запись «QA» уже существует в списке.":
             raise AssertionError(
