@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QMainWindow
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -40,7 +40,7 @@ from streaming_manager.constants import (
 from streaming_manager.database import Database, Game
 from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
 from streaming_manager.ui import MainWindow
-from streaming_manager.views.games import GameDialog
+from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 
 
 def free_local_port() -> int:
@@ -165,6 +165,52 @@ def main() -> int:
             raise AssertionError(
                 f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
             )
+
+        if window.games_tab.clear_all_btn.text() != "Очистить список":
+            raise AssertionError(
+                f"clear-list button label mismatch: {window.games_tab.clear_all_btn.text()!r}"
+            )
+
+        clear_dialog = DeleteAllGamesDialog(7)
+        if clear_dialog.windowTitle() != "Очистить список":
+            raise AssertionError(
+                f"clear-list dialog title mismatch: {clear_dialog.windowTitle()!r}"
+            )
+        clear_labels = {label.text() for label in clear_dialog.findChildren(QLabel)}
+        if "Будут удалены все записи: 7" not in clear_labels:
+            raise AssertionError(f"clear-list heading mismatch: {sorted(clear_labels)!r}")
+        expected_warning = (
+            "Операция удалит обычные, архивные и временные записи. "
+            "Завершённая история аукционов и Журнал сохранятся. Перед удалением "
+            "программа автоматически создаст резервную копию текущей базы."
+        )
+        if expected_warning not in clear_labels:
+            raise AssertionError(f"clear-list warning mismatch: {sorted(clear_labels)!r}")
+        if DeleteAllGamesDialog.CONFIRM_TEXT != "УДАЛИТЬ ЗАПИСИ":
+            raise AssertionError(
+                f"clear-list confirm text mismatch: {DeleteAllGamesDialog.CONFIRM_TEXT!r}"
+            )
+        if clear_dialog.confirm_edit.placeholderText() != "УДАЛИТЬ ЗАПИСИ":
+            raise AssertionError(
+                f"clear-list placeholder mismatch: {clear_dialog.confirm_edit.placeholderText()!r}"
+            )
+        if clear_dialog.delete_button.text() != "Удалить записи":
+            raise AssertionError(
+                f"clear-list destructive button mismatch: {clear_dialog.delete_button.text()!r}"
+            )
+        clear_dialog.confirm_edit.setText("УДАЛИТЬ ЗАПИСИ ")
+        app.processEvents()
+        if clear_dialog.delete_button.isEnabled():
+            raise AssertionError("clear-list destructive button enabled for inexact confirmation")
+        clear_dialog.confirm_edit.setText("УДАЛИТЬ ЗАПИСИ")
+        app.processEvents()
+        if not clear_dialog.delete_button.isEnabled():
+            raise AssertionError("clear-list destructive button not enabled for exact confirmation")
+        clear_dialog.confirm_edit.returnPressed.emit()
+        app.processEvents()
+        if clear_dialog.result() != QDialog.Accepted:
+            raise AssertionError("clear-list Enter confirmation semantics changed")
+        clear_dialog.deleteLater()
 
         add_dialog = GameDialog()
         if add_dialog.windowTitle() != "Добавить":
