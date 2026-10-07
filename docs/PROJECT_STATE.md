@@ -422,9 +422,10 @@ Permanent repository gate:
 - P01-D `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`: added focused shell assertions to the existing GUI regression smoke for no menus, exact/noninteractive hint, exactly one F5 action and real `refresh_all()` dispatch.
 - Candidate source diff now contains `streaming_manager/views/main_window.py` plus `tools/gui_regression_smoke.py`; product/runtime behavior is still changed only in `main_window.py`.
 - P01-E QA trigger: draft PR #19 opened only to run existing PR-gated automation against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; no merge/publication authorized.
-- Main Windows regression run: `37582729729`, job `112665869659` — **IN PROGRESS** at recording time.
-- Automatic `Publication wording gate` run `37582729787` failed on pre-existing documentation wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md` and `PROJECT_STATE.md`; no P01 runtime/new-regression file was cited, so this is recorded separately and not patched inside P01.
-- P01 is **not accepted yet**: automated candidate checks + user manual QA remain.
+- Main Windows regression run `37582729729`, job `112665869659` — **SUCCESS**.
+- PASS includes compile, Actions/publication regressions, A9 UI-state/installer checks, backup/restore/media regressions, source snapshot, fresh DB integrity, the P01-focused Native GUI regression, frozen application build/startup/browser-source checks, Inno Setup, installer build and silent-install startup/filesystem regression.
+- Automatic `Publication wording gate` run `37582729787` failed only on pre-existing documentation wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md` and `PROJECT_STATE.md`; no P01 runtime/new-regression file was cited, so it remains a separate documentation finding outside P01.
+- P01 automated candidate gate is **PASS**. P01 is **not accepted yet**: user manual QA remains.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
