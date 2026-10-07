@@ -265,7 +265,7 @@
   - P02-D ещё не принят пользователем; P02 batch продолжается.
 
 
-- **BUG-002 — поля ручного ввода должны вести себя при редактировании как `Название`; поле `Дата` сейчас нарушает это правило — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
+- **BUG-002 — поля ручного ввода должны вести себя при редактировании как `Название`; поле `Дата` сейчас нарушает это правило — ACCEPTED / MERGED / POST-MERGE PASS.**
   - Эталон поведения пользователя: поле `Название`. Если поставить caret в середину введённого значения и вставить/удалить символ, caret остаётся у места редактирования и не прыгает самопроизвольно в конец.
   - Это правило применяется к редактируемым полям GameDialog в обоих режимах — `Добавить` и `Изменить`: программная обработка не должна ломать обычные cursor/selection semantics поля ввода.
   - Repro для текущего дефекта: в существующей дате поставить caret между символами, удалить цифру — caret автоматически переносится в конец.
@@ -281,7 +281,7 @@
   - Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified size 46,755,018 bytes.
   - Separate wording gate `37633288273` remains the known docs-only finding; P03 runtime/regression files are not cited.
   - **P03 automated candidate gate = PASS; full user manual QA = PASS / ACCEPTED.**
-  - Прямое подтверждение на полный чек-лист: «Работает. Идём дальше.» Приёмка включает все CSV/help/error/atomicity/backup и date-editing сценарии; P03 ждёт merge и post-merge regression.
+  - Прямое подтверждение на полный чек-лист: «Работает. Идём дальше.» Приёмка включает все CSV/help/error/atomicity/backup и date-editing сценарии; P03 закрыт после merge и post-merge PASS.
 
 
 - **UI-014 — поле `Баллы`: текущий 9-значный лимит сохранить — CANCELLED / PRESERVE CURRENT LIMIT.**
@@ -340,7 +340,7 @@
   - Пользовательская ручная проверка подтверждена 2026-10-03; результаты стали основанием для UI-019/UI-020/UI-021.
   - Runtime/code не изменялись.
 
-- **UI-019 — привести сообщения об ошибках CSV-импорта к единому понятному стилю — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
+- **UI-019 — привести сообщения об ошибках CSV-импорта к единому понятному стилю — ACCEPTED / MERGED / POST-MERGE PASS.**
   - Основание: ручная проверка TEST-001 подтверждена пользователем 2026-10-03.
   - Ошибки duplicate title, invalid status, invalid coop и legacy missing points сейчас функционально корректны, но часть формулировок слишком техническая/не объясняет, что исправить.
   - Ошибки invalid date, invalid points и missing required header по смыслу понятны; их также привести к общему стилю без ухудшения конкретики.
@@ -351,10 +351,10 @@
   - Реализация P03-C 2026-10-07: duplicate/status/coop/date/points/missing-header/legacy `Название|Баллы` ошибки приведены к единой структуре `что не так -> строка/значение -> как исправить`. Commit `0f7f8b24b3b702607b9c1ef4b167745f714230c7`.
   - Duplicate validation теперь хранит номер первой строки только для более понятного сообщения; parsed payload, transaction/atomicity и merge semantics не менялись.
   - Existing GUI regression автоматизирует TEST-001 error scenarios, сохраняет allowed statuses `ПРОХОДИТСЯ / НЕ ИГРАЛ / ИГРАЛ / ПРОЙДЕНО / ЗАБРОШЕНО`, проверяет `0` guidance, safety-backup path и full-file atomicity; commits `2230c10a06a986389bff3ab546afbe011368730c` + `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`.
-  - P03-C принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
+  - P03-C принят пользователем в полном ручном чек-листе P03; merge и post-merge PASS подтверждены.
 
 
-- **UI-020 — переписать окно `Правила импорта CSV` в более понятном пользовательском стиле — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
+- **UI-020 — переписать окно `Правила импорта CSV` в более понятном пользовательском стиле — ACCEPTED / MERGED / POST-MERGE PASS.**
   - Решение пользователя: справка должна быть короче, единообразнее и прямо объяснять обязательные/необязательные поля и допустимые значения.
   - Везде, где возможно, использовать **`Название`** вместо `Название игры`.
   - Для баллов явно рекомендовать `0`, если баллов нет; в legacy `Название|Баллы` значение после `|` обязательно.
@@ -419,10 +419,10 @@ Alan Wake 2|0
   - Реализация P03-B 2026-10-07: окно `Правила импорта CSV` переписано по утверждённому draft — canonical `НАЗВАНИЕ`/`ДАТА`, явные optional fields, рекомендация/требование `0` для баллов, нейтральное `запись`, legacy aliases только в compatibility section, backup + atomicity explanation. Commit `a70f00688650638ff2173ba942b418db26ba8201`.
   - Parser/import mechanics на этом шаге не менялись.
   - Existing GUI regression перехватывает actual help QMessageBox и проверяет canonical wording, compatibility aliases, отсутствие старых user-facing phrases и сохранение status labels `НЕ ИГРАЛ / ИГРАЛ`; commit `ec74bed827edaa675f6360dd703326e442f38ee9`.
-  - P03-B принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
+  - P03-B принят пользователем в полном ручном чек-листе P03; merge и post-merge PASS подтверждены.
 
 
-- **UI-021 — подогнать CSV importer под новые пользовательские заголовки без потери обратной совместимости — MANUALLY ACCEPTED IN P03 / AWAITING MERGE AND POST-MERGE QA.**
+- **UI-021 — подогнать CSV importer под новые пользовательские заголовки без потери обратной совместимости — ACCEPTED / MERGED / POST-MERGE PASS.**
   - Основные новые headers: `НАЗВАНИЕ` и `ДАТА`.
   - Старые `НАЗВАНИЕ ИГРЫ` и `ДАТА ВЫХОДА` должны продолжать приниматься как aliases, чтобы существующие CSV не сломались.
   - `БАЛЛЫ` остаётся основным header; legacy aliases `БАЛЛЫ SM` и `СУММА` сохраняются.
@@ -432,7 +432,7 @@ Alan Wake 2|0
   - Реализация P03-A 2026-10-07: importer принимает canonical headers `НАЗВАНИЕ` и `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` / `ДАТА ВЫХОДА` сохраняются. `БАЛЛЫ`, `БАЛЛЫ SM`, `СУММА`, `КООП/НЕ КООП`, `СТАТУС`, `ОТЗЫВ` не менялись. Commit `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`.
   - Existing GUI regression на isolated DB проверяет новый и legacy варианты и соответствие title/date/points; commit `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
   - `ИГРАЛ / НЕ ИГРАЛ` status labels/values не менялись.
-  - P03-A принят пользователем в полном ручном чек-листе P03; техническое закрытие ждёт merge и post-merge PASS.
+  - P03-A принят пользователем в полном ручном чек-листе P03; merge и post-merge PASS подтверждены.
 
 
 - **UI-022 — переименовать и упростить сценарий полной очистки списка — IMPLEMENTED IN P02-F / CANDIDATE / NOT YET ACCEPTED.**
@@ -497,7 +497,7 @@ Alan Wake 2|0
   - P02-G ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-025 — удалить функцию `Скрыть список / Показать список` — READY AFTER BATCH APPROVAL.**
+- **UI-025 — удалить функцию `Скрыть список / Показать список` — IN PROGRESS IN P04-A.**
   - Исторический замысел функции был связан с compact-window mode, но автоматическое изменение геометрии MainWindow ранее удалено из-за подтверждённых geometry/shrink defects.
   - Решение пользователя 2026-10-03: текущая возможность временно скрывать таблицы больше не нужна и должна быть удалена целиком.
   - Удалить видимые toggle-кнопки на вкладках `Список` и `Публичный список`.
@@ -3490,6 +3490,16 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
 - Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
 - Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
-- **P03 = MANUALLY ACCEPTED / AWAITING MERGE AND POST-MERGE REGRESSION. P04 is not started yet.**
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-A / UI-025 is now in progress.**
 
 - Publication wording preflight: ten existing documentation phrases were reworded without changing their contracts; no runtime or gate logic was modified.
+
+## P03 technical closure and P04-A start
+
+- User accepted the complete P03 manual checklist: «Работает. Идём дальше.»
+- Clean promotion PR #26 merged as `8a0ac384f2df7b2cbf526c14e62ae89b86586932`; all three accepted file blobs match candidate `9fb64bc0d0867f439b0866f82826b406c22ef012`.
+- Pre-merge Windows regression `37647359158` and wording gate `37647358838` — **SUCCESS**.
+- Exact merge-commit Windows regression `37647803098` and wording gate `37647803210` — **SUCCESS**. Historical QA PR #25 closed without merge. Accepted installer bytes were not replaced.
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P04-A / UI-025 = IN PROGRESS.** Only remove obsolete hide/show-list buttons, spacers, MainWindow/Enter hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys after reference review. Reuse the existing tables and `ui_state.ini`; preserve geometry/tab restoration, data, filters and explicit search navigation. Leave selection/search/total-points follow-up scopes for later small steps.
+- P04 remains open. Give the complete manual checklist for the P04-A candidate together; do not start the next implementation step before acceptance.

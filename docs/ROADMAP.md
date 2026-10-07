@@ -95,7 +95,7 @@
 - Clean accepted promotion PR #23 merged as `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
 - Clean-promotion regression `37596838501` — **SUCCESS**; post-merge regression `37597234911` — **SUCCESS**. QA PR #24 and superseded PR #22 closed without merge.
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
-- **P03 implementation and manual acceptance are complete; technical closure is pending.**
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
 - P03-A / UI-021 complete on `candidate/p03-csv-date-caret`: canonical CSV headers `НАЗВАНИЕ` + `ДАТА` are accepted while legacy `НАЗВАНИЕ ИГРЫ` + `ДАТА ВЫХОДА` remain aliases. Implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`; regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
 - P03-B / UI-020 complete: CSV help rewritten to the accepted neutral/canonical wording while explicitly preserving legacy aliases and `ИГРАЛ / НЕ ИГРАЛ` status labels. Implementation `a70f00688650638ff2173ba942b418db26ba8201`; GUI regression `ec74bed827edaa675f6360dd703326e442f38ee9`.
 - P03-C / UI-019 complete: CSV error messages now state the problem, source row/value and correction guidance; TEST-001 error scenarios + atomicity + backup-path preservation are automated in the existing GUI smoke. Implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`; regression `2230c10a06a986389bff3ab546afbe011368730c` + `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`.
@@ -103,7 +103,7 @@
 - P03 clean review branch `candidate/p03-review`, head `9fb64bc0d0867f439b0866f82826b406c22ef012`, draft PR #25; exactly 3 changed files.
 - Candidate-wide Windows regression `37633288322` — **SUCCESS**, including Native GUI P03 checks, frozen build/startup, Browser Source, installer and silent-install gates.
 - Manual-QA ZIP uploaded to Drive: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`; installer SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
-- **P03 automated gate PASS; complete user manual QA PASS / ACCEPTED («Работает. Идём дальше.»).** Merge and post-merge regression remain the gate before P04.
+- **P03 automated gate PASS; complete user manual QA PASS / ACCEPTED («Работает. Идём дальше.»).** Merge and post-merge regression passed; P04-A / UI-025 is now in progress.
 ## P00 baseline gate — PASS — 2026-10-07
 
 - Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
@@ -256,6 +256,16 @@ Release cadence считает **только принятые CURRENT/released 
 
 ## Current implementation handoff
 
-- P03: user accepted the complete checklist. Finish merge and post-merge regression before starting P04.
+- P03: full manual checklist accepted, merged and post-merge regression passed. P04-A / UI-025 is unblocked.
 - P04: first remove obsolete list hide/show state/hooks and fallback automatic selection, then implement the accepted search/Enter/deselect contract and total-points snapshot reuse. Keep individual implementation steps small.
 - Manual checks for each current candidate package are delivered together as one complete checklist.
+
+## P03 technical closure and P04-A start
+
+- User accepted the complete P03 manual checklist: «Работает. Идём дальше.»
+- Clean promotion PR #26 merged as `8a0ac384f2df7b2cbf526c14e62ae89b86586932`; all three accepted file blobs match candidate `9fb64bc0d0867f439b0866f82826b406c22ef012`.
+- Pre-merge Windows regression `37647359158` and wording gate `37647358838` — **SUCCESS**.
+- Exact merge-commit Windows regression `37647803098` and wording gate `37647803210` — **SUCCESS**. Historical QA PR #25 closed without merge. Accepted installer bytes were not replaced.
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P04-A / UI-025 = IN PROGRESS.** Only remove obsolete hide/show-list buttons, spacers, MainWindow/Enter hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys after reference review. Reuse the existing tables and `ui_state.ini`; preserve geometry/tab restoration, data, filters and explicit search navigation. Leave selection/search/total-points follow-up scopes for later small steps.
+- P04 remains open. Give the complete manual checklist for the P04-A candidate together; do not start the next implementation step before acceptance.

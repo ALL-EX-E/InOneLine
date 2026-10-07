@@ -509,7 +509,7 @@ Permanent repository gate:
 - Manual-QA artifact: GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`.
 - ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
 - Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified ZIP size 46,755,018 bytes.
-- **P03 automated candidate gate = PASS; user manual QA = PASS / ACCEPTED.** Merge and post-merge regression are pending.
+- **P03 automated candidate gate = PASS; user manual QA = PASS / ACCEPTED.** Merge and post-merge regression passed.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
@@ -537,6 +537,16 @@ Permanent repository gate:
 - User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
 - Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
 - Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
-- **P03 = MANUALLY ACCEPTED / AWAITING MERGE AND POST-MERGE REGRESSION. P04 is not started yet.**
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-A / UI-025 is now in progress.**
 
 - Current manual-QA format: issue the complete current-package checklist in one message; do not repeat already accepted scenarios without a reason. Other latest workflow and terminology rules remain active.
+
+## P03 technical closure and P04-A start
+
+- User accepted the complete P03 manual checklist: «Работает. Идём дальше.»
+- Clean promotion PR #26 merged as `8a0ac384f2df7b2cbf526c14e62ae89b86586932`; all three accepted file blobs match candidate `9fb64bc0d0867f439b0866f82826b406c22ef012`.
+- Pre-merge Windows regression `37647359158` and wording gate `37647358838` — **SUCCESS**.
+- Exact merge-commit Windows regression `37647803098` and wording gate `37647803210` — **SUCCESS**. Historical QA PR #25 closed without merge. Accepted installer bytes were not replaced.
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
+- **P04-A / UI-025 = IN PROGRESS.** Only remove obsolete hide/show-list buttons, spacers, MainWindow/Enter hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys after reference review. Reuse the existing tables and `ui_state.ini`; preserve geometry/tab restoration, data, filters and explicit search navigation. Leave selection/search/total-points follow-up scopes for later small steps.
+- P04 remains open. Give the complete manual checklist for the P04-A candidate together; do not start the next implementation step before acceptance.
