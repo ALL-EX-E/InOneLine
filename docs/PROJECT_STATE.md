@@ -502,7 +502,14 @@ Permanent repository gate:
 - **P03-D / BUG-002** implementation `7872121a09c740e99073053d9b1ee9e776296202`: `_format_date_while_typing()` keeps the existing auto-dot formatter but restores caret using the formatted prefix left of the current caret instead of forcing `len(formatted)`. No new widget; `normalize_date_text()` and accepted date formats are unchanged.
 - P03-D regression `2fd76ae1260738fdf289b36de084ac2b15234e19`: both Add/Edit GameDialog modes verify middle-of-field formatting, Backspace, Delete, selection replacement and sequential compact input; caret no longer jumps to the end.
 - Focused P03-D diff versus P03-C: `games.py` caret-preservation logic + regression-only changes in existing `gui_regression_smoke.py`.
-- **P03 implementation scope is now complete as candidate.** Next: candidate-wide regression/review preparation; P03 is not accepted yet.
+- **P03 implementation scope is complete as candidate.**
+- Clean review branch: `candidate/p03-review`, head `9fb64bc0d0867f439b0866f82826b406c22ef012`; draft PR #25. Diff from current `main`: exactly 3 files — `streaming_manager/db/services.py`, `streaming_manager/views/games.py`, existing `tools/gui_regression_smoke.py`.
+- Candidate-wide Windows regression run `37633288322` — **SUCCESS**. Passed compile, current dependency/toolchain gates, backup/restore/media, fresh DB, Native GUI regression with P03 header/help/error/atomicity/caret checks, frozen build/startup/Browser Source, installer build, silent-install startup and artifact preservation.
+- Separate Publication wording gate `37633288273` failed only on the already-known documentation wording in `docs/ACTIVE_REVIEW_LEDGER.md`, `docs/IDEA_INVENTORY.md`, and `docs/PROJECT_STATE.md`; P03 runtime/regression files were not cited.
+- Manual-QA artifact: GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
+- Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified ZIP size 46,755,018 bytes.
+- **P03 automated candidate gate = PASS / AWAITING MANUAL QA.** P03 is not accepted yet.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
