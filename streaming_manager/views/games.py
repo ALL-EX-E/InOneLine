@@ -125,11 +125,11 @@ class GameDialog(QDialog):
         self.review_edit.setMinimumHeight(150)
 
         form.addRow("Название:", self.title_edit)
-        form.addRow("Дата:", self.date_edit)
-        form.addRow("Баллы:", self.amount_edit)
+        form.addRow("Дата (необязательно):", self.date_edit)
+        form.addRow("Баллы (необязательно):", self.amount_edit)
         form.addRow("Кооператив:", self.coop_combo)
         form.addRow("Статус:", self.status_combo)
-        form.addRow("Отзыв:", self.review_edit)
+        form.addRow("Отзыв (необязательно):", self.review_edit)
         layout.addLayout(form)
 
         if game:
