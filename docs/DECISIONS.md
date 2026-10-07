@@ -399,3 +399,11 @@ The full tab-by-tab UI/function review is complete. Runtime remains exact CURREN
 - Accepted behavior: both `Список` and `Публичный список` tables remain permanently visible; obsolete hide/show controls and visibility preferences are gone; tab switching/F5/restart do not hide tables or resize the main window; Enter navigation/selection synchronization remains intact.
 - Exact accepted candidate head: `3cdff95129d012729d1cfc8c7a74f4050f3231d0`; candidate Windows regression `37648861189` and wording gate `37648861211` were SUCCESS.
 - Acceptance does not bypass release gates. Clean promotion from current `main`, fresh promotion regression, merge, and exact merge-commit regression are required before the next P04 code step.
+
+
+## P04-A technical closure and P04-B scope — 2026-10-07
+
+- P04-A / UI-025 is **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
+- Clean promotion PR #28 head `7fe09b7543b666ae6657377a9d782bac9442ec77`; promotion Regression Foundation `37652474014` and wording gate `37652474280` succeeded.
+- PR #28 merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`; exact merge-commit Regression Foundation `37653013085` and wording gate `37653013097` succeeded. Candidate PR #27 was closed without merge.
+- Next step P04-B is BUG-003 only: remove implicit first-row selection on normal refresh/filter when the previous selection is absent; allow deselection by clicking empty table space. Explicit Enter-search and `focus_game()` selection remain exceptions. Search/filter rule changes and total-points display stay outside this step.
