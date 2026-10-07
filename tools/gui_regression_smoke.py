@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -170,6 +170,49 @@ def main() -> int:
             raise AssertionError(
                 f"clear-list button label mismatch: {window.games_tab.clear_all_btn.text()!r}"
             )
+
+        original_messagebox_exec = QMessageBox.exec
+        sorting_rules_capture = {}
+
+        def capture_sorting_rules_exec(box):
+            sorting_rules_capture["title"] = box.windowTitle()
+            sorting_rules_capture["text"] = box.text()
+            sorting_rules_capture["informative"] = box.informativeText()
+            return QMessageBox.Ok
+
+        QMessageBox.exec = capture_sorting_rules_exec
+        try:
+            window.games_tab.show_sorting_rules()
+        finally:
+            QMessageBox.exec = original_messagebox_exec
+
+        if sorting_rules_capture.get("title") != "Правила сортировки":
+            raise AssertionError(
+                f"sorting-rules window title mismatch: {sorting_rules_capture!r}"
+            )
+        if sorting_rules_capture.get("text") != "Автоматическая сортировка списка":
+            raise AssertionError(
+                f"sorting-rules heading mismatch: {sorting_rules_capture!r}"
+            )
+        sorting_info = sorting_rules_capture.get("informative", "")
+        for expected_text in (
+            "Сначала список распределяется по статусу:",
+            "• В режиме «Всего» сначала идут все записи вне архива",
+            "• Архивные записи располагаются отдельным блоком в самом низу",
+        ):
+            if expected_text not in sorting_info:
+                raise AssertionError(
+                    f"sorting-rules wording missing {expected_text!r}: {sorting_info!r}"
+                )
+        for legacy_text in (
+            "Сначала игры распределяются по статусу:",
+            "• В режиме «Всего» все активные игры идут первыми",
+            "• Архивные игры располагаются отдельным блоком в самом низу",
+        ):
+            if legacy_text in sorting_info:
+                raise AssertionError(
+                    f"legacy sorting-rules wording remains {legacy_text!r}"
+                )
 
         clear_dialog = DeleteAllGamesDialog(7)
         if clear_dialog.windowTitle() != "Очистить список":
