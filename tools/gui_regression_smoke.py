@@ -161,6 +161,29 @@ def main() -> int:
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
 
+        public_descriptions = [
+            label.text()
+            for label in window.public_tab.findChildren(QLabel)
+            if label.text().startswith("Публичный список формируется напрямую")
+        ]
+        if len(public_descriptions) != 1:
+            raise AssertionError(
+                f"public-list description lookup mismatch: {public_descriptions!r}"
+            )
+        public_description = public_descriptions[0]
+        if "НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС" not in public_description:
+            raise AssertionError(
+                f"public-list description title label mismatch: {public_description!r}"
+            )
+        if "НАЗВАНИЕ ИГРЫ" in public_description:
+            raise AssertionError("legacy public-list description title label remains")
+        public_title_header = window.public_tab.table.horizontalHeaderItem(2)
+        if public_title_header is None or public_title_header.text() != "НАЗВАНИЕ":
+            raise AssertionError(
+                "public-list table title header mismatch: "
+                f"{public_title_header.text() if public_title_header else None!r}"
+            )
+
         if window.games_tab.add_btn.text() != "Добавить":
             raise AssertionError(
                 f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
