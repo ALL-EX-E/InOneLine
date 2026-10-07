@@ -431,6 +431,7 @@ Permanent repository gate:
 - Extracted installer: `InOneLine_P01_CANDIDATE_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
 - Product runtime remained the P01 candidate; the later branch commit only synchronized CI artifact-preservation infrastructure.
 - P01 automated candidate gate is **PASS**. P01 is **not accepted yet**: user manual QA remains.
+- Manual QA observation (2026-10-07): user confirmed top File/View menus are absent. User pressed F5; no visible change was noticed and no error occurred. This is consistent with current `refresh_all()` behavior because it reloads the same data and `_update_status_bar()` hides/clears the status bar; automated P01 regression already proves the sole F5 action invokes the existing refresh path exactly once. Awaiting explicit user acceptance.
 ## P00 exact baseline verification — PASS — 2026-10-07
 
 - Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
