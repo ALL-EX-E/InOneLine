@@ -215,14 +215,18 @@
   - P02-B ещё не принят пользователем; P02 batch продолжается.
 
 
-- **UI-012 — упростить заголовки GameDialog в режимах добавления и редактирования — READY AFTER BATCH APPROVAL.**
+- **UI-012 — упростить заголовки GameDialog в режимах добавления и редактирования — IMPLEMENTED IN P02-C / CANDIDATE / NOT YET ACCEPTED.**
   - Current add-mode: window title `Добавить игру - In one line`; внутренний heading `Новая игра`.
   - Current edit-mode: window title `Изменить игру - In one line`; внутренний heading `Редактирование записи`.
   - Решение пользователя 2026-10-03:
     - add-mode: внутренний heading `Новая игра` убрать; window title -> **`Добавить`**;
     - edit-mode: внутренний heading `Редактирование записи` убрать; window title -> **`Изменить`**.
   - В обоих режимах убрать только лишние видимые подписи; существующая логика одного общего `GameDialog` сохраняется.
-  - Runtime/code пока не изменялись.
+  - Реализация P02-C 2026-10-07: window title общего `GameDialog` теперь точно `Добавить` / `Изменить`; внутренние headings `Новая игра` и `Редактирование записи` удалены. Shared dialog logic сохранён. Commit `dc4197fc05f9eec7885705f77eda1ed7053962b3`.
+  - Existing GUI regression создаёт оба режима диалога, проверяет точные window titles и отсутствие legacy headings; commit `57789c7dbbc1202f000cf8c74f04239f8772c4d9`.
+  - Focused diff UI-012 против P02-B: `games.py` 1 addition / 5 deletions + regression-only changes. Candidate readback подтверждает отсутствие старых четырёх строк.
+  - P02-C ещё не принят пользователем; P02 batch продолжается.
+
 
 - **UI-013 — сократить подписи полей GameDialog — READY AFTER BATCH APPROVAL.**
   - В обоих режимах общего окна — добавление и редактирование:
