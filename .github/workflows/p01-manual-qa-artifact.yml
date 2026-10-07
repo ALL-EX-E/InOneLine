@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - qa/p01-windows-artifact
+  pull_request:
+    branches:
+      - candidate/p01-mainwindow-shell-cleanup
 
 permissions:
   contents: read
