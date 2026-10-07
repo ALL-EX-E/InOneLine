@@ -4,8 +4,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
@@ -85,12 +84,8 @@ class PublicTab(QWidget):
         layout.addLayout(top)
 
         bar = QHBoxLayout()
-        # R1.0.9: file-export actions moved to Settings -> Export.
-        # Public keeps search, local API JSON access, list visibility and its
-        # dedicated public-XLSX mirror controls.
-        open_json = QPushButton("Открыть локальный JSON")
-        open_json.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/api/public")))
-        bar.addWidget(open_json)
+        # Public keeps list visibility and its dedicated public-XLSX mirror controls.
+        # /api/public remains available for external/custom integrations.
 
         self.list_toggle_btn = QPushButton("Скрыть список")
         self.list_toggle_btn.setToolTip("Скрыть или показать таблицу публичного списка")
