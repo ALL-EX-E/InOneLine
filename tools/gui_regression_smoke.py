@@ -104,6 +104,43 @@ def main() -> int:
 
     sys.excepthook = capture
     try:
+        import_db = Database(root / "p03_import_aliases.db")
+        neutral_csv = root / "p03_neutral_headers.csv"
+        neutral_csv.write_text(
+            "НАЗВАНИЕ;ДАТА;БАЛЛЫ\n"
+            "P03 Neutral;27.08.2019;1500\n",
+            encoding="utf-8",
+        )
+        neutral_result = import_db.import_csv(neutral_csv)
+        if neutral_result["created"] != 1:
+            raise AssertionError(f"neutral CSV import result mismatch: {neutral_result!r}")
+        neutral_game = import_db.find_game_by_title("P03 Neutral")
+        if neutral_game is None:
+            raise AssertionError("neutral CSV title header was not accepted")
+        if neutral_game.release_date != "2019-08-27" or neutral_game.amount != 1500:
+            raise AssertionError(
+                "neutral CSV field mapping mismatch: "
+                f"{neutral_game.release_date!r}, {neutral_game.amount!r}"
+            )
+
+        legacy_csv = root / "p03_legacy_headers.csv"
+        legacy_csv.write_text(
+            "НАЗВАНИЕ ИГРЫ;ДАТА ВЫХОДА;БАЛЛЫ\n"
+            "P03 Legacy;28.08.2019;1600\n",
+            encoding="utf-8",
+        )
+        legacy_result = import_db.import_csv(legacy_csv)
+        if legacy_result["created"] != 1:
+            raise AssertionError(f"legacy CSV import result mismatch: {legacy_result!r}")
+        legacy_game = import_db.find_game_by_title("P03 Legacy")
+        if legacy_game is None:
+            raise AssertionError("legacy CSV title alias stopped working")
+        if legacy_game.release_date != "2019-08-28" or legacy_game.amount != 1600:
+            raise AssertionError(
+                "legacy CSV alias mapping mismatch: "
+                f"{legacy_game.release_date!r}, {legacy_game.amount!r}"
+            )
+
         db = Database(paths.database_path)
         db.set_setting("api_port", str(free_local_port()))
 
