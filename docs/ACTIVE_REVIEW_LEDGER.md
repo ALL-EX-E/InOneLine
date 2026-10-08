@@ -3582,3 +3582,14 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - **Точный post-merge** Windows Regression Foundation [`37748751586`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37748751586) = **SUCCESS**; wording [`37748751519`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37748751519) = **SUCCESS**. Git blob в `main` повторно сверены с принятым кандидатом.
 - Ручной installer/ZIP не пересобран и не перепубликован. VERSION `1.0.8`, схема `19`, 15 миграций, публичный maintenance-релиз и rollback оставлены без изменений.
 - **Следующий изолированный шаг — UI-008**: удалить только дублирующую кнопку `Найти` в основном списке, сохранив live-search и расширенное действие Enter. **UI-009, UI-028, UI-076 и GLOBAL-FOCUS-001 не включать в UI-008**. Перед изменением проверить exact `main`, места подключений и существующий smoke; отдельный candidate и ручная приёмка обязательны.
+
+## UI-008 — подготовлен отдельный кандидат / AUTOMATED PASS / AWAITING MANUAL QA — 2026-10-08
+
+- После технического закрытия P04-D выбран ровно один следующий шаг — UI-008. Exact base main: `8576f28835878212c79764db983985bb1fdd0cf0`, version 1.0.8, schema 19, migrations unchanged.
+- Branch `candidate/p04-e-ui008-search-button`, head `f8f03430d0ed77fddde18ba58e2db7b8030cead4`, [draft PR #37](https://github.com/ALL-EX-E/InOneLine/pull/37). Diff только `streaming_manager/views/games.py` (7 удалённых строк) и `tools/gui_regression_smoke.py` (дополнительные тесты), без нового backend/state.
+- Удалена только основная кнопка `Найти`, её tooltip/click и layout-вставка. Существующие `search.textChanged` и `search.returnPressed`, `activate_search()`, алгоритм P04-D, кнопки `Сбросить фильтры` и Public `Найти` остаются на месте. UI-009/UI-028/UI-076/GLOBAL-FOCUS-001 не включены.
+- Постоянный smoke добавляет отсутствие кнопки, live-search без Enter, focus/selection по Enter и no-result dialog, плюс оставляет ранее принятые P04-D/P04-C тесты.
+- Windows Regression [`37749509764`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37749509764) = SUCCESS, publication wording [`37749509711`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37749509711) = SUCCESS.
+- Artifact ID `11537451402`: ZIP 46 752 920 байт, SHA-256 `44ef8a29606af13c7af3f4a9343a2c890e25a90bf43f67649a7499de21e0029d`. ZIP CRC PASS, внутри ровно `InOneLine_Setup_1.0.8.exe`, 47 613 067 байт, SHA-256 `f96bc5804d3f19de8fbe18587f612cc57fcd4a17723eb95b4c40a1a9d4902815`.
+- Drive QA handoff: [`InOneLine_UI_008_CANDIDATE_1.0.8_WINDOWS_QA.zip`](https://drive.google.com/file/d/1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ/view), ID `1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ`, подтверждён размер 46 752 920 байт.
+- **UI-008 = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED**. Выпустить полный чек-лист разом. Пока нет подтверждения пользователя, не начинать UI-009 и не объединять PR #37.
