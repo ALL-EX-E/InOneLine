@@ -424,3 +424,11 @@ Release cadence считает **только принятые CURRENT/released 
 - Pre-merge Windows `37814527293` + wording `37814527185`/`37814518804`; exact post-merge Windows `37814970241` + wording `37814970284` — all **SUCCESS**.
 - **P04/UI-076 CLOSED.** Version 1.0.8, schema 19, 15 migrations, published release and rollback unchanged.
 - Следующий пункт очереди: **P05 — Public file export + removal Настройки → Экспорт**. Перед runtime-изменением требуется fresh scope review exact CURRENT и отдельное явное одобрение пользователя.
+
+
+## P05 — свежий review exact CURRENT завершён; ожидает batch approval — 2026-10-08
+
+- Review проведён по `main` `eb123eb99d9913db2d6ee2694471dc99f8b9d569`. Runtime P05 не менялся.
+- Объём UI-088/UI-089/UI-090 подтверждён: перенос трёх existing file-export actions на `Публичный список`; отдельное пояснение snapshot vs auto-update XLSX mirror; удаление legacy compatible-export controls и внутренней вкладки `Настройки → Экспорт`.
+- Existing public exporters/data contract и `/api/public` сохраняются; старый импорт `Название|Баллы` остаётся совместимым. Regression gate должен проверять новые кнопки/отсутствие дублей, четыре оставшиеся вкладки настроек и сохранность зеркала/импорта.
+- **READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Код не менять до отдельного прямого одобрения пользователя.

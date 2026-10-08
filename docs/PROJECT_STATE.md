@@ -717,3 +717,14 @@ Permanent repository gate:
 - Pre-merge Windows regression `37814527293` and wording gates `37814527185` / `37814518804` — **SUCCESS**. Exact post-merge Windows regression `37814970241` and wording gate `37814970284` — **SUCCESS**.
 - UI-076 **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. App/release version `1.0.8`, SQLite schema `19`, migrations `15`, official release and rollback remain unchanged.
 - Следующий пункт утверждённой очереди — **P05: Public file export + removal Настройки → Экспорт**. Сначала fresh scope review exact CURRENT; runtime changes ждут отдельного явного пользовательского одобрения.
+
+
+## P05 — свежий review exact CURRENT завершён; ожидает batch approval — 2026-10-08
+
+- Exact CURRENT: `main` at `eb123eb99d9913db2d6ee2694471dc99f8b9d569`; app 1.0.8, SQLite schema 19, 15 migrations. Runtime/UI P05 не менялись.
+- P05 объединяет ранее одобренные решения UI-088/UI-089/UI-090: перенести единственные файловые кнопки CSV/JSON/Excel на `Публичный список` в отдельный блок `Экспорт списка`; объяснить, что это одноразовый снимок, в отличие от продолжающегося XLSX-зеркала; удалить совместимый pipe-export UI и вкладку `Настройки → Экспорт`.
+- Уже существуют `PublicTab.export_csv/export_json/export_xlsx` и общий backend `streaming_manager.exporters`; они используют полный `db.public_games()` dataset (без archived и `auction_only=1`, в каноническом порядке) и не добавляют `СТАРТ/ТЕКУЩАЯ`. Эти семантики и отдельный auto-update workflow `Публичная таблица` сохраняются. `/api/public` остаётся без нового UI-входа.
+- В `SettingsTab` сейчас пять внутренних вкладок, включая `Экспорт`; там же находятся три Public file actions и legacy `Экспорт CSV` / `Копировать список`. `tools/gui_regression_smoke.py` жёстко проверяет старые пять вкладок и пока не проверяет перемещённый блок: gate следует обновить, проверить единственные кнопки на Public, отсутствие legacy controls/Export tab, сохранность XLSX mirror и импорта старого headerless `Название|Баллы`.
+- Review note: текущий Settings save helper автоматически нормализует расширение файла; существующий Public helper этого не делает. При переносе сохранить корректный суффикс CSV/JSON/XLSX, одновременно переиспользуя существующие `PublicTab.export_*` и exporters.
+- `AuctionTab.legacy_export_page` в `streaming_manager/views/auction.py` создаётся, но не добавляется в `auction_tabs` (там остаются только `Лоты` и `Проведение`). Его callbacks используют legacy pipe helpers; после удаления Settings Export провести exact caller audit и удалять эту недоступную страницу/helper только если tests, imports и другие callers не требуют их. Импортёр в `streaming_manager/db/services.py::import_csv` сохраняет pipe import compatibility.
+- **Статус: FRESH REVIEW COMPLETE / READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Требуется отдельное прямое пользовательское одобрение начала P05; до него runtime не менять.
