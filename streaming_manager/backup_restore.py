@@ -780,7 +780,7 @@ def stage_restore_candidate(
 ) -> dict[str, Any]:
     """Validate and copy a candidate to a private same-volume staging file."""
     source = Path(source_path).resolve()
-    validation = validate_streaming_manager_backup(source)
+    validate_streaming_manager_backup(source)
     data_path = Path(data_dir)
     data_path.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")

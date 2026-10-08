@@ -2009,7 +2009,6 @@ class AuctionSessionMixin:
         """
         auction_id = int(auction_id)
         game_id = int(game_id)
-        now = utc_now()
 
         with self.connect() as conn:
             session = conn.execute(

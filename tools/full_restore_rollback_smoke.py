@@ -67,6 +67,7 @@ with TemporaryDirectory() as td:
     finally:
         br.shutil.move = real_move
 
+    assert failed["done"], "Restore failed before the injected partial-restore failure"
     with closing(sqlite3.connect(paths.database_path)) as conn, conn:
         assert conn.execute("SELECT title FROM games WHERE sm_points=1").fetchone()[0] == "LIVE"
     assert (paths.data_dir / "music/a.txt").read_text() == "LIVE"

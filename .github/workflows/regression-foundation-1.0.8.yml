@@ -25,7 +25,8 @@ on:
       - "requirements.txt"
       - "requirements-build-lock.txt"
       - "tools/**"
-      - ".github/workflows/regression-foundation-1.0.8.yml"
+      - ".github/workflows/**"
+      - ".github/release/requests/**"
       - "data/**"
       - "assets/**"
   workflow_dispatch:
@@ -53,8 +54,11 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
           python -m pip install -r requirements-build-lock.txt
+          if ($LASTEXITCODE -ne 0) { throw "Locked dependency installation failed" }
           python -m pip check
+          if ($LASTEXITCODE -ne 0) { throw "Dependency check failed" }
 
       - name: Compile current source and restored QA
         shell: pwsh
@@ -77,19 +81,29 @@ jobs:
         shell: pwsh
         run: |
           python tools/ui_settings_migration_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "UI settings migration regression failed" }
           python tools/installer_user_area_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Installer user-area regression failed" }
           python tools/single_instance_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Single-instance regression failed" }
 
       - name: Database backup, restore and legacy media regressions
         shell: pwsh
         run: |
           python tools/full_backup_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Full backup regression failed" }
           python tools/full_restore_rollback_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Full restore rollback regression failed" }
           python tools/legacy_wheel_jingles_migration_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Legacy wheel-jingles migration regression failed" }
           python tools/legacy_full_backup_restore_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Legacy full restore regression failed" }
           python tools/runtime_filesystem_cleanup_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Runtime filesystem regression failed" }
           python tools/media_sync_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Media synchronization regression failed" }
           python tools/a6_dependency_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "A6 dependency regression failed" }
 
       - name: Clean tracked-files source snapshot
         shell: pwsh
