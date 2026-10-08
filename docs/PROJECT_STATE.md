@@ -638,3 +638,9 @@ Permanent repository gate:
 - Exact head `f8f03430d0ed77fddde18ba58e2db7b8030cead4`, draft PR #37. Windows regression `37749509764` = SUCCESS, wording `37749509711` = SUCCESS.
 - QA artifact `11537451402`, ZIP SHA-256 `44ef8a29606af13c7af3f4a9343a2c890e25a90bf43f67649a7499de21e0029d`; Drive ZIP ID `1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ`. ZIP CRC PASS, единственный installer SHA-256 `f96bc5804d3f19de8fbe18587f612cc57fcd4a17723eb95b4c40a1a9d4902815`.
 - **UI-008 = AUTOMATED PASS / AWAITING MANUAL QA / NOT MERGED.** CURRENT main остаётся принятым P04-D. Следующий UI-009 запрещён до ручной приёмки и отдельной технической финализации UI-008.
+
+## UI-008 — MANUAL FAIL / REOPENED (2026-10-08)
+
+- Пользователь прислал скриншот: в основном `Список` остаётся кнопка `Найти`. Остальные четыре ручные проверки пройдены. Итог: **FAIL 1/5, PASS 4/5**. Текущий кандидат НЕ принят, PR #37 открыт/draft, код UI-008 не в `main`.
+- Удаление `self.search_btn` подтверждено в исходном коде candidate, но текущий Windows CI не проверяет визуальный интерфейс установленного бинарника (только source GUI smoke плюс installed EXE startup/API), а каталог/хэш фактически запущенного пользователем `InOneLine.exe` пока неизвестны.
+- Требуется сопоставить исполняемый путь и SHA-256 процесса с установщиком из exact QA ZIP; не делать новый runtime patch до идентификации сбоя упаковки/установки/запуска. Существующий accepted P04-D в `main` остаётся неизменным. UI-009 НЕ начинать.
