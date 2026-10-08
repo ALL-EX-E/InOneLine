@@ -547,7 +547,7 @@ def main() -> int:
         expected_public_xlsx_rows = [
             tuple(public_export_headers),
             *[
-                (row["title"], int(row["sm_points"]), row["review"], row["status"])
+                (row["title"], int(row["sm_points"]), row["review"] or None, row["status"])
                 for row in public_export_expected
             ],
         ]
