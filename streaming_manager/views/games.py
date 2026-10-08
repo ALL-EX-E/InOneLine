@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
-    QSpacerItem,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -567,7 +566,6 @@ class GamesTab(QWidget):
         sorting_actions.addWidget(self.sorting_rules_btn)
         sorting_actions.addWidget(self.copy_list_overlay_url_btn)
         sorting_actions.addWidget(self.open_list_overlay_preview_btn)
-        sorting_actions.addStretch()
 
         # UI-076: use the EXISTING action row, not an extra row that moves
         # when the window is resized. The counter is informational only.
@@ -579,14 +577,11 @@ class GamesTab(QWidget):
         self.total_points_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.total_points_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.total_points_label.setMinimumHeight(30)
+        # Stable position 2: immediately after the three already-existing
+        # actions. This single static QHBoxLayout needs no resize/show events,
+        # spacer resizing or calculations from the separate statistic row.
         sorting_actions.addWidget(self.total_points_label, 0, Qt.AlignVCenter)
-        # The spacer anchors the counter's right edge to the last existing
-        # statistics button (НЕ КООП) at EVERY width, not to the window edge.
-        self._sorting_actions = sorting_actions
-        self._points_end_spacer = QSpacerItem(
-            0, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
-        )
-        sorting_actions.addItem(self._points_end_spacer)
+        sorting_actions.addStretch()
         layout.addLayout(sorting_actions)
 
         self.table = QTableWidget(0, 9)
@@ -644,37 +639,6 @@ class GamesTab(QWidget):
             self.shortcuts.append(shortcut)
 
         self.refresh()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        # When the page first becomes visible, Qt has calculated final
-        # widget geometries; do not position from constructor-time defaults.
-        QTimer.singleShot(0, self._align_total_points_with_filters)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._align_total_points_with_filters()
-
-    def _align_total_points_with_filters(self):
-        """Keep the counter aligned under the НЕ КООП filter without wrapping."""
-        if not hasattr(self, "_points_end_spacer") or not self.isVisible():
-            return
-        # Calculate from actual Qt widget positions. This is DPI-independent,
-        # and deliberately does not set the window's minimum width. Future
-        # horizontal scrolling is a separate already-approved task.
-        filter_right = self.noncoop_badge.mapTo(
-            self, self.noncoop_badge.rect().topRight()
-        ).x() + 1
-        margins = self.layout().contentsMargins()
-        row_right = self.width() - margins.right()
-        # The QHBoxLayout already accounts for the gap before the spacer.
-        # Subtracting it here would shift the badge by that same gap.
-        trailing = max(0, row_right - filter_right)
-        if trailing != self._points_end_spacer.sizeHint().width():
-            self._points_end_spacer.changeSize(
-                trailing, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
-            )
-            self._sorting_actions.invalidate()
 
     def attach_shared_xlsx_controls(self, sync_host) -> None:
         """Host the existing shared-main-list XLSX controls on Games.
@@ -941,8 +905,6 @@ class GamesTab(QWidget):
             f"Всего баллов: {format_points(stats['total_points'])}"
         )
         self._sync_filter_buttons()
-        # Only the informational text changes, not the ten filter controls.
-        self._align_total_points_with_filters()
 
     def refresh(self):
         started = time.perf_counter()
