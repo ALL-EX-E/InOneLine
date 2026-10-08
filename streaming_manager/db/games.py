@@ -488,6 +488,7 @@ class GamesMixin:
             """
             SELECT
                 COUNT(*) AS total,
+                COALESCE(SUM(sm_points), 0) AS total_points,
                 SUM(CASE WHEN archived=0 AND status=? THEN 1 ELSE 0 END) AS playing,
                 SUM(CASE WHEN archived=0 AND status=? THEN 1 ELSE 0 END) AS played,
                 SUM(CASE WHEN archived=0 AND status=? THEN 1 ELSE 0 END) AS not_played,
