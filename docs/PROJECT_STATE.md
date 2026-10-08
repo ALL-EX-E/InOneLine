@@ -1,6 +1,6 @@
 # InOneLine — Current Project State
 
-Обновлено: **2026-10-07**
+Обновлено: **2026-10-08**
 
 ## CURRENT / RELEASED
 
@@ -706,3 +706,14 @@ Permanent repository gate:
 - Code candidate `candidate/p04-h-ui076-total-points` head `220adcc78778a43265a855045bf694a5e5d75d03`, PR #50 OPEN/DRAFT. GUI Windows test 7 последовательных ширин и отсутствие горизонтального jitter; Windows run `37810486613` SUCCESS, wording SUCCESS. БД/агрегат и фильтры без изменений.
 - Новый QA ZIP `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`, GitHub artifact `11564293733`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`; local ZIP CRC PASS, one installer. Три предыдущих UI-076 кандидата superseded, не заменяются/не удаляются.
 - **UI-076 AWAITING USER QA / NOT MERGED.** Main retains accepted UI-028, App version 1.0.8, schema 19, 15 migrations, installed accepted release unchanged. Future P06 (smaller minimum + horizontal scroll) separate.
+
+
+## UI-076 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
+
+- Пользователь вручную принял стабильное размещение счётчика после «Открыть предпросмотр списка»: «Всё работает. Идём дальше».
+- QA package: `InOneLine_UI_076_STABLE_POSITION_2_CANDIDATE_1.0.8_WINDOWS_QA.zip`, artifact `11564293733`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`; Drive file `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`.
+- Clean promotion PR [#55](https://github.com/ALL-EX-E/InOneLine/pull/55), merge commit `5d8ee1e2d7fb7be57246ff332cf603dc970b54fc); original candidate PR #50 закрыт без merge. Candidate QA bytes не пересобирались и не заменялись после ручной проверки.
+- Точные runtime blobs в `main`: `streaming_manager/db/games.py` `3d14e9df676dbefbad80e4942d8e8d267eb7f0dc`; `streaming_manager/views/games.py` `f6ca072489e30b99ac7f28859669910a0edc94ce`; `tools/gui_regression_smoke.py` `669e32f4961b865550aafa9f35fbf71dbca92f5c`.
+- Pre-merge Windows regression `37814527293` and wording gates `37814527185` / `37814518804` — **SUCCESS**. Exact post-merge Windows regression `37814970241` and wording gate `37814970284` — **SUCCESS**.
+- UI-076 **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. App/release version `1.0.8`, SQLite schema `19`, migrations `15`, official release and rollback remain unchanged.
+- Следующий пункт утверждённой очереди — **P05: Public file export + removal Настройки → Экспорт**. Сначала fresh scope review exact CURRENT; runtime changes ждут отдельного явного пользовательского одобрения.

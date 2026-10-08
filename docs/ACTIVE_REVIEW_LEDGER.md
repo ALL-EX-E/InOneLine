@@ -3706,3 +3706,13 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Новый уникальный Drive QA файл [`InOneLine_UI_076_STABLE_POSITION_2_CANDIDATE_1.0.8_WINDOWS_QA.zip`](https://drive.google.com/file/d/1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA/view), ID `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`; размер **46 769 147 bytes** по metadata, в папке QA. **Это 4-й и единственный актуальный кандидат для ручного QA; три предыдущих UI-076 ZIP — исторические/superseded.**
 - **P06 (окно меньше текущего минимума + горизонтальная прокрутка) остаётся самостоятельной утверждённой задачей.** Текущий UI-076 не ставит новый минимум, не добавляет прокрутку и не изменяет расположение других компонентов. В P06 отдельно проверять всю строку сортировки с UILabel при ширинах ниже 1100.
 - **UI-076 = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.** При успешной ручной проверке — clean promotion EXACT Git blobs, pre/post-merge CI и отдельное docs closure. До этого следующий пункт не начинать.
+
+
+## UI-076 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
+
+- Ручная приёмка пользователя: «Всё работает. Идём дальше». Принят только стабильный вариант 2: `Всего баллов: N` сразу после «Открыть предпросмотр списка» в существующем sorting row; никаких resize-выравниваний и изменений скрытых action-кнопок/«Очистить список».
+- QA ZIP `InOneLine_UI_076_STABLE_POSITION_2_CANDIDATE_1.0.8_WINDOWS_QA.zip`: artifact `11564293733`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`; Drive ID `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`. Предыдущие три UI-076 ZIP остаются historical/superseded.
+- Exact promotion PR #55 merged `5d8ee1e2d7fb7be57246ff332cf603dc970b54fc`; blobs `3d14e9df676dbefbad80e4942d8e8d267eb7f0dc`, `f6ca072489e30b99ac7f28859669910a0edc94ce`, `669e32f4961b865550aafa9f35fbf71dbca92f5c` совпадают в `main`. Original candidate PR #50 закрыт без merge.
+- Pre-merge regression `37814527293` + wording `37814527185`/`37814518804`; точный post-merge regression `37814970241` + wording `37814970284` — **SUCCESS**.
+- **UI-076 CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. App 1.0.8 / schema 19 / 15 migrations / published release / rollback unchanged.
+- Следующий пункт очереди — **P05 (UI-088/UI-089/UI-090): Public file export + removal Настройки → Экспорт**. Перед изменением — fresh review exact CURRENT; код не менять до отдельного явного одобрения пользователя.
