@@ -414,3 +414,13 @@ Release cadence считает **только принятые CURRENT/released 
 - GitHub [draft PR #50](https://github.com/ALL-EX-E/InOneLine/pull/50) head `220adcc78778a43265a855045bf694a5e5d75d03`. Windows regression `37810486613` SUCCESS (7 widths incl. 1100/1600); wording SUCCESS. Новый [Drive QA ZIP](https://drive.google.com/file/d/1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA/view), SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`, 46 769 147 bytes, CRC PASS. Другие три UI-076 ZIP superseded/historical.
 - **UI-076 не принят и не merged; ожидается ручная QA именно 4-го кандидата.** Затем clean promotion + exact post-merge Windows CI.
 - Напоминание: **P06** остаётся отдельной утверждённой задачей уменьшить минимум окна ниже 1100 и добавить горизонтальную прокрутку. UI-076 не содержит P06.
+
+
+## UI-076 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
+
+- Ручной PASS пользователя: «Всё работает. Идём дальше» для кандидата со стабильной позицией 2 — счётчик сразу после «Открыть предпросмотр списка», без пересчёта геометрии при resize.
+- QA ZIP `11564293733` / Drive `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`.
+- Clean promotion PR #55 merged as `5d8ee1e2d7fb7be57246ff332cf603dc970b54fc`; exact candidate blobs are present. Original candidate PR #50 closed without merge.
+- Pre-merge Windows `37814527293` + wording `37814527185`/`37814518804`; exact post-merge Windows `37814970241` + wording `37814970284` — all **SUCCESS**.
+- **P04/UI-076 CLOSED.** Version 1.0.8, schema 19, 15 migrations, published release and rollback unchanged.
+- Следующий пункт очереди: **P05 — Public file export + removal Настройки → Экспорт**. Перед runtime-изменением требуется fresh scope review exact CURRENT и отдельное явное одобрение пользователя.
