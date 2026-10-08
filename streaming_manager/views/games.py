@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QSpacerItem,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -474,12 +475,8 @@ class GamesTab(QWidget):
         actions.addWidget(self.clear_all_btn)
         layout.addLayout(actions)
 
-        stats_rows = QVBoxLayout()
-        stats_rows.setContentsMargins(0, 0, 0, 0)
-        stats_rows.setSpacing(4)
         stats = QHBoxLayout()
         stats.setSpacing(8)
-        self._stats_filter_row = stats
 
         def make_stat_button(key: str, tooltip: str) -> QPushButton:
             button = QPushButton()
@@ -542,32 +539,12 @@ class GamesTab(QWidget):
             "Показать только некооперативные записи",
         )
 
-        # UI-076: informational total; it is not one of the filter buttons.
-        # Keep the existing ten filter controls in their original order.
+        # All ten existing statistic filters retain their own row. In the
+        # later small-window/scrolling task the row will be horizontally
+        # scrollable instead of being squeezed to fit an arbitrary minimum.
         stats.addStretch()
-        self.total_points_label = QLabel()
-        self.total_points_label.setProperty("badge", True)
-        self.total_points_label.setToolTip(
-            "Сумма баллов всех обычных записей, включая архив"
-        )
-        self.total_points_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.total_points_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.total_points_label.setMinimumHeight(30)
-        stats.addWidget(self.total_points_label, 0, Qt.AlignTop)
         stats.setAlignment(Qt.AlignTop)
-        stats_rows.addLayout(stats)
-
-        # Qt does not wrap QHBoxLayout contents. At narrow window widths the
-        # informational counter goes onto its own right-aligned row instead
-        # of compressing every established statistic filter.
-        self._points_overflow_widget = QWidget(self)
-        self._points_overflow_row = QHBoxLayout(self._points_overflow_widget)
-        self._points_overflow_row.setContentsMargins(0, 0, 0, 0)
-        self._points_overflow_row.addStretch()
-        stats_rows.addWidget(self._points_overflow_widget)
-        self._points_overflow_widget.hide()
-        self._points_compact = False
-        layout.addLayout(stats_rows)
+        layout.addLayout(stats)
 
         sorting_actions = QHBoxLayout()
         self.sorting_rules_btn = QPushButton("Правила сортировки")
@@ -591,6 +568,25 @@ class GamesTab(QWidget):
         sorting_actions.addWidget(self.copy_list_overlay_url_btn)
         sorting_actions.addWidget(self.open_list_overlay_preview_btn)
         sorting_actions.addStretch()
+
+        # UI-076: use the EXISTING action row, not an extra row that moves
+        # when the window is resized. The counter is informational only.
+        self.total_points_label = QLabel()
+        self.total_points_label.setProperty("badge", True)
+        self.total_points_label.setToolTip(
+            "Сумма баллов всех обычных записей, включая архив"
+        )
+        self.total_points_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.total_points_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.total_points_label.setMinimumHeight(30)
+        sorting_actions.addWidget(self.total_points_label, 0, Qt.AlignVCenter)
+        # The spacer anchors the counter's right edge to the last existing
+        # statistics button (НЕ КООП) at EVERY width, not to the window edge.
+        self._sorting_actions = sorting_actions
+        self._points_end_spacer = QSpacerItem(
+            0, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
+        )
+        sorting_actions.addItem(self._points_end_spacer)
         layout.addLayout(sorting_actions)
 
         self.table = QTableWidget(0, 9)
@@ -651,38 +647,28 @@ class GamesTab(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._reflow_total_points()
+        self._align_total_points_with_filters()
 
-    def _reflow_total_points(self):
-        """Move only the informational badge when the filters need room."""
-        if not hasattr(self, "_points_overflow_widget"):
+    def _align_total_points_with_filters(self):
+        """Keep the counter aligned under the НЕ КООП filter without wrapping."""
+        if not hasattr(self, "_points_end_spacer"):
             return
+        # Calculate from actual Qt widget positions. This is DPI-independent,
+        # and deliberately does not set the window's minimum width. Future
+        # horizontal scrolling is a separate already-approved task.
+        filter_right = self.noncoop_badge.mapTo(
+            self, self.noncoop_badge.rect().topRight()
+        ).x() + 1
         margins = self.layout().contentsMargins()
-        available = max(0, self.width() - margins.left() - margins.right())
-        buttons = tuple(self.filter_buttons.values())
-        for button in buttons:
-            button.ensurePolished()
-        self.total_points_label.ensurePolished()
-        button_width = sum(button.sizeHint().width() for button in buttons)
-        # Account for the existing spaces and a small style/DPI tolerance.
-        required = (
-            button_width + self.total_points_label.sizeHint().width()
-            + self._stats_filter_row.spacing() * (len(buttons) + 1) + 12
+        row_right = self.width() - margins.right()
+        trailing = max(
+            0, row_right - filter_right - self._sorting_actions.spacing()
         )
-        compact = available < required
-        if compact == self._points_compact:
-            return
-        self._points_compact = compact
-        if compact:
-            self._stats_filter_row.removeWidget(self.total_points_label)
-            self._points_overflow_row.addWidget(self.total_points_label)
-            self._points_overflow_widget.show()
-        else:
-            self._points_overflow_row.removeWidget(self.total_points_label)
-            self._stats_filter_row.addWidget(
-                self.total_points_label, 0, Qt.AlignTop
+        if trailing != self._points_end_spacer.sizeHint().width():
+            self._points_end_spacer.changeSize(
+                trailing, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
             )
-            self._points_overflow_widget.hide()
+            self._sorting_actions.invalidate()
 
     def attach_shared_xlsx_controls(self, sync_host) -> None:
         """Host the existing shared-main-list XLSX controls on Games.
@@ -949,8 +935,8 @@ class GamesTab(QWidget):
             f"Всего баллов: {format_points(stats['total_points'])}"
         )
         self._sync_filter_buttons()
-        # Digit-count changes also change the badge's width requirement.
-        self._reflow_total_points()
+        # Only the informational text changes, not the ten filter controls.
+        self._align_total_points_with_filters()
 
     def refresh(self):
         started = time.perf_counter()
