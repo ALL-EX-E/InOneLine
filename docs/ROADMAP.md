@@ -394,3 +394,10 @@ Release cadence считает **только принятые CURRENT/released 
 - Точный candidate `ad6a913dceaa3ea05584211845a1c9755e5fdebf`, PR #50 (draft), основан на закрытом UI-028. Информационный счётчик справа в статистической строке через existing single-query `_game_stats_conn` + existing `games_refresh_snapshot -> _update_stats`. В сумме `sm_points` всех обычных записей с архивом независимо от фильтра; `auction_only=1` исключаются до materialization.
 - Regression Windows `37797159783` и wording `37797159654` SUCCESS. QA ZIP [Google Drive](https://drive.google.com/file/d/1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5/view) (46 774 807 bytes; declared GitHub artifact digest `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`).
 - **NOT ACCEPTED / NOT MERGED**. Следующий шаг — ручная проверка UI-076. Не начинать следующий самостоятельный пункт до приёмки и clean promotion + точного post-merge PASS.
+
+## UI-076 — REOPENED after MANUAL FAIL, fixed candidate AWAITING RETEST — 2026-10-08
+
+- Пользовательские скриншоты: при 1100 px исходные фильтры и новый счётчик `Всего баллов: N` обрезались (пункт 6 FAIL; остальные 5 PASS). UI-076 **не принят**.
+- В первоначальном draft PR #50 обновлён код до head `cbc0056daba456e9c5bf3792f979ca6e9b6877c7`: адаптивный перенос только информационного QLabel вниз вправо при узком окне с возвратом в первый ряд при расширении. Агрегат SUM и старые кнопки неизменны. Тест окна `1100→1600→1100` и фильтров включён в existing GUI smoke.
+- Windows regression `37803969976` SUCCESS, wording SUCCESS; новый Drive ZIP `1XQ83iShKwVZapAxyhlp5neDIP5_Flu6I`, 46 772 444 байта, SHA-256 `c86caa20d0c7939997e15bd1d04bcbc741da34a92b8014238327a45139a63041`, проверка CRC PASS. Прежний `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5` — FAILED/SUPERSEDED (сохранён).
+- **Ожидается только повторная ручная QA исправленной сборки; не объединять с main до PASS.** Затем clean promotion и post-merge CI, после чего перейти по дорожной карте.
