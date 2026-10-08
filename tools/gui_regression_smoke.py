@@ -343,6 +343,141 @@ def main() -> int:
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
 
+        # UI-076: one existing aggregate serves both the statistics snapshot
+        # and the right-side informational QLabel, never the visible rows.
+        points_label = window.games_tab.total_points_label
+        if not isinstance(points_label, QLabel):
+            raise AssertionError("UI-076 total points must be an informational QLabel")
+        if points_label in window.games_tab.filter_buttons.values():
+            raise AssertionError("UI-076 total points was registered as a filter")
+        if points_label.text() != "Всего баллов: 15000":
+            raise AssertionError(f"UI-076 initial sum wrong: {points_label.text()!r}")
+        if db.game_stats()["total_points"] != 15000:
+            raise AssertionError("UI-076 base DB aggregate wrong")
+        if hasattr(window.public_tab, "total_points_label"):
+            raise AssertionError("UI-076 points counter leaked into Public List")
+
+        # UI-076 stable position 2: the informational label follows the
+        # existing sorting/URL/preview buttons. Repeated resizes must never
+        # shift it horizontally (the former geometry-based spacer jittered).
+        initial_ui076_size = window.size()
+        from PySide6.QtCore import QPoint
+
+        measured_action_gap = None
+        measured_badge_left = None
+        for width in (1100, 1150, 1300, 1600, 1450, 1200, 1100):
+            window.resize(width, 750)
+            app.processEvents()
+            QTest.qWait(30)
+            app.processEvents()
+            if window.width() != width:
+                raise AssertionError(
+                    f"UI-076 resize refused {width}px: actual={window.width()}"
+                )
+            for button in window.games_tab.filter_buttons.values():
+                caption_width = button.fontMetrics().horizontalAdvance(button.text())
+                if button.width() < caption_width + 12:
+                    raise AssertionError(
+                        f"UI-076 filter clipped at {width}px: "
+                        f"{button.text()!r} (width={button.width()}, text={caption_width})"
+                    )
+            if points_label.width() < points_label.sizeHint().width() - 1:
+                raise AssertionError(
+                    f"UI-076 points label clipped at {width}px: "
+                    f"{points_label.width()} vs {points_label.sizeHint().width()}"
+                )
+            sorting_y = window.games_tab.sorting_rules_btn.mapTo(
+                window.games_tab, QPoint(0, 0)
+            ).y()
+            badge_y = points_label.mapTo(
+                window.games_tab, QPoint(0, 0)
+            ).y()
+            if abs(sorting_y - badge_y) > 3:
+                raise AssertionError(
+                    f"UI-076 points not on sorting actions row at {width}px: "
+                    f"{sorting_y} vs {badge_y}"
+                )
+            last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
+                window.games_tab,
+                window.games_tab.open_list_overlay_preview_btn.rect().topRight()
+            ).x()
+            badge_left = points_label.mapTo(
+                window.games_tab, QPoint(0, 0)
+            ).x()
+            gap = badge_left - last_action_right - 1
+            if not 4 <= gap <= 16:
+                raise AssertionError(
+                    f"UI-076 points not immediately after preview at {width}px: gap={gap}"
+                )
+            if measured_action_gap is None:
+                measured_action_gap = gap
+                measured_badge_left = badge_left
+            if abs(gap - measured_action_gap) > 1:
+                raise AssertionError(
+                    f"UI-076 badge jitters relative to preview at {width}px: "
+                    f"{gap} vs {measured_action_gap}"
+                )
+            if abs(badge_left - measured_badge_left) > 1:
+                raise AssertionError(
+                    f"UI-076 badge position shifts with window width at {width}px: "
+                    f"{badge_left} vs {measured_badge_left}"
+                )
+            if points_label.text() != "Всего баллов: 15000":
+                raise AssertionError("UI-076 resizing changed the total")
+        window.resize(initial_ui076_size)
+        app.processEvents()
+
+        archived_points_id = db.add_game(
+            Game(None, "UI076 Archive", "2026-02-11", 321, 0, STATUS_NOT_PLAYED, "")
+        )
+        db.archive_game(archived_points_id, True)
+        temporary_points_id = db.add_game(
+            Game(None, "UI076 Temporary", "2026-02-12", 7777, 0, STATUS_PLAYED, "")
+        )
+        # Fixture-only synthetic unmaterialized lot. Normal product data must
+        # exclude auction_only=1 even when that row carries SM points.
+        with db.connect() as conn:
+            conn.execute(
+                "UPDATE games SET auction_only=1 WHERE id=?", (temporary_points_id,)
+            )
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15321":
+            raise AssertionError("UI-076 archive or temporary exclusion wrong")
+
+        window.games_tab.apply_stat_filter(STATUS_PLAYED)
+        window.games_tab.search.setText("UI076 Archive")
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15321":
+            raise AssertionError("UI-076 total changed with active search/filter")
+        if window.games_tab.active_filter != STATUS_PLAYED:
+            raise AssertionError("UI-076 search unexpectedly changed statistic filter")
+        window.games_tab.search.clear()
+        db.update_game(archived_points_id, {"sm_points": 654})
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15654":
+            raise AssertionError("UI-076 archived points edit not reflected")
+
+        # Simulate materialization: the formerly temporary row becomes a
+        # normal record and must immediately participate in the same aggregate.
+        with db.connect() as conn:
+            conn.execute(
+                "UPDATE games SET auction_only=0 WHERE id=?", (temporary_points_id,)
+            )
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 23431":
+            raise AssertionError("UI-076 materialized points missing")
+
+        db.delete_game(temporary_points_id)
+        db.delete_game(archived_points_id)
+        window.games_tab.apply_stat_filter("all")
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15000":
+            raise AssertionError("UI-076 delete/cleanup failed to restore points")
+
         public_descriptions = [
             label.text()
             for label in window.public_tab.findChildren(QLabel)
