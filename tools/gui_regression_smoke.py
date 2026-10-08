@@ -383,12 +383,12 @@ def main() -> int:
                 "main-list title header mismatch: "
                 f"{games_title_header.text() if games_title_header else None!r}"
             )
-        if window.games_tab.search_btn.toolTip() != (
-            "Показать список и перейти к первой найденной записи"
-        ):
-            raise AssertionError(
-                f"main-list search tooltip mismatch: {window.games_tab.search_btn.toolTip()!r}"
-            )
+        # UI-008: the redundant main-list Find button is removed, while
+        # Public's separate UI-028 decision is intentionally untouched.
+        if hasattr(window.games_tab, "search_btn") or "Найти" in {
+            button.text() for button in window.games_tab.findChildren(QPushButton)
+        }:
+            raise AssertionError("UI-008 main-list Find button still exists")
         if window.public_tab.search_btn.toolTip() != (
             "Показать список и перейти к первой найденной записи"
         ):
@@ -455,10 +455,15 @@ def main() -> int:
             raise AssertionError("refresh invented a selection after none was selected")
 
         games_tab.search.setText("Smoke Game A")
+        app.processEvents()
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("UI-008 typing stopped filtering the main list live")
         QTest.keyClick(games_tab.search, Qt.Key_Return)
         app.processEvents()
         if games_tab.selected_game_id() != first_id:
             raise AssertionError("explicit Enter search stopped selecting its target")
+        if not games_tab.table.hasFocus():
+            raise AssertionError("UI-008 Enter did not move focus to the main-list table")
         games_tab.search.clear()
         app.processEvents()
         if games_tab.selected_game_id() != first_id:
@@ -578,6 +583,35 @@ def main() -> int:
             raise AssertionError("P04-D fixture cleanup changed the normal list")
         if not games_tab._select_game_row(first_id):
             raise AssertionError("P04-D fixture could not restore explicit selection")
+
+        # UI-008: Enter on a live-search miss retains the existing
+        # informational dialog, without bringing back the Find button.
+        games_tab.search.setText("__ui008_no_matching_record__")
+        app.processEvents()
+        if games_tab.table.rowCount() != 0:
+            raise AssertionError("UI-008 no-match query did not produce an empty table")
+        ui008_info = {}
+        original_ui008_information = QMessageBox.information
+
+        def capture_ui008_information(parent, title, message, *args, **kwargs):
+            ui008_info["title"] = title
+            ui008_info["message"] = message
+            return QMessageBox.Ok
+
+        QMessageBox.information = capture_ui008_information
+        try:
+            QTest.keyClick(games_tab.search, Qt.Key_Return)
+            app.processEvents()
+        finally:
+            QMessageBox.information = original_ui008_information
+        if ui008_info.get("title") != "Поиск" or "ничего не найдено" not in (
+            ui008_info.get("message") or ""
+        ):
+            raise AssertionError(f"UI-008 no-match Enter message changed: {ui008_info!r}")
+        games_tab.search.clear()
+        app.processEvents()
+        if games_tab.table.rowCount() != 2:
+            raise AssertionError("UI-008 clearing a missing query did not restore rows")
 
         duplicate_error = DuplicateGameError(1, "QA")
         if str(duplicate_error) != "Запись «QA» уже существует в списке.":
