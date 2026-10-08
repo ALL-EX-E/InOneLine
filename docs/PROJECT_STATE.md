@@ -678,3 +678,10 @@ Permanent repository gate:
 - Ручная приёмка 5/5 PASS. Candidate `e23e4d2fea50cdc6f962c3486244d4a018279c77`, historic PR #46 CLOSED without merge. Clean PR #48 merged `974515f8065c8aa11e9b244d9b4841d346259a64`, два blob exact-match.
 - Pre-merge Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — все **SUCCESS**. UI-028 **CLOSED / ACCEPTED / POST-MERGE PASS**.
 - Все текущие P04 удаления кнопок (`UI-008`, `UI-009`, `UI-028`) приняты; следующая отдельная задача `UI-076` — общий счётчик баллов только внутри основного «Список». Version/schema/migrations/accepted installer/rollback без изменений.
+
+## UI-076 — candidate готов, ожидает ручной приёмки — 2026-10-08
+
+- Exact branch `candidate/p04-h-ui076-total-points` head `ad6a913dceaa3ea05584211845a1c9755e5fdebf` / draft PR #50; isolated 3 files: existing aggregate `_game_stats_conn` adds `COALESCE(SUM(sm_points),0) AS total_points` with `auction_only=0`, stat snapshot unchanged, non-clickable `QLabel` `Всего баллов: N` at right of existing stats buttons, current GUI smoke expanded.
+- Scope: normal entries all statuses + archived included; temporary auction-only excluded before materialization; no new DB connection, Public/OBS/API, filters, migration.
+- Windows CI `37797159783` **SUCCESS**; wording `37797159654` **SUCCESS**. GitHub QA artifact `11559571188`, ZIP 46 774 807 bytes, repository SHA-256 `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`. Local CRC/hash verification unavailable; no independent checksum claim. QA Drive ID `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5`; file size verified 46 774 807 bytes.
+- **UI-076 = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**; `main` retains accepted UI-028. Version 1.0.8, schema 19, 15 migrations and published release unchanged.
