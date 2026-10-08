@@ -659,3 +659,9 @@ Permanent repository gate:
 - Automated Windows regression `37772947602` = SUCCESS; wording `37772947662` = SUCCESS. Artifact `11547684618`, ZIP SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`, one setup EXE SHA-256 `8d326e0386b536dd3403331897cf2c357e52fddcf29be78588c1b37d5f86441b`. ZIP CRC PASS.
 - Google Drive QA ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9` size confirmed 46 756 918 bytes.
 - **UI-009 = AWAITING USER MANUAL QA / NOT MERGED.** Official published release/installer unchanged. Do not advance before manual QA + clean promotion + post-merge.
+
+## UI-009 — технически закрыт 2026-10-08
+
+- Ручная приёмка 5/5 PASS, original candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e` (PR #42 closed without merge). PR #44 перенёс два exact candidate Git blobs в `main` merge `464136d144e054efcf38a10da8e075ed5fec8281`.
+- Pre-merge Windows CI `37778466982` + wording `37778467039` SUCCESS; post-merge Windows `37778963533` + wording `37778963540` SUCCESS. UI-009 = **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
+- Удалены `Сбросить фильтры` и неиспользуемый `reset_filters()`, существующий крестик поиска/фильтры/Enter и Public List сохранены. 1.0.8/schema 19/15 migrations/accepted installer/rollback unchanged. Следующий scope — **UI-028** (Public `Найти`), только отдельным кандидатом.
