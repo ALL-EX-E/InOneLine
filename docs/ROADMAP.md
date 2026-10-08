@@ -376,3 +376,9 @@ Release cadence считает **только принятые CURRENT/released 
 - **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** Пользователь принял 5/5 сценариев. Убрана лишняя основная кнопка `Сбросить фильтры`, native крестик очистки поиска сохраняет активный фильтр; единственный лишний helper `reset_filters()` убран после проверки ссылок.
 - Clean PR #44 merged `464136d144e054efcf38a10da8e075ed5fec8281`; pre-merge Windows `37778466982`, wording `37778467039`, exact post-merge Windows `37778963533`, wording `37778963540` — SUCCESS. Historical PR #42 closed without merge, accepted QA ZIP unchanged.
 - **Следующий отдельный шаг P04 — UI-028 (публичный поиск без кнопки `Найти`)**, затем UI-076 по дорожной карте; не включать другие UI задачи в UI-028.
+
+## UI-028 — candidate / AUTOMATED PASS / AWAITING MANUAL QA — 2026-10-08
+
+- UI-028 isolated branch `candidate/p04-g-ui028-public-find-removal`, head `e23e4d2fea50cdc6f962c3486244d4a018279c77` (draft PR #46), изменены только Public GUI и существующий regression smoke. Удалена `Найти` из `Публичный список`, сохранены live-search/Enter, подсистема фильтров основного списка и API.
+- Windows CI `37779716348` + wording `37779716372` SUCCESS. Drive QA ZIP `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`.
+- Status **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-076 и дальнейшие шаги не начинать до ручной приёмки UI-028 и точной post-merge проверки.
