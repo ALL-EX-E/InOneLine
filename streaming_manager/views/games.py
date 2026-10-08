@@ -538,6 +538,9 @@ class GamesTab(QWidget):
             "Показать только некооперативные записи",
         )
 
+        # All ten existing statistic filters retain their own row. In the
+        # later small-window/scrolling task the row will be horizontally
+        # scrollable instead of being squeezed to fit an arbitrary minimum.
         stats.addStretch()
         stats.setAlignment(Qt.AlignTop)
         layout.addLayout(stats)
@@ -563,6 +566,21 @@ class GamesTab(QWidget):
         sorting_actions.addWidget(self.sorting_rules_btn)
         sorting_actions.addWidget(self.copy_list_overlay_url_btn)
         sorting_actions.addWidget(self.open_list_overlay_preview_btn)
+
+        # UI-076: use the EXISTING action row, not an extra row that moves
+        # when the window is resized. The counter is informational only.
+        self.total_points_label = QLabel()
+        self.total_points_label.setProperty("badge", True)
+        self.total_points_label.setToolTip(
+            "Сумма баллов всех обычных записей, включая архив"
+        )
+        self.total_points_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.total_points_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.total_points_label.setMinimumHeight(30)
+        # Stable position 2: immediately after the three already-existing
+        # actions. This single static QHBoxLayout needs no resize/show events,
+        # spacer resizing or calculations from the separate statistic row.
+        sorting_actions.addWidget(self.total_points_label, 0, Qt.AlignVCenter)
         sorting_actions.addStretch()
         layout.addLayout(sorting_actions)
 
@@ -883,6 +901,9 @@ class GamesTab(QWidget):
         self.archived_badge.setText(f"Архив: {stats['archived']}")
         self.coop_badge.setText(f"Кооп: {stats['coop']}")
         self.noncoop_badge.setText(f"Не кооп: {stats['noncoop']}")
+        self.total_points_label.setText(
+            f"Всего баллов: {format_points(stats['total_points'])}"
+        )
         self._sync_filter_buttons()
 
     def refresh(self):
