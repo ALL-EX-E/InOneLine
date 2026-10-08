@@ -388,3 +388,9 @@ Release cadence считает **только принятые CURRENT/released 
 - Ручной PASS 5/5. Чистый PR #48 объединил точно проверенные два файла: merge `974515f8065c8aa11e9b244d9b4841d346259a64`. Original draft PR #46 закрыт без повторного merge.
 - Pre-merge CI Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — SUCCESS.
 - Следующий изолированный пункт `UI-076`: добавить справа информационный `Всего баллов: N` на основной статистической строке; существующий `_game_stats_conn` должен суммировать `sm_points` всех `auction_only=0` независимо от статуса/архива/фильтра. Без дополнительного SQL, Public, API, OBS и нового фильтра.
+
+## UI-076 — candidate / AUTOMATED PASS / AWAITING USER MANUAL QA — 2026-10-08
+
+- Точный candidate `ad6a913dceaa3ea05584211845a1c9755e5fdebf`, PR #50 (draft), основан на закрытом UI-028. Информационный счётчик справа в статистической строке через existing single-query `_game_stats_conn` + existing `games_refresh_snapshot -> _update_stats`. В сумме `sm_points` всех обычных записей с архивом независимо от фильтра; `auction_only=1` исключаются до materialization.
+- Regression Windows `37797159783` и wording `37797159654` SUCCESS. QA ZIP [Google Drive](https://drive.google.com/file/d/1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5/view) (46 774 807 bytes; declared GitHub artifact digest `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`).
+- **NOT ACCEPTED / NOT MERGED**. Следующий шаг — ручная проверка UI-076. Не начинать следующий самостоятельный пункт до приёмки и clean promotion + точного post-merge PASS.
