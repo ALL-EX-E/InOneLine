@@ -46,6 +46,7 @@ from ..database import (
     display_datetime_local,
     format_points,
     normalize_date_text,
+    normalize_text_key,
     parse_date,
 )
 from ..workers import FunctionWorker
@@ -901,10 +902,17 @@ class GamesTab(QWidget):
     def refresh(self):
         started = time.perf_counter()
         selected = self.selected_game_id()
+        query = self.search.text()
+        search_active = bool(normalize_text_key(query))
+        effective_filter = "all" if search_active else self.active_filter
         snapshot = self.db.games_refresh_snapshot(
-            self.search.text(),
-            self.active_filter,
-            include_archived=(self.active_filter in ("all", "archive")),
+            query,
+            effective_filter,
+            include_archived=(
+                True
+                if search_active
+                else self.active_filter in ("all", "archive")
+            ),
         )
         games = snapshot["games"]
         positions = snapshot["positions"]
