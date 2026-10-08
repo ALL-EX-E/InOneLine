@@ -345,3 +345,10 @@ Release cadence считает **только принятые CURRENT/released 
 - **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. Пользователь подтвердил 6/6 сценариев. Изолированный поиск игнорирует статистический фильтр только при непустом запросе, включает обычный архив и возвращает выбранный фильтр после очистки.
 - QA candidate `943a26d76bbaf0784b9e38fed84076d9597e82e3` / PR #33; чистый PR #35 переносит те же два Git blob; принят в `main` коммитом `e9e22d27d0f0101773c7016367f867e2bb61e7c8`. Pre-merge regression `37748280816`, wording `37748280794`, post-merge regression `37748751586`, wording `37748751519` — все SUCCESS.
 - **Дальше P04 / UI-008** (убрать дублирующую кнопку `Найти`, сохранив live-search + Enter). Затем отдельными небольшими scope UI-009 / UI-028 / UI-076 в порядке согласованных зависимостей. P05 и далее пока не начаты.
+
+## UI-008 — кандидат / ожидает ручной проверки 2026-10-08
+
+- `UI-008` реализован изолированно на branch `candidate/p04-e-ui008-search-button`, draft PR #37, head `f8f03430d0ed77fddde18ba58e2db7b8030cead4`. **AUTOMATED PASS / AWAITING MANUAL QA / NOT MERGED**.
+- Только убрать дублирующую кнопку `Найти` в основном списке; live-search/Enter сохраняются. UI-009, UI-028, UI-076 и GLOBAL-FOCUS-001 не включены.
+- Windows CI run `37749509764` и publication wording `37749509711` = SUCCESS. QA ZIP сохранён на Drive: `1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ`, SHA-256 `44ef8a29606af13c7af3f4a9343a2c890e25a90bf43f67649a7499de21e0029d`.
+- Следующий шаг: только ручная QA UI-008, затем чистый перенос в `main` + точная post-merge проверка при PASS. Другие P04 части пока не начинать.
