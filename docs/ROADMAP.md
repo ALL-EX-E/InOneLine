@@ -370,3 +370,9 @@ Release cadence считает **только принятые CURRENT/released 
 - Exact candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e`, PR #42 (draft). Removes redundant main-list `Сбросить фильтры`; existing native clear X removes search text without changing statistic filter. No new state/subsystem; Public `Найти` and subsequent P04 scope preserved.
 - Windows regression `37772947602` + wording `37772947662` = SUCCESS; QA Drive ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9`; SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`.
 - Status: **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-028/UI-076 and further scopes wait for separate manual approval and technical closure.
+
+## UI-009 — завершение 2026-10-08
+
+- **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** Пользователь принял 5/5 сценариев. Убрана лишняя основная кнопка `Сбросить фильтры`, native крестик очистки поиска сохраняет активный фильтр; единственный лишний helper `reset_filters()` убран после проверки ссылок.
+- Clean PR #44 merged `464136d144e054efcf38a10da8e075ed5fec8281`; pre-merge Windows `37778466982`, wording `37778467039`, exact post-merge Windows `37778963533`, wording `37778963540` — SUCCESS. Historical PR #42 closed without merge, accepted QA ZIP unchanged.
+- **Следующий отдельный шаг P04 — UI-028 (публичный поиск без кнопки `Найти`)**, затем UI-076 по дорожной карте; не включать другие UI задачи в UI-028.
