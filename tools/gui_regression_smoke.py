@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox, QPushButton
+from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox, QPushButton, QToolButton
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -389,6 +389,14 @@ def main() -> int:
             button.text() for button in window.games_tab.findChildren(QPushButton)
         }:
             raise AssertionError("UI-008 main-list Find button still exists")
+        # UI-009 removes only the main-list reset control, never the
+        # native QLineEdit clear icon or statistic-filter toggle buttons.
+        if hasattr(window.games_tab, "reset_filters_btn") or "Сбросить фильтры" in {
+            button.text() for button in window.games_tab.findChildren(QPushButton)
+        }:
+            raise AssertionError("UI-009 obsolete Reset Filters button still exists")
+        if not window.games_tab.search.isClearButtonEnabled():
+            raise AssertionError("UI-009 native QLineEdit clear button disabled")
         if window.public_tab.search_btn.toolTip() != (
             "Показать список и перейти к первой найденной записи"
         ):
@@ -566,15 +574,56 @@ def main() -> int:
         if not games_tab.filter_buttons[STATUS_NOT_PLAYED].isChecked():
             raise AssertionError("search visually reset the selected statistic filter")
 
-        games_tab.search.clear()
+        # UI-009: exercise the actual Qt clear icon, not an invented reset
+        # mechanism. The selected statistic filter must survive this click.
+        clear_buttons = [
+            button for button in games_tab.search.findChildren(QToolButton)
+            if button.isVisible() and button.isEnabled()
+        ]
+        if len(clear_buttons) != 1:
+            raise AssertionError(
+                f"UI-009 expected one visible native clear button, got {len(clear_buttons)}"
+            )
+        QTest.mouseClick(clear_buttons[0], Qt.MouseButton.LeftButton)
         app.processEvents()
+        if games_tab.search.text() != "":
+            raise AssertionError("UI-009 native clear icon did not clear search text")
         if games_tab.active_filter != STATUS_NOT_PLAYED:
             raise AssertionError("clearing search lost the selected statistic filter")
+        if not games_tab.filter_buttons[STATUS_NOT_PLAYED].isChecked():
+            raise AssertionError("UI-009 native clear reset the selected filter button")
         if games_tab.table.rowCount() != 1:
             raise AssertionError("clearing search did not restore the active statistic filter")
         restored_title = games_tab.table.item(0, 3)
         if restored_title is None or restored_title.text() != "Smoke Game B":
             raise AssertionError("clearing search restored the wrong filtered result")
+
+        # The Archive filter follows the same established search/clear path.
+        games_tab.apply_stat_filter("archive")
+        app.processEvents()
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("UI-009 archive-filter fixture changed unexpectedly")
+        games_tab.search.setText("Smoke Game B")
+        app.processEvents()
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("UI-009 live search stopped overriding archive filter")
+        clear_buttons = [
+            button for button in games_tab.search.findChildren(QToolButton)
+            if button.isVisible() and button.isEnabled()
+        ]
+        if len(clear_buttons) != 1:
+            raise AssertionError("UI-009 archive search lost its native clear button")
+        QTest.mouseClick(clear_buttons[0], Qt.MouseButton.LeftButton)
+        app.processEvents()
+        if games_tab.search.text() or games_tab.active_filter != "archive":
+            raise AssertionError("UI-009 native clear lost archive filter state")
+        if not games_tab.filter_buttons["archive"].isChecked():
+            raise AssertionError("UI-009 native clear unchecked Archive statistic filter")
+        if games_tab.table.rowCount() != 1:
+            raise AssertionError("UI-009 native clear did not restore archive entries")
+        archived_title = games_tab.table.item(0, 3)
+        if archived_title is None or archived_title.text() != "P04 Search Archived":
+            raise AssertionError("UI-009 native clear displayed the wrong archive entry")
 
         db.delete_game(search_scope_id)
         games_tab.apply_stat_filter("all")
