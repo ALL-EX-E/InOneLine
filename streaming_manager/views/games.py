@@ -667,9 +667,9 @@ class GamesTab(QWidget):
         ).x() + 1
         margins = self.layout().contentsMargins()
         row_right = self.width() - margins.right()
-        trailing = max(
-            0, row_right - filter_right - self._sorting_actions.spacing()
-        )
+        # The QHBoxLayout already accounts for the gap before the spacer.
+        # Subtracting it here would shift the badge by that same gap.
+        trailing = max(0, row_right - filter_right)
         if trailing != self._points_end_spacer.sizeHint().width():
             self._points_end_spacer.changeSize(
                 trailing, 0, QSizePolicy.Fixed, QSizePolicy.Minimum
