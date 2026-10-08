@@ -339,3 +339,9 @@ Release cadence считает **только принятые CURRENT/released 
 - Artifact `11501485064`, ZIP 46,756,657 bytes, SHA-256 `6e8d3d5d320c60fc75e882a7c53e00fefea6388fadae7081f3d97e29f812dad9`; contains exactly `InOneLine_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `2a6fa43681b535f14a4092693c975033863fe969b756e78cc994943fc6e682d7`.
 - Drive handoff: `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1o1BEOnoJqFCwkgTJVQoBgahGiVWYslSC`, verified 46,756,657 bytes.
 - **P04-D = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED.** Do not start UI-008/UI-009 or later P04 scopes before manual acceptance and technical closure.
+
+## P04-D / UI-007 — завершение 2026-10-08
+
+- **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. Пользователь подтвердил 6/6 сценариев. Изолированный поиск игнорирует статистический фильтр только при непустом запросе, включает обычный архив и возвращает выбранный фильтр после очистки.
+- QA candidate `943a26d76bbaf0784b9e38fed84076d9597e82e3` / PR #33; чистый PR #35 переносит те же два Git blob; принят в `main` коммитом `e9e22d27d0f0101773c7016367f867e2bb61e7c8`. Pre-merge regression `37748280816`, wording `37748280794`, post-merge regression `37748751586`, wording `37748751519` — все SUCCESS.
+- **Дальше P04 / UI-008** (убрать дублирующую кнопку `Найти`, сохранив live-search + Enter). Затем отдельными небольшими scope UI-009 / UI-028 / UI-076 в порядке согласованных зависимостей. P05 и далее пока не начаты.
