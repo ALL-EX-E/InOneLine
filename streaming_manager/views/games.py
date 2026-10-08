@@ -427,14 +427,7 @@ class GamesTab(QWidget):
         self.search.textChanged.connect(self._search_text_changed)
         self.search.returnPressed.connect(self.activate_search)
 
-        self.reset_filters_btn = QPushButton("Сбросить фильтры")
-        self.reset_filters_btn.setToolTip(
-            "Очистить поиск и показать все записи, включая архив"
-        )
-        self.reset_filters_btn.clicked.connect(self.reset_filters)
-
         filters.addWidget(self.search, 1)
-        filters.addWidget(self.reset_filters_btn)
         layout.addLayout(filters)
 
         actions = QHBoxLayout()
@@ -1046,22 +1039,6 @@ class GamesTab(QWidget):
         self.active_filter = filter_key
         self._sync_filter_buttons()
         self.refresh()
-
-        # Если список был скрыт, фильтрация сама по себе его не открывает:
-        # пользователь может смотреть только статистику. Для просмотра результата
-        # используется «Показать список», «Найти» или Enter в поиске.
-
-    def reset_filters(self):
-        """Сбрасывает поиск и показывает всю базу, включая архив."""
-        self.search.blockSignals(True)
-        self.search.clear()
-        self.search.blockSignals(False)
-
-        self.active_filter = "all"
-        self._sync_filter_buttons()
-        self._notify_search_text_changed()
-        self.refresh()
-        self.search.setFocus()
 
     def focus_game(self, game_id: int):
         """Сбрасывает скрывающие фильтры и выделяет нужную игру."""
