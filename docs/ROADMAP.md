@@ -382,3 +382,9 @@ Release cadence считает **только принятые CURRENT/released 
 - UI-028 isolated branch `candidate/p04-g-ui028-public-find-removal`, head `e23e4d2fea50cdc6f962c3486244d4a018279c77` (draft PR #46), изменены только Public GUI и существующий regression smoke. Удалена `Найти` из `Публичный список`, сохранены live-search/Enter, подсистема фильтров основного списка и API.
 - Windows CI `37779716348` + wording `37779716372` SUCCESS. Drive QA ZIP `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`.
 - Status **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-076 и дальнейшие шаги не начинать до ручной приёмки UI-028 и точной post-merge проверки.
+
+## UI-028 — CLOSED / ACCEPTED / POST-MERGE PASS — 2026-10-08
+
+- Ручной PASS 5/5. Чистый PR #48 объединил точно проверенные два файла: merge `974515f8065c8aa11e9b244d9b4841d346259a64`. Original draft PR #46 закрыт без повторного merge.
+- Pre-merge CI Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — SUCCESS.
+- Следующий изолированный пункт `UI-076`: добавить справа информационный `Всего баллов: N` на основной статистической строке; существующий `_game_stats_conn` должен суммировать `sm_points` всех `auction_only=0` независимо от статуса/архива/фильтра. Без дополнительного SQL, Public, API, OBS и нового фильтра.
