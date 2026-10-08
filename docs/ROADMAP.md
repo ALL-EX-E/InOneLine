@@ -364,3 +364,9 @@ Release cadence считает **только принятые CURRENT/released 
 - После первой QA (4/5 PASS, кнопка `Найти` осталась) пользователь повторно установил проверяемую сборку и прислал скриншот `Список` без этой кнопки. Суммарно **5/5 ручных сценариев PASS**. Первопричина первоначального отображения кнопки неизвестна; QA-наблюдение сохранить, не придумывать вывод об installer.
 - Чистый перенос проверенных файлов: PR #40, merge `f5e244d04db63ddb421213d3ee1272ed77aee55c`; pre-merge Windows `37771721603` + wording `37771721591`, точный post-merge Windows `37772054443` + wording `37772054420` — все SUCCESS. PR #37 закрыт без merge; принятый installer не пересобирался.
 - **Следующее по утверждённой очереди — UI-009**: удалить дублирующую кнопку `Сбросить фильтры` на основном списке, используя уже существующий крестик поля поиска, при этом сохранять выбранный statistic filter. UI-028 (Public `Найти`) и UI-076 (счётчик баллов) после отдельной приёмки.
+
+## UI-009 — candidate / AWAITING MANUAL QA — 2026-10-08
+
+- Exact candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e`, PR #42 (draft). Removes redundant main-list `Сбросить фильтры`; existing native clear X removes search text without changing statistic filter. No new state/subsystem; Public `Найти` and subsequent P04 scope preserved.
+- Windows regression `37772947602` + wording `37772947662` = SUCCESS; QA Drive ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9`; SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`.
+- Status: **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-028/UI-076 and further scopes wait for separate manual approval and technical closure.
