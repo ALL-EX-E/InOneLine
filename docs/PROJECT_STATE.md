@@ -672,3 +672,9 @@ Permanent repository gate:
 - Code head `e23e4d2fea50cdc6f962c3486244d4a018279c77`, draft PR #46, ровно два файла Public view + existing GUI smoke.
 - Windows regression `37779716348` SUCCESS; wording `37779716372` SUCCESS. GitHub artifact `11550914358`: ZIP SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`, CRC PASS; installer SHA-256 `fd9a9d70c74434c6f45b28e63cb6e0239dfe90b986802627701c92f685b5e967`. Drive ZIP ID `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, verified 46 763 712 bytes.
 - **UI-028 = AWAITING USER MANUAL QA / NOT MERGED**. `main` по-прежнему принят до UI-009, VERSION 1.0.8/schema19/15 migrations и официальный релиз unchanged.
+
+## UI-028 — техническое закрытие — 2026-10-08
+
+- Ручная приёмка 5/5 PASS. Candidate `e23e4d2fea50cdc6f962c3486244d4a018279c77`, historic PR #46 CLOSED without merge. Clean PR #48 merged `974515f8065c8aa11e9b244d9b4841d346259a64`, два blob exact-match.
+- Pre-merge Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — все **SUCCESS**. UI-028 **CLOSED / ACCEPTED / POST-MERGE PASS**.
+- Все текущие P04 удаления кнопок (`UI-008`, `UI-009`, `UI-028`) приняты; следующая отдельная задача `UI-076` — общий счётчик баллов только внутри основного «Список». Version/schema/migrations/accepted installer/rollback без изменений.
