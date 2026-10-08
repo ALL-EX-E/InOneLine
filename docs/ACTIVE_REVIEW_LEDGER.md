@@ -3572,3 +3572,13 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Artifact `11501485064`, ZIP 46,756,657 bytes, SHA-256 `6e8d3d5d320c60fc75e882a7c53e00fefea6388fadae7081f3d97e29f812dad9`; contains exactly `InOneLine_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `2a6fa43681b535f14a4092693c975033863fe969b756e78cc994943fc6e682d7`.
 - Drive handoff: `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1o1BEOnoJqFCwkgTJVQoBgahGiVWYslSC`, verified 46,756,657 bytes.
 - **P04-D = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED.** Do not start UI-008/UI-009 or later P04 scopes before manual acceptance and technical closure.
+
+## P04-D / UI-007 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
+
+- Пользователь выполнил и принял полный чек-лист **6/6**: поиск вне выбранного фильтра, архивная запись, сохранение подсветки фильтра, восстановление фильтра после очистки, поиск по отзыву, отсутствие совпадений.
+- Точный ручной QA-кандидат: `candidate/p04-d-search-scope`, commit `943a26d76bbaf0784b9e38fed84076d9597e82e3`; исторический PR #33 **закрыт без merge**.
+- Чистый перенос PR #35: `promotion/p04-d-accepted-ui007`, head `05390ce9e1ec98cb3f7073b6e19ef482c6d0ea02`; сравнены **оба точных Git blob** с кандидатом: `streaming_manager/views/games.py` = `83ed543e2b01825dcd35e19bae51d53a19ef481b`, `tools/gui_regression_smoke.py` = `411ef802544e657543ca3622be2735e0d386cbcf`. Отличия от `main` перед merge — только эти два файла, 64 добавления / 3 удаления.
+- Предварительная Windows Regression Foundation `37748280816` = **SUCCESS**; publication wording `37748280794` = **SUCCESS**. PR #35 объединён в `main` commit `e9e22d27d0f0101773c7016367f867e2bb61e7c8`.
+- **Точный post-merge** Windows Regression Foundation [`37748751586`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37748751586) = **SUCCESS**; wording [`37748751519`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37748751519) = **SUCCESS**. Git blob в `main` повторно сверены с принятым кандидатом.
+- Ручной installer/ZIP не пересобран и не перепубликован. VERSION `1.0.8`, схема `19`, 15 миграций, публичный maintenance-релиз и rollback оставлены без изменений.
+- **Следующий изолированный шаг — UI-008**: удалить только дублирующую кнопку `Найти` в основном списке, сохранив live-search и расширенное действие Enter. **UI-009, UI-028, UI-076 и GLOBAL-FOCUS-001 не включать в UI-008**. Перед изменением проверить exact `main`, места подключений и существующий smoke; отдельный candidate и ручная приёмка обязательны.
