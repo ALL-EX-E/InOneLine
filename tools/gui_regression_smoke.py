@@ -2,7 +2,9 @@ from __future__ import annotations
 
 """Current-contract GUI regression smoke restored from the historical R1.0.10 suite."""
 
+import csv
 import gc
+import json
 import os
 import shutil
 import socket
@@ -12,6 +14,7 @@ import time
 import wave
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -20,7 +23,17 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMainWindow, QMessageBox, QPushButton, QToolButton
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QToolButton,
+)
+from openpyxl import load_workbook
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
@@ -145,6 +158,15 @@ def main() -> int:
                 "legacy CSV alias mapping mismatch: "
                 f"{legacy_game.release_date!r}, {legacy_game.amount!r}"
             )
+
+        legacy_pipe_csv = root / "p05_legacy_pipe.csv"
+        legacy_pipe_csv.write_text("P05 Legacy Pipe|1700\n", encoding="utf-8")
+        pipe_result = import_db.import_csv(legacy_pipe_csv)
+        if pipe_result["created"] != 1:
+            raise AssertionError(f"legacy pipe import result mismatch: {pipe_result!r}")
+        pipe_game = import_db.find_game_by_title("P05 Legacy Pipe")
+        if pipe_game is None or pipe_game.amount != 1700:
+            raise AssertionError("legacy Название|Баллы import compatibility failed")
 
         def expect_csv_error(name, content, expected_parts, *, with_backup=False):
             csv_path = root / name
@@ -444,6 +466,93 @@ def main() -> int:
         app.processEvents()
         if points_label.text() != "Всего баллов: 15321":
             raise AssertionError("UI-076 archive or temporary exclusion wrong")
+
+        public_export_expected = db.public_games()
+        public_export_titles = {str(row["title"]) for row in public_export_expected}
+        if {"UI076 Archive", "UI076 Temporary"} & public_export_titles:
+            raise AssertionError("public_games included archived or auction_only fixtures")
+        public_export_headers = ["НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
+
+        def click_public_export(button, basename, suffix):
+            selected_base = root / basename
+            with (
+                patch.object(
+                    QFileDialog,
+                    "getSaveFileName",
+                    return_value=(str(selected_base), ""),
+                ),
+                patch.object(QMessageBox, "information") as info_box,
+                patch.object(QMessageBox, "critical") as error_box,
+            ):
+                button.click()
+            if error_box.called:
+                raise AssertionError(
+                    f"Public export {suffix} raised an error: {error_box.call_args!r}"
+                )
+            if not info_box.called:
+                raise AssertionError(f"Public export {suffix} did not report success")
+            saved_path = selected_base.with_suffix(suffix)
+            if not saved_path.is_file():
+                raise AssertionError(
+                    f"Public export did not normalize its {suffix} suffix: {saved_path}"
+                )
+            return saved_path
+
+        public_csv_path = click_public_export(
+            window.public_tab.public_export_csv_btn, "p05_public_export_csv", ".csv"
+        )
+        with public_csv_path.open(encoding="utf-8-sig", newline="") as exported_file:
+            public_csv_rows = list(csv.reader(exported_file, delimiter=";"))
+        expected_public_csv_rows = [
+            [
+                str(row["title"]),
+                str(int(row["sm_points"])),
+                row["review"] or "",
+                row["status"],
+            ]
+            for row in public_export_expected
+        ]
+        if public_csv_rows != [public_export_headers, *expected_public_csv_rows]:
+            raise AssertionError(f"Public CSV contract mismatch: {public_csv_rows!r}")
+
+        public_json_path = click_public_export(
+            window.public_tab.public_export_json_btn, "p05_public_export_json", ".json"
+        )
+        public_json_payload = json.loads(public_json_path.read_text(encoding="utf-8"))
+        if public_json_payload["columns"] != public_export_headers:
+            raise AssertionError(
+                f"Public JSON columns mismatch: {public_json_payload['columns']!r}"
+            )
+        if public_json_payload["games"] != public_export_expected:
+            raise AssertionError("Public JSON changed the canonical public dataset")
+        if any(
+            key in {"СТАРТ", "ТЕКУЩАЯ"}
+            for row in public_json_payload["games"]
+            for key in row
+        ):
+            raise AssertionError("Public JSON added screen-only position columns")
+
+        public_xlsx_path = click_public_export(
+            window.public_tab.public_export_xlsx_btn, "p05_public_export_xlsx", ".xlsx"
+        )
+        public_xlsx_workbook = load_workbook(
+            public_xlsx_path, read_only=True, data_only=True
+        )
+        try:
+            public_xlsx_rows = list(
+                public_xlsx_workbook.active.iter_rows(values_only=True)
+            )
+        finally:
+            public_xlsx_workbook.close()
+        expected_public_xlsx_rows = [
+            tuple(public_export_headers),
+            *[
+                (row["title"], int(row["sm_points"]), row["review"] or "", row["status"])
+                for row in public_export_expected
+            ],
+        ]
+        if public_xlsx_rows != expected_public_xlsx_rows:
+            raise AssertionError(f"Public XLSX contract mismatch: {public_xlsx_rows!r}")
 
         window.games_tab.apply_stat_filter(STATUS_PLAYED)
         window.games_tab.search.setText("UI076 Archive")
@@ -1217,8 +1326,41 @@ def main() -> int:
             window.settings_tab.settings_tabs.tabText(i)
             for i in range(window.settings_tab.settings_tabs.count())
         ]
-        if settings_tabs != ["Общие", "Аукцион", "Интеграции", "Конвертация", "Экспорт"]:
+        if settings_tabs != ["Общие", "Аукцион", "Интеграции", "Конвертация"]:
             raise AssertionError(f"settings tabs mismatch: {settings_tabs}")
+        if hasattr(window.settings_tab, "export_page"):
+            raise AssertionError("removed Settings Export page is still constructed")
+        if hasattr(window.settings_tab, "export_public_csv_btn"):
+            raise AssertionError("duplicate public export buttons remain in Settings")
+        if hasattr(window.auction_tab, "legacy_export_page") or hasattr(
+            window.auction_tab, "export_rules_btn"
+        ):
+            raise AssertionError("legacy compatible export page is still constructed")
+        if any(
+            button.text() == "Копировать список"
+            for button in window.auction_tab.findChildren(QPushButton)
+        ):
+            raise AssertionError("legacy copy-list action remains visible in Auction")
+
+        expected_public_export_labels = ["Экспорт CSV", "Экспорт JSON", "Экспорт Excel"]
+        actual_public_export_labels = [
+            button.text()
+            for button in window.public_tab.findChildren(QPushButton)
+            if button.text() in expected_public_export_labels
+        ]
+        if sorted(actual_public_export_labels) != sorted(expected_public_export_labels):
+            raise AssertionError(
+                f"Public export actions are missing or duplicated: {actual_public_export_labels!r}"
+            )
+        for attr in (
+            "public_xlsx_create_btn",
+            "public_xlsx_connect_btn",
+            "public_xlsx_disconnect_btn",
+        ):
+            if not isinstance(getattr(window.public_tab, attr, None), QPushButton):
+                raise AssertionError(f"P1 Public XLSX mirror control missing: {attr}")
+        if getattr(window.games_tab, "shared_xlsx_section", None) is None:
+            raise AssertionError("shared main-list XLSX mirror was not re-hosted on Games")
 
         pool = QThreadPool.globalInstance()
         if pool.maxThreadCount() > 8:
