@@ -685,3 +685,10 @@ Permanent repository gate:
 - Scope: normal entries all statuses + archived included; temporary auction-only excluded before materialization; no new DB connection, Public/OBS/API, filters, migration.
 - Windows CI `37797159783` **SUCCESS**; wording `37797159654` **SUCCESS**. GitHub QA artifact `11559571188`, ZIP 46 774 807 bytes, repository SHA-256 `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`. Local CRC/hash verification unavailable; no independent checksum claim. QA Drive ID `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5`; file size verified 46 774 807 bytes.
 - **UI-076 = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**; `main` retains accepted UI-028. Version 1.0.8, schema 19, 15 migrations and published release unchanged.
+
+## UI-076 — MANUAL FAIL на 1100 px, исправлен; повторная QA ожидается — 2026-10-08
+
+- Ручная QA исходного UI-076: 5/6 PASS, шестой пункт FAIL по двум скриншотам: QLabel `Всего баллов: 500` и статистические фильтры обрезались на минимальной ширине 1100 px. Не считать UI-076 принятым.
+- В том же `candidate/p04-h-ui076-total-points`, PR #50 (draft), head `cbc0056daba456e9c5bf3792f979ca6e9b6877c7`, добавлен адаптивный перенос ТОЛЬКО QLabel на правую вторую строку при нехватке места; на широкой форме он возвращается справа первой строки. Десять фильтров, сумма `sm_points`, запрос/схема БД и обработчики без изменений.
+- GUI smoke теперь измеряет геометрию и полноту подписей при `1100 → 1600 → 1100`; Windows CI `37803969976` SUCCESS; wording SUCCESS. Новый артефакт GitHub `11562825039`, ZIP SHA-256 `c86caa20d0c7939997e15bd1d04bcbc741da34a92b8014238327a45139a63041`, CRC PASS, Drive ID `1XQ83iShKwVZapAxyhlp5neDIP5_Flu6I`. Старый Drive QA ZIP `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5` оставлен как failed/superseded.
+- **Status = AUTOMATED PASS / AWAITING USER MANUAL RETEST / NOT MERGED.** Current main остаётся принятым UI-028, официальный релиз, версия 1.0.8, 15 миграций и схема 19 без изменений. Следующий пункт дорожной карты заблокирован до отдельного пользовательского PASS и технического закрытия.
