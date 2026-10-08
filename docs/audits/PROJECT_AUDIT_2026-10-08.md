@@ -76,7 +76,7 @@ GUI покрывает все четыре интервала: неверный 
 | Windows Registry migration в Linux | Неприменима: отсутствует QSettings Registry64Format; не классифицирована как дефект программы |
 | Windows/OBS/DPAPI/реальный звук и ручная приёмка кандидата | Ожидают проверки; автоматический/Linux PASS не заменяет её |
 
-Первый Windows run `37728707771` честно завершился FAILURE на старом A9 provenance assertion; до этого он подтвердил исполнение всех 13 отрицательных PowerShell-проб. Ошибка не замаскирована. Тест исправлен без изменения runtime-миграции; итог повторного run добавляется после проверки. Wording run `37728707731` — SUCCESS. Релиз не публикуется этим аудитом.
+Первый Windows run [`37728707771`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37728707771) честно завершился FAILURE на старом A9 provenance assertion; до этого он подтвердил исполнение всех 13 отрицательных PowerShell-проб. Ошибка не замаскирована. Тест исправлен без изменения runtime-миграции. **Повторный Windows regression run [`37729267605`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37729267605) завершился SUCCESS**, job `windows-regression` — SUCCESS, для HEAD `46f2124da23d6884374de8dd064595dfa75c96b0`. Publication wording gate [`37729267548`](https://github.com/ALL-EX-E/InOneLine/actions/runs/37729267548) — SUCCESS на том же HEAD. Это автоматическая проверка; ручная Windows/OBS/DPAPI/аудио-приёмка остаётся незавершённой. Принятый релиз и `main` не изменены.
 
 ## Полный ручной чек-лист данного кандидата
 
