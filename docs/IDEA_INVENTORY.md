@@ -698,3 +698,8 @@ This section records the latest accepted review target while preserving all hist
 
 - **UI-008 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS**. На главной вкладке `Список` больше нет дублирующей кнопки `Найти`; существующие live-search, Enter selection/focus/sync/no-match сохранились. Ручные проверки 5/5 PASS (последний пункт подтверждён повторным скриншотом после переустановки), предшествующий FAIL задокументирован.
 - PR #40 clean merge `f5e244d04db63ddb421213d3ee1272ed77aee55c`; Windows post-merge regression `37772054443` и wording `37772054420` — SUCCESS. **UI-009 / UI-028 / UI-076 остаются следующими отдельными утверждёнными пунктами**, не реализованы в UI-008.
+
+## UI-009 — принято и объединено в main 2026-10-08
+
+- **UI-009 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS.** Удалена `Сбросить фильтры` в основном списке; Qt native X очищает строку без переключения `active_filter`. Все пять ручных проверок PASS. Clean PR #44 merged commit `464136d144e054efcf38a10da8e075ed5fec8281`; post-merge Windows regression `37778963533` + wording `37778963540` = SUCCESS.
+- UI-028 (Public `Найти`) и UI-076 (`Всего баллов`) остаются отдельными принятыми задачами, не реализованными этим изменением.
