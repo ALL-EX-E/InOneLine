@@ -965,6 +965,20 @@ class SettingsTab(QWidget):
         return value
 
     def save_auction_settings(self):
+        def duration_value(editor, toggle, key, default, example):
+            try:
+                value = self._parse_duration_text(editor.text(), example=example)
+                if not 1 <= value <= AUCTION_AUTO_EXTEND_MAX_MS:
+                    raise ValueError(
+                        "Значения автопродления и порога должны быть от "
+                        "00:00:00.001 до 24:00:00.000."
+                    )
+                return value
+            except ValueError:
+                if toggle.isChecked():
+                    raise
+                return self._saved_auto_extend_duration_ms(key, default)
+
         try:
             max_amount_duration_ms = self._parse_duration_text(
                 self.auction_max_amount_duration.text(),
@@ -985,30 +999,26 @@ class SettingsTab(QWidget):
                     "00:00:03.000 до 24:00:00.000."
                 )
 
-            leader_extend_ms = self._parse_duration_text(
-                self.auto_extend_leader_duration.text(),
-                example="00:00:30.000",
+            leader_extend_ms = duration_value(
+                self.auto_extend_leader_duration, self.auto_extend_leader_enabled,
+                AUCTION_AUTO_EXTEND_LEADER_MS_KEY, AUCTION_AUTO_EXTEND_LEADER_MS_DEFAULT,
+                "00:00:30.000",
             )
-            new_lot_extend_ms = self._parse_duration_text(
-                self.auto_extend_new_lot_duration.text(),
-                example="00:01:00.000",
+            new_lot_extend_ms = duration_value(
+                self.auto_extend_new_lot_duration, self.auto_extend_new_lot_enabled,
+                AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY, AUCTION_AUTO_EXTEND_NEW_LOT_MS_DEFAULT,
+                "00:01:00.000",
             )
-            external_extend_ms = self._parse_duration_text(
-                self.auto_extend_external_duration.text(),
-                example="00:01:00.000",
+            external_extend_ms = duration_value(
+                self.auto_extend_external_duration, self.auto_extend_external_enabled,
+                AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY, AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT,
+                "00:01:00.000",
             )
-            threshold_ms = self._parse_duration_text(
-                self.auto_extend_threshold_duration.text(),
-                example="00:02:00.000",
+            threshold_ms = duration_value(
+                self.auto_extend_threshold_duration, self.auto_extend_threshold_enabled,
+                AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY, AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT,
+                "00:02:00.000",
             )
-            for value in (
-                leader_extend_ms, new_lot_extend_ms, external_extend_ms, threshold_ms
-            ):
-                if not 1 <= value <= AUCTION_AUTO_EXTEND_MAX_MS:
-                    raise ValueError(
-                        "Значения автопродления и порога должны быть от "
-                        "00:00:00.001 до 24:00:00.000."
-                    )
         except ValueError as exc:
             QMessageBox.warning(self, "Настройки аукциона", str(exc))
             return

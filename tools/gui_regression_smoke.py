@@ -26,6 +26,14 @@ from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
 from streaming_manager.constants import (
     APP_VERSION,
+    AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
+    AUCTION_AUTO_EXTEND_LEADER_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_LEADER_MS_KEY,
+    AUCTION_AUTO_EXTEND_NEW_LOT_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY,
+    AUCTION_AUTO_EXTEND_THRESHOLD_ENABLED_KEY,
+    AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
     AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
     AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
     AUCTION_SOUNDTRACK_MUTE_KEY,
@@ -968,6 +976,60 @@ def main() -> int:
         auto._update_auto_extend_conditional_visibility()
         if auto.auto_extend_leader_duration.isHidden():
             raise AssertionError("auto-extend duration hidden while reason is enabled")
+
+        duration_cases = (
+            (auto.auto_extend_leader_enabled, auto.auto_extend_leader_duration,
+             AUCTION_AUTO_EXTEND_LEADER_ENABLED_KEY, AUCTION_AUTO_EXTEND_LEADER_MS_KEY),
+            (auto.auto_extend_new_lot_enabled, auto.auto_extend_new_lot_duration,
+             AUCTION_AUTO_EXTEND_NEW_LOT_ENABLED_KEY, AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY),
+            (auto.auto_extend_external_enabled, auto.auto_extend_external_duration,
+             AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY, AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY),
+            (auto.auto_extend_threshold_enabled, auto.auto_extend_threshold_duration,
+             AUCTION_AUTO_EXTEND_THRESHOLD_ENABLED_KEY, AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY),
+        )
+        original_controls = [(toggle.isChecked(), editor.text()) for toggle, editor, _, _ in duration_cases]
+        original_values = {
+            key: auto.db.get_setting(key)
+            for _, _, enabled_key, duration_key in duration_cases
+            for key in (enabled_key, duration_key)
+        }
+        original_warning = QMessageBox.warning
+        original_information = QMessageBox.information
+        warnings = []
+        QMessageBox.warning = lambda *args: warnings.append(args) or QMessageBox.Ok
+        QMessageBox.information = lambda *args: QMessageBox.Ok
+        try:
+            for toggle, editor, _, _ in duration_cases:
+                toggle.setChecked(False)
+                editor.setText("00:00:10.000")
+            for toggle, editor, enabled_key, duration_key in duration_cases:
+                for invalid in ("invalid", "00:00:00.000", "25:00:00.000"):
+                    auto.db.set_setting(duration_key, "23456")
+                    toggle.setChecked(False)
+                    editor.setText(invalid)
+                    warnings.clear()
+                    auto.save_auction_settings()
+                    assert not warnings, f"Hidden invalid interval blocked save: {duration_key} {invalid}"
+                    assert auto.db.get_setting(duration_key) == "23456", "Last valid stored interval was lost"
+                    assert auto.db.get_setting(enabled_key) == "0"
+                    toggle.setChecked(True)
+                    editor.setText(invalid)
+                    auto.save_auction_settings()
+                    assert len(warnings) == 1, "Enabled invalid interval was not rejected"
+                    assert auto.db.get_setting(duration_key) == "23456"
+                    assert auto.db.get_setting(enabled_key) == "0", "Invalid save partially changed settings"
+                toggle.setChecked(False)
+                editor.setText("00:00:12.345")
+                warnings.clear()
+                auto.save_auction_settings()
+                assert not warnings and auto.db.get_setting(duration_key) == "12345", "Valid hidden draft was lost"
+        finally:
+            QMessageBox.warning = original_warning
+            QMessageBox.information = original_information
+            auto.db.set_settings_bulk(original_values)
+            for (toggle, editor, _, _), (checked, text) in zip(duration_cases, original_controls):
+                toggle.setChecked(checked)
+                editor.setText(text)
 
         public = window.public_tab
         public._public_xlsx_path = None
