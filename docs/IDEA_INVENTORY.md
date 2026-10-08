@@ -693,3 +693,8 @@ This section records the latest accepted review target while preserving all hist
 
 - **UI-007 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS**. Ручная проверка пользователя 6/6 PASS; clean promotion PR #35 merged as `e9e22d27d0f0101773c7016367f867e2bb61e7c8`; post-merge Windows regression `37748751586` и publication wording `37748751519` — SUCCESS.
 - Назначение: поиск по всем обычным записям и архиву независимо от текущего статистического фильтра; выбранный фильтр не сбрасывается, очищение поиска возвращает его. `UI-008/UI-009/UI-028/UI-076` и `GLOBAL-FOCUS-001` остаются отдельными задачами.
+
+## UI-008 — принято после повторной установки 2026-10-08
+
+- **UI-008 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS**. На главной вкладке `Список` больше нет дублирующей кнопки `Найти`; существующие live-search, Enter selection/focus/sync/no-match сохранились. Ручные проверки 5/5 PASS (последний пункт подтверждён повторным скриншотом после переустановки), предшествующий FAIL задокументирован.
+- PR #40 clean merge `f5e244d04db63ddb421213d3ee1272ed77aee55c`; Windows post-merge regression `37772054443` и wording `37772054420` — SUCCESS. **UI-009 / UI-028 / UI-076 остаются следующими отдельными утверждёнными пунктами**, не реализованы в UI-008.
