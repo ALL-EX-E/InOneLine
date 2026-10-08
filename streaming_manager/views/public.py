@@ -68,17 +68,10 @@ class PublicTab(QWidget):
         self.search.textChanged.connect(self._search_text_changed)
         self.search.returnPressed.connect(self.activate_search)
 
-        self.search_btn = QPushButton("Найти")
-        self.search_btn.setToolTip(
-            "Показать список и перейти к первой найденной записи"
-        )
-        self.search_btn.clicked.connect(self.activate_search)
-
         self.count_label = QLabel()
         self.count_label.setProperty("badge", True)
 
         top.addWidget(self.search, 1)
-        top.addWidget(self.search_btn)
         top.addWidget(self.count_label)
         layout.addLayout(top)
 
