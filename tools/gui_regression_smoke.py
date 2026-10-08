@@ -397,12 +397,14 @@ def main() -> int:
             raise AssertionError("UI-009 obsolete Reset Filters button still exists")
         if not window.games_tab.search.isClearButtonEnabled():
             raise AssertionError("UI-009 native QLineEdit clear button disabled")
-        if window.public_tab.search_btn.toolTip() != (
-            "Показать список и перейти к первой найденной записи"
-        ):
-            raise AssertionError(
-                f"public-list search tooltip mismatch: {window.public_tab.search_btn.toolTip()!r}"
-            )
+        # UI-028: Public no longer duplicates native live-search/Enter with
+        # a visible Find action; the main list was retired by UI-008.
+        if hasattr(window.public_tab, "search_btn") or "Найти" in {
+            button.text() for button in window.public_tab.findChildren(QPushButton)
+        }:
+            raise AssertionError("UI-028 Public Find button still exists")
+        if not window.public_tab.search.isClearButtonEnabled():
+            raise AssertionError("UI-028 native Public search clear disabled")
 
         # P04-A: upgrading from hidden-list preferences must still show both
         # tables, preserve window state and keep explicit Enter navigation.
@@ -527,12 +529,43 @@ def main() -> int:
             raise AssertionError("Public refresh invented a selection after deselection")
 
         public_tab.search.setText("Smoke Game A")
+        app.processEvents()
+        if public_tab.table.rowCount() != 1:
+            raise AssertionError("UI-028 Public live-search stopped showing matches")
         QTest.keyClick(public_tab.search, Qt.Key_Return)
         app.processEvents()
         if public_tab.selected_game_id() != first_id:
             raise AssertionError("Public Enter search stopped selecting its target")
+        if not public_tab.table.hasFocus():
+            raise AssertionError("UI-028 Enter did not focus Public table")
+        if window.games_tab.selected_game_id() != first_id:
+            raise AssertionError("UI-028 Enter no longer synchronizes the main list")
+        public_tab.search.setText("__ui028_no_such_public_record__")
+        app.processEvents()
+        if public_tab.table.rowCount() != 0:
+            raise AssertionError("UI-028 no-match query did not empty Public table")
+        ui028_dialog = {}
+        original_ui028_info = QMessageBox.information
+
+        def capture_ui028_info(parent, title, message, *args, **kwargs):
+            ui028_dialog["title"] = title
+            ui028_dialog["message"] = message
+            return QMessageBox.Ok
+
+        QMessageBox.information = capture_ui028_info
+        try:
+            QTest.keyClick(public_tab.search, Qt.Key_Return)
+            app.processEvents()
+        finally:
+            QMessageBox.information = original_ui028_info
+        if ui028_dialog.get("title") != "Поиск" or "ничего не найдено" not in (
+            ui028_dialog.get("message") or ""
+        ):
+            raise AssertionError(f"UI-028 Enter no-result dialog changed: {ui028_dialog!r}")
         public_tab.search.clear()
         app.processEvents()
+        if public_tab.table.rowCount() != 2:
+            raise AssertionError("UI-028 clearing query failed to restore Public list")
 
         if not public_tab.select_synced_search_result(first_id):
             raise AssertionError("P04-C fixture could not restore explicit Public selection")
