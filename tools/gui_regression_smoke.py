@@ -357,6 +357,43 @@ def main() -> int:
         if hasattr(window.public_tab, "total_points_label"):
             raise AssertionError("UI-076 points counter leaked into Public List")
 
+        # UI-076 manual regression: resizing the same Qt window must never
+        # truncate existing filter captions or the informational counter.
+        initial_ui076_size = window.size()
+        for width in (1100, 1600, 1100):
+            window.resize(width, 750)
+            app.processEvents()
+            QTest.qWait(60)
+            app.processEvents()
+            for button in window.games_tab.filter_buttons.values():
+                caption_width = button.fontMetrics().horizontalAdvance(button.text())
+                if button.width() < caption_width + 12:
+                    raise AssertionError(
+                        f"UI-076 filter clipped at {width}px: "
+                        f"{button.text()!r} (width={button.width()}, text={caption_width})"
+                    )
+            if points_label.width() < points_label.sizeHint().width() - 1:
+                raise AssertionError(
+                    f"UI-076 points label clipped at {width}px: "
+                    f"{points_label.width()} vs {points_label.sizeHint().width()}"
+                )
+            if width == 1600 and window.games_tab._points_compact:
+                raise AssertionError("UI-076 counter did not return to wide row")
+            top_filter = window.games_tab.total_badge.mapTo(
+                window.games_tab, window.games_tab.total_badge.rect().topLeft()
+            ).y()
+            counter_top = points_label.mapTo(
+                window.games_tab, points_label.rect().topLeft()
+            ).y()
+            if window.games_tab._points_compact and counter_top <= top_filter:
+                raise AssertionError("UI-076 narrow counter did not move down")
+            if not window.games_tab._points_compact and counter_top != top_filter:
+                raise AssertionError("UI-076 wide counter not aligned with filters")
+            if points_label.text() != "Всего баллов: 15000":
+                raise AssertionError("UI-076 resizing changed the total")
+        window.resize(initial_ui076_size)
+        app.processEvents()
+
         archived_points_id = db.add_game(
             Game(None, "UI076 Archive", "2026-02-11", 321, 0, STATUS_NOT_PLAYED, "")
         )
