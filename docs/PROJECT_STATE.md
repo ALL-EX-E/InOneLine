@@ -665,3 +665,10 @@ Permanent repository gate:
 - Ручная приёмка 5/5 PASS, original candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e` (PR #42 closed without merge). PR #44 перенёс два exact candidate Git blobs в `main` merge `464136d144e054efcf38a10da8e075ed5fec8281`.
 - Pre-merge Windows CI `37778466982` + wording `37778467039` SUCCESS; post-merge Windows `37778963533` + wording `37778963540` SUCCESS. UI-009 = **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
 - Удалены `Сбросить фильтры` и неиспользуемый `reset_filters()`, существующий крестик поиска/фильтры/Enter и Public List сохранены. 1.0.8/schema 19/15 migrations/accepted installer/rollback unchanged. Следующий scope — **UI-028** (Public `Найти`), только отдельным кандидатом.
+
+## UI-028 — isolated candidate, Windows PASS, ожидает ручной QA — 2026-10-08
+
+- После UI-009 CLOSED подготовлен UI-028 только для Public: удалить кнопку `Найти`; сохранить live-search, Enter selection/focus/sync/no-match, native X. Вне scope Main Games/OBS/DB/медиа/UI-076/GLOBAL-FOCUS-001.
+- Code head `e23e4d2fea50cdc6f962c3486244d4a018279c77`, draft PR #46, ровно два файла Public view + existing GUI smoke.
+- Windows regression `37779716348` SUCCESS; wording `37779716372` SUCCESS. GitHub artifact `11550914358`: ZIP SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`, CRC PASS; installer SHA-256 `fd9a9d70c74434c6f45b28e63cb6e0239dfe90b986802627701c92f685b5e967`. Drive ZIP ID `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, verified 46 763 712 bytes.
+- **UI-028 = AWAITING USER MANUAL QA / NOT MERGED**. `main` по-прежнему принят до UI-009, VERSION 1.0.8/schema19/15 migrations и официальный релиз unchanged.
