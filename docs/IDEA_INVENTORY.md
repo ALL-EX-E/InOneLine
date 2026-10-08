@@ -688,3 +688,8 @@ This section records the latest accepted review target while preserving all hist
 - Предпочтительно сначала исследовать один общий механизм на уровне shared UI/MainWindow/event handling; не ломать обычный click/double-click, Enter-search, keyboard navigation, dialog validation, caret/selection semantics, buttons, combo/spin boxes и explicit programmatic focus/selection.
 - Конкретный жест/реализацию (например neutral-background click и/или универсальный keyboard escape fallback) утвердить при отдельном global UI review после проверки влияния на существующие widgets.
 - Не расширять текущий P04-C до глобального mouse/focus subsystem. Реализовывать отдельным изолированным шагом после сортировки зависимостей.
+
+## P04-D / UI-007 — реализовано и принято 2026-10-08
+
+- **UI-007 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS**. Ручная проверка пользователя 6/6 PASS; clean promotion PR #35 merged as `e9e22d27d0f0101773c7016367f867e2bb61e7c8`; post-merge Windows regression `37748751586` и publication wording `37748751519` — SUCCESS.
+- Назначение: поиск по всем обычным записям и архиву независимо от текущего статистического фильтра; выбранный фильтр не сбрасывается, очищение поиска возвращает его. `UI-008/UI-009/UI-028/UI-076` и `GLOBAL-FOCUS-001` остаются отдельными задачами.

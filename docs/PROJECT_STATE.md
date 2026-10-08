@@ -621,3 +621,13 @@ Permanent repository gate:
 - Artifact `11501485064`, ZIP 46,756,657 bytes, SHA-256 `6e8d3d5d320c60fc75e882a7c53e00fefea6388fadae7081f3d97e29f812dad9`; contains exactly `InOneLine_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `2a6fa43681b535f14a4092693c975033863fe969b756e78cc994943fc6e682d7`.
 - Drive handoff: `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1o1BEOnoJqFCwkgTJVQoBgahGiVWYslSC`, verified 46,756,657 bytes.
 - **P04-D = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED.** Do not start UI-008/UI-009 or later P04 scopes before manual acceptance and technical closure.
+
+## P04-D / UI-007 — ПРИНЯТ И ТЕХНИЧЕСКИ ЗАКРЫТ — 2026-10-08
+
+- Пользователь подтвердил **ручной PASS всех шести проверок** поиска и сохранения фильтра на `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`.
+- Original QA candidate `943a26d76bbaf0784b9e38fed84076d9597e82e3`; исторический PR #33 закрыт без merge после принятия.
+- Чистый перенос через PR #35, два файла с теми же SHA Git blob, что и у вручную проверенного кандидата; merge commit `e9e22d27d0f0101773c7016367f867e2bb61e7c8`.
+- До merge Windows Regression `37748280816` = SUCCESS и wording `37748280794` = SUCCESS; **точный post-merge** Regression `37748751586` = SUCCESS и wording `37748751519` = SUCCESS.
+- **P04-D = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** В `main` теперь действуют независимый от статистического фильтра поиск по всем обычным записям с архивом и возврат выбранного фильтра после очистки строки. Следующая отдельная задача P04 — **UI-008**.
+- Публичный maintenance installer не заменён; текущий исходный код и официальный опубликованный установщик могут отличаться при одинаковом `APP_VERSION=1.0.8`. Не объявлять новый релиз.
+- PR #34 (полный аудит и отдельные исправления) остаётся самостоятельным не принятым пакетом; после этого merge его изменения в общем `tools/gui_regression_smoke.py` требуют повторной совместной проверки, прежде чем объединять #34.
