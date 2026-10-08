@@ -82,6 +82,21 @@ def main() -> None:
         reserved64.sync()
         assert reserved64.status() == QSettings.Status.NoError
 
+        # HKCU\Software is shared on current Windows: explicit 32/64 handles
+        # can observe the same physical keys and have the same write time.
+        # Accept the 32-bit provenance label only when it contains the same
+        # current overlapping values; independent stale views must still lose.
+        current32 = registry_settings(QSettings.Format.Registry32Format, *sources[0])
+        current32.sync()
+        overlapping_keys = legacy64.allKeys()
+        shared_current_values = all(
+            current32.value(key) == legacy64.value(key)
+            for key in overlapping_keys
+        )
+        allowed_sources = [f"{organization}/Streaming Manager/registry64"]
+        if shared_current_values:
+            allowed_sources.append(f"{organization}/Streaming Manager/registry32")
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             data_dir = Path(tmp) / "data"
             settings = open_ui_settings(
@@ -104,7 +119,7 @@ def main() -> None:
             assert settings.value(UI_SETTINGS_MIGRATION_KEY, False, type=bool) is True
             assert settings.value("migration/legacy_backup_created", False, type=bool) is True
             assert settings.value("migration/native_qsettings_cleared", False, type=bool) is True
-            assert "Streaming Manager/registry64" in str(settings.value("migration/source", ""))
+            assert str(settings.value("migration/source", "")) in allowed_sources
 
             for store in stores:
                 assert store.allKeys() == [], store.allKeys()
@@ -122,6 +137,7 @@ def main() -> None:
             assert again.value("main_window/tab_index", 0, type=int) == 6
 
         print("UI_SETTINGS_DUAL_REGISTRY_VIEW_MIGRATION=PASS")
+        print(f"UI_SETTINGS_REGISTRY_CURRENT_VALUES_SHARED={shared_current_values}")
         print("UI_SETTINGS_LEGACY_BACKUP=PASS")
         print("UI_SETTINGS_FILE_BACKEND=PASS")
     finally:
