@@ -703,3 +703,8 @@ This section records the latest accepted review target while preserving all hist
 
 - **UI-009 = IMPLEMENTED / ACCEPTED / POST-MERGE PASS.** Удалена `Сбросить фильтры` в основном списке; Qt native X очищает строку без переключения `active_filter`. Все пять ручных проверок PASS. Clean PR #44 merged commit `464136d144e054efcf38a10da8e075ed5fec8281`; post-merge Windows regression `37778963533` + wording `37778963540` = SUCCESS.
 - UI-028 (Public `Найти`) и UI-076 (`Всего баллов`) остаются отдельными принятыми задачами, не реализованными этим изменением.
+
+## UI-028 — реализовано и принято — 2026-10-08
+
+- **UI-028 = IMPLEMENTED / MANUALLY ACCEPTED 5/5 / POST-MERGE PASS**. Удалена лишняя кнопка «Найти» в Публичном списке; поиск при вводе, Enter и синхронизация сохранены. PR #48 merged `974515f8065c8aa11e9b244d9b4841d346259a64`; exact post-merge Windows regression `37796011497` и wording `37796011272` SUCCESS.
+- **UI-076 остаётся следующей отдельной задачей**: информационная сумма баллов на вкладке «Список», без нового SQL-запроса, Public/API/OBS.
