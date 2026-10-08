@@ -651,3 +651,11 @@ Permanent repository gate:
 - Проверенный кандидат `f8f03430d0ed77fddde18ba58e2db7b8030cead4` / historical PR #37 закрыт без merge. Принятые Git blobs перенесены через PR #40, head `fa831a05d6e474337e1012752003be639d6ce9c6`; `main` merge commit `f5e244d04db63ddb421213d3ee1272ed77aee55c`.
 - Pre-merge Windows regression `37771721603` = SUCCESS, wording `37771721591` = SUCCESS; точный post-merge regression `37772054443` = SUCCESS, wording `37772054420` = SUCCESS. Два Git blob в `main` соответствуют ручному кандидату, без изменений иных файлов.
 - **UI-008 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. APP_VERSION 1.0.8, schema 19, 15 migrations, published installer и rollback не менялись. Следующий UI-009 только в отдельном candidate; проверка same-version reinstallation/frozen UI оставлена как QA-наблюдение, без неподтверждённого fix.
+
+## UI-009 — подготовлен кандидат, ожидается ручной PASS — 2026-10-08
+
+- Пакет после закрытого UI-008: только убрать `Сбросить фильтры` в основном `Список`; native clear X сохраняет выбранный filter `Не играл`/`Архив`. Не затрагивать Public/OBS/БД и другие P04 scope.
+- Exact code: `candidate/p04-f-ui009-clear-search` head `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e`, [draft PR #42](https://github.com/ALL-EX-E/InOneLine/pull/42). Only `games.py` + existing GUI smoke; sole unreferenced `reset_filters()` removed after repo-wide reference check.
+- Automated Windows regression `37772947602` = SUCCESS; wording `37772947662` = SUCCESS. Artifact `11547684618`, ZIP SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`, one setup EXE SHA-256 `8d326e0386b536dd3403331897cf2c357e52fddcf29be78588c1b37d5f86441b`. ZIP CRC PASS.
+- Google Drive QA ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9` size confirmed 46 756 918 bytes.
+- **UI-009 = AWAITING USER MANUAL QA / NOT MERGED.** Official published release/installer unchanged. Do not advance before manual QA + clean promotion + post-merge.
