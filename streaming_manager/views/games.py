@@ -645,13 +645,19 @@ class GamesTab(QWidget):
 
         self.refresh()
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # When the page first becomes visible, Qt has calculated final
+        # widget geometries; do not position from constructor-time defaults.
+        QTimer.singleShot(0, self._align_total_points_with_filters)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._align_total_points_with_filters()
 
     def _align_total_points_with_filters(self):
         """Keep the counter aligned under the НЕ КООП filter without wrapping."""
-        if not hasattr(self, "_points_end_spacer"):
+        if not hasattr(self, "_points_end_spacer") or not self.isVisible():
             return
         # Calculate from actual Qt widget positions. This is DPI-independent,
         # and deliberately does not set the window's minimum width. Future
