@@ -538,7 +538,18 @@ class GamesTab(QWidget):
             "Показать только некооперативные записи",
         )
 
+        # UI-076: informational total; it is not one of the filter buttons.
+        # Keep the existing ten filter controls in their original order.
         stats.addStretch()
+        self.total_points_label = QLabel()
+        self.total_points_label.setProperty("badge", True)
+        self.total_points_label.setToolTip(
+            "Сумма баллов всех обычных записей, включая архив"
+        )
+        self.total_points_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.total_points_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.total_points_label.setMinimumHeight(30)
+        stats.addWidget(self.total_points_label, 0, Qt.AlignTop)
         stats.setAlignment(Qt.AlignTop)
         layout.addLayout(stats)
 
@@ -883,6 +894,9 @@ class GamesTab(QWidget):
         self.archived_badge.setText(f"Архив: {stats['archived']}")
         self.coop_badge.setText(f"Кооп: {stats['coop']}")
         self.noncoop_badge.setText(f"Не кооп: {stats['noncoop']}")
+        self.total_points_label.setText(
+            f"Всего баллов: {format_points(stats['total_points'])}"
+        )
         self._sync_filter_buttons()
 
     def refresh(self):
