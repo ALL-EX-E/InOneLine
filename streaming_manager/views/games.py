@@ -427,12 +427,6 @@ class GamesTab(QWidget):
         self.search.textChanged.connect(self._search_text_changed)
         self.search.returnPressed.connect(self.activate_search)
 
-        self.search_btn = QPushButton("Найти")
-        self.search_btn.setToolTip(
-            "Показать список и перейти к первой найденной записи"
-        )
-        self.search_btn.clicked.connect(self.activate_search)
-
         self.reset_filters_btn = QPushButton("Сбросить фильтры")
         self.reset_filters_btn.setToolTip(
             "Очистить поиск и показать все записи, включая архив"
@@ -440,7 +434,6 @@ class GamesTab(QWidget):
         self.reset_filters_btn.clicked.connect(self.reset_filters)
 
         filters.addWidget(self.search, 1)
-        filters.addWidget(self.search_btn)
         filters.addWidget(self.reset_filters_btn)
         layout.addLayout(filters)
 
