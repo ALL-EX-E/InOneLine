@@ -343,6 +343,71 @@ def main() -> int:
         if actual_tabs != expected_tabs:
             raise AssertionError(f"main tabs mismatch: {actual_tabs}")
 
+        # UI-076: one existing aggregate serves both the statistics snapshot
+        # and the right-side informational QLabel, never the visible rows.
+        points_label = window.games_tab.total_points_label
+        if not isinstance(points_label, QLabel):
+            raise AssertionError("UI-076 total points must be an informational QLabel")
+        if points_label in window.games_tab.filter_buttons.values():
+            raise AssertionError("UI-076 total points was registered as a filter")
+        if points_label.text() != "Всего баллов: 15000":
+            raise AssertionError(f"UI-076 initial sum wrong: {points_label.text()!r}")
+        if db.game_stats()["total_points"] != 15000:
+            raise AssertionError("UI-076 base DB aggregate wrong")
+        if hasattr(window.public_tab, "total_points_label"):
+            raise AssertionError("UI-076 points counter leaked into Public List")
+
+        archived_points_id = db.add_game(
+            Game(None, "UI076 Archive", "2026-02-11", 321, 0, STATUS_NOT_PLAYED, "")
+        )
+        db.archive_game(archived_points_id, True)
+        temporary_points_id = db.add_game(
+            Game(None, "UI076 Temporary", "2026-02-12", 7777, 0, STATUS_PLAYED, "")
+        )
+        # Fixture-only synthetic unmaterialized lot. Normal product data must
+        # exclude auction_only=1 even when that row carries SM points.
+        with db.connect() as conn:
+            conn.execute(
+                "UPDATE games SET auction_only=1 WHERE id=?", (temporary_points_id,)
+            )
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15321":
+            raise AssertionError("UI-076 archive or temporary exclusion wrong")
+
+        window.games_tab.apply_stat_filter(STATUS_PLAYED)
+        window.games_tab.search.setText("UI076 Archive")
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15321":
+            raise AssertionError("UI-076 total changed with active search/filter")
+        if window.games_tab.active_filter != STATUS_PLAYED:
+            raise AssertionError("UI-076 search unexpectedly changed statistic filter")
+        window.games_tab.search.clear()
+        db.update_game(archived_points_id, {"sm_points": 654})
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15654":
+            raise AssertionError("UI-076 archived points edit not reflected")
+
+        # Simulate materialization: the formerly temporary row becomes a
+        # normal record and must immediately participate in the same aggregate.
+        with db.connect() as conn:
+            conn.execute(
+                "UPDATE games SET auction_only=0 WHERE id=?", (temporary_points_id,)
+            )
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 23431":
+            raise AssertionError("UI-076 materialized points missing")
+
+        db.delete_game(temporary_points_id)
+        db.delete_game(archived_points_id)
+        window.games_tab.apply_stat_filter("all")
+        window.games_tab.refresh()
+        app.processEvents()
+        if points_label.text() != "Всего баллов: 15000":
+            raise AssertionError("UI-076 delete/cleanup failed to restore points")
+
         public_descriptions = [
             label.text()
             for label in window.public_tab.findChildren(QLabel)
