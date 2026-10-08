@@ -3716,3 +3716,14 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Pre-merge regression `37814527293` + wording `37814527185`/`37814518804`; точный post-merge regression `37814970241` + wording `37814970284` — **SUCCESS**.
 - **UI-076 CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. App 1.0.8 / schema 19 / 15 migrations / published release / rollback unchanged.
 - Следующий пункт очереди — **P05 (UI-088/UI-089/UI-090): Public file export + removal Настройки → Экспорт**. Перед изменением — fresh review exact CURRENT; код не менять до отдельного явного одобрения пользователя.
+
+
+## P05 — свежий review exact CURRENT завершён; ожидает batch approval — 2026-10-08
+
+- Exact reviewed `main`: `eb123eb99d9913db2d6ee2694471dc99f8b9d569`, app 1.0.8 / schema 19 / migrations 15. Runtime P05 не менялся.
+- P05 = UI-088/UI-089/UI-090: перенести existing file exports CSV/JSON/Excel в отдельный блок `Экспорт списка` на `Публичный список`; объяснить snapshot vs auto-update `Публичная таблица`; удалить pipe-compatible export CSV + `Копировать список` и всю внутреннюю Settings tab `Экспорт`.
+- Reuse existing `PublicTab.export_*` / `streaming_manager.exporters`; preserve full `db.public_games()` dataset semantics (exclude archived and `auction_only=1`, canonical order, no `СТАРТ/ТЕКУЩАЯ`), one-way XLSX mirror, and `/api/public` without a new UI entry point.
+- Fresh code check: the GUI smoke currently hardcodes five Settings tabs including `Экспорт` and has no assertions for relocated export actions. Update it to require four tabs and one non-duplicated Public export block, verify the P1 XLSX mirror stays present, and exercise existing pipe-format import compatibility.
+- Preserve suffix correctness on the moved Save As actions: Settings currently normalizes the requested extension, while the existing Public save helper does not.
+- `AuctionTab.legacy_export_page` is constructed but is not registered in `auction_tabs`; its handlers are the other callers of legacy pipe helpers. After removing Settings Export, perform exact repo-wide caller/test audit. Delete this hidden page/helpers only if no required runtime callers, tests or compatibility dependencies remain; do not remove `DatabaseServices.import_csv` pipe-import support.
+- **FRESH REVIEW COMPLETE / READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Existing UI-088/UI-089/UI-090 decisions are individually recorded as ACCEPTED; this review does not authorize runtime edits. Wait for user's direct P05 batch approval.
