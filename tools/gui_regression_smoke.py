@@ -357,14 +357,19 @@ def main() -> int:
         if hasattr(window.public_tab, "total_points_label"):
             raise AssertionError("UI-076 points counter leaked into Public List")
 
-        # UI-076 manual regression: resizing the same Qt window must never
-        # truncate existing filter captions or the informational counter.
+        # UI-076 second manual layout review: position points in the
+        # EXISTING sorting-actions row, anchored to the right edge of the
+        # last statistic filter at both widths, never creating a third row.
         initial_ui076_size = window.size()
         for width in (1100, 1600, 1100):
             window.resize(width, 750)
             app.processEvents()
             QTest.qWait(60)
             app.processEvents()
+            if window.width() != width:
+                raise AssertionError(
+                    f"UI-076 resize refused {width}px: actual={window.width()}"
+                )
             for button in window.games_tab.filter_buttons.values():
                 caption_width = button.fontMetrics().horizontalAdvance(button.text())
                 if button.width() < caption_width + 12:
@@ -377,18 +382,42 @@ def main() -> int:
                     f"UI-076 points label clipped at {width}px: "
                     f"{points_label.width()} vs {points_label.sizeHint().width()}"
                 )
-            if width == 1600 and window.games_tab._points_compact:
-                raise AssertionError("UI-076 counter did not return to wide row")
-            top_filter = window.games_tab.total_badge.mapTo(
-                window.games_tab, window.games_tab.total_badge.rect().topLeft()
+            from PySide6.QtCore import QPoint
+
+            sorting_y = window.games_tab.sorting_rules_btn.mapTo(
+                window.games_tab, QPoint(0, 0)
             ).y()
-            counter_top = points_label.mapTo(
-                window.games_tab, points_label.rect().topLeft()
+            badge_y = points_label.mapTo(
+                window.games_tab, QPoint(0, 0)
             ).y()
-            if window.games_tab._points_compact and counter_top <= top_filter:
-                raise AssertionError("UI-076 narrow counter did not move down")
-            if not window.games_tab._points_compact and counter_top != top_filter:
-                raise AssertionError("UI-076 wide counter not aligned with filters")
+            if abs(sorting_y - badge_y) > 3:
+                raise AssertionError(
+                    f"UI-076 points not on sorting actions row at {width}px: "
+                    f"{sorting_y} vs {badge_y}"
+                )
+            last_filter_right = window.games_tab.noncoop_badge.mapTo(
+                window.games_tab,
+                window.games_tab.noncoop_badge.rect().topRight()
+            ).x()
+            badge_right = points_label.mapTo(
+                window.games_tab, points_label.rect().topRight()
+            ).x()
+            if abs(last_filter_right - badge_right) > 2:
+                raise AssertionError(
+                    f"UI-076 badge not aligned with НЕ КООП at {width}px: "
+                    f"{last_filter_right} vs {badge_right}"
+                )
+            last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
+                window.games_tab,
+                window.games_tab.open_list_overlay_preview_btn.rect().topRight()
+            ).x()
+            badge_left = points_label.mapTo(
+                window.games_tab, QPoint(0, 0)
+            ).x()
+            if badge_left < last_action_right + 4:
+                raise AssertionError(
+                    f"UI-076 points overlap sorting action at {width}px"
+                )
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
         window.resize(initial_ui076_size)
