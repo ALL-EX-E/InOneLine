@@ -144,7 +144,14 @@ class StreamTab(QWidget):
         obs_help_actions.addStretch()
         layout.addLayout(obs_help_actions)
 
+        # Existing typography controls keep one registry even when individual
+        # visual rows move into their corresponding main-overlay sections.
+        self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
+        self.typography_row_widgets: dict[str, tuple[QLabel, QWidget]] = {}
+        self.typography_control_groups: dict[str, tuple[QWidget, QWidget]] = {}
+
         form = QFormLayout()
+        self.main_settings_form = form
         form.setVerticalSpacing(10)
         form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -181,6 +188,17 @@ class StreamTab(QWidget):
         self.format_combo.setMaximumWidth(180)
 
         form.addRow("Текущая игра:", self.game_combo)
+        # UI-034: move, do not recreate, the existing title typography row.
+        # Same font/color widgets, handlers and overlay_font_title_* settings.
+        self.title_typography_host = QWidget()
+        title_typography_layout = QVBoxLayout(self.title_typography_host)
+        title_typography_layout.setContentsMargins(0, 0, 0, 0)
+        title_typography_layout.setSpacing(8)
+        self._add_typography_row(
+            title_typography_layout, "title", "Название текущей игры",
+            30, "#FFFFFF",
+        )
+        form.addRow("", self.title_typography_host)
         form.addRow("Текст информационного блока:", info_row)
         form.addRow("Формат:", self.format_combo)
         layout.addLayout(form)
@@ -384,15 +402,9 @@ class StreamTab(QWidget):
         typography_help.setProperty("muted", True)
         layout.addWidget(typography_help)
 
-        self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
-        self.typography_row_widgets: dict[str, tuple[QLabel, QWidget]] = {}
-        self.typography_control_groups: dict[str, tuple[QWidget, QWidget]] = {}
         typography_layout = QVBoxLayout()
         typography_layout.setSpacing(10)
 
-        self._add_typography_row(
-            typography_layout, "title", "Название текущей игры", 30, "#FFFFFF"
-        )
         self._add_typography_row(
             typography_layout, "top1", "Top-1", 17, "#FFFFFF"
         )
