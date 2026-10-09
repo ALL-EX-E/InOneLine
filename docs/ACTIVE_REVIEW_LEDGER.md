@@ -3803,3 +3803,10 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Windows run #188 (`37946557309`) остановился на exact-size assertion: native runner ограничил запрошенные `2560×1440` до `1028×749` ещё до проверки положения кнопок. Это ограничение доступного desktop, не подтверждённый runtime FAIL исправления.
 - Exact-width geometry regression теперь запускается отдельным процессом с Qt offscreen platform (`--wide-window-probe`); общий helper проверяет те же размеры, фильтры, строки и title-width floor. Native Windows regression дополнительно использует доступный desktop для циклов resize. Производственный diff не изменился.
 - Полные Windows gates и новый установщик должны успешно собраться до повторной ручной QA. **P07 остаётся REOPENED / NOT MERGED.**
+
+### P07 wide-window / compact caption correction — 2026-10-09
+
+- Runs #189/#190 прошли новую wide-adjacency проверку, но offscreen probe выявил нечитаемый compact filter: при `520×640` подпись `Проходится: 0` имела text width 169 px и size hint 189 px, тогда как кнопке назначалось 155 px.
+- Причина в существующих фиксированных порогах 3/4/5 колонок: они не проверяют фактические size hints для текущего шрифта. Native Windows transition check прошёл; более крупные метрики offscreen выявили общий geometry edge case.
+- До дополнительного runtime diff записан corrective scope: при заданной ширине viewport уменьшать выбранное число колонок существующей grid до размещения всех её кнопок по их natural size hints. Сохранить порядок, существующие preferred counts и trailing stretch; не менять шрифты, persistence, фильтрацию или бизнес-логику.
+- Исправляется тот же reopened responsive пункт; **P07 NOT MERGED**.
