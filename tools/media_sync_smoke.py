@@ -134,10 +134,10 @@ def main() -> None:
             MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
         )
         assert counter["value"] == 1
-        assert any(
+        assert not any(
             asset.id == overlay_stale.id
             for asset in overlay_assets
-        ), "Non-D26 categories must preserve established missing-file recovery rows"
+        ), "P08 managed overlay backgrounds must follow source-of-truth deletion"
 
     print("MEDIA_SYNC_SINGLE_TRANSACTION=PASS")
 

@@ -219,20 +219,7 @@ class StreamTab(QWidget):
         self.background_path.setPlaceholderText(
             "Фон не выбран — используется стандартная подложка оверлея"
         )
-        self.repair_background_btn = QPushButton("Восстановить ссылку…")
-        self.repair_background_btn.setEnabled(False)
-        self.repair_background_btn.setVisible(False)
-        self.repair_background_btn.setToolTip(
-            "Восстановить потерянную ссылку на исходный внешний файл"
-        )
-        self.repair_background_btn.clicked.connect(self._repair_background_reference)
-        background_path_row = QWidget()
-        background_path_layout = QHBoxLayout(background_path_row)
-        background_path_layout.setContentsMargins(0, 0, 0, 0)
-        background_path_layout.setSpacing(8)
-        background_path_layout.addWidget(self.background_path, 1)
-        background_path_layout.addWidget(self.repair_background_btn)
-        background_form.addRow("Источник:", background_path_row)
+        background_form.addRow("Источник:", self.background_path)
 
         self.background_status = QLabel("Фон не выбран")
         self.background_status.setProperty("muted", True)
@@ -251,7 +238,8 @@ class StreamTab(QWidget):
             "Копия хранится только в отдельной папке data\\overlay_backgrounds; оригинал программа "
             "никогда не изменяет и не удаляет. Ссылки на исходные файлы обслуживаются OBS через "
             "защищённый локальный media-route без раскрытия произвольного доступа к файловой системе. "
-            "Если исходный файл перемещён или удалён, фон безопасно отключается и его можно переуказать. "
+            "Если файл недоступен, он автоматически исключается из выбора; "
+            "отсутствующая управляемая копия удаляется из библиотеки, а выбранный фон сбрасывается. "
             "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM. GIF воспроизводится как анимация, "
             "видео — без звука и по кругу. Фон применяется после «Сохранить параметры стрима»."
         )
@@ -1314,9 +1302,19 @@ class StreamTab(QWidget):
         return set(supported_media_extensions(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS))
 
     def _background_assets(self):
-        return self.db.sync_managed_media_category(
-            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+        # An in-flight video copy is not a completed managed file. Do not
+        # auto-register it before the existing worker promotes its external ID.
+        assets = (
+            self.db.list_media_assets(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
+            if self._background_copy_worker is not None
+            else self.db.sync_managed_media_category(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+            )
         )
+        return [
+            asset for asset in assets
+            if media_asset_available(self.db.path.parent, asset)
+        ]
 
     @staticmethod
     def _background_asset_label(asset, available: bool) -> str:
@@ -1327,17 +1325,9 @@ class StreamTab(QWidget):
         return label if available else f"⚠ файл недоступен: {label}"
 
     def _refresh_selected_background_availability(self):
-        asset = self._selected_background_asset()
-        if asset is None:
-            self._update_background_path_field()
-            return
-        available = media_asset_available(self.db.path.parent, asset)
-        index = self.background_combo.currentIndex()
-        if index >= 0:
-            expected = self._background_asset_label(asset, available)
-            if self.background_combo.itemText(index) != expected:
-                self.background_combo.setItemText(index, expected)
-        self._update_background_path_field()
+        # This category is shared by the main overlay and Auction Lots.
+        self._refresh_background_library()
+        self._refresh_auction_lots_background_library()
 
     def _refresh_background_library(self, selected_asset_id: int | str | None = None):
         if selected_asset_id is None:
@@ -1420,8 +1410,6 @@ class StreamTab(QWidget):
         if asset is None:
             self.background_path.clear()
             self.background_status.setText("Фон не выбран")
-            self.repair_background_btn.setEnabled(False)
-            self.repair_background_btn.setVisible(False)
             return
 
         try:
@@ -1431,23 +1419,9 @@ class StreamTab(QWidget):
         available = media_asset_available(self.db.path.parent, asset)
         self.background_path.setText(str(path))
 
-        needs_external_repair = (
-            asset.storage_mode == MEDIA_STORAGE_EXTERNAL and not available
+        self.background_status.setText(
+            "Доступен" if available else "Файл недоступен — выберите другой фон"
         )
-        if available:
-            status_text = "Доступен"
-        elif needs_external_repair:
-            status_text = (
-                "Файл недоступен — нажмите «Восстановить ссылку…» "
-                "или добавьте другой фон"
-            )
-        else:
-            status_text = (
-                "Файл недоступен — добавьте фон заново или выберите другой"
-            )
-        self.background_status.setText(status_text)
-        self.repair_background_btn.setVisible(needs_external_repair)
-        self.repair_background_btn.setEnabled(needs_external_repair)
 
     def _unique_background_target(self, source_name: str) -> Path:
         source_path = Path(source_name)
@@ -1473,16 +1447,24 @@ class StreamTab(QWidget):
             raise
         return target
 
-    def _background_video_copy_ready(self, target: Path):
-        asset = self.db.ensure_managed_media_asset(
-            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
-            target.name,
-            target.name,
-        )
-        self._select_imported_background(
-            self._background_copy_target,
-            asset.id,
-        )
+    def _background_video_copy_ready(
+        self, target: Path, promote_id: int | None = None,
+    ):
+        try:
+            if promote_id is None:
+                asset = self.db.ensure_managed_media_asset(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                    target.name,
+                    target.name,
+                )
+            else:
+                asset = self.db.promote_external_media_asset_to_managed(
+                    promote_id, target.name, target.name,
+                )
+        except (OSError, ValueError) as exc:
+            self._background_video_copy_failed(exc)
+            return
+        self._select_imported_background(self._background_copy_target, asset.id)
 
     def _background_video_copy_failed(self, exc):
         QMessageBox.critical(
@@ -1503,6 +1485,7 @@ class StreamTab(QWidget):
         source: Path,
         target: Path,
         selection_target: str = "main",
+        promote_id: int | None = None,
     ):
         if self._background_copy_worker is not None:
             return
@@ -1517,7 +1500,11 @@ class StreamTab(QWidget):
         active_button.setText("Копирование…")
         worker = FunctionWorker(self._copy_background_video, source, target)
         self._background_copy_worker = worker
-        worker.signals.result.connect(self._background_video_copy_ready)
+        worker.signals.result.connect(
+            lambda target, existing_id=promote_id: self._background_video_copy_ready(
+                target, existing_id
+            )
+        )
         worker.signals.error.connect(self._background_video_copy_failed)
         worker.signals.finished.connect(self._background_video_copy_finished)
         self.thread_pool.start(worker)
@@ -1567,12 +1554,10 @@ class StreamTab(QWidget):
         )
         if not path:
             return
-
         source = Path(path)
         if source.suffix.lower() not in self._supported_background_extensions():
             QMessageBox.warning(
-                self,
-                "Неподдерживаемый формат",
+                self, "Неподдерживаемый формат",
                 "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
             )
             return
@@ -1580,114 +1565,102 @@ class StreamTab(QWidget):
             QMessageBox.critical(self, "Ошибка", "Выбранный файл не найден.")
             return
 
+        storage_mode = self._choose_background_storage_mode(source)
+        if storage_mode is None:
+            return
         try:
-            self.background_dir.mkdir(parents=True, exist_ok=True)
-            # Every file chosen through the operator picker uses the same W2
-            # storage decision, including video and files that already happen
-            # to be inside the managed background directory.
-            storage_mode = self._choose_background_storage_mode(source)
-            if storage_mode is None:
-                return
-            if storage_mode == MEDIA_STORAGE_EXTERNAL:
-                asset = self.db.register_external_media_asset(
-                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
-                    source,
-                )
-                self._select_imported_background(selection_target, asset.id)
-                return
-
-            # Copy mode for a file already in the dedicated managed category
-            # means "use this existing managed copy"; never copy a file onto
-            # itself.
-            if source.resolve().parent == self.background_dir.resolve():
-                asset = self.db.ensure_managed_media_asset(
-                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
-                    source.name,
-                    source.name,
-                )
-                self._select_imported_background(selection_target, asset.id)
-                return
-
-            if source.suffix.lower() in {".mp4", ".webm"}:
-                existing_video = next(
-                    (
-                        item
-                        for item in self.background_dir.iterdir()
-                        if item.is_file() and item.name.casefold() == source.name.casefold()
-                    ),
-                    None,
-                )
-                if existing_video is not None:
-                    QMessageBox.information(
-                        self,
-                        "Фон уже есть",
-                        f'Файл «{source.name}» уже есть в библиотеке фонов.\n'
-                        "Будет выбран существующий файл.",
-                    )
-                    asset = self.db.ensure_managed_media_asset(
-                        MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
-                        existing_video.name,
-                        existing_video.name,
-                    )
-                    self._select_imported_background(selection_target, asset.id)
-                    return
-                target = self.background_dir / source.name
-                self._start_background_video_copy(source, target, selection_target)
-                return
-
-            target = self._unique_background_target(source.name)
-            shutil.copy2(source, target)
-            asset = self.db.ensure_managed_media_asset(
-                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
-                target.name,
-                source.name,
-            )
+            self._apply_background_import(source, storage_mode, selection_target)
         except (OSError, ValueError) as exc:
             QMessageBox.critical(
-                self,
-                "Ошибка выбора фона",
+                self, "Ошибка выбора фона",
                 f"Не удалось подготовить выбранный фон:\n{exc}",
             )
-            return
 
-        self._select_imported_background(selection_target, asset.id)
-
-    def _repair_background_reference(self):
-        asset = self._selected_background_asset()
-        if asset is None or asset.storage_mode != MEDIA_STORAGE_EXTERNAL:
+    def _apply_background_import(
+        self, source: Path, storage_mode: str, selection_target: str,
+    ) -> None:
+        """Use shared D26 filename identity for both overlay background pickers."""
+        if self._background_copy_worker is not None:
             return
-        current = Path(asset.external_path) if asset.external_path else Path.home()
-        start_dir = str(current.parent if current.parent.exists() else Path.home())
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Переукажите исходный файл фона",
-            start_dir,
-            "Поддерживаемые фоны (*.png *.jpg *.jpeg *.webp *.gif *.mp4 *.webm);;"
-            "Все файлы (*.*)",
-        )
-        if not path:
-            return
-        source = Path(path)
         if not source.is_file():
-            QMessageBox.warning(self, "Файл недоступен", "Выбранный файл не найден.")
-            return
+            raise ValueError("Выбранный файл не найден")
         if source.suffix.lower() not in self._supported_background_extensions():
-            QMessageBox.warning(
-                self,
-                "Неподдерживаемый формат",
-                "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
+            raise ValueError("Неподдерживаемый формат фона")
+        if storage_mode not in {MEDIA_STORAGE_MANAGED, MEDIA_STORAGE_EXTERNAL}:
+            raise ValueError("Неизвестный режим хранения фона")
+
+        self.background_dir.mkdir(parents=True, exist_ok=True)
+        # Discover manually copied managed files before consulting shared
+        # category-wide, case-insensitive filename identity.
+        self._background_assets()
+        matches = self.db.media_assets_by_filename(
+            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, source.name,
+        )
+        if len(matches) > 1:
+            QMessageBox.information(
+                self, "Фоны уже есть",
+                f"Для «{source.name}» найдено несколько записей в библиотеке. "
+                "Новая запись не создана. Выберите нужный фон вручную.",
             )
             return
-        try:
-            repaired = self.db.update_external_media_asset(asset.id, source)
-        except (OSError, ValueError) as exc:
-            QMessageBox.critical(
-                self,
-                "Ошибка переуказания",
-                f"Не удалось обновить ссылку на файл:\n{exc}",
+        existing = matches[0] if matches else None
+
+        if storage_mode == MEDIA_STORAGE_EXTERNAL:
+            if existing is None:
+                asset = self.db.register_external_media_asset(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, source,
+                )
+            else:
+                asset = existing
+                if (
+                    asset.storage_mode == MEDIA_STORAGE_EXTERNAL
+                    and not media_asset_available(self.db.path.parent, asset)
+                ):
+                    # Readding a moved source reuses the original media ID.
+                    asset = self.db.update_external_media_asset(asset.id, source)
+                QMessageBox.information(
+                    self, "Фон уже есть",
+                    f"Файл «{source.name}» уже есть в библиотеке. "
+                    "Будет выбран существующий фон.",
+                )
+            self._select_imported_background(selection_target, asset.id)
+            return
+
+        if existing is not None and existing.storage_mode == MEDIA_STORAGE_MANAGED:
+            QMessageBox.information(
+                self, "Фон уже есть",
+                f"Файл «{source.name}» уже есть в библиотеке. "
+                "Будет выбран существующий фон.",
+            )
+            self._select_imported_background(selection_target, existing.id)
+            return
+
+        if source.resolve().parent == self.background_dir.resolve():
+            # The category sync above normally found this managed file.
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, source.name, source.name,
+            )
+            self._select_imported_background(selection_target, asset.id)
+            return
+
+        target = self._unique_background_target(source.name)
+        promote_id = int(existing.id) if existing is not None else None
+        if source.suffix.lower() in {".mp4", ".webm"}:
+            self._start_background_video_copy(
+                source, target, selection_target, promote_id=promote_id,
             )
             return
-        self._refresh_background_library(repaired.id)
+
+        shutil.copy2(source, target)
+        if promote_id is not None:
+            asset = self.db.promote_external_media_asset_to_managed(
+                promote_id, target.name, source.name,
+            )
+        else:
+            asset = self.db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, target.name, source.name,
+            )
+        self._select_imported_background(selection_target, asset.id)
 
     def _add_typography_row(
         self,
@@ -2033,7 +2006,11 @@ class StreamTab(QWidget):
             # Migration 16 normally populates this.  Keep a defensive legacy
             # adoption path for partially upgraded/copied settings databases.
             legacy_file = setting("overlay_background_file", "")
-            if legacy_file and Path(legacy_file).name == legacy_file:
+            if (
+                legacy_file
+                and Path(legacy_file).name == legacy_file
+                and (self.background_dir / legacy_file).is_file()
+            ):
                 try:
                     legacy_asset = self.db.ensure_managed_media_asset(
                         MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
@@ -2045,6 +2022,11 @@ class StreamTab(QWidget):
                 if legacy_asset is not None:
                     background_media_id = str(legacy_asset.id)
         self._refresh_background_library(background_media_id)
+        if background_media_id and not self.background_combo.currentData():
+            self.db.set_settings_bulk({
+                "overlay_background_media_id": "",
+                "overlay_background_file": "",
+            })
         self._set_combo_by_data(
             self.background_mode,
             setting("overlay_background_mode", "stretch"),
@@ -2240,9 +2222,14 @@ class StreamTab(QWidget):
                 AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT,
             ),
         )
-        self._refresh_auction_lots_background_library(
-            setting(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+        saved_lots_background = setting(
+            AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, ""
         )
+        self._refresh_auction_lots_background_library(saved_lots_background)
+        if saved_lots_background and not self.auction_lots_background_combo.currentData():
+            self.db.set_settings_bulk({
+                AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: "",
+            })
         self._update_auction_lots_background_enabled_state()
 
         self.rules_overlay_visible.setChecked(
