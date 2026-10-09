@@ -946,13 +946,25 @@ def main() -> int:
                 raise AssertionError(
                     f"P06 OBS typography color field is squeezed: {key}"
                 )
-            if (
-                size_group.width() < size_group.layout().sizeHint().width()
-                or color_group.width() < color_group.layout().sizeHint().width()
-            ):
-                raise AssertionError(
-                    f"P06 OBS typography group is clipped: {key}"
-                )
+            for group in (size_group, color_group):
+                child_widths = []
+                for index in range(group.layout().count()):
+                    child = group.layout().itemAt(index).widget()
+                    if child is not None:
+                        child_widths.append(
+                            max(
+                                child.minimumWidth(),
+                                child.minimumSizeHint().width(),
+                                child.sizeHint().width(),
+                            )
+                        )
+                required_width = sum(child_widths) + max(
+                    0, group.layout().spacing()
+                ) * max(0, len(child_widths) - 1)
+                if group.width() < required_width:
+                    raise AssertionError(
+                        f"P06 OBS typography group is clipped: {key}"
+                    )
 
         # The narrow Settings → Auction image selector and import action remain
         # in one compact row instead of leaving the label isolated.
