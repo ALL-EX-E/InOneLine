@@ -354,11 +354,11 @@ def main() -> int:
         expected_tabs = [
             "Список",
             "Публичный список",
-            "Стрим / OBS",
             "Музыка",
             "Аукцион",
             "История аукционов",
             "Журнал",
+            "Стрим / OBS",
             "Настройки",
         ]
         actual_tabs = [window.tabs.tabText(i) for i in range(window.tabs.count())]
