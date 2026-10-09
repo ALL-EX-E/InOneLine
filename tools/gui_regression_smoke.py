@@ -997,16 +997,26 @@ def main() -> int:
                     f"P06 OBS typography group labels are missing: {key}"
                 )
             size_label, color_label = size_labels[0], color_labels[0]
-            if (
+            size_gap = (
                 size_spin.geometry().left()
                 - (size_label.geometry().left() + size_label.width())
-                > size_group.layout().spacing() + 2
-                or color_button.geometry().left()
+            )
+            color_gap = (
+                color_button.geometry().left()
                 - (color_label.geometry().left() + color_label.width())
-                > color_group.layout().spacing() + 2
+            )
+            if (
+                size_gap > size_group.layout().spacing() + 2
+                or color_gap > color_group.layout().spacing() + 2
             ):
                 raise AssertionError(
-                    f"P06 OBS typography labels leave gaps before their fields: {key}"
+                    f"P06 OBS typography labels leave gaps before their fields: {key}; "
+                    f"size_gap={size_gap}, size_spacing={size_group.layout().spacing()}, "
+                    f"size_label={size_label.geometry().getRect()}, "
+                    f"size_spin={size_spin.geometry().getRect()}, "
+                    f"color_gap={color_gap}, color_spacing={color_group.layout().spacing()}, "
+                    f"color_label={color_label.geometry().getRect()}, "
+                    f"color_button={color_button.geometry().getRect()}"
                 )
             for group in (size_group, color_group):
                 child_widths = []
