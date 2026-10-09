@@ -136,12 +136,12 @@ class StreamTab(QWidget):
         self.stream_scroll = QScrollArea(self)
         self.stream_scroll.setWidgetResizable(True)
         self.stream_scroll.setFrameShape(QFrame.NoFrame)
-        self.stream_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.stream_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.stream_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         self.stream_content = QWidget()
         self.stream_content.setSizePolicy(
-            QSizePolicy.Expanding,
+            QSizePolicy.MinimumExpanding,
             QSizePolicy.Preferred,
         )
 
