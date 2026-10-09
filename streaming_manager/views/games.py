@@ -7,12 +7,14 @@ from PySide6.QtCore import QEvent, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
+    QBoxLayout,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -416,11 +418,23 @@ class GamesTab(QWidget):
         self.active_filter = "all"
         self.filter_buttons: dict[str, QPushButton] = {}
 
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.MinimumExpanding)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(9)
+        self._header_layout = QGridLayout()
+        self._header_layout.setContentsMargins(0, 0, 0, 0)
+        self._header_layout.setHorizontalSpacing(8)
+        self._header_layout.setVerticalSpacing(9)
+        layout.addLayout(self._header_layout)
+        self._compact_controls_enabled: bool | None = None
+        self._stats_columns = 0
+        self._stat_filter_buttons_order: list[QPushButton] = []
 
         filters = QHBoxLayout()
+        self._filters_layout = filters
         self.search = QLineEdit()
         self.search.setPlaceholderText("Поиск по названию или отзыву…")
         self.search.setClearButtonEnabled(True)
@@ -428,9 +442,11 @@ class GamesTab(QWidget):
         self.search.returnPressed.connect(self.activate_search)
 
         filters.addWidget(self.search, 1)
-        layout.addLayout(filters)
+        self._header_layout.addLayout(filters, 0, 0, 1, 2)
 
-        actions = QHBoxLayout()
+        actions = QBoxLayout(QBoxLayout.LeftToRight)
+        actions.setSpacing(8)
+        self._action_layout = actions
         self.add_btn = QPushButton("Добавить")
         self.add_btn.setProperty("primary", True)
         self.edit_btn = QPushButton("Изменить")
@@ -460,7 +476,7 @@ class GamesTab(QWidget):
         self.import_help_btn.clicked.connect(self.show_import_csv_help)
         self.clear_all_btn.clicked.connect(self.clear_all_games)
 
-        for w in (
+        self._action_buttons = (
             self.add_btn,
             self.edit_btn,
             self.archive_btn,
@@ -468,14 +484,16 @@ class GamesTab(QWidget):
             self.delete_btn,
             self.import_btn,
             self.import_help_btn,
-        ):
+        )
+        for w in self._action_buttons:
             actions.addWidget(w)
         actions.addStretch()
         actions.addWidget(self.clear_all_btn)
-        layout.addLayout(actions)
+        self._header_layout.addLayout(actions, 1, 0, 1, 2)
 
-        stats = QHBoxLayout()
+        stats = QGridLayout()
         stats.setSpacing(8)
+        self._stats_layout = stats
 
         def make_stat_button(key: str, tooltip: str) -> QPushButton:
             button = QPushButton()
@@ -490,7 +508,7 @@ class GamesTab(QWidget):
                 lambda checked=False, filter_key=key: self.apply_stat_filter(filter_key)
             )
             self.filter_buttons[key] = button
-            stats.addWidget(button, 0, Qt.AlignTop)
+            self._stat_filter_buttons_order.append(button)
             return button
 
         self.total_badge = make_stat_button(
@@ -538,14 +556,13 @@ class GamesTab(QWidget):
             "Показать только некооперативные записи",
         )
 
-        # All ten existing statistic filters retain their own row. In the
-        # later small-window/scrolling task the row will be horizontally
-        # scrollable instead of being squeezed to fit an arbitrary minimum.
-        stats.addStretch()
-        stats.setAlignment(Qt.AlignTop)
-        layout.addLayout(stats)
+        # Keep the ten existing filters in a responsive grid at small widths.
+        stats.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self._header_layout.addLayout(stats, 2, 0, 1, 2)
 
-        sorting_actions = QHBoxLayout()
+        sorting_actions = QBoxLayout(QBoxLayout.LeftToRight)
+        sorting_actions.setSpacing(8)
+        self._sorting_actions_layout = sorting_actions
         self.sorting_rules_btn = QPushButton("Правила сортировки")
         self.sorting_rules_btn.setToolTip(
             "Показать полный порядок автоматической сортировки списка"
@@ -582,9 +599,18 @@ class GamesTab(QWidget):
         # spacer resizing or calculations from the separate statistic row.
         sorting_actions.addWidget(self.total_points_label, 0, Qt.AlignVCenter)
         sorting_actions.addStretch()
-        layout.addLayout(sorting_actions)
+        self._sorting_action_widgets = (
+            self.sorting_rules_btn,
+            self.copy_list_overlay_url_btn,
+            self.open_list_overlay_preview_btn,
+            self.total_points_label,
+        )
+        self._header_layout.addLayout(sorting_actions, 3, 0, 1, 2)
 
         self.table = QTableWidget(0, 9)
+        self.table.setMinimumWidth(0)
+        self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setHorizontalHeaderLabels([
             "ID", "СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "ДАТА ВЫХОДА",
             "БАЛЛЫ", "КООП/НЕ КООП", "СТАТУС", "ОТЗЫВ",
@@ -626,6 +652,7 @@ class GamesTab(QWidget):
         self.table.itemSelectionChanged.connect(self._update_action_state)
         self.table.viewport().installEventFilter(self)
         layout.addWidget(self.table, 1)
+        self.set_compact_controls(False, 0)
 
         self.shortcuts = []
         for key, handler in (
@@ -639,6 +666,101 @@ class GamesTab(QWidget):
             self.shortcuts.append(shortcut)
 
         self.refresh()
+
+    def set_compact_controls(
+        self, compact: bool, available_width: int = 0
+    ) -> None:
+        """Reflow controls so narrow windows scroll only the table columns."""
+        compact = bool(compact)
+        if compact:
+            stats_columns = (
+                3 if available_width <= 620
+                else 4 if available_width <= 820
+                else 5
+            )
+        else:
+            stats_columns = len(self._stat_filter_buttons_order)
+
+        if (
+            compact == self._compact_controls_enabled
+            and stats_columns == self._stats_columns
+        ):
+            return
+
+        self._compact_controls_enabled = compact
+        self._stats_columns = stats_columns
+
+        for child_layout in (
+            self._filters_layout,
+            self._action_layout,
+            self._stats_layout,
+            self._sorting_actions_layout,
+        ):
+            self._header_layout.removeItem(child_layout)
+
+        for child_layout in (
+            self._action_layout,
+            self._stats_layout,
+            self._sorting_actions_layout,
+        ):
+            while child_layout.count():
+                child_layout.takeAt(0)
+
+        if compact:
+            self._action_layout.setDirection(QBoxLayout.TopToBottom)
+            self._action_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            for widget in self._action_buttons:
+                self._action_layout.addWidget(widget)
+            self._action_layout.addStretch(1)
+
+            self._sorting_actions_layout.setDirection(QBoxLayout.TopToBottom)
+            self._sorting_actions_layout.setAlignment(Qt.AlignRight | Qt.AlignTop)
+            for widget in self._sorting_action_widgets:
+                self._sorting_actions_layout.addWidget(widget, 0, Qt.AlignRight)
+            self._sorting_actions_layout.addWidget(
+                self.clear_all_btn, 0, Qt.AlignRight
+            )
+            self._sorting_actions_layout.addStretch(1)
+        else:
+            self._action_layout.setDirection(QBoxLayout.LeftToRight)
+            for widget in self._action_buttons:
+                self._action_layout.addWidget(widget)
+            self._action_layout.addStretch(1)
+            self._action_layout.addWidget(self.clear_all_btn)
+
+            self._sorting_actions_layout.setDirection(QBoxLayout.LeftToRight)
+            for widget in self._sorting_action_widgets:
+                self._sorting_actions_layout.addWidget(widget)
+            self._sorting_actions_layout.addStretch(1)
+
+        for column in range(max(len(self._stat_filter_buttons_order), stats_columns) + 1):
+            self._stats_layout.setColumnStretch(column, 0)
+        for index, button in enumerate(self._stat_filter_buttons_order):
+            row, column = divmod(index, stats_columns)
+            self._stats_layout.addWidget(
+                button,
+                row,
+                column,
+                Qt.AlignLeft | Qt.AlignTop,
+            )
+
+        if compact:
+            self._header_layout.addLayout(self._filters_layout, 0, 0, 1, 2)
+            self._header_layout.addLayout(self._action_layout, 1, 0)
+            self._header_layout.addLayout(self._sorting_actions_layout, 1, 1)
+            self._header_layout.addLayout(self._stats_layout, 2, 0, 1, 2)
+            self._header_layout.setColumnStretch(0, 1)
+            self._header_layout.setColumnStretch(1, 0)
+        else:
+            self._header_layout.addLayout(self._filters_layout, 0, 0, 1, 2)
+            self._header_layout.addLayout(self._action_layout, 1, 0, 1, 2)
+            self._header_layout.addLayout(self._stats_layout, 2, 0, 1, 2)
+            self._header_layout.addLayout(self._sorting_actions_layout, 3, 0, 1, 2)
+            self._header_layout.setColumnStretch(0, 1)
+            self._header_layout.setColumnStretch(1, 1)
+
+        self._header_layout.invalidate()
+        self.updateGeometry()
 
     def attach_shared_xlsx_controls(self, sync_host) -> None:
         """Host the existing shared-main-list XLSX controls on Games.
@@ -677,6 +799,9 @@ class GamesTab(QWidget):
         section_layout.addLayout(buttons)
 
         form = QFormLayout()
+        sync_host.shared_xlsx_path_label.setWordWrap(True)
+        sync_host.shared_xlsx_status_label.setWordWrap(True)
+        sync_host.shared_xlsx_modified_label.setWordWrap(True)
         form.addRow("Таблица:", sync_host.shared_xlsx_path_label)
         form.addRow("Состояние:", sync_host.shared_xlsx_status_label)
         form.addRow("Последнее изменение:", sync_host.shared_xlsx_modified_label)

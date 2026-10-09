@@ -6,7 +6,7 @@ R1.0.4 installer source
 - Reinstall/update removes only InOneLine.exe and _internal before replacing runtime files; data/, backups/ and logs/ are preserved.
 - Final uninstall policy is active in R1.0.4: before removal the uninstaller presents an explicit destructive-data warning with No as the default choice.
 - If the user confirms, data/, backups/ and logs/ are deleted together with the runtime. Current UI state is stored as data/ui_state.ini and is removed with data/.
-- The warning directs the user to create a full external .iolbackup via Settings -> General -> Local data before continuing. The backup must be stored outside the InOneLine installation root.
+- The warning directs the user to create a full external .iolbackup via Settings -> General -> Full program backup -> «Создать полную резервную копию…» before continuing. Store the backup outside the InOneLine installation root.
 - External files merely referenced by InOneLine are never deleted by the uninstaller.
 - App/Setup/shortcut icon design remains the approved transparent FIX4 icon from assets/InOneLine_icon_master.png and assets/InOneLine.ico.
 - Installed Apps display name remains explicitly registered as "In one line".

@@ -221,6 +221,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # и совместимость с внешними форматами. Так на одном экране больше нет ряда
         # неактуальных кнопок.
         self.auction_tabs = QTabWidget()
+        self.auction_tabs.setMinimumWidth(0)
+        self.auction_tabs.setSizePolicy(
+            QSizePolicy.Ignored, QSizePolicy.Expanding
+        )
         layout.addWidget(self.auction_tabs, 1)
 
         # ==========================================================
@@ -306,25 +310,18 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # ==========================================================
         # ПРОВЕДЕНИЕ
         # ==========================================================
-        # R1.0.8: Conduct is a long-form operator page. Keep its content at a
-        # usable minimum height and let the page scroll vertically when the
-        # main window is near its 1100x700 minimum. This prevents the table,
-        # history and wheel area from collapsing to a few rows.
-        self.conduct_page = QScrollArea()
-        self.conduct_page.setFrameShape(QFrame.NoFrame)
-        self.conduct_page.setWidgetResizable(True)
-        self.conduct_page.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.conduct_page.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-        self.conduct_page_content = FocusClearingWidget()
-        self.conduct_page_content.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Minimum
+        # Page-level overflow is handled by MainWindow's active-tab scroll host,
+        # keeping the vertical scrollbar at the visible edge of the workspace.
+        self.conduct_page = FocusClearingWidget()
+        self.conduct_page_content = self.conduct_page
+        self.conduct_page.setMinimumWidth(0)
+        self.conduct_page.setSizePolicy(
+            QSizePolicy.Ignored, QSizePolicy.Minimum
         )
-        conduct_layout = QVBoxLayout(self.conduct_page_content)
-        conduct_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        conduct_layout = QVBoxLayout(self.conduct_page)
+        conduct_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         conduct_layout.setContentsMargins(10, 10, 10, 10)
         conduct_layout.setSpacing(12)
-        self.conduct_page.setWidget(self.conduct_page_content)
 
         conduct_rules_row = QHBoxLayout()
         self.conduct_rules_btn = QPushButton("Правила вкладки")
@@ -842,7 +839,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # Keep the operator table readable when the optional wheel panel appears.
         # The enclosing QScrollArea below absorbs width pressure instead of
         # collapsing columns or requesting a wider top-level window.
-        self.conduct_table.setMinimumWidth(520)
+        self.conduct_table.setMinimumWidth(0)
+        self.conduct_table.setSizePolicy(
+            QSizePolicy.Ignored, QSizePolicy.Expanding
+        )
         self.conduct_table.setHorizontalHeaderLabels(
             ["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
         )
@@ -879,7 +879,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             4, QHeaderView.ResizeToContents
         )
         self.conduct_content = QWidget()
+        self.conduct_content.setMinimumWidth(0)
+        self.conduct_content.setSizePolicy(
+            QSizePolicy.Ignored, QSizePolicy.MinimumExpanding
+        )
         conduct_content_layout = QHBoxLayout(self.conduct_content)
+        self.conduct_content_layout = conduct_content_layout
         conduct_content_layout.setContentsMargins(0, 0, 0, 0)
         conduct_content_layout.setSpacing(12)
         self.conduct_table.itemSelectionChanged.connect(
@@ -985,7 +990,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.conduct_content_scroll.setFrameShape(QFrame.NoFrame)
         self.conduct_content_scroll.setWidgetResizable(True)
         self.conduct_content_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarAsNeeded
+            Qt.ScrollBarAlwaysOff
         )
         self.conduct_content_scroll.setVerticalScrollBarPolicy(
             Qt.ScrollBarAlwaysOff

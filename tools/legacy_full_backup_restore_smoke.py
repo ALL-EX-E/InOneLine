@@ -113,6 +113,12 @@ with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
     checked = validate_full_backup_archive(archive_path)
     assert checked["app_version"] == "1.0.6"
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        assert "data/ui_state.ini" not in archive.namelist()
+        legacy_manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        assert "ui_state" not in legacy_manifest
+    live_ui_state = paths.data_dir / "ui_state.ini"
+    live_ui_state.write_text("LIVE_UI_STATE", encoding="utf-8")
     assert checked["file_count"] == 2
 
     # Simulate data created by a newer D26 installation after that old backup.
@@ -133,6 +139,7 @@ with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
 
     result = apply_staged_full_restore(staged["staged_dir"], root)
     assert result["success"] is True
+    assert live_ui_state.read_text(encoding="utf-8") == "LIVE_UI_STATE"
     assert not (soundtrack_dir / "newer-only.wav").exists()
     assert (paths.data_dir / "wheel_jingles" / legacy_name).read_bytes() == legacy_bytes
 
