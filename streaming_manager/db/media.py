@@ -574,10 +574,14 @@ class MediaMixin:
                 )
                 managed_names.add(key)
 
-            # D26 changes source-of-truth semantics only for its audio
-            # libraries. Existing overlay/background/center-image categories
-            # keep their established missing-file recovery behavior.
-            if str(category) in {MEDIA_CATEGORY_MUSIC, MEDIA_CATEGORY_SOUNDTRACK}:
+            # P08 shares D26's managed-directory source of truth for
+            # overlay backgrounds. Other media categories retain their own
+            # previously accepted missing-file rules.
+            if str(category) in {
+                MEDIA_CATEGORY_MUSIC,
+                MEDIA_CATEGORY_SOUNDTRACK,
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+            }:
                 stale_ids = [
                     int(row["id"])
                     for row in managed_rows
