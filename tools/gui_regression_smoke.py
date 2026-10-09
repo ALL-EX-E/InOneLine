@@ -471,7 +471,7 @@ def main() -> int:
         public_export_titles = {str(row["title"]) for row in public_export_expected}
         if {"UI076 Archive", "UI076 Temporary"} & public_export_titles:
             raise AssertionError("public_games included archived or auction_only fixtures")
-        public_export_headers = ["НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
+        public_export_headers = ["НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
 
         def click_public_export(button, basename, suffix):
             selected_base = root / basename
