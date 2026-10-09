@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QMessageBox
 
 from ...diagnostic_logs import sanitize_diagnostic_text
-from ...exporters import export_auction_pipe_csv, auction_pipe_text
 from ...random_sources import RandomOrgClient
 from ...workers import FunctionWorker
 
@@ -722,26 +721,3 @@ class AuctionActionMixin:
         self.changed()
         self.conduct_table.clearFocus()
         self.delete_lot_btn.clearFocus()
-
-    def export_auction_csv(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Экспорт CSV",
-            "auction.csv",
-            "CSV (*.csv);;Все файлы (*.*)",
-        )
-        if not path:
-            return
-        try:
-            export_auction_pipe_csv(self.db, path)
-            QMessageBox.information(self, "Экспорт", f"Список сохранён:\n{path}")
-        except Exception as exc:
-            QMessageBox.critical(self, "Ошибка", str(exc))
-
-    def copy_auction_list(self):
-        QApplication.clipboard().setText(auction_pipe_text(self.db))
-        QMessageBox.information(
-            self,
-            "Экспорт",
-            "Список скопирован в буфер обмена.",
-        )

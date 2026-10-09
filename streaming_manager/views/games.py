@@ -689,6 +689,12 @@ class GamesTab(QWidget):
         else:
             self.layout().insertWidget(table_index, section)
 
+        # All controls have been reparented into the Games section. Hide their
+        # now-empty temporary host so it cannot cover the Auction page.
+        temporary_host = getattr(sync_host, "_shared_xlsx_controls_host", None)
+        if temporary_host is not None:
+            temporary_host.hide()
+
     def _game_title_header_min_width(self) -> int:
         """Return a DPI-aware floor that always fits ``НАЗВАНИЕ``."""
         header = self.table.horizontalHeader()
