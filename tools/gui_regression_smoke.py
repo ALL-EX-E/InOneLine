@@ -650,11 +650,66 @@ def main() -> int:
         if not window.public_tab.search.isClearButtonEnabled():
             raise AssertionError("UI-028 native Public search clear disabled")
 
+        # P06: the approved order and small technical minimum keep the shell usable.
+        expected_tab_titles = [
+            "Список",
+            "Публичный список",
+            "Музыка",
+            "Аукцион",
+            "История аукционов",
+            "Журнал",
+            "Стрим / OBS",
+            "Настройки",
+        ]
+        actual_tab_titles = [
+            window.tabs.tabText(index) for index in range(window.tabs.count())
+        ]
+        if actual_tab_titles != expected_tab_titles:
+            raise AssertionError(f"P06 main tab order mismatch: {actual_tab_titles!r}")
+        if window.minimumWidth() >= 800 or window.minimumHeight() >= 600:
+            raise AssertionError("P06 main-window minimum is still tied to content size")
+        if window.main_scroll.widget() is not window.tabs:
+            raise AssertionError("P06 main tabs are outside the reusable scroll area")
+        if window.main_scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
+            raise AssertionError("P06 main horizontal scrolling is not available")
+        if window.main_scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
+            raise AssertionError("P06 main vertical scrolling is not available")
+
+        # Old installations persisted numeric indices in the former tab order.
+        legacy_pages = [
+            ("list", window.games_tab),
+            ("public", window.public_tab),
+            ("stream", window.stream_tab),
+            ("music", window.music_tab),
+            ("auction", window.auction_tab),
+            ("auction_history", window.completed_history_tab),
+            ("log", window.log_tab),
+            ("settings", window.settings_tab),
+        ]
+        for legacy_index, (expected_key, expected_page) in enumerate(legacy_pages):
+            window._ui_settings.remove("main_window/tab_key")
+            window._ui_settings.setValue("main_window/tab_index", legacy_index)
+            window._ui_settings.sync()
+            window._restore_ui_state()
+            app.processEvents()
+            if window.tabs.currentWidget() is not expected_page:
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} restored the wrong page"
+                )
+            if window._ui_settings.value("main_window/tab_key", "", type=str) != expected_key:
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} did not save its stable key"
+                )
+            if window._ui_settings.value("main_window/tab_index", -1, type=int) != window.tabs.indexOf(expected_page):
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} did not migrate to the new index"
+                )
+
         # P04-A: upgrading from hidden-list preferences must still show both
         # tables, preserve window state and keep explicit Enter navigation.
         original_size = window.size()
-        if window.tabs.currentIndex() != 0:
-            raise AssertionError("retiring list visibility changed the restored tab")
+        if window.tabs.currentIndex() != window.tabs.indexOf(window.settings_tab):
+            raise AssertionError("P06 legacy-index fixture did not finish at Settings")
         for tab in (window.games_tab, window.public_tab):
             window.tabs.setCurrentWidget(tab)
             app.processEvents()
@@ -676,6 +731,35 @@ def main() -> int:
             app.processEvents()
             if window.size() != original_size:
                 raise AssertionError("list tab/search changed the outer window size")
+
+        # The narrow shell scrolls its content while preserving top-level geometry.
+        window.tabs.setCurrentWidget(window.auction_tab)
+        narrow_width = max(window.minimumWidth() + 80, 600)
+        narrow_height = max(window.minimumHeight() + 80, 440)
+        window.resize(narrow_width, narrow_height)
+        app.processEvents()
+        narrow_size = window.size()
+        if narrow_size.width() >= 1100 or narrow_size.height() >= 700:
+            raise AssertionError("P06 could not resize below 1100x700")
+        if window.main_scroll.horizontalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 narrow main window did not expose horizontal scrolling")
+        window.tabs.setCurrentWidget(window.public_tab)
+        app.processEvents()
+        if window.size() != narrow_size:
+            raise AssertionError("switching tabs resized the narrow main window")
+        narrow_geometry = window.saveGeometry()
+        window.resize(original_size)
+        window._ui_settings.setValue("main_window/geometry", narrow_geometry)
+        window._ui_settings.sync()
+        window._restore_ui_state()
+        app.processEvents()
+        if window.width() >= 1100 or window.height() >= 700:
+            raise AssertionError("P06 did not restore saved geometry below 1100x700")
+        window.resize(original_size)
+        app.processEvents()
+        window.tabs.setCurrentWidget(window.public_tab)
+        app.processEvents()
+
         window._save_ui_state()
         reopened = open_ui_settings(paths.data_dir, migrate_native=False)
         if any(reopened.contains(key) for key in obsolete_list_keys):
@@ -684,6 +768,8 @@ def main() -> int:
             raise AssertionError("retiring list visibility removed saved window geometry")
         if reopened.value("main_window/tab_index", -1, type=int) != 1:
             raise AssertionError("retiring list visibility changed saved tab persistence")
+        if reopened.value("main_window/tab_key", "", type=str) != "public":
+            raise AssertionError("P06 stable tab key was not persisted")
         window.tabs.setCurrentWidget(window.games_tab)
         app.processEvents()
 
@@ -1330,6 +1416,58 @@ def main() -> int:
             raise AssertionError(f"settings tabs mismatch: {settings_tabs}")
         if hasattr(window.settings_tab, "export_page"):
             raise AssertionError("removed Settings Export page is still constructed")
+        p06_general_page = window.settings_tab.general_page
+        p06_general_labels = [
+            label.text() for label in p06_general_page.findChildren(QLabel)
+        ]
+        if "Резервная копия базы данных" not in p06_general_labels:
+            raise AssertionError("P06 database-backup section heading is missing")
+        db_path_label = next(
+            (
+                label
+                for label in p06_general_page.findChildren(QLabel)
+                if label.text().startswith("База данных:\n")
+            ),
+            None,
+        )
+        if db_path_label is None:
+            raise AssertionError("P06 current database path is not visible")
+        if not (db_path_label.textInteractionFlags() & Qt.TextSelectableByMouse):
+            raise AssertionError("P06 current database path is not selectable")
+        if "Полная резервная копия программы" not in p06_general_labels:
+            raise AssertionError("P06 full-backup section is not visually separated")
+        if (
+            "Полная резервная копия предназначена для восстановления данных после "
+            "полного удаления и повторной установки InOneLine."
+            not in p06_general_labels
+        ):
+            raise AssertionError("P06 full-backup explanation is missing")
+        if not any(
+            label.startswith(
+                "Защищённые данные подключений предназначены для восстановления "
+            )
+            for label in p06_general_labels
+        ):
+            raise AssertionError("P06 DPAPI limitation is not shown in advance")
+        if "Интеграции" in p06_general_labels:
+            raise AssertionError("P06 redundant Integrations explainer remains")
+        settings_titles = [
+            window.settings_tab.settings_tabs.tabText(index)
+            for index in range(window.settings_tab.settings_tabs.count())
+        ]
+        if "Интеграции" not in settings_titles:
+            raise AssertionError("P06 removed the real Integrations settings tab")
+        p06_backup_buttons = {
+            button.text() for button in p06_general_page.findChildren(QPushButton)
+        }
+        if "Создать полную резервную копию…" not in p06_backup_buttons:
+            raise AssertionError("P06 full-backup button caption mismatch")
+        if "Восстановить из полной резервной копии…" not in p06_backup_buttons:
+            raise AssertionError("P06 full-restore button caption mismatch")
+        if not {"Открыть папку данных", "Открыть папку резервных копий"}.issubset(
+            p06_backup_buttons
+        ):
+            raise AssertionError("P06 data-folder button captions mismatch")
         if hasattr(window.settings_tab, "export_public_csv_btn"):
             raise AssertionError("duplicate public export buttons remain in Settings")
         if hasattr(window.auction_tab, "legacy_export_page") or hasattr(
