@@ -3772,3 +3772,11 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Для изменения сессии, ставок и временных лотов использовать существующий shared-refresh path, чтобы списки и XLSX получали новые позиции. Новую схему/миграцию и отдельное хранилище не добавлять.
 - Реализация идёт одним candidate-пакетом. Перед ручной проверкой обязательны Windows Regression Foundation, GUI regression, frozen build и Windows QA installer. Пользователь получает полный чек-лист сразу; ранее принятые QA сценарии не повторяются без причины. До ручного PASS candidate не продвигать в main.
 - Статус: **IN PROGRESS**.
+
+## P07 — candidate собран; ожидает ручную QA пользователя — 2026-10-09
+
+- Candidate PR #68, `candidate/p07-position-policy-xlsx`; код-кандидат `5e5fb221d4107d44e7e05aa3dce600e5198804ce` поверх exact main `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Первый Windows Regression Foundation run #184 остановился на GUI startup: `MainWindow._finalize_compact_headers_after_polish` ссылался на прежние fixed compact-column constants. Исправление P07 заменило их на актуальные колонки двух Auction tables; GUI smoke теперь отдельно проверяет post-polish finalizer для одной и двух позиций.
+- Итоговый Windows Regression Foundation run #185: **SUCCESS**; native GUI regression, frozen app/browser regression, PyInstaller build, installer build и silent installer startup прошли. Publication wording gate run #1340: **SUCCESS**. Python compile, overlay JS syntax и focused position/XLSX checks также прошли.
+- Windows QA artifact run #185: `InOneLine_1.0.8_WINDOWS_QA`, artifact ID `11621074873`, размер `47,802,248` bytes, SHA-256 `c3f35b00bc09cd655b8256c79d14d74fd582a6f97ca3b3be815099a141461b34`; истекает 2026-10-16. PR #68 остаётся draft и не merged до ручного PASS.
+- **P07 = AWAITING MANUAL QA / NOT ACCEPTED / NOT MERGED.** После PASS закрыть candidate отдельно и выполнить exact-blob clean promotion; без PASS main не менять.
