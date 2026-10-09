@@ -1542,6 +1542,33 @@ class ServicesMixin:
             },
         }
 
+    def _auction_position_columns_conn(
+        self,
+        conn: sqlite3.Connection,
+        session: dict[str, Any] | None,
+        surface: str = "auction",
+    ) -> str:
+        """Project position columns without losing archived elimination history."""
+        elimination_progress = False
+        if session and str(session.get("mode") or "") == "weighted_wheel":
+            elimination_progress = bool(conn.execute(
+                "SELECT EXISTS(SELECT 1 FROM auction_entries "
+                "WHERE auction_id=? "
+                "AND result IN ('elimination_selected', 'eliminated'))",
+                (int(session["id"]),),
+            ).fetchone()[0])
+        return position_columns_for_surface(
+            surface, session, elimination_progress=elimination_progress,
+        )
+
+    def auction_position_columns(
+        self,
+        session: dict[str, Any] | None,
+        surface: str = "auction",
+    ) -> str:
+        with self.connect() as conn:
+            return self._auction_position_columns_conn(conn, session, surface)
+
     def current_auction_lots_payload(
         self,
         runtime_state: dict[str, Any] | None = None,
@@ -1610,12 +1637,9 @@ class ServicesMixin:
                 if media_raw.isdigit()
                 else None
             )
-
-        position_columns = position_columns_for_surface(
-            "auction_overlay",
-            session,
-            rows,
-        )
+            position_columns = self._auction_position_columns_conn(
+                conn, session, "auction_overlay",
+            )
 
         chance_raw = str(
             settings.get(

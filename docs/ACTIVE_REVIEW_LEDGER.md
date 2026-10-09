@@ -3844,3 +3844,12 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Regression должна проходить реальный lifecycle: до выбора → выбранный лот → «В архив» → следующий раунд → смена формата → закрытие сессии; обе локальные таблицы и overlay должны совпадать. Current helper-only synthetic test этот переход не покрывал.
 - Дополнительно review отметил расширение существующего Shared XLSX local/cloud write race на position-only refresh; это ещё не подтверждённый data-loss incident. Проверить конкретный derived-only trigger перед завершением P07, не объявлять inherited risk новым наблюдённым сбоем.
 - **P07 = REOPENED / PREMERGE CORRECTION / NOT MERGED.** Прежняя promotion не сливается; P08 runtime не начинается до исправления, свежих Windows gates и точечного manual retest.
+
+
+### P07 — Shared XLSX derived-only write collision verified — 2026-10-09
+
+- Проверка дополнительного review finding воспроизвела перезапись на временной базе и XLSX, а не на пользовательских данных. Exact existing `_shared_xlsx_start_write` task получил новое derived положение постоянных игр после добавления лидирующего temporary lot; logical hash постоянных данных не изменился. Заранее доставленная внешняя правка `ОТЗЫВ` была заменена пустым local value при полном rewrite.
+- До corrective runtime diff записан узкий scope: при logical hash == last synchronized hash и изменившейся внешней file signature отложить position-only rewrite, сохранить файл и дать существующему stable-file poll/import обработать внешнее изменение. После импорта существующий projection repair завершает синхронизацию. General conflict policy для одновременных logical edits не переписывается; новая persistence и второй sync path не нужны.
+- Lifecycle regression сначала RED на реальном `archive_elimination_result` (overlay `position` вместо `start_current`), затем GREEN после shared read-only history adapter. GUI regression теперь проверяет те же переходы в обеих локальных таблицах.
+- Отдельная GUI regression на production worker + real workbook проверяет preservation/import внешнего review и convergence derived positions. Ожидаемый RED для ещё не исправленного Shared collision должен быть подтверждён Windows runner перед runtime correction; installer из такого run не выдаётся пользователю.
+- **P07 remains REOPENED / NOT MERGED.**

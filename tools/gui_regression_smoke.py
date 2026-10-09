@@ -77,6 +77,7 @@ from streaming_manager.public_xlsx import (
 )
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
+from tools.position_policy_smoke import assert_elimination_lifecycle
 
 
 def free_local_port() -> int:
@@ -147,6 +148,82 @@ def assert_position_policy() -> None:
         {"mode": "weighted_wheel", "wheel_format": "standard"},
         [{"result": "eliminated"}],
     ) == POSITION_COLUMNS_START_CURRENT
+
+
+def assert_shared_projection_preserves_external_edit(app, window, root: Path) -> None:
+    """A derived-only refresh must import an already delivered cloud edit first."""
+    db = window.db
+    auction = window.auction_tab
+    path = root / "p07_shared_projection_race.xlsx"
+    auction_id = db.create_auction_session("max_amount", 60)
+
+    def wait_for_worker() -> None:
+        deadline = time.monotonic() + 8
+        while auction._shared_xlsx_worker is not None:
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                raise AssertionError("P07 Shared XLSX worker did not finish")
+            QTest.qWait(10)
+        app.processEvents()
+
+    try:
+        initial = write_shared_xlsx(db, path)
+        auction._shared_xlsx_activate(
+            path, persist=False, import_now=False,
+            initial_hash=initial["hash"],
+            initial_presentation_hash=initial["presentation_hash"],
+            initial_signature=initial["signature"],
+        )
+        auction._shared_xlsx_poll_timer.stop()
+        workbook = load_workbook(path)
+        edited_title = str(workbook.active["B2"].value)
+        cloud_review = "P07 cloud review delivered before position refresh"
+        workbook.active["G2"] = cloud_review
+        workbook.save(path)
+        workbook.close()
+        top_points = max(game.sm_points for game in db.auction_eligible_games())
+        db.add_or_increment_auction_lot(
+            auction_id, "P07 Shared Temporary", int(top_points) + 10_000,
+        )
+        local_rows = main_games_rows(db)
+        if state_hash(local_rows) != initial["hash"]:
+            raise AssertionError("P07 race fixture changed logical permanent data")
+        if presentation_hash(local_rows) == initial["presentation_hash"]:
+            raise AssertionError("P07 race fixture did not change derived positions")
+
+        auction.shared_xlsx_local_data_changed()
+        auction._shared_xlsx_write_timer.stop()
+        auction._shared_xlsx_start_local_write()
+        wait_for_worker()
+        preserved = read_shared_xlsx(path)
+        if not any(
+            row["title"] == edited_title and row["review"] == cloud_review
+            for row in preserved["rows"]
+        ):
+            raise AssertionError("P07 position-only refresh overwrote a cloud business edit")
+
+        # Reuse the existing stable-file poll/import path, then drain its
+        # projection rewrite without waiting for wall-clock poll intervals.
+        auction._shared_xlsx_poll()
+        auction._shared_xlsx_poll()
+        wait_for_worker()
+        auction._shared_xlsx_write_timer.stop()
+        auction._shared_xlsx_start_local_write()
+        wait_for_worker()
+        local_rows = main_games_rows(db)
+        final_payload = read_shared_xlsx(path)
+        if not any(
+            row["title"] == edited_title and row["review"] == cloud_review
+            for row in local_rows
+        ):
+            raise AssertionError("P07 cloud business edit was not imported into the database")
+        if not position_projection_matches(local_rows, final_payload):
+            raise AssertionError("P07 deferred Shared position projection did not converge")
+        print("P07_SHARED_POSITION_REFRESH_PRESERVES_CLOUD_EDIT=PASS")
+    finally:
+        wait_for_worker()
+        auction._shared_xlsx_disconnect()
+        db.cancel_auction(auction_id)
 
 
 def assert_position_xlsx_mirrors(db: Database, root: Path) -> None:
@@ -2397,6 +2474,30 @@ def main() -> int:
             raise AssertionError("re-selected external wheel soundtrack was not adopted")
         if "доступен" not in auction.wheel_soundtrack_status.text().lower():
             raise AssertionError("re-selected wheel soundtrack stayed unavailable")
+
+        assert_shared_projection_preserves_external_edit(app, window, root)
+
+        def check_lifecycle_tables(phase, expected):
+            auction.refresh_force()
+            window._finalize_compact_headers_after_polish()
+            expected_headers = (
+                ["СТАРТ", "ТЕКУЩАЯ"]
+                if expected == POSITION_COLUMNS_START_CURRENT
+                else ["ПОЗИЦИЯ", "НАЗВАНИЕ"]
+            )
+            for table in (auction.table, auction.conduct_table):
+                actual_headers = [
+                    table.horizontalHeaderItem(column).text()
+                    for column in range(2)
+                ]
+                if actual_headers != expected_headers:
+                    raise AssertionError(
+                        f"P07 {phase}: local table headers "
+                        f"{actual_headers!r} != {expected_headers!r}"
+                    )
+
+        assert_elimination_lifecycle(db, check_lifecycle_tables)
+        print("P07_LOCAL_AND_OVERLAY_ELIMINATION_LIFECYCLE=PASS")
 
         # Populate the temporary database so the main-list row scrollbar is
         # genuinely visible, then verify it stays inside the viewport at x=0.

@@ -9,7 +9,6 @@ from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
 from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
-from ...position_policy import position_columns_for_surface
 
 
 class AuctionStateMixin:
@@ -91,11 +90,7 @@ class AuctionStateMixin:
             QTimer.singleShot(0, self.changed)
 
         all_rows = self._entries_for_table(session)
-        position_mode = position_columns_for_surface(
-            "auction",
-            session,
-            all_rows,
-        )
+        position_mode = self.db.auction_position_columns(session)
         wheel_payload = (
             self._load_wheel_payload(session)
             if self._wheel_context_relevant(session)

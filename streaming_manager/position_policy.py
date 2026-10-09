@@ -16,6 +16,8 @@ def position_columns_for_surface(
     surface: str,
     session: Mapping[str, Any] | None,
     entries: Iterable[Mapping[str, Any]] | None = None,
+    *,
+    elimination_progress: bool = False,
 ) -> str:
     """Return the position-column presentation for a list surface.
 
@@ -35,6 +37,11 @@ def position_columns_for_surface(
         return POSITION_COLUMNS_START_CURRENT
     if mode != "weighted_wheel":
         return POSITION_COLUMNS_SINGLE
+
+    # Archived elimination results are not in the active table rows. Callers
+    # may supply read-only evidence from the complete existing session history.
+    if elimination_progress:
+        return POSITION_COLUMNS_START_CURRENT
 
     for entry in entries or ():
         result = str(entry.get("result") or "").strip().casefold()
