@@ -49,12 +49,19 @@ from streaming_manager.constants import (
     STATUS_NOT_PLAYED,
     STATUS_PLAYED,
     TIMER_OVERLAY_BACKGROUND_KEY,
+    AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
     WHEEL_SOUNDTRACK_MEDIA_ID_KEY,
     WHEEL_SOUNDTRACK_MUTE_KEY,
     WHEEL_SOUNDTRACK_VOLUME_KEY,
 )
 from streaming_manager.database import Database, DuplicateGameError, Game
-from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
+from streaming_manager.media import (
+    MEDIA_CATEGORY_SOUNDTRACK,
+    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+    MEDIA_STORAGE_MANAGED,
+    MEDIA_STORAGE_EXTERNAL,
+    media_asset_available,
+)
 from streaming_manager.position_policy import (
     POSITION_COLUMNS_SINGLE,
     POSITION_COLUMNS_START_CURRENT,
@@ -78,6 +85,131 @@ from streaming_manager.public_xlsx import (
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
+
+
+
+def assert_p08_background_media(app, window, root: Path) -> None:
+    """Both selectors share D26 dedup/availability with no new registry."""
+    db = window.db
+    stream = window.stream_tab
+    category = MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+    source = root / "P08-Main.png"
+    source.write_bytes(b"P08 test PNG fixture")
+    with patch.object(QMessageBox, "information") as notice:
+        stream._apply_background_import(source, MEDIA_STORAGE_MANAGED, "main")
+        matches = db.media_assets_by_filename(category, source.name)
+        if len(matches) != 1 or matches[0].storage_mode != MEDIA_STORAGE_MANAGED:
+            raise AssertionError("P08 initial managed background was not registered")
+        managed_id = matches[0].id
+        stream._apply_background_import(source, MEDIA_STORAGE_EXTERNAL, "main")
+        matches = db.media_assets_by_filename(category, source.name)
+        if len(matches) != 1 or matches[0].id != managed_id:
+            raise AssertionError("P08 managed -> external switch created a duplicate")
+        if stream.background_combo.currentData() != managed_id:
+            raise AssertionError("P08 duplicate background was not reselected")
+        if not notice.called:
+            raise AssertionError("P08 duplicate background notice is missing")
+
+        external_source = root / "P08-External.png"
+        external_source.write_bytes(b"P08 external image fixture")
+        stream._apply_background_import(external_source, MEDIA_STORAGE_EXTERNAL, "auction_lots")
+        original = db.media_assets_by_filename(category, external_source.name)
+        if len(original) != 1 or original[0].storage_mode != MEDIA_STORAGE_EXTERNAL:
+            raise AssertionError("P08 external background import failed")
+        preserved_id = original[0].id
+        stream._apply_background_import(external_source, MEDIA_STORAGE_MANAGED, "auction_lots")
+        promoted = db.media_assets_by_filename(category, external_source.name)
+        if (
+            len(promoted) != 1
+            or promoted[0].id != preserved_id
+            or promoted[0].storage_mode != MEDIA_STORAGE_MANAGED
+            or not media_asset_available(db.path.parent, promoted[0])
+        ):
+            raise AssertionError("P08 external -> managed did not preserve the media ID")
+        if stream.auction_lots_background_combo.currentData() != preserved_id:
+            raise AssertionError("P08 Auction Lots selector lost promoted media ID")
+
+        # Real video copy is asynchronous; the same row must be promoted after
+        # the existing copy worker finishes (not replaced with a second row).
+        video_source = root / "P08-Video.mp4"
+        video_source.write_bytes(b"P08 video copy fixture")
+        stream._apply_background_import(video_source, MEDIA_STORAGE_EXTERNAL, "main")
+        video_id = db.media_assets_by_filename(category, video_source.name)[0].id
+        stream._apply_background_import(video_source, MEDIA_STORAGE_MANAGED, "main")
+        deadline = time.monotonic() + 8
+        while stream._background_copy_worker is not None:
+            app.processEvents()
+            if time.monotonic() > deadline:
+                raise AssertionError("P08 video-copy worker did not finish")
+            QTest.qWait(10)
+        app.processEvents()
+        video_rows = db.media_assets_by_filename(category, video_source.name)
+        if (
+            len(video_rows) != 1
+            or video_rows[0].id != video_id
+            or video_rows[0].storage_mode != MEDIA_STORAGE_MANAGED
+        ):
+            raise AssertionError("P08 asynchronous video promotion duplicated the row")
+
+        # A disappearing managed file is pruned and any saved selection is reset.
+        db.set_settings_bulk({"overlay_background_media_id": str(managed_id)})
+        (stream.background_dir / source.name).unlink()
+        stream.refresh()
+        if db.get_media_asset(managed_id) is not None:
+            raise AssertionError("P08 missing managed background row survived sync")
+        if stream.background_combo.currentData():
+            raise AssertionError("P08 missing managed background stayed selected")
+        if db.get_setting("overlay_background_media_id", ""):
+            raise AssertionError("P08 missing managed background setting was not reset")
+
+        # A missing external reference survives in DB but is unavailable in
+        # both selectors; its saved Auction Lots selection is cleared.
+        missing_source = root / "P08-Missing.png"
+        missing_source.write_bytes(b"P08 missing reference fixture")
+        stream._apply_background_import(missing_source, MEDIA_STORAGE_EXTERNAL, "auction_lots")
+        missing_id = db.media_assets_by_filename(category, missing_source.name)[0].id
+        db.set_settings_bulk({
+            AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: str(missing_id),
+        })
+        missing_source.unlink()
+        stream.refresh()
+        if db.get_media_asset(missing_id) is None:
+            raise AssertionError("P08 missing external reference should remain registered")
+        if stream.background_combo.findData(missing_id) >= 0:
+            raise AssertionError("P08 unavailable external asset leaked into main choices")
+        if stream.auction_lots_background_combo.findData(missing_id) >= 0:
+            raise AssertionError("P08 unavailable external asset leaked into Auction Lots")
+        if db.get_setting(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, ""):
+            raise AssertionError("P08 unavailable external lot selection stayed persisted")
+
+        missing_source.write_bytes(b"P08 restored at the original source path")
+        stream.refresh()
+        if stream.background_combo.findData(missing_id) < 0:
+            raise AssertionError("P08 restored external background did not reappear")
+        stream._apply_background_import(missing_source, MEDIA_STORAGE_EXTERNAL, "main")
+        restored = db.media_assets_by_filename(category, missing_source.name)
+        if len(restored) != 1 or restored[0].id != missing_id:
+            raise AssertionError("P08 re-added external background duplicated media ID")
+
+        # Historical mixed-mode duplicates are not silently picked or grown.
+        ambiguous_source = root / "P08-Ambiguous.png"
+        ambiguous_source.write_bytes(b"P08 ambiguous source")
+        managed_copy = stream.background_dir / ambiguous_source.name
+        managed_copy.write_bytes(b"P08 direct managed copy")
+        db.sync_managed_media_category(category)
+        db.register_external_media_asset(category, ambiguous_source)
+        before = db.media_assets_by_filename(category, ambiguous_source.name)
+        selected_before = stream.background_combo.currentData()
+        stream._apply_background_import(ambiguous_source, MEDIA_STORAGE_EXTERNAL, "main")
+        after = db.media_assets_by_filename(category, ambiguous_source.name)
+        if len(before) != 2 or len(after) != 2:
+            raise AssertionError("P08 ambiguous duplicates were implicitly modified")
+        if stream.background_combo.currentData() != selected_before:
+            raise AssertionError("P08 ambiguous duplicate implicitly moved selection")
+
+    if hasattr(stream, "repair_background_btn"):
+        raise AssertionError("P08 obsolete background repair action remains visible")
+    print("P08_MEDIA_DEDUP_AVAILABILITY_BOTH_SELECTORS=PASS")
 
 
 def free_local_port() -> int:
@@ -2475,6 +2607,7 @@ def main() -> int:
         if "доступен" not in auction.wheel_soundtrack_status.text().lower():
             raise AssertionError("re-selected wheel soundtrack stayed unavailable")
 
+        assert_p08_background_media(app, window, root)
         assert_shared_projection_preserves_external_edit(app, window, root)
 
         def check_lifecycle_tables(phase, expected):
