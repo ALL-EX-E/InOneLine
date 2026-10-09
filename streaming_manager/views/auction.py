@@ -291,6 +291,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ"])
         self._lot_title_column = 1
+        self._lot_compact_columns = (0, 2)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
@@ -838,6 +839,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.conduct_table = QTableWidget(0, 4)
         self._conduct_title_column = 1
         self._conduct_chance_column = 2
+        self._conduct_compact_columns = (0, 2, 3)
         # Keep the operator table readable when the optional wheel panel appears.
         # The enclosing QScrollArea below absorbs width pressure instead of
         # collapsing columns or requesting a wider top-level window.
@@ -2297,8 +2299,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         if is_conduct:
             self._conduct_title_column = name_column
             self._conduct_chance_column = int(chance_column)
+            self._conduct_compact_columns = compact_columns
         else:
             self._lot_title_column = name_column
+            self._lot_compact_columns = compact_columns
 
         previous_blocked = table.blockSignals(True)
         table.setUpdatesEnabled(False)

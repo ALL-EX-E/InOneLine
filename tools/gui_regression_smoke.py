@@ -2190,6 +2190,8 @@ def main() -> int:
             raise AssertionError("Auction single-position table schema is wrong")
         if auction.table.item(0, 0).text() != "3":
             raise AssertionError("Auction current position value is wrong")
+        if auction._lot_compact_columns != (0, 2):
+            raise AssertionError("Auction single-position compact columns are wrong")
 
         auction._populate_lot_table(
             auction.conduct_table,
@@ -2225,6 +2227,8 @@ def main() -> int:
             for column in (0, 1)
         ] != ["2", "3"]:
             raise AssertionError("Auction start/current position values are wrong")
+        if auction._lot_compact_columns != (0, 1, 3):
+            raise AssertionError("Auction start/current compact columns are wrong")
 
         auction._populate_lot_table(
             auction.conduct_table,
@@ -2239,6 +2243,9 @@ def main() -> int:
             or not auction.conduct_table.isColumnHidden(3)
         ):
             raise AssertionError("Auction start/current chance-column layout is wrong")
+        if auction._conduct_compact_columns != (0, 1, 3, 4):
+            raise AssertionError("Auction start/current conduct compact columns are wrong")
+        window._finalize_compact_headers_after_polish()
         auction.refresh()
 
         if int(auction.wheel_soundtrack_combo.currentData() or 0) != wheel_asset.id:
