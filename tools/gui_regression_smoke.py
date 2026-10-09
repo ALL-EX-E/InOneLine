@@ -344,9 +344,9 @@ def main() -> int:
 
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
-        if window.minimumWidth() != 1100 or window.minimumHeight() != 700:
+        if window.minimumWidth() != 520 or window.minimumHeight() != 360:
             raise AssertionError(
-                f"product minimum changed: {window.minimumWidth()}x{window.minimumHeight()}"
+                f"P06 technical minimum changed: {window.minimumWidth()}x{window.minimumHeight()}"
             )
         if window.width() < 1100 or window.height() < 700:
             raise AssertionError(f"cold-start window below minimum: {window.size()}")
