@@ -1739,6 +1739,13 @@ class StreamTab(QWidget):
         step_up_btn.clicked.connect(size_spin.stepUp)
         step_down_btn.clicked.connect(size_spin.stepDown)
 
+        def preferred_control_width(widget: QWidget) -> int:
+            return max(
+                widget.minimumWidth(),
+                widget.minimumSizeHint().width(),
+                widget.sizeHint().width(),
+            )
+
         size_label = QLabel("Размер:")
         size_label.setFixedWidth(size_label.sizeHint().width())
         size_controls_group = QWidget()
@@ -1749,8 +1756,12 @@ class StreamTab(QWidget):
         size_controls_layout.addWidget(size_spin)
         size_controls_layout.addWidget(step_up_btn)
         size_controls_layout.addWidget(step_down_btn)
+        size_controls_width = sum(
+            preferred_control_width(widget)
+            for widget in (size_label, size_spin, step_up_btn, step_down_btn)
+        ) + size_controls_layout.spacing() * 3
         size_controls_group.setFixedSize(
-            size_controls_layout.sizeHint().width() + 4,
+            max(size_controls_layout.sizeHint().width(), size_controls_width) + 4,
             max(size_label.sizeHint().height(), size_spin.sizeHint().height(), step_button_size),
         )
 
@@ -1779,8 +1790,12 @@ class StreamTab(QWidget):
         color_picker_layout.addWidget(color_label)
         color_picker_layout.addWidget(color_btn)
         color_picker_layout.addWidget(pipette_btn)
+        color_picker_width = sum(
+            preferred_control_width(widget)
+            for widget in (color_label, color_btn, pipette_btn)
+        ) + color_picker_layout.spacing() * 2
         color_picker_group.setFixedSize(
-            color_picker_layout.sizeHint().width() + 4,
+            max(color_picker_layout.sizeHint().width(), color_picker_width) + 4,
             max(
                 color_label.sizeHint().height(),
                 color_btn.sizeHint().height(),
