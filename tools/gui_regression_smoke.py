@@ -876,6 +876,69 @@ def main() -> int:
                 raise AssertionError(
                     f"P06 {page_scroll.accessibleName()} content exceeds its viewport"
                 )
+        # Music volume controls stay together because they fit the compact row.
+        window._set_current_main_page(window.music_tab)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        music_step_layout = window.music_tab.volume_control.layout()
+        if music_step_layout is None or music_step_layout.direction() != QBoxLayout.LeftToRight:
+            raise AssertionError("P06 Music volume controls split vertically at minimum width")
+        if window.music_tab.volume_control.width() < music_step_layout.sizeHint().width():
+            raise AssertionError("P06 Music volume control is clipped at minimum width")
+
+        # Every OBS eyedropper is square, compact, and grouped beside its color field.
+        window._set_current_main_page(window.stream_tab)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        stream_pipettes = [
+            button
+            for button in window.stream_tab.findChildren(QPushButton)
+            if button.property("screenColorPicker")
+        ]
+        if not stream_pipettes:
+            raise AssertionError("P06 OBS screen-color pipettes were not marked for layout QA")
+        for pipette in stream_pipettes:
+            if (
+                pipette.minimumWidth() != pipette.maximumWidth()
+                or pipette.minimumHeight() != pipette.maximumHeight()
+                or pipette.minimumWidth() != pipette.minimumHeight()
+            ):
+                raise AssertionError("P06 OBS eyedropper is not a compact square button")
+            group = pipette.parentWidget()
+            if group is None or group.layout() is None or group.layout().direction() != QBoxLayout.LeftToRight:
+                raise AssertionError("P06 OBS eyedropper is separated from its color field")
+
+        # The narrow Settings → Auction image selector and import action remain
+        # in one compact row instead of leaving the label isolated.
+        window._set_current_main_page(window.settings_tab)
+        settings = window.settings_tab
+        settings.settings_tabs.setCurrentWidget(settings.auction_page)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        image_center_y = (
+            settings.wheel_center_image_label.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.wheel_center_image_label.height() / 2
+        )
+        combo_center_y = (
+            settings.wheel_center_image_combo.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.wheel_center_image_combo.height() / 2
+        )
+        file_center_y = (
+            settings.add_wheel_center_file_btn.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.add_wheel_center_file_btn.height() / 2
+        )
+        if (
+            settings.wheel_center_select_row.direction() != QBoxLayout.LeftToRight
+            or max(image_center_y, combo_center_y, file_center_y)
+            - min(image_center_y, combo_center_y, file_center_y) > 8
+        ):
+            raise AssertionError("P06 Settings → Auction image field did not stay compact and inline")
+        if settings.wheel_center_image_combo.width() > 260:
+            raise AssertionError("P06 Settings → Auction image selector grew excessively wide")
+
         # The main-list table keeps its own vertical bar inside the visible
         # workspace while its horizontal bar stays attached to the table.
         window._set_current_main_page(window.games_tab)

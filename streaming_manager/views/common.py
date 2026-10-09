@@ -638,6 +638,18 @@ def pick_screen_color(parent: QWidget | None = None) -> QColor | None:
     return _ScreenEyedropperSession(parent).run()
 
 
+def make_screen_color_picker_button(tooltip: str = "") -> QPushButton:
+    """Create a square, compact eyedropper button for screen color picking."""
+    button = QPushButton("⌖")
+    size = max(34, button.sizeHint().height())
+    button.setFixedSize(size, size)
+    button.setProperty("screenColorPicker", True)
+    button.setAccessibleName("Выбрать цвет с экрана")
+    if tooltip:
+        button.setToolTip(tooltip)
+    return button
+
+
 def _center(item: QTableWidgetItem) -> QTableWidgetItem:
     item.setTextAlignment(Qt.AlignCenter)
     return item

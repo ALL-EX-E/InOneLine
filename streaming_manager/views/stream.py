@@ -109,6 +109,7 @@ from .common import (
     ScrollSafeFontComboBox,
     ScrollSafeSpinBox,
     make_wide_step_control,
+    make_screen_color_picker_button,
     pick_screen_color,
 )
 
@@ -351,7 +352,7 @@ class StreamTab(QWidget):
             color_btn.clicked.connect(
                 lambda checked=False, key=color_key: self._choose_frame_color(key)
             )
-            pipette_btn = QPushButton("⌖")
+            pipette_btn = make_screen_color_picker_button()
             pipette_btn.setToolTip(
                 "Выбрать цвет непосредственно с экрана. Левый клик — принять, Escape — отмена."
             )
@@ -532,7 +533,7 @@ class StreamTab(QWidget):
         timer_text_color_layout.setSpacing(8)
         self.timer_overlay_font_color_btn = QPushButton()
         self.timer_overlay_font_color_btn.clicked.connect(self._choose_timer_font_color)
-        self.timer_overlay_font_color_pick_btn = QPushButton("⌖")
+        self.timer_overlay_font_color_pick_btn = make_screen_color_picker_button()
         self.timer_overlay_font_color_pick_btn.setToolTip("Выбрать цвет таймера с экрана")
         self.timer_overlay_font_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.timer_overlay_font_color_btn)
@@ -561,7 +562,7 @@ class StreamTab(QWidget):
         timer_bg_color_layout.setSpacing(8)
         self.timer_background_color_btn = QPushButton()
         self.timer_background_color_btn.clicked.connect(self._choose_timer_background_color)
-        self.timer_background_color_pick_btn = QPushButton("⌖")
+        self.timer_background_color_pick_btn = make_screen_color_picker_button()
         self.timer_background_color_pick_btn.setToolTip("Выбрать цвет фона таймера с экрана")
         self.timer_background_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.timer_background_color_btn)
@@ -625,7 +626,7 @@ class StreamTab(QWidget):
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.setSpacing(8)
             button = QPushButton()
-            picker = QPushButton("⌖")
+            picker = make_screen_color_picker_button()
             picker.setToolTip(tooltip)
             setattr(self, button_attr, button)
             setattr(self, picker_attr, picker)
@@ -812,7 +813,7 @@ class StreamTab(QWidget):
         color_layout.setSpacing(8)
         self.auction_lots_overlay_font_color_btn = QPushButton()
         self.auction_lots_overlay_font_color_btn.clicked.connect(self._choose_auction_lots_font_color)
-        self.auction_lots_overlay_font_color_pick_btn = QPushButton("⌖")
+        self.auction_lots_overlay_font_color_pick_btn = make_screen_color_picker_button()
         self.auction_lots_overlay_font_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.auction_lots_overlay_font_color_btn)
         )
@@ -844,7 +845,7 @@ class StreamTab(QWidget):
         bg_color_layout.setSpacing(8)
         self.auction_lots_background_color_btn = QPushButton()
         self.auction_lots_background_color_btn.clicked.connect(self._choose_auction_lots_background_color)
-        self.auction_lots_background_color_pick_btn = QPushButton("⌖")
+        self.auction_lots_background_color_pick_btn = make_screen_color_picker_button()
         self.auction_lots_background_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.auction_lots_background_color_btn)
         )
@@ -923,7 +924,7 @@ class StreamTab(QWidget):
         rules_color_layout.setSpacing(8)
         self.rules_background_color_btn = QPushButton()
         self.rules_background_color_btn.clicked.connect(self._choose_rules_background_color)
-        self.rules_background_color_pick_btn = QPushButton("⌖")
+        self.rules_background_color_pick_btn = make_screen_color_picker_button()
         self.rules_background_color_pick_btn.setToolTip(
             "Выбрать цвет фона непосредственно с экрана"
         )
@@ -1747,7 +1748,7 @@ class StreamTab(QWidget):
         color_btn.clicked.connect(
             lambda checked=False, row_key=key: self._choose_typography_color(row_key)
         )
-        pipette_btn = QPushButton("⌖")
+        pipette_btn = make_screen_color_picker_button()
         pipette_btn.setToolTip(
             "Выбрать цвет непосредственно с экрана. Левый клик — принять, Escape — отмена."
         )
@@ -1769,8 +1770,18 @@ class StreamTab(QWidget):
         row_layout.addWidget(step_up_btn)
         row_layout.addWidget(step_down_btn)
         row_layout.addWidget(QLabel("Цвет:"))
-        row_layout.addWidget(color_btn)
-        row_layout.addWidget(pipette_btn)
+        color_picker_group = QWidget()
+        color_picker_layout = QHBoxLayout(color_picker_group)
+        color_picker_layout.setContentsMargins(0, 0, 0, 0)
+        color_picker_layout.setSpacing(8)
+        color_picker_layout.addWidget(color_btn)
+        color_picker_layout.addWidget(pipette_btn)
+        color_picker_layout.addStretch()
+        color_picker_group.setFixedSize(
+            color_picker_layout.sizeHint().width() + 4,
+            max(color_btn.sizeHint().height(), pipette_btn.sizeHint().height()),
+        )
+        row_layout.addWidget(color_picker_group)
 
         # Запрещаем вертикальное схлопывание строки, которое раньше было
         # заметно в невысоком окне.

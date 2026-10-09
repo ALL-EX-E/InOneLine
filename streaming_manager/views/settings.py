@@ -106,7 +106,7 @@ from ..wheel_center_media import (
 from ..workers import FunctionWorker
 from ..ui_settings import UI_SETTINGS_FILENAME
 from ..time_input import parse_duration_input
-from .common import ScrollSafeComboBox, pick_screen_color
+from .common import ScrollSafeComboBox, make_screen_color_picker_button, pick_screen_color
 
 class SettingsTab(QWidget):
     twitch_device_code_ready = Signal(object)
@@ -352,20 +352,23 @@ class SettingsTab(QWidget):
         wheel_center_note.setProperty("muted", True)
         auction_layout.addWidget(wheel_center_note)
 
-        wheel_center_select_row = QHBoxLayout()
-        wheel_center_select_row.addWidget(QLabel("Изображение:"))
+        self.wheel_center_select_row = QHBoxLayout()
+        self.wheel_center_image_label = QLabel("Изображение:")
+        self.wheel_center_select_row.addWidget(self.wheel_center_image_label)
         self.wheel_center_image_combo = ScrollSafeComboBox()
-        self.wheel_center_image_combo.setMinimumWidth(260)
+        self.wheel_center_image_combo.setMinimumWidth(180)
+        self.wheel_center_image_combo.setMaximumWidth(240)
         self.wheel_center_image_combo.currentIndexChanged.connect(
             self._update_wheel_center_image_status
         )
-        wheel_center_select_row.addWidget(self.wheel_center_image_combo, 1)
+        self.wheel_center_select_row.addWidget(self.wheel_center_image_combo)
         self.add_wheel_center_file_btn = QPushButton("Добавить файл…")
         self.add_wheel_center_file_btn.clicked.connect(
             self._import_wheel_center_image_file
         )
-        wheel_center_select_row.addWidget(self.add_wheel_center_file_btn)
-        auction_layout.addLayout(wheel_center_select_row)
+        self.wheel_center_select_row.addWidget(self.add_wheel_center_file_btn)
+        self.wheel_center_select_row.addStretch()
+        auction_layout.addLayout(self.wheel_center_select_row)
 
         wheel_center_external_row = QHBoxLayout()
         wheel_center_external_row.addWidget(QLabel("Внешний источник:"))
@@ -1570,11 +1573,9 @@ class SettingsTab(QWidget):
         color = QLineEdit(str(definition.color or TWITCH_DEFAULT_REWARD_COLOR).upper())
         color.setMaxLength(7)
         color.setFixedWidth(90)
-        color_pick = QPushButton("⌖")
-        color_pick.setToolTip(
+        color_pick = make_screen_color_picker_button(
             "Пипетка: выбрать цвет с экрана. Левый клик — принять, Escape — отмена."
         )
-        color_pick.setFixedWidth(max(34, color_pick.sizeHint().height()))
         color_pick.clicked.connect(
             lambda _checked=False, edit=color: self._pick_twitch_reward_color(edit)
         )
