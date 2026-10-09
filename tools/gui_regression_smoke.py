@@ -20,7 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QPoint, QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
@@ -696,8 +696,8 @@ def main() -> int:
                 raise AssertionError("P06 workspace horizontal scrolling is unavailable")
             if scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
                 raise AssertionError("P06 workspace vertical scrolling is unavailable")
-        if not window.tabs.usesScrollButtons():
-            raise AssertionError("P06 tab navigation is not available at narrow widths")
+        if window.tabs.usesScrollButtons():
+            raise AssertionError("P06 tab strip still displays horizontal navigation arrows")
 
         # Old installations persisted numeric indices in the former tab order.
         legacy_pages = [
@@ -769,6 +769,42 @@ def main() -> int:
         if auction_scroll.horizontalScrollBar().maximum() <= 0:
             raise AssertionError("P06 narrow Auction workspace did not expose horizontal scrolling")
 
+        # The tab strip compacts to accessible icons, with no horizontal arrows.
+        if not window._main_tabs_compact:
+            raise AssertionError("P06 narrow tab strip did not switch to icon mode")
+        if any(window.tabs.tabText(index) for index in range(window.tabs.count())):
+            raise AssertionError("P06 compact tab strip still shows full-width captions")
+        if any(window.tabs.tabIcon(index).isNull() for index in range(window.tabs.count())):
+            raise AssertionError("P06 compact tab strip is missing a tab icon")
+        if any(
+            not window.tabs.tabToolTip(index)
+            for index in range(window.tabs.count())
+        ):
+            raise AssertionError("P06 compact tabs lost their full-name tooltips")
+        compact_bar = window.tabs.tabBar()
+        if compact_bar.tabRect(window.tabs.count() - 1).right() >= compact_bar.width():
+            raise AssertionError("P06 compact tab icons do not all fit in the tab strip")
+
+        # The main-list table keeps its own vertical bar inside the visible
+        # workspace even when page-level horizontal scrolling is at the left.
+        window._set_current_main_page(window.games_tab)
+        app.processEvents()
+        games_scroll = window._main_tab_scroll_by_page[window.games_tab]
+        games_scroll.horizontalScrollBar().setValue(0)
+        window._update_responsive_layout()
+        app.processEvents()
+        table = window.games_tab.table
+        games_viewport = games_scroll.viewport()
+        if table.width() > games_viewport.width():
+            raise AssertionError("P06 main-list table exceeds its visible viewport width")
+        table_bar = table.verticalScrollBar()
+        table_bar_right = table.mapTo(
+            games_viewport,
+            table_bar.geometry().topRight(),
+        ).x()
+        if table_bar_right >= games_viewport.width():
+            raise AssertionError("P06 main-list vertical bar moved outside the visible workspace")
+
         # Settings keeps its vertical bar at the visible right edge, even when
         # its own horizontal scrollbar remains at the far left.
         settings_scroll = window._main_tab_scroll_by_page[window.settings_tab]
@@ -794,6 +830,10 @@ def main() -> int:
             raise AssertionError("P06 did not restore saved geometry below 1100x700")
         window.resize(original_size)
         app.processEvents()
+        if window._main_tabs_compact:
+            raise AssertionError("P06 wide window did not restore tab captions")
+        if [window.tabs.tabText(index) for index in range(window.tabs.count())] != expected_tab_titles:
+            raise AssertionError("P06 wide tab captions were not restored after compact mode")
         window._set_current_main_page(window.public_tab)
         app.processEvents()
 
@@ -1657,6 +1697,46 @@ def main() -> int:
             raise AssertionError("re-selected external wheel soundtrack was not adopted")
         if "доступен" not in auction.wheel_soundtrack_status.text().lower():
             raise AssertionError("re-selected wheel soundtrack stayed unavailable")
+
+        # Populate the temporary database so the main-list row scrollbar is
+        # genuinely visible, then verify it stays inside the viewport at x=0.
+        window.games_tab.search.clear()
+        window.games_tab.active_filter = "all"
+        for index in range(80):
+            db.add_game(
+                Game(
+                    None,
+                    f"Scrollbar Fixture {index:02d}",
+                    None,
+                    0,
+                    0,
+                    STATUS_NOT_PLAYED,
+                    "",
+                )
+            )
+        window.games_tab.refresh()
+        window._set_current_main_page(window.games_tab)
+        window.resize(
+            max(window.minimumWidth() + 80, 600),
+            max(window.minimumHeight() + 80, 440),
+        )
+        app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
+        games_scroll = window._main_tab_scroll_by_page[window.games_tab]
+        games_scroll.horizontalScrollBar().setValue(0)
+        window._update_responsive_layout()
+        app.processEvents()
+        main_table = window.games_tab.table
+        main_vertical_bar = main_table.verticalScrollBar()
+        if main_vertical_bar.maximum() <= 0 or not main_vertical_bar.isVisible():
+            raise AssertionError("P06 narrow main-list vertical scrollbar is not usable")
+        main_bar_right = main_table.mapTo(
+            games_scroll.viewport(),
+            main_vertical_bar.geometry().topRight(),
+        ).x()
+        if main_bar_right >= games_scroll.viewport().width():
+            raise AssertionError("P06 narrow main-list vertical scrollbar is off-screen at x=0")
 
         print("[4/4] Clean shutdown")
         window.close()

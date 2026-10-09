@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QScrollArea,
     QSizePolicy,
+    QStyle,
     QTabWidget,
     QWidget,
 )
@@ -111,11 +112,20 @@ class MainWindow(QMainWindow):
         # resize the outer MainWindow implicitly.
 
         self.tabs = QTabWidget()
-        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setUsesScrollButtons(False)
+        self.tabs.setIconSize(QSize(18, 18))
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setElideMode(Qt.ElideRight)
         self.tabs.setMinimumSize(0, 0)
         self.setCentralWidget(self.tabs)
         self._main_tab_scroll_by_page: dict[QWidget, QScrollArea] = {}
         self._main_tab_page_by_scroll: dict[QScrollArea, QWidget] = {}
+        self._main_tab_title_by_page: dict[QWidget, str] = {}
+        self._main_tab_icon_by_page: dict[QWidget, QIcon] = {}
+        self._main_tabs_compact = False
+        self._responsive_layout_timer = QTimer(self)
+        self._responsive_layout_timer.setSingleShot(True)
+        self._responsive_layout_timer.timeout.connect(self._update_responsive_layout)
 
         self._dirty_tabs: set[QWidget] = set()
 
@@ -194,14 +204,14 @@ class MainWindow(QMainWindow):
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
 
-        self._add_main_tab(self.games_tab, "Список")
-        self._add_main_tab(self.public_tab, "Публичный список")
-        self._add_main_tab(self.music_tab, "Музыка")
-        self._add_main_tab(self.auction_tab, "Аукцион")
-        self._add_main_tab(self.completed_history_tab, "История аукционов")
-        self._add_main_tab(self.log_tab, "Журнал")
-        self._add_main_tab(self.stream_tab, "Стрим / OBS")
-        self._add_main_tab(self.settings_tab, "Настройки")
+        self._add_main_tab(self.games_tab, "Список", QStyle.SP_FileDialogListView)
+        self._add_main_tab(self.public_tab, "Публичный список", QStyle.SP_DirLinkIcon)
+        self._add_main_tab(self.music_tab, "Музыка", QStyle.SP_MediaVolume)
+        self._add_main_tab(self.auction_tab, "Аукцион", QStyle.SP_DialogApplyButton)
+        self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
+        self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
+        self._add_main_tab(self.settings_tab, "Настройки", QStyle.SP_FileDialogContentsView)
         self._main_tab_pages = {
             "list": self.games_tab,
             "public": self.public_tab,
@@ -321,7 +331,9 @@ class MainWindow(QMainWindow):
         self._refresh_dirty_search_target(self.auction_tab, force=True)
         self.auction_tab.select_synced_search_result(game_id)
 
-    def _add_main_tab(self, page: QWidget, title: str) -> QScrollArea:
+    def _add_main_tab(
+        self, page: QWidget, title: str, icon_pixmap: QStyle.StandardPixmap
+    ) -> QScrollArea:
         """Give each workspace its own scrollbars inside the fixed tab shell."""
         scroll = QScrollArea(self.tabs)
         scroll.setObjectName(
@@ -334,10 +346,101 @@ class MainWindow(QMainWindow):
         scroll.setMinimumSize(0, 0)
         scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         scroll.setWidget(page)
+        scroll.setAccessibleName(title)
         self._main_tab_scroll_by_page[page] = scroll
         self._main_tab_page_by_scroll[scroll] = page
-        self.tabs.addTab(scroll, title)
+        self._main_tab_title_by_page[page] = title
+        self._main_tab_icon_by_page[page] = self._make_tinted_tab_icon(icon_pixmap)
+        tab_index = self.tabs.addTab(scroll, title)
+        self.tabs.setTabToolTip(tab_index, title)
+        self.tabs.setTabWhatsThis(tab_index, title)
+        scroll.viewport().installEventFilter(self)
+        self._queue_responsive_layout_update()
         return scroll
+
+    def _make_tinted_tab_icon(self, icon_pixmap: QStyle.StandardPixmap) -> QIcon:
+        source_icon = self.style().standardIcon(icon_pixmap)
+        if source_icon.isNull():
+            source_icon = self.style().standardIcon(QStyle.SP_FileIcon)
+        source = source_icon.pixmap(QSize(18, 18))
+        if source.isNull():
+            return source_icon
+
+        def tinted(color: str) -> QPixmap:
+            pixmap = QPixmap(source.size())
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.drawPixmap(0, 0, source)
+            painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor(color))
+            painter.end()
+            return pixmap
+
+        icon = QIcon()
+        icon.addPixmap(tinted("#cfd3d6"), QIcon.Mode.Normal, QIcon.State.Off)
+        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Normal, QIcon.State.On)
+        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Active, QIcon.State.Off)
+        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Active, QIcon.State.On)
+        return icon
+
+    def _queue_responsive_layout_update(self) -> None:
+        timer = getattr(self, "_responsive_layout_timer", None)
+        if timer is not None:
+            timer.start(0)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._queue_responsive_layout_update()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Resize:
+            if any(
+                watched is scroll.viewport()
+                for scroll in self._main_tab_scroll_by_page.values()
+            ):
+                self._queue_responsive_layout_update()
+        return super().eventFilter(watched, event)
+
+    def _update_responsive_layout(self) -> None:
+        if not self.tabs.count():
+            return
+
+        tab_bar = self.tabs.tabBar()
+        metrics = tab_bar.fontMetrics()
+        full_width = sum(
+            metrics.horizontalAdvance(title) + 40
+            for title in self._main_tab_title_by_page.values()
+        )
+        available_width = max(0, self.tabs.width() - 20)
+        compact = full_width > available_width
+        if compact != self._main_tabs_compact:
+            self._main_tabs_compact = compact
+            tab_bar.setExpanding(compact)
+            for index in range(self.tabs.count()):
+                scroll = self.tabs.widget(index)
+                page = self._main_tab_page_by_scroll[scroll]
+                title = self._main_tab_title_by_page[page]
+                self.tabs.setTabText(index, "" if compact else title)
+                self.tabs.setTabIcon(
+                    index,
+                    self._main_tab_icon_by_page[page] if compact else QIcon(),
+                )
+                self.tabs.setTabToolTip(index, title)
+                self.tabs.setTabWhatsThis(index, title)
+
+        games_scroll = self._main_tab_scroll_by_page.get(
+            getattr(self, "games_tab", None)
+        )
+        if games_scroll is not None:
+            viewport_width = games_scroll.viewport().width()
+            if viewport_width > 0:
+                margins = self.games_tab.layout().contentsMargins()
+                table_width = max(
+                    1,
+                    viewport_width - margins.left() - margins.right(),
+                )
+                if self.games_tab.table.maximumWidth() != table_width:
+                    self.games_tab.table.setMaximumWidth(table_width)
 
     def _current_main_page(self) -> QWidget | None:
         current = self.tabs.currentWidget()

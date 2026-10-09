@@ -585,6 +585,9 @@ class GamesTab(QWidget):
         layout.addLayout(sorting_actions)
 
         self.table = QTableWidget(0, 9)
+        self.table.setMinimumWidth(0)
+        self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setHorizontalHeaderLabels([
             "ID", "СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "ДАТА ВЫХОДА",
             "БАЛЛЫ", "КООП/НЕ КООП", "СТАТУС", "ОТЗЫВ",
@@ -625,7 +628,7 @@ class GamesTab(QWidget):
         self.table.doubleClicked.connect(self.edit_game)
         self.table.itemSelectionChanged.connect(self._update_action_state)
         self.table.viewport().installEventFilter(self)
-        layout.addWidget(self.table, 1)
+        layout.addWidget(self.table, 1, Qt.AlignLeft)
 
         self.shortcuts = []
         for key, handler in (
