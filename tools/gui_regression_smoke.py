@@ -387,7 +387,16 @@ def main() -> int:
 
         measured_action_gap = None
         measured_badge_left = None
-        for width in (1100, 1150, 1300, 1600, 1450, 1200, 1100):
+        available_width = window.screen().availableGeometry().width()
+        layout_max_width = min(1600, max(600, available_width - 32))
+        if layout_max_width >= 1100:
+            layout_test_widths = (1100, 1150, 1300, 1600, 1450, 1200, 1100)
+        else:
+            layout_test_widths = tuple(
+                max(600, int(layout_max_width * fraction))
+                for fraction in (0.72, 0.80, 0.90, 1.0, 0.85, 0.75, 1.0)
+            )
+        for width in layout_test_widths:
             window.resize(width, 750)
             app.processEvents()
             QTest.qWait(30)
