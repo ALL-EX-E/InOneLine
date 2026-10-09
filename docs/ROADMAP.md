@@ -1,6 +1,6 @@
 # InOneLine Roadmap
 
-Обновлено: **2026-10-07**
+Обновлено: **2026-10-09**
 
 Этот файл — короткий канонический inventory будущей работы. Он восстановлен после повторной сверки чатов «Программа для стрима» 1–31, исторических Drive-roadmap/reconciliation-файлов, GitHub Issues, release notes и exact current source.
 
@@ -123,7 +123,7 @@ Execution rule: each package below is one candidate/review gate. Do not start th
 4. **P03** — CSV/import + date/caret correctness.
 5. **P04** — search/filter/selection/hide-list cleanup + total points.
 6. **P05** — Public file export relocation + remove Settings Export.
-7. **P06** — window sizing/state/tab-order migration + full backup ui_state.
+7. **P06** — window sizing/state/tab-order migration + full backup ui_state — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
 8. **P07** — one position policy + XLSX derived position.
 9. **P08** — shared media dedup/availability foundation.
 10. **P09** — Stream/OBS structural cleanup and API-control removal.
@@ -452,3 +452,12 @@ Release cadence считает **только принятые CURRENT/released 
 - P05 is closed with manual PASS, clean merge PR #62, and successful post-merge Regression Foundation `37887212648` plus wording gate `37887212487`. Candidate PR #60 and QA-only PR #63 are closed without merge.
 - The next package is P06: responsive main-window sizing/scrolling, stable selected-tab restoration after the approved tab reorder, and inclusion/restoration of `data/ui_state.ini` in new full backups while preserving legacy archives and ordinary `.db` backups.
 - User authorized continuation with `«Работает. Записывай и идём дальше»`; candidate implementation proceeds within the already accepted P06 scope. Manual QA and clean promotion remain pending.
+
+
+## P06 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- Пользователь подтвердил полный manual PASS: обычный и минимальный размеры окна; все вкладки и прокрутка только таблиц; перестройка основного списка и отступы кнопок; цветные иконки/подсказки; страницы «Лоты» и «Проведение»; строка «Изображение» в настройках «Аукциона»; сохранение выбранной вкладки после обновления/перезапуска; резервное копирование `.db`, новая полная `.iolbackup` с состоянием UI и legacy `.iolbackup` без `data/ui_state.ini`. Отдельно приняты шрифты/пипетки OBS и первый показ компактных кнопок «Музыки».
+- Tested candidate `0901fb2d864190cb2954909302217be0457699cb`; QA archive `InOneLine_P06_RESPONSIVE_TAB_STATE_BACKUP_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1YfwqW1SF85QUaxZafI1bgwSozV6LLv-U`, 46,766,667 bytes, SHA-256 `166ffe31981a1f88510245bc64361c6dd5d50a41d129e8d6de55b9c68ad6a14c`.
+- Clean promotion PR #66 reused the exact 15 candidate blobs from main `aae15c30ebd69b79d87bf3aeaf5a58a701e27884`; merged as `e9a8919357eeb4cb182e847ef115058e6c253f58`. Candidate PR #65 closed without merge.
+- Pre-merge Regression Foundation `37936833848` and publication wording gate `37936833837`: **SUCCESS**. Exact post-merge Regression Foundation `37937370459` and wording gate `37937370714`: **SUCCESS**.
+- **P06 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback remain unchanged. Next roadmap package: **P07 — position policy + XLSX derived position**.

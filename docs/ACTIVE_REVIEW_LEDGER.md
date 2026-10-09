@@ -3750,3 +3750,12 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Main list/table pages do not share a main-window scroll container. Stream and Settings have nested vertical-only scroll areas; Auction's Conduct panel already has its own horizontal scroller. Reuse these controls without introducing conflicting scrollbars or changing table/list scrolling. The main window must remain fixed while tabs/conditional controls change.
 - General Settings currently mixes DB and full-backup controls, uses long backup captions and technical wording, and has a redundant Integrations explainer. Keep DB backup/restore behavior intact, clarify the two backup flows, and remove only that redundant explainer.
 - P06 candidate must cover 1920×1080 and a narrower window, logical tab migration for legacy indices and new stable keys, restore of new archives containing UI state, and legacy archive restore with live UI state preserved. This is the review/implementation scope; manual QA and clean promotion remain pending.
+
+
+## P06 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- Пользователь подтвердил полный manual PASS: обычный и минимальный размеры окна; все вкладки и прокрутка только таблиц; перестройка основного списка и отступы кнопок; цветные иконки/подсказки; страницы «Лоты» и «Проведение»; строка «Изображение» в настройках «Аукциона»; сохранение выбранной вкладки после обновления/перезапуска; резервное копирование `.db`, новая полная `.iolbackup` с состоянием UI и legacy `.iolbackup` без `data/ui_state.ini`. Отдельно приняты шрифты/пипетки OBS и первый показ компактных кнопок «Музыки».
+- Tested candidate `0901fb2d864190cb2954909302217be0457699cb`; QA archive `InOneLine_P06_RESPONSIVE_TAB_STATE_BACKUP_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1YfwqW1SF85QUaxZafI1bgwSozV6LLv-U`, 46,766,667 bytes, SHA-256 `166ffe31981a1f88510245bc64361c6dd5d50a41d129e8d6de55b9c68ad6a14c`.
+- Clean promotion PR #66 reused the exact 15 candidate blobs from main `aae15c30ebd69b79d87bf3aeaf5a58a701e27884`; merged as `e9a8919357eeb4cb182e847ef115058e6c253f58`. Candidate PR #65 closed without merge.
+- Pre-merge Regression Foundation `37936833848` and publication wording gate `37936833837`: **SUCCESS**. Exact post-merge Regression Foundation `37937370459` and wording gate `37937370714`: **SUCCESS**.
+- **P06 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback remain unchanged. Next roadmap package: **P07 — position policy + XLSX derived position**.
