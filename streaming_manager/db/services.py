@@ -30,6 +30,7 @@ from ..constants import (
     STATUS_FROM_LABEL, STATUS_NOT_PLAYED, STATUS_PLAYED, STATUS_PLAYING,
 )
 from ..backup_restore import create_sqlite_backup, prune_backup_files
+from ..position_policy import position_columns_for_surface
 from ..media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     MEDIA_STORAGE_MANAGED,
@@ -1610,6 +1611,12 @@ class ServicesMixin:
                 else None
             )
 
+        position_columns = position_columns_for_surface(
+            "auction_overlay",
+            session,
+            rows,
+        )
+
         chance_raw = str(
             settings.get(
                 AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
@@ -1687,6 +1694,7 @@ class ServicesMixin:
             "status": status,
             "mode": mode,
             "show_wheel_chance": show_wheel_chance,
+            "position_columns": position_columns,
             "auto_scroll": auto_scroll,
             "rows": payload_rows,
             "presentation": {

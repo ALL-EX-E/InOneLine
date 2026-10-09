@@ -9,6 +9,7 @@ from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
 from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
+from ...position_policy import position_columns_for_surface
 
 
 class AuctionStateMixin:
@@ -84,8 +85,17 @@ class AuctionStateMixin:
             session = self.db.get_open_auction_session()
             self._sync_auction_timer_activity(session)
             self._active_auction_id = int(session["id"]) if session else None
+            # The session can expire while the Auction page is hidden. Defer a
+            # single shared refresh so list positions and XLSX mirrors use the
+            # post-session snapshot after this table refresh completes.
+            QTimer.singleShot(0, self.changed)
 
         all_rows = self._entries_for_table(session)
+        position_mode = position_columns_for_surface(
+            "auction",
+            session,
+            all_rows,
+        )
         wheel_payload = (
             self._load_wheel_payload(session)
             if self._wheel_context_relevant(session)
@@ -114,6 +124,7 @@ class AuctionStateMixin:
             self.table,
             rows,
             selected_id,
+            position_mode=position_mode,
         )
         lots_seconds = time.perf_counter() - lots_started
 
@@ -132,6 +143,7 @@ class AuctionStateMixin:
             conduct_rows,
             conduct_selected_id,
             wheel_probabilities=wheel_probabilities,
+            position_mode=position_mode,
         )
         conduct_seconds = time.perf_counter() - conduct_started
 
@@ -588,7 +600,7 @@ class AuctionStateMixin:
         weighted = self._weighted_wheel_chance_context(session)
         self._set_visible_state(self.wheel_chance_checkbox, weighted)
         self.conduct_table.setColumnHidden(
-            3,
+            int(getattr(self, "_conduct_chance_column", 3)),
             not (weighted and self._wheel_chance_visible),
         )
 
@@ -609,7 +621,10 @@ class AuctionStateMixin:
         probabilities = self._wheel_probability_map(payload)
         for row_index in range(self.conduct_table.rowCount()):
             id_item = self.conduct_table.item(row_index, 0)
-            chance_item = self.conduct_table.item(row_index, 3)
+            chance_item = self.conduct_table.item(
+                row_index,
+                int(getattr(self, "_conduct_chance_column", 3)),
+            )
             if id_item is None or chance_item is None:
                 continue
             try:

@@ -40,7 +40,7 @@ from ..workers import FunctionWorker
 from .common import autosize_compact_columns_once, suspend_live_content_resize
 
 class PublicTab(QWidget):
-    _COMPACT_COLUMNS = (0, 1, 3, 5)
+    _COMPACT_COLUMNS = (0, 2, 4)
 
     def __init__(self, db: Database, api: LocalApiServer):
         super().__init__()
@@ -53,7 +53,7 @@ class PublicTab(QWidget):
 
         desc = QLabel(
             "Публичный список формируется напрямую из основной локальной базы: "
-            "СТАРТ / ТЕКУЩАЯ / НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
+            "ПОЗИЦИЯ / НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС. "
             "Независимой копии данных нет. "
             "Архивные записи в публичный список не включаются."
         )
@@ -149,8 +149,8 @@ class PublicTab(QWidget):
         public_xlsx_form.addRow("Последнее обновление:", self.public_xlsx_modified_label)
         layout.addLayout(public_xlsx_form)
 
-        self.table = QTableWidget(0, 6)
-        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"])
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
@@ -160,11 +160,10 @@ class PublicTab(QWidget):
         header = self.table.horizontalHeader()
         header.setResizeContentsPrecision(0)
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.Stretch)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         self.table.viewport().installEventFilter(self)
         layout.addWidget(self.table, 1)
 
@@ -500,11 +499,10 @@ class PublicTab(QWidget):
         try:
             self.table.setRowCount(len(rows))
             for r, row in enumerate(rows):
-                start_position, current_position = positions.get(
+                _start_position, current_position = positions.get(
                     int(row["id"]), (None, None)
                 )
                 values = [
-                    "" if start_position is None else str(start_position),
                     "" if current_position is None else str(current_position),
                     row["title"],
                     format_points(int(row["sm_points"])),
@@ -521,11 +519,11 @@ class PublicTab(QWidget):
                         item.setText(text)
                     if c == 0:
                         item.setData(Qt.UserRole, int(row["id"]))
-                    if c in (0, 1, 3, 5):
+                    if c in (0, 2, 4):
                         item.setTextAlignment(Qt.AlignCenter)
                     else:
                         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                    item.setToolTip(str(row["review"]) if c == 4 and row["review"] else "")
+                    item.setToolTip(str(row["review"]) if c == 3 and row["review"] else "")
             fill_seconds = time.perf_counter() - fill_started
 
             autosize_started = time.perf_counter()
