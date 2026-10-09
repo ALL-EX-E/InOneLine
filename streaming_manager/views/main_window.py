@@ -118,6 +118,10 @@ class MainWindow(QMainWindow):
         self.tabs.tabBar().setElideMode(Qt.ElideRight)
         self.tabs.setMinimumSize(0, 0)
         self.setCentralWidget(self.tabs)
+        # The MainWindow resize can run before QTabWidget receives its final
+        # geometry. Recheck after the tab shell and tab bar themselves resize.
+        self.tabs.installEventFilter(self)
+        self.tabs.tabBar().installEventFilter(self)
         self._main_tab_scroll_by_page: dict[QWidget, QScrollArea] = {}
         self._main_tab_page_by_scroll: dict[QScrollArea, QWidget] = {}
         self._main_tab_title_by_page: dict[QWidget, str] = {}
@@ -394,10 +398,12 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Type.Resize:
-            if any(
+            is_tab_layout = watched is self.tabs or watched is self.tabs.tabBar()
+            is_workspace_viewport = any(
                 watched is scroll.viewport()
                 for scroll in self._main_tab_scroll_by_page.values()
-            ):
+            )
+            if is_tab_layout or is_workspace_viewport:
                 self._queue_responsive_layout_update()
         return super().eventFilter(watched, event)
 
