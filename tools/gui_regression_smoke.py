@@ -1361,6 +1361,11 @@ def main() -> int:
                 raise AssertionError(f"P1 Public XLSX mirror control missing: {attr}")
         if getattr(window.games_tab, "shared_xlsx_section", None) is None:
             raise AssertionError("shared main-list XLSX mirror was not re-hosted on Games")
+        temporary_xlsx_host = getattr(
+            window.auction_tab, "_shared_xlsx_controls_host", None
+        )
+        if temporary_xlsx_host is None or not temporary_xlsx_host.isHidden():
+            raise AssertionError("empty AuctionTab XLSX controls host is not hidden")
 
         pool = QThreadPool.globalInstance()
         if pool.maxThreadCount() > 8:
