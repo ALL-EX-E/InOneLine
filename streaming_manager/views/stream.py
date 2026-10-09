@@ -219,20 +219,7 @@ class StreamTab(QWidget):
         self.background_path.setPlaceholderText(
             "Фон не выбран — используется стандартная подложка оверлея"
         )
-        self.repair_background_btn = QPushButton("Восстановить ссылку…")
-        self.repair_background_btn.setEnabled(False)
-        self.repair_background_btn.setVisible(False)
-        self.repair_background_btn.setToolTip(
-            "Восстановить потерянную ссылку на исходный внешний файл"
-        )
-        self.repair_background_btn.clicked.connect(self._repair_background_reference)
-        background_path_row = QWidget()
-        background_path_layout = QHBoxLayout(background_path_row)
-        background_path_layout.setContentsMargins(0, 0, 0, 0)
-        background_path_layout.setSpacing(8)
-        background_path_layout.addWidget(self.background_path, 1)
-        background_path_layout.addWidget(self.repair_background_btn)
-        background_form.addRow("Источник:", background_path_row)
+        background_form.addRow("Источник:", self.background_path)
 
         self.background_status = QLabel("Фон не выбран")
         self.background_status.setProperty("muted", True)
@@ -251,7 +238,8 @@ class StreamTab(QWidget):
             "Копия хранится только в отдельной папке data\\overlay_backgrounds; оригинал программа "
             "никогда не изменяет и не удаляет. Ссылки на исходные файлы обслуживаются OBS через "
             "защищённый локальный media-route без раскрытия произвольного доступа к файловой системе. "
-            "Если исходный файл перемещён или удалён, фон безопасно отключается и его можно переуказать. "
+            "Если файл недоступен, он автоматически исключается из выбора; "
+            "отсутствующая управляемая копия удаляется из библиотеки, а выбранный фон сбрасывается. "
             "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM. GIF воспроизводится как анимация, "
             "видео — без звука и по кругу. Фон применяется после «Сохранить параметры стрима»."
         )
@@ -1314,9 +1302,14 @@ class StreamTab(QWidget):
         return set(supported_media_extensions(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS))
 
     def _background_assets(self):
-        return self.db.sync_managed_media_category(
-            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
-        )
+        # One available-only category view for both overlay selectors.
+        return [
+            asset
+            for asset in self.db.sync_managed_media_category(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+            )
+            if media_asset_available(self.db.path.parent, asset)
+        ]
 
     @staticmethod
     def _background_asset_label(asset, available: bool) -> str:
@@ -1327,17 +1320,9 @@ class StreamTab(QWidget):
         return label if available else f"⚠ файл недоступен: {label}"
 
     def _refresh_selected_background_availability(self):
-        asset = self._selected_background_asset()
-        if asset is None:
-            self._update_background_path_field()
-            return
-        available = media_asset_available(self.db.path.parent, asset)
-        index = self.background_combo.currentIndex()
-        if index >= 0:
-            expected = self._background_asset_label(asset, available)
-            if self.background_combo.itemText(index) != expected:
-                self.background_combo.setItemText(index, expected)
-        self._update_background_path_field()
+        # This category is shared by the main overlay and Auction Lots.
+        self._refresh_background_library()
+        self._refresh_auction_lots_background_library()
 
     def _refresh_background_library(self, selected_asset_id: int | str | None = None):
         if selected_asset_id is None:
@@ -1431,23 +1416,9 @@ class StreamTab(QWidget):
         available = media_asset_available(self.db.path.parent, asset)
         self.background_path.setText(str(path))
 
-        needs_external_repair = (
-            asset.storage_mode == MEDIA_STORAGE_EXTERNAL and not available
+        self.background_status.setText(
+            "Доступен" if available else "Файл недоступен — выберите другой фон"
         )
-        if available:
-            status_text = "Доступен"
-        elif needs_external_repair:
-            status_text = (
-                "Файл недоступен — нажмите «Восстановить ссылку…» "
-                "или добавьте другой фон"
-            )
-        else:
-            status_text = (
-                "Файл недоступен — добавьте фон заново или выберите другой"
-            )
-        self.background_status.setText(status_text)
-        self.repair_background_btn.setVisible(needs_external_repair)
-        self.repair_background_btn.setEnabled(needs_external_repair)
 
     def _unique_background_target(self, source_name: str) -> Path:
         source_path = Path(source_name)
@@ -2033,7 +2004,11 @@ class StreamTab(QWidget):
             # Migration 16 normally populates this.  Keep a defensive legacy
             # adoption path for partially upgraded/copied settings databases.
             legacy_file = setting("overlay_background_file", "")
-            if legacy_file and Path(legacy_file).name == legacy_file:
+            if (
+                legacy_file
+                and Path(legacy_file).name == legacy_file
+                and (self.background_dir / legacy_file).is_file()
+            ):
                 try:
                     legacy_asset = self.db.ensure_managed_media_asset(
                         MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
@@ -2045,6 +2020,11 @@ class StreamTab(QWidget):
                 if legacy_asset is not None:
                     background_media_id = str(legacy_asset.id)
         self._refresh_background_library(background_media_id)
+        if background_media_id and not self.background_combo.currentData():
+            self.db.set_settings_bulk({
+                "overlay_background_media_id": "",
+                "overlay_background_file": "",
+            })
         self._set_combo_by_data(
             self.background_mode,
             setting("overlay_background_mode", "stretch"),
@@ -2240,9 +2220,14 @@ class StreamTab(QWidget):
                 AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT,
             ),
         )
-        self._refresh_auction_lots_background_library(
-            setting(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+        saved_lots_background = setting(
+            AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, ""
         )
+        self._refresh_auction_lots_background_library(saved_lots_background)
+        if saved_lots_background and not self.auction_lots_background_combo.currentData():
+            self.db.set_settings_bulk({
+                AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: "",
+            })
         self._update_auction_lots_background_enabled_state()
 
         self.rules_overlay_visible.setChecked(
