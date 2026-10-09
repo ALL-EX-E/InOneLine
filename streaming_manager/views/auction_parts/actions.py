@@ -169,7 +169,9 @@ class AuctionActionMixin:
         # D26 ownership is acquired by the soundtrack engine only when a
         # configured soundtrack is actually audible.
         self.auction_tabs.setCurrentWidget(self.conduct_page)
-        self.refresh()
+        # Session creation changes the authoritative position projection for
+        # every connected list and XLSX mirror.
+        self.changed()
         QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
         if direct_wheel:
@@ -342,7 +344,7 @@ class AuctionActionMixin:
                     "Проверьте результат и нажмите «Подтвердить победителя».",
                 )
         elif status == "tie_break_required":
-            self.refresh()
+            self.changed()
             self._show_tie_break_dialog()
             return
         elif status == "finished_no_winner":
@@ -354,7 +356,7 @@ class AuctionActionMixin:
             self._active_auction_id = None
             self._prepare_next_max_amount_timer()
 
-        self.refresh()
+        self.changed()
 
     def _show_tie_break_dialog(self):
         session = self._current_session()
@@ -570,9 +572,9 @@ class AuctionActionMixin:
         self.new_lot_title.clear()
         self.new_lot_points.setValue(0)
 
-        # Новый временный лот не должен появляться в основных таблицах,
-        # поэтому обновляем именно аукцион и его колесо.
-        self.refresh()
+        # Временный лот остаётся скрытым в общих списках, но может изменить
+        # текущие позиции постоянных лотов, поэтому общие списки обновляются.
+        self.changed()
         self.select_conduct_game_id(int(result["game_id"]))
 
         if result.get("merged"):
@@ -692,7 +694,12 @@ class AuctionActionMixin:
             return
 
         row = self.conduct_table.currentRow()
-        title_item = self.conduct_table.item(row, 2) if row >= 0 else None
+        title_column = int(getattr(self, "_conduct_title_column", 2))
+        title_item = (
+            self.conduct_table.item(row, title_column)
+            if row >= 0
+            else None
+        )
         title = title_item.text().strip() if title_item is not None else str(game_id)
         answer = QMessageBox.warning(
             self,

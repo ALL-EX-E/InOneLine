@@ -13,6 +13,7 @@ from .database import Database
 
 
 PUBLIC_XLSX_HEADERS = (
+    "ПОЗИЦИЯ",
     "НАЗВАНИЕ ИГРЫ",
     "БАЛЛЫ",
     "ОТЗЫВ",
@@ -30,15 +31,22 @@ class PublicXlsxTransientError(PublicXlsxError):
 
 
 def public_mirror_rows(db: Database) -> list[dict]:
-    """Return exactly the four public columns in canonical public-list order."""
+    """Return the public columns and authoritative positions in canonical order."""
+    snapshot = db.public_refresh_snapshot()
+    positions = snapshot["positions"]
     return [
         {
+            "position": (
+                int(positions[int(row["id"])][1])
+                if positions.get(int(row["id"]), (None, None))[1] is not None
+                else None
+            ),
             "title": str(row["title"]),
             "sm_points": int(row["sm_points"]),
             "review": str(row["review"] or ""),
             "status": str(row["status"]),
         }
-        for row in db.public_games()
+        for row in snapshot["rows"]
     ]
 
 
@@ -46,6 +54,11 @@ def public_state_hash(rows: list[dict]) -> str:
     """Hash exact public content including row order, but no XLSX presentation."""
     canonical = [
         {
+            "position": (
+                int(row["position"])
+                if row.get("position") is not None
+                else None
+            ),
             "title": str(row.get("title") or ""),
             "sm_points": int(row.get("sm_points") or 0),
             "review": str(row.get("review") or ""),
@@ -96,6 +109,7 @@ def write_public_xlsx(db: Database, path: str | Path) -> dict:
     for row in rows:
         sheet.append(
             [
+                row.get("position"),
                 row["title"],
                 int(row["sm_points"]),
                 row["review"],
@@ -104,14 +118,15 @@ def write_public_xlsx(db: Database, path: str | Path) -> dict:
         )
 
     sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = f"A1:D{max(1, sheet.max_row)}"
-    sheet.column_dimensions["A"].width = 42
-    sheet.column_dimensions["B"].width = 14
-    sheet.column_dimensions["C"].width = 55
-    sheet.column_dimensions["D"].width = 18
+    sheet.auto_filter.ref = f"A1:E{max(1, sheet.max_row)}"
+    sheet.column_dimensions["A"].width = 12
+    sheet.column_dimensions["B"].width = 42
+    sheet.column_dimensions["C"].width = 14
+    sheet.column_dimensions["D"].width = 55
+    sheet.column_dimensions["E"].width = 18
 
     for cells in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
-        cells[1].number_format = "0"
+        cells[2].number_format = "0"
         for cell in cells:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
