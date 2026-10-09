@@ -124,7 +124,7 @@ Execution rule: each package below is one candidate/review gate. Do not start th
 5. **P04** — search/filter/selection/hide-list cleanup + total points.
 6. **P05** — Public file export relocation + remove Settings Export.
 7. **P06** — window sizing/state/tab-order migration + full backup ui_state — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-8. **P07** — one position policy + XLSX derived position.
+8. **P07** — one position policy + XLSX derived position — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
 9. **P08** — shared media dedup/availability foundation.
 10. **P09** — Stream/OBS structural cleanup and API-control removal.
 11. **P10** — common OBS show-mode + timer/music widget presentation/audio help.

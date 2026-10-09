@@ -3759,3 +3759,117 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Clean promotion PR #66 reused the exact 15 candidate blobs from main `aae15c30ebd69b79d87bf3aeaf5a58a701e27884`; merged as `e9a8919357eeb4cb182e847ef115058e6c253f58`. Candidate PR #65 closed without merge.
 - Pre-merge Regression Foundation `37936833848` and publication wording gate `37936833837`: **SUCCESS**. Exact post-merge Regression Foundation `37937370459` and wording gate `37937370714`: **SUCCESS**.
 - **P06 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback remain unchanged. Next roadmap package: **P07 — position policy + XLSX derived position**.
+
+
+## P07 — свежая сверка exact CURRENT завершена; реализация разрешена — 2026-10-09
+
+- Exact reviewed `main`: `ef110927fe7d869b748ae55397cba28f833150f9`; app 1.0.8 / schema 19 / 15 migrations. Выпуск, миграции и RNG/business semantics в scope не входят.
+- После принятого P06 пользователь подтвердил: «Всё работает. Записывай и идём дальше». Это разрешает начать следующий пакет очереди P07.
+- Один source of truth: использовать существующий `_auction_position_map_conn()` и его snapshot-обёртки; не менять sorting, filters или ownership данных.
+- Общие «Список» и «Публичный список» всегда показывают одну колонку `ПОЗИЦИЯ` с текущей эффективной позицией. В обеих существующих локальных таблицах «Аукцион» и в `/auction-lots-overlay`: Max Amount до старта — одна позиция; после старта, включая паузу, завершение таймера, допвремя, ничью и колесо — `СТАРТ / ТЕКУЩАЯ`; direct weighted standard wheel остаётся с одной позицией; direct elimination переходит к двум после первого подтверждённого выбора и сохраняет их между раундами/после смены формата. Закрытая сессия возвращается к одной позиции. `Шанс в колесе` остаётся отдельным условным столбцом. Overlay применяет смену режима и ширины без перезагрузки URL.
+- Пока UI-051/P12 не объединил таблицы, обе существующие локальные таблицы применяют один общий helper. P12 consolidation остаётся отдельным пакетом.
+- Оба XLSX mirror получают `ПОЗИЦИЯ`: Shared остаётся двунаправленным, Public — однонаправленным. Позиция вычисляется, не импортируется в базу; logical import hash её игнорирует, presentation fingerprint учитывает. Старый Shared XLSX без колонки продолжает импортироваться; подключённый файл обновляется из local projection. Одноразовые P05 exports остаются без позиции.
+- Для изменения сессии, ставок и временных лотов использовать существующий shared-refresh path, чтобы списки и XLSX получали новые позиции. Новую схему/миграцию и отдельное хранилище не добавлять.
+- Реализация идёт одним candidate-пакетом. Перед ручной проверкой обязательны Windows Regression Foundation, GUI regression, frozen build и Windows QA installer. Пользователь получает полный чек-лист сразу; ранее принятые QA сценарии не повторяются без причины. До ручного PASS candidate не продвигать в main.
+- Статус: **IN PROGRESS**.
+
+## P07 — candidate собран; ожидает ручную QA пользователя — 2026-10-09
+
+- Candidate PR #68, `candidate/p07-position-policy-xlsx`; код-кандидат `5e5fb221d4107d44e7e05aa3dce600e5198804ce` поверх exact main `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Первый Windows Regression Foundation run #184 остановился на GUI startup: `MainWindow._finalize_compact_headers_after_polish` ссылался на прежние fixed compact-column constants. Исправление P07 заменило их на актуальные колонки двух Auction tables; GUI smoke теперь отдельно проверяет post-polish finalizer для одной и двух позиций.
+- Итоговый Windows Regression Foundation run #185: **SUCCESS**; native GUI regression, frozen app/browser regression, PyInstaller build, installer build и silent installer startup прошли. Publication wording gate run #1340: **SUCCESS**. Python compile, overlay JS syntax и focused position/XLSX checks также прошли.
+- Windows QA artifact run #185: `InOneLine_1.0.8_WINDOWS_QA`, artifact ID `11621074873`, размер `47,802,248` bytes, SHA-256 `c3f35b00bc09cd655b8256c79d14d74fd582a6f97ca3b3be815099a141461b34`; истекает 2026-10-16. PR #68 остаётся draft и не merged до ручного PASS.
+- **P07 = AWAITING MANUAL QA / NOT ACCEPTED / NOT MERGED.** После PASS закрыть candidate отдельно и выполнить exact-blob clean promotion; без PASS main не менять.
+
+## P07 — замечание ручной QA: широкое окно «Список» — REOPENED — 2026-10-09
+
+- Пользователь сообщил: «Всё работает. Но вот что произошло при растяжении окна на максимальный размер на экране 2560х1440» и приложил `{EE600D06-9BC6-4969-9459-8C32C69E556E}.png`.
+- На скриншоте десять фильтров основного списка разнесены по всей ширине окна; `НАЗВАНИЕ` остаётся узким. Выбран `Архив: 0`; пустая таблица в этом состоянии сама по себе не является свидетельством исчезновения записей. Optional уточнение не дало ответа; корректирующий scope ограничен видимым распределением ширины.
+- Fresh exact candidate: PR #68, head `0dd03bd5e53569b142041bd2ce501985a57ad9a4`; Windows run #186 и publication wording run #1342 успешны. Main остаётся `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Existing responsive grid меняет количество колонок, но не отводит остаток ширины в trailing stretch. Применить этот существующий layout mechanism, сохранить порядок/conditional visibility/узкую компоновку. В `GamesTab._clamp_game_title_column_width` после P07 переноса title в index 2 остался `setColumnWidth(3, ...)`: исправить только адресуемую колонку.
+- Runtime пока не менялся. Замечание записано до исправления и возвращает текущий candidate к доработке; это не новый roadmap-пакет. Ранее подтверждённые сценарии P07 не повторять без причины; повторная ручная QA нужна для широкого окна, возврата к минимальному размеру и затронутой ширины столбца.
+- **P07 = REOPENED / CORRECTIVE FIX IN PROGRESS / NOT MERGED.** Переход к P08 и promotion остаются заблокированы до ручной приёмки исправленного candidate.
+
+### P07 wide-window corrective candidate — 2026-10-09
+
+- Исправление использует trailing stretch существующего `GamesTab._stats_layout`, поэтому фильтры стоят компактно слева при любой ширине, а свободное место остаётся после группы. Перестройка 3/4/5/10 колонок и порядок кнопок сохранены.
+- Ограничитель ширины `НАЗВАНИЕ` адресует index 2, не соседний `ДАТА ВЫХОДА` (index 3).
+- Existing GUI regression дополнена переходами `2560×1440 → 520×640 → 2560×1440 → 1100×750` для заполненного списка и пустого архива: проверяет соседство фильтров, читаемость подписей, сохранность видимых строк и корректный title-width floor без изменения соседнего столбца.
+- Python compilation: **PASS**. Windows full regression/build/installer gates для исправления ещё ожидаются. Опубликованный выпуск, app version 1.0.8, schema 19 и 15 migrations не изменяются.
+- **P07 = CORRECTIVE CANDIDATE / WINDOWS QA PENDING / NOT MERGED.**
+
+### P07 wide-window test environment correction — 2026-10-09
+
+- Windows run #188 (`37946557309`) остановился на exact-size assertion: native runner ограничил запрошенные `2560×1440` до `1028×749` ещё до проверки положения кнопок. Это ограничение доступного desktop, не подтверждённый runtime FAIL исправления.
+- Exact-width geometry regression теперь запускается отдельным процессом с Qt offscreen platform (`--wide-window-probe`); общий helper проверяет те же размеры, фильтры, строки и title-width floor. Native Windows regression дополнительно использует доступный desktop для циклов resize. Производственный diff не изменился.
+- Полные Windows gates и новый установщик должны успешно собраться до повторной ручной QA. **P07 остаётся REOPENED / NOT MERGED.**
+
+### P07 wide-window / compact caption correction — 2026-10-09
+
+- Runs #189/#190 прошли новую wide-adjacency проверку, но offscreen probe выявил нечитаемый compact filter: при `520×640` подпись `Проходится: 0` имела text width 169 px и size hint 189 px, тогда как кнопке назначалось 155 px.
+- Причина в существующих фиксированных порогах 3/4/5 колонок: они не проверяют фактические size hints для текущего шрифта. Native Windows transition check прошёл; более крупные метрики offscreen выявили общий geometry edge case.
+- До дополнительного runtime diff записан corrective scope: при заданной ширине viewport уменьшать выбранное число колонок существующей grid до размещения всех её кнопок по их natural size hints. Сохранить порядок, существующие preferred counts и trailing stretch; не менять шрифты, persistence, фильтрацию или бизнес-логику.
+- Исправляется тот же reopened responsive пункт; **P07 NOT MERGED**.
+
+- Corrective runtime теперь учитывает natural button size hints перед перестройкой stats grid; при недостатке места число колонок уменьшается. Header clamp и trailing stretch сохранены. Python compile повторно **PASS**. Wide/compact regression проверяет один ряд на 2560 px и читаемость wrapped grids; Windows gates запускаются заново.
+
+
+## P07 — wide-window correction: Windows gates PASS; awaiting manual retest — 2026-10-09
+
+- Tested runtime candidate `da0ffcae9c687e3fbadee3e429c4905eee7d7e94`, PR #68. Windows Regression Foundation #192 (`37948159785`) завершён **SUCCESS**: native GUI + isolated 2560×1440 geometry probe, frozen startup/browser regression, installer build и silent installer startup. Publication wording #1354 (`37948159776`): **SUCCESS**.
+- В логе подтверждены `WIDE_WINDOW_2560x1440_GEOMETRY=PASS`, `1.0.8 GUI REGRESSION CORE: OK`, `FROZEN_STARTUP_BROWSER_REGRESSION=PASS`, `SILENT_INSTALL_STARTUP_REGRESSION=PASS`, `CLEAN_INSTALL_FILESYSTEM=PASS`. Новый corrective runtime diff не меняет filtering/data, app version, schema, migrations или auction logic.
+- Актуальная QA сборка: Actions run https://github.com/ALL-EX-E/InOneLine/actions/runs/37948159785 → `InOneLine_1.0.8_WINDOWS_QA`, artifact ID `11624039603`, 46 788 497 bytes, SHA-256 `65993b99073cd22e906ed4992a1c1d89b720e8b0ed1efc00ef53f2ef12e30b15`, expires 2026-10-16. В ZIP — `InOneLine_Setup_1.0.8.exe`. Предыдущие QA artifacts считаются superseded для текущего resize follow-up.
+- Drive QA folder по metadata прежней P06 сборки подтверждена: `1m7ed82NYoojIFN0-QdDKO8OnAn83qeU4`. Копирование новой сборки пока не выполнено: authenticated GitHub artifact reference получен, но скачивание в локальный workspace (требование текущего Drive uploader) вернуло HTTP 403 до записи файла. Сборка доступна через GitHub Actions. Bearer download URLs не публикуются и в ledger не сохраняются.
+- Повторный полный для этого corrective scope manual checklist: (1) `Список → Всего`, максимальное окно на 2560×1440: фильтры компактно слева, с нормальными промежутками; (2) несколько переходов максимум → минимум → максимум: подписи читаемы, порядок сохранён, строки списка не меняются, прокрутка таблицы доступна; (3) попробовать сузить `НАЗВАНИЕ`: заголовок не обрезается, `ДАТА ВЫХОДА` не расширяется вместо него. При `Архив: 0` пустая таблица ожидаема; `Всего` снова возвращает записи.
+- User-confirmed функциональные сценарии P07 сохраняются PASS; повторять их целиком без причины не нужно. Этот documents-only record не меняет протестированные runtime blobs. До нового manual PASS promotion и P08 не начинать.
+- **P07 = AWAITING MANUAL RETEST / NOT ACCEPTED / NOT MERGED.**
+
+
+## P07 — MANUALLY ACCEPTED; exact-blob promotion pending — 2026-10-09
+
+- Пользователь подтвердил повторную ручную QA: «Работает. Записываем и идём дальше». Приняты 2560×1440 / minimum / repeated resize transitions, compact filters и корректный title-column clamp. Ранее подтверждённые функциональные P07 сценарии сохраняются PASS.
+- Tested installer: run #192 (`37948159785`), artifact `11624039603`, 46 788 497 bytes, SHA-256 `65993b99073cd22e906ed4992a1c1d89b720e8b0ed1efc00ef53f2ef12e30b15`. Exact candidate head `950084b6d18d70af40a87c5b3544eea0f723d855`; fresh Regression Foundation #193 (`37949052091`) и wording #1356 (`37949052094`): **SUCCESS**.
+- Clean promotion должен переиспользовать все 12 exact tested runtime/test blobs candidate PR #68 поверх main `ef110927fe7d869b748ae55397cba28f833150f9`; ledger дополняется записью ручного PASS. Candidate history не вливается в main.
+- Review перед merge и обязательные clean-promotion / exact post-merge gates ещё выполняются. Не объявлять пакет MERGED/CLOSED до их завершения. Выпуск, version 1.0.8, schema 19 и 15 migrations не изменяются.
+- Следующий уже согласованный пакет — P08 (BUG-005/UI-039), existing shared media dedup/availability. Fresh read-only review разрешён, runtime P08 начинается после closure P07.
+- **P07 = MANUALLY ACCEPTED / CLEAN PROMOTION IN PROGRESS.**
+
+
+## P07 — premerge review: elimination lifecycle correction — REOPENED — 2026-10-09
+
+- Ручной PASS пользователя записан и сохраняется для уже проверенных функциональных/resize сценариев. Promotion PR #69 создан, но не merged; main остаётся `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Independent read-only review выявил Important нарушение утверждённого P07 требования. Fresh reproduction через реальные `Database.create_auction_session / run_weighted_wheel / archive_elimination_result / set_auction_wheel_format` подтверждает: после первого выбора local/overlay = `start_current`; после архивации и смены формата = `position`, хотя сессия ещё открыта.
+- Причина: оба callers передают helper только active=1 rows. Existing archive transition сохраняет `result='eliminated'` в inactive row и очищает result на оставшихся active rows. Табличная проекция правильно исключает архив, но теряет evidence о состоявшемся выбывании.
+- До runtime diff записан минимальный corrective scope: общий read-only DB adapter выводит elimination progress из существующих session entries без active filter и передаёт derived evidence в тот же presentation helper. Отображаемые rows/order остаются active-only; новая persistence/schema, изменение RNG или archive semantics не нужны.
+- Regression должна проходить реальный lifecycle: до выбора → выбранный лот → «В архив» → следующий раунд → смена формата → закрытие сессии; обе локальные таблицы и overlay должны совпадать. Current helper-only synthetic test этот переход не покрывал.
+- Дополнительно review отметил расширение существующего Shared XLSX local/cloud write race на position-only refresh; это ещё не подтверждённый data-loss incident. Проверить конкретный derived-only trigger перед завершением P07, не объявлять inherited risk новым наблюдённым сбоем.
+- **P07 = REOPENED / PREMERGE CORRECTION / NOT MERGED.** Прежняя promotion не сливается; P08 runtime не начинается до исправления, свежих Windows gates и точечного manual retest.
+
+
+### P07 — Shared XLSX derived-only write collision verified — 2026-10-09
+
+- Проверка дополнительного review finding воспроизвела перезапись на временной базе и XLSX, а не на пользовательских данных. Exact existing `_shared_xlsx_start_write` task получил новое derived положение постоянных игр после добавления лидирующего temporary lot; logical hash постоянных данных не изменился. Заранее доставленная внешняя правка `ОТЗЫВ` была заменена пустым local value при полном rewrite.
+- До corrective runtime diff записан узкий scope: при logical hash == last synchronized hash и изменившейся внешней file signature отложить position-only rewrite, сохранить файл и дать существующему stable-file poll/import обработать внешнее изменение. После импорта существующий projection repair завершает синхронизацию. General conflict policy для одновременных logical edits не переписывается; новая persistence и второй sync path не нужны.
+- Lifecycle regression сначала RED на реальном `archive_elimination_result` (overlay `position` вместо `start_current`), затем GREEN после shared read-only history adapter. GUI regression теперь проверяет те же переходы в обеих локальных таблицах.
+- Отдельная GUI regression на production worker + real workbook проверяет preservation/import внешнего review и convergence derived positions. Ожидаемый RED для ещё не исправленного Shared collision должен быть подтверждён Windows runner перед runtime correction; installer из такого run не выдаётся пользователю.
+- **P07 remains REOPENED / NOT MERGED.**
+
+
+## P07 — derived-only Shared XLSX collision corrected; Windows gates PASS — 2026-10-09
+
+- Earlier Windows RED: Regression Foundation run `37951845071` reproduced `P07 position-only refresh overwrote a cloud business edit` on an isolated test workbook after an external `ОТЗЫВ` change.
+- Minimal corrective runtime: `streaming_manager/views/auction.py` on commit `fa6c36d0fe19f53aadfc24ef7c1756490501d753`. Before a local write with unchanged logical hash, compare the current file signature to the last synchronized signature; if a cloud edit has arrived, defer the rewrite without advancing sync markers. The existing stable-file poll/import then consumes that external version and repairs the derived position projection. No second sync path or DB/schema/RNG/auction semantic change.
+- Existing real elimination-lifecycle regression remains included in this candidate. Full Windows Regression Foundation `37952905531` is **SUCCESS**, including the formerly failing Shared workbook/cloud review regression, `WIDE_WINDOW_2560x1440_GEOMETRY=PASS`, compilation, fresh database integrity, frozen startup/browser, installer build, silent install and clean filesystem checks. Publication wording gate `37952905546` is **SUCCESS**.
+- New QA artifact: GitHub `InOneLine_1.0.8_WINDOWS_QA`, ID `11627206204`, 46,789,798 bytes, SHA-256 `0556c9d5a1bd00cb11f9bd1190243f17570e7622a18875133a6841198e5c4de9`; local ZIP CRC PASS; one `InOneLine_Setup_1.0.8.exe`. Expires 2026-10-16.
+- New unique Google Drive QA file: `InOneLine_P07_XLSX_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1CMX8uX5BNsMYxG8DKf5cAoQDlv573_12`, inside `Программа для стриминга/Сама программа/Кандидаты_проверки/Обзор_UI_1.0.8`. Independent Library readback confirms exact 46,789,798 bytes. Earlier archives remain historical/superseded, not deleted.
+- Manual QA still required for this exact candidate: focus on a separate throwaway XLSX file and test data, preservation of an external review cell after derived position changes, and normal shared-table connect/disconnect; do not risk a live shared workbook. User's earlier functional/resize P07 PASS remains valid, no need to repeat unrelated UI tests.
+- **P07 = CORRECTED / AUTOMATED PASS / AWAITING FOCUSED MANUAL QA / NOT MERGED.** `main` and public 1.0.8 release remain unchanged; P08 implementation is blocked until acceptance, exact-blob promotion and post-merge Windows gates.
+
+
+## P07 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- User confirmed manual candidate PASS: «Работает. Идём дальше» after focused Shared XLSX and position-policy QA. Original functional, 2560×1440/compact layouts and both Auction presentation scenarios were accepted earlier.
+- Exact accepted artifact: GitHub Windows QA `11627206204`, 46,789,798 bytes, SHA-256 `0556c9d5a1bd00cb11f9bd1190243f17570e7622a18875133a6841198e5c4de9`; same ZIP at [Drive](https://drive.google.com/file/d/1CMX8uX5BNsMYxG8DKf5cAoQDlv573_12/view). Candidate runtime validated on Windows `37952905531` and documentation-only follow-up `37953728981`, both **SUCCESS**.
+- Clean promotion PR [#70](https://github.com/ALL-EX-E/InOneLine/pull/70) copied **exactly 13 Git source/test blob SHAs** from the user-tested candidate without recompilation or code changes. Premerge Windows run `37954975909` and wording `37954975953`: **SUCCESS**. Merge commit `f3d78a5b78862e78807c09694a3655fab800ee52`. Independent postmerge Git blob verification: **13/13 identical** to candidate. Exact postmerge Windows `37955458936` and wording `37955458951`: **SUCCESS**. Superseded candidate PR #68 closed **without merge**; rejected PR #69 also remains closed without merge.
+- P07 behavior delivered: main/public one calculated current position; Auction/Auction Lots overlay adapt one vs start/current columns and preserve elimination progress between rounds; Shared and Public XLSX calculated position projection, legacy Shared read compatibility and safe external edit preservation; wide/narrow header/filter polish. P05 one-off exports unchanged. No runtime version/schema/migration/RNG/auction business semantics change.
+- **P07 CLOSED. P08 (BUG-005/UI-039) is next for fresh exact-CURRENT source review**, then one isolated candidate and manual QA. No P08 runtime change included in P07 clean promotion. APP_VERSION 1.0.8; SQLite schema 19 / 15 migrations; published installer/rollback remain unchanged.
