@@ -104,7 +104,7 @@ def main() -> None:
             assert settings.value(UI_SETTINGS_MIGRATION_KEY, False, type=bool) is True
             assert settings.value("migration/legacy_backup_created", False, type=bool) is True
             assert settings.value("migration/native_qsettings_cleared", False, type=bool) is True
-            assert "Streaming Manager/registry64" in str(settings.value("migration/source", ""))
+            assert str(settings.value("migration/source", "")).endswith("/Streaming Manager/registry64")
 
             for store in stores:
                 assert store.allKeys() == [], store.allKeys()
