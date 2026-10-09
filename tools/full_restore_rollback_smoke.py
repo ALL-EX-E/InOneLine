@@ -28,6 +28,8 @@ with TemporaryDirectory() as td:
 
     (paths.data_dir / "music").mkdir(exist_ok=True)
     (paths.data_dir / "music/a.txt").write_text("ORIG")
+    ui_state = paths.data_dir / "ui_state.ini"
+    ui_state.write_text("ORIGINAL_UI_STATE", encoding="utf-8")
 
     snap_dir = base / "snap"
     snap_dir.mkdir()
@@ -44,6 +46,7 @@ with TemporaryDirectory() as td:
     with closing(sqlite3.connect(paths.database_path)) as conn, conn:
         conn.execute("UPDATE games SET title='LIVE' WHERE sm_points=1")
     (paths.data_dir / "music/a.txt").write_text("LIVE")
+    ui_state.write_text("LIVE_UI_STATE", encoding="utf-8")
 
     staged = br.stage_full_restore_candidate(archive, paths.data_dir)
     real_move = br.shutil.move
@@ -70,6 +73,7 @@ with TemporaryDirectory() as td:
     with closing(sqlite3.connect(paths.database_path)) as conn, conn:
         assert conn.execute("SELECT title FROM games WHERE sm_points=1").fetchone()[0] == "LIVE"
     assert (paths.data_dir / "music/a.txt").read_text() == "LIVE"
+    assert ui_state.read_text(encoding="utf-8") == "LIVE_UI_STATE"
     assert list(paths.backups_dir.glob("full_restore_safety_*.iolbackup"))
 
 print("1.0.8 FULL RESTORE ROLLBACK REGRESSION SMOKE: OK")

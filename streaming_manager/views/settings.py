@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
     QLayout,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -105,8 +104,9 @@ from ..wheel_center_media import (
     store_prepared_center_image,
 )
 from ..workers import FunctionWorker
+from ..ui_settings import UI_SETTINGS_FILENAME
 from ..time_input import parse_duration_input
-from .common import ScrollSafeComboBox, pick_screen_color
+from .common import ScrollSafeComboBox, make_screen_color_picker_button, pick_screen_color
 
 class SettingsTab(QWidget):
     twitch_device_code_ready = Signal(object)
@@ -186,7 +186,7 @@ class SettingsTab(QWidget):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
 
-        heading = QLabel("Локальные данные")
+        heading = QLabel("Резервная копия базы данных")
         heading.setStyleSheet("font-size: 15pt; font-weight: 700;")
         layout.addWidget(heading)
 
@@ -202,11 +202,11 @@ class SettingsTab(QWidget):
         self.restore_btn = QPushButton("Восстановить из резервной копии…")
         self.restore_btn.clicked.connect(self.restore_backup)
         self.restore_btn.setToolTip(
-            "Проверить выбранную .db, сохранить текущее состояние и безопасно восстановить backup."
+            "Проверить выбранный файл .db, сохранить текущую базу и безопасно восстановить её."
         )
-        open_data = QPushButton("Открыть папку data")
+        open_data = QPushButton("Открыть папку данных")
         open_data.clicked.connect(lambda: self._open_folder(self.db.path.parent))
-        open_backups = QPushButton("Открыть папку backups")
+        open_backups = QPushButton("Открыть папку резервных копий")
         open_backups.clicked.connect(lambda: self._open_folder(self.paths.backups_dir))
         btns.addWidget(self.backup_btn)
         btns.addWidget(self.restore_btn)
@@ -215,50 +215,56 @@ class SettingsTab(QWidget):
         btns.addStretch()
         layout.addLayout(btns)
 
+        line = QFrame()
+        line.setProperty("line", True)
+        layout.addWidget(line)
+
+        full_backup_heading = QLabel("Полная резервная копия программы")
+        full_backup_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(full_backup_heading)
+
         full_backup_note = QLabel(
-            "Полная резервная копия предназначена для сохранения данных вне папки InOneLine "
-            "перед полным удалением программы. Она включает БД, защищённые credentials и "
-            "managed-media; внутренние logs/backups и внешние связанные файлы не копируются."
+            "Полная резервная копия предназначена для восстановления данных после "
+            "полного удаления и повторной установки InOneLine."
         )
         full_backup_note.setWordWrap(True)
         full_backup_note.setProperty("muted", True)
         layout.addWidget(full_backup_note)
 
+        full_backup_details = QLabel(
+            "В копию входят база данных, защищённые данные подключений, файлы, сохранённые "
+            "программой, и состояние окна и вкладок. Журналы, резервные копии и внешние "
+            "файлы, на которые InOneLine только ссылается, не включаются."
+        )
+        full_backup_details.setWordWrap(True)
+        full_backup_details.setProperty("muted", True)
+        layout.addWidget(full_backup_details)
+
+        dpapi_note = QLabel(
+            "Защищённые данные подключений предназначены для восстановления под тем же "
+            "пользователем Windows. При переносе на другой компьютер или другую учётную "
+            "запись сервисы может потребоваться подключить заново."
+        )
+        dpapi_note.setWordWrap(True)
+        dpapi_note.setProperty("muted", True)
+        layout.addWidget(dpapi_note)
+
         full_btns = QHBoxLayout()
-        self.full_backup_btn = QPushButton(
-            "Создать полную резервную копию в случае полного удаления программы"
-        )
+        self.full_backup_btn = QPushButton("Создать полную резервную копию…")
         self.full_backup_btn.clicked.connect(self.create_full_backup)
-        self.full_restore_btn = QPushButton(
-            "Восстановить полную резервную копию после полного удаления программы…"
-        )
+        self.full_restore_btn = QPushButton("Восстановить из полной резервной копии…")
         self.full_restore_btn.clicked.connect(self.restore_full_backup)
         self.full_restore_btn.setToolTip(
-            "Проверить .iolbackup, создать полную safety-копию текущих данных и восстановить "
-            "БД, protected credentials и managed-media с автоматическим перезапуском."
+            "Проверить файл .iolbackup, создать страховочную резервную копию текущих данных, "
+            "восстановить базу, сохранённые файлы и состояние окна, затем перезапустить InOneLine."
         )
         full_btns.addWidget(self.full_backup_btn)
         full_btns.addWidget(self.full_restore_btn)
         full_btns.addStretch()
         layout.addLayout(full_btns)
-
-        line = QFrame()
-        line.setProperty("line", True)
-        layout.addWidget(line)
-
-        integrations_hint = QLabel("Интеграции")
-        integrations_hint.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        layout.addWidget(integrations_hint)
-        info = QLabel(
-            "Подключения внешних сервисов и RANDOM.ORG находятся на отдельной "
-            "внутренней вкладке «Интеграции»."
-        )
-        info.setWordWrap(True)
-        info.setProperty("muted", True)
-        layout.addWidget(info)
         layout.addStretch()
-        self.general_scroll = self._wrap_settings_page(self.general_page, layout)
-        self.settings_tabs.addTab(self.general_scroll, "Общие")
+        self._prepare_settings_page(self.general_page, layout)
+        self.settings_tabs.addTab(self.general_page, "Общие")
 
         self.auction_page = QWidget()
         auction_layout = QVBoxLayout(self.auction_page)
@@ -346,20 +352,23 @@ class SettingsTab(QWidget):
         wheel_center_note.setProperty("muted", True)
         auction_layout.addWidget(wheel_center_note)
 
-        wheel_center_select_row = QHBoxLayout()
-        wheel_center_select_row.addWidget(QLabel("Изображение:"))
+        self.wheel_center_select_row = QHBoxLayout()
+        self.wheel_center_image_label = QLabel("Изображение:")
+        self.wheel_center_select_row.addWidget(self.wheel_center_image_label)
         self.wheel_center_image_combo = ScrollSafeComboBox()
-        self.wheel_center_image_combo.setMinimumWidth(260)
+        self.wheel_center_image_combo.setMinimumWidth(180)
+        self.wheel_center_image_combo.setMaximumWidth(240)
         self.wheel_center_image_combo.currentIndexChanged.connect(
             self._update_wheel_center_image_status
         )
-        wheel_center_select_row.addWidget(self.wheel_center_image_combo, 1)
+        self.wheel_center_select_row.addWidget(self.wheel_center_image_combo)
         self.add_wheel_center_file_btn = QPushButton("Добавить файл…")
         self.add_wheel_center_file_btn.clicked.connect(
             self._import_wheel_center_image_file
         )
-        wheel_center_select_row.addWidget(self.add_wheel_center_file_btn)
-        auction_layout.addLayout(wheel_center_select_row)
+        self.wheel_center_select_row.addWidget(self.add_wheel_center_file_btn)
+        self.wheel_center_select_row.addStretch()
+        auction_layout.addLayout(self.wheel_center_select_row)
 
         wheel_center_external_row = QHBoxLayout()
         wheel_center_external_row.addWidget(QLabel("Внешний источник:"))
@@ -522,8 +531,8 @@ class SettingsTab(QWidget):
         auction_layout.addWidget(save_auction, 0, Qt.AlignLeft)
         auction_layout.addStretch()
 
-        self.auction_scroll = self._wrap_settings_page(self.auction_page, auction_layout)
-        self.settings_tabs.addTab(self.auction_scroll, "Аукцион")
+        self._prepare_settings_page(self.auction_page, auction_layout)
+        self.settings_tabs.addTab(self.auction_page, "Аукцион")
 
         # B1 — единый центр реальных поддерживаемых сервисных адаптеров.
         # Registry пуст до B2, поэтому никаких фальшивых карточек
@@ -590,8 +599,8 @@ class SettingsTab(QWidget):
         self.integration_cards_layout.setSpacing(10)
         integration_layout.addWidget(self.integration_cards_host)
         integration_layout.addStretch()
-        self.integration_scroll = self._wrap_settings_page(self.integration_page, integration_layout)
-        self.settings_tabs.addTab(self.integration_scroll, "Интеграции")
+        self._prepare_settings_page(self.integration_page, integration_layout)
+        self.settings_tabs.addTab(self.integration_page, "Интеграции")
         self._refresh_integrations()
 
         self.conversion_page = QWidget()
@@ -685,30 +694,19 @@ class SettingsTab(QWidget):
         conversion_layout.addWidget(save_conversion, 0, Qt.AlignLeft)
         conversion_layout.addStretch()
 
-        self.conversion_scroll = self._wrap_settings_page(self.conversion_page, conversion_layout)
-        self.settings_tabs.addTab(self.conversion_scroll, "Конвертация")
+        self._prepare_settings_page(self.conversion_page, conversion_layout)
+        self.settings_tabs.addTab(self.conversion_page, "Конвертация")
 
         self.settings_tabs.currentChanged.connect(self._handle_settings_page_changed)
         self._refresh_conversion_rate_rows(force=True)
         self._refresh_pending_conversion_rows()
 
     @staticmethod
-    def _wrap_settings_page(page: QWidget, page_layout: QLayout) -> QScrollArea:
-        """Keep long settings pages readable instead of vertically compressing them."""
-        # Force the page's minimum height to follow the layout's real minimum
-        # whenever dynamic integration/conversion controls are rebuilt. The
-        # enclosing scroll area then absorbs height pressure at the 1100x700
-        # main-window minimum instead of letting Qt collapse child widgets.
-        page_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        page.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        scroll = QScrollArea()
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setWidget(page)
-        return scroll
+    def _prepare_settings_page(page: QWidget, page_layout: QLayout) -> None:
+        """Let compact workspaces wrap each Settings page to their viewport."""
+        page_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        page.setMinimumWidth(0)
+        page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Minimum)
 
     @staticmethod
     def _format_duration_ms(milliseconds: int) -> str:
@@ -1144,9 +1142,9 @@ class SettingsTab(QWidget):
         self._conversion_units_signature = signature
 
     def _handle_settings_page_changed(self, _index: int) -> None:
-        if self.settings_tabs.currentWidget() is self.integration_scroll:
+        if self.settings_tabs.currentWidget() is self.integration_page:
             self._refresh_integrations()
-        if self.settings_tabs.currentWidget() is self.conversion_scroll:
+        if self.settings_tabs.currentWidget() is self.conversion_page:
             # Rebuild only if the connected-adapter capability set changed, so
             # ordinary tab switching does not discard unsaved editor text.
             self._refresh_conversion_rate_rows()
@@ -1575,11 +1573,9 @@ class SettingsTab(QWidget):
         color = QLineEdit(str(definition.color or TWITCH_DEFAULT_REWARD_COLOR).upper())
         color.setMaxLength(7)
         color.setFixedWidth(90)
-        color_pick = QPushButton("⌖")
-        color_pick.setToolTip(
+        color_pick = make_screen_color_picker_button(
             "Пипетка: выбрать цвет с экрана. Левый клик — принять, Escape — отмена."
         )
-        color_pick.setFixedWidth(max(34, color_pick.sizeHint().height()))
         color_pick.clicked.connect(
             lambda _checked=False, edit=color: self._pick_twitch_reward_color(edit)
         )
@@ -2135,7 +2131,7 @@ class SettingsTab(QWidget):
             QMessageBox.information(
                 self,
                 "Восстановление",
-                "Выбран текущий рабочий файл базы данных. Выберите резервную копию из папки backups.",
+                "Выбран текущий рабочий файл базы данных. Выберите резервную копию из папки резервных копий.",
             )
             return
 
@@ -2190,11 +2186,31 @@ class SettingsTab(QWidget):
             QMessageBox.warning(self, "Полная резервная копия", str(exc))
             return
 
-        def create_backup():
-            work = self.paths.data_dir / (
-                f".full_backup_create_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-            )
+        save_ui_state = getattr(self.window(), "_save_ui_state", None)
+        if callable(save_ui_state):
+            save_ui_state()
+
+        work = self.paths.data_dir / (
+            f".full_backup_create_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        )
+        try:
             work.mkdir(parents=True, exist_ok=False)
+            ui_state_source = self.paths.data_dir / UI_SETTINGS_FILENAME
+            if not ui_state_source.is_file():
+                ui_state_source.touch()
+            ui_state_snapshot = work / UI_SETTINGS_FILENAME
+            shutil.copy2(ui_state_source, ui_state_snapshot)
+        except Exception as exc:
+            shutil.rmtree(work, ignore_errors=True)
+            QMessageBox.critical(
+                self,
+                "Ошибка полной резервной копии",
+                "Не удалось сохранить состояние окна для полной резервной копии.\n\n"
+                + str(exc),
+            )
+            return
+
+        def create_backup():
             try:
                 snapshot = self.db.backup_isolated(work)
                 return create_full_backup_archive(
@@ -2203,6 +2219,7 @@ class SettingsTab(QWidget):
                     destination,
                     app_version=APP_VERSION,
                     installation_root=self.paths.root_dir,
+                    ui_state_snapshot=ui_state_snapshot,
                 )
             finally:
                 shutil.rmtree(work, ignore_errors=True)
@@ -2218,8 +2235,9 @@ class SettingsTab(QWidget):
 
     def _full_backup_created(self, result):
         credential_note = (
-            "\n\nЗащищённые credentials включены. Они используют Windows DPAPI и "
-            "предназначены для восстановления под тем же Windows-пользователем."
+            "\n\nЗащищённые данные подключений предназначены для восстановления под тем же "
+            "пользователем Windows. При переносе на другой компьютер или другую учётную "
+            "запись сервисы может потребоваться подключить заново."
             if result.get("credentials_present")
             else ""
         )
@@ -2243,7 +2261,7 @@ class SettingsTab(QWidget):
     def _full_backup_finished(self):
         self._full_backup_worker = None
         self.full_backup_btn.setText(
-            "Создать полную резервную копию в случае полного удаления программы"
+            "Создать полную резервную копию…"
         )
         if not self._backup_restore_busy():
             self._set_backup_controls_enabled(True)
@@ -2263,12 +2281,15 @@ class SettingsTab(QWidget):
         answer = QMessageBox.warning(
             self,
             "Восстановить полную резервную копию?",
-            "Будут заменены рабочая база In one line, protected credentials и все managed-media "
-            "из папок data\\overlay_backgrounds, data\\music, data\\soundtrack "
-            "и data\\wheel_center_icons.\n\n"
-            "Внешние файлы, на которые In one line только ссылается, изменяться не будут. "
-            "Перед заменой программа создаст полную safety-копию текущих данных в backups.\n\n"
-            "После проверки In one line закроется, выполнит восстановление и автоматически запустится снова.\n\n"
+            "Будут восстановлены база данных, защищённые данные подключений, файлы, сохранённые "
+            "программой, и состояние окна и вкладок.\n\n"
+            "Защищённые данные подключений предназначены для восстановления под тем же "
+            "пользователем Windows. При переносе на другой компьютер или другую учётную "
+            "запись сервисы может потребоваться подключить заново.\n\n"
+            "Внешние файлы, на которые InOneLine только ссылается, останутся без изменений. "
+            "Перед заменой текущих данных программа создаст страховочную резервную копию "
+            "в папке резервных копий.\n\n"
+            "После проверки программа закроется, выполнит восстановление и автоматически запустится снова.\n\n"
             f"Файл:\n{source}",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
@@ -2300,7 +2321,7 @@ class SettingsTab(QWidget):
             self.window().setEnabled(True)
             self._set_backup_controls_enabled(True)
             self.full_restore_btn.setText(
-                "Восстановить полную резервную копию после полного удаления программы…"
+                "Восстановить из полной резервной копии…"
             )
             QMessageBox.critical(
                 self,
@@ -2315,7 +2336,7 @@ class SettingsTab(QWidget):
         self.window().setEnabled(True)
         self._set_backup_controls_enabled(True)
         self.full_restore_btn.setText(
-            "Восстановить полную резервную копию после полного удаления программы…"
+            "Восстановить из полной резервной копии…"
         )
         QMessageBox.critical(
             self,

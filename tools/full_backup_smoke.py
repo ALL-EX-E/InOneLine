@@ -1,6 +1,7 @@
 from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import json
 import sqlite3
 import sys
 import zipfile
@@ -51,6 +52,9 @@ with TemporaryDirectory() as tmp:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
 
+    ui_state_bytes = b"[main_window]\ntab_index=3\ntab_key=auction\n"
+    (paths.data_dir / "ui_state.ini").write_bytes(ui_state_bytes)
+
     external_dir = base / "ExternalBackups"
     external_dir.mkdir()
     dest = external_dir / "backup.iolbackup"
@@ -73,12 +77,20 @@ with TemporaryDirectory() as tmp:
     )
 
     checked = validate_full_backup_archive(dest)
-    assert checked["file_count"] == 6, checked
+    assert checked["file_count"] == 7, checked
     assert checked["credentials_present"] is True
 
     with zipfile.ZipFile(dest) as archive:
         names = set(archive.namelist())
         assert "data/streaming.db" in names
+        assert "data/ui_state.ini" in names
+        assert archive.read("data/ui_state.ini") == ui_state_bytes
+        manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        assert manifest["ui_state"] == {
+            "path": "data/ui_state.ini",
+            "payload_version": 1,
+        }
+        assert any(item["path"] == "data/ui_state.ini" for item in manifest["files"])
         assert "data/soundtrack/event.wav" in names
         assert not any(name.startswith("data/wheel_jingles/") for name in names)
         assert not any(name.startswith("logs/") or name.startswith("backups/") for name in names)
@@ -86,6 +98,7 @@ with TemporaryDirectory() as tmp:
     with closing(sqlite3.connect(paths.database_path)) as conn, conn:
         conn.execute("UPDATE games SET title='MUTATED' WHERE title='FULL BACKUP MARKER'")
     (paths.data_dir / "music/theme.wav").write_bytes(b"MUTATED")
+    (paths.data_dir / "ui_state.ini").write_bytes(b"[main_window]\ntab_index=0\ntab_key=list\n")
     (paths.data_dir / "soundtrack/event.wav").write_bytes(b"MUTATED")
     (paths.data_dir / "overlay_backgrounds/new-only.txt").write_text("remove me", encoding="utf-8")
 
@@ -99,6 +112,7 @@ with TemporaryDirectory() as tmp:
 
     for rel, content in payloads.items():
         assert (paths.data_dir / rel).read_bytes() == content
+    assert (paths.data_dir / "ui_state.ini").read_bytes() == ui_state_bytes
     assert not (paths.data_dir / "overlay_backgrounds/new-only.txt").exists()
     assert Path(result["safety_backup"]).is_file()
     validate_full_backup_archive(result["safety_backup"])
@@ -108,7 +122,7 @@ with TemporaryDirectory() as tmp:
     with zipfile.ZipFile(dest, "r") as src, zipfile.ZipFile(tampered, "w", zipfile.ZIP_DEFLATED) as dst:
         for info in src.infolist():
             data = src.read(info.filename)
-            if info.filename == "data/music/theme.wav":
+            if info.filename == "data/ui_state.ini":
                 data += b"X"
             dst.writestr(info.filename, data)
 

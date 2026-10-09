@@ -120,6 +120,12 @@ class MusicTab(QWidget):
             up_tooltip="Увеличить громкость на 1 %",
             down_tooltip="Уменьшить громкость на 1 %",
         )
+        # Keep the spinner and its two step buttons together. The compact
+        # pass can otherwise mistake the wrapper's transient width for overflow
+        # and split a control that easily fits on the volume row.
+        control_layout = self.volume_control.layout()
+        if control_layout is not None:
+            self.volume_control.setFixedWidth(control_layout.sizeHint().width() + 4)
         gain_row.addWidget(self.volume_control)
         self.mute_check = QCheckBox("Без звука")
         self.mute_check.toggled.connect(self.controller.set_muted)

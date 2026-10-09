@@ -20,10 +20,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QPoint, QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QApplication,
     QDialog,
     QFileDialog,
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QToolButton,
 )
 from openpyxl import load_workbook
@@ -344,21 +346,21 @@ def main() -> int:
 
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
-        if window.minimumWidth() != 1100 or window.minimumHeight() != 700:
+        if window.minimumWidth() != 520 or window.minimumHeight() != 360:
             raise AssertionError(
-                f"product minimum changed: {window.minimumWidth()}x{window.minimumHeight()}"
+                f"P06 technical minimum changed: {window.minimumWidth()}x{window.minimumHeight()}"
             )
-        if window.width() < 1100 or window.height() < 700:
-            raise AssertionError(f"cold-start window below minimum: {window.size()}")
+        if window.width() < window.minimumWidth() or window.height() < window.minimumHeight():
+            raise AssertionError(f"cold-start window below technical minimum: {window.size()}")
 
         expected_tabs = [
             "Список",
             "Публичный список",
-            "Стрим / OBS",
             "Музыка",
             "Аукцион",
             "История аукционов",
             "Журнал",
+            "Стрим / OBS",
             "Настройки",
         ]
         actual_tabs = [window.tabs.tabText(i) for i in range(window.tabs.count())]
@@ -387,7 +389,16 @@ def main() -> int:
 
         measured_action_gap = None
         measured_badge_left = None
-        for width in (1100, 1150, 1300, 1600, 1450, 1200, 1100):
+        available_width = window.screen().availableGeometry().width()
+        layout_max_width = min(1600, max(600, available_width - 32))
+        if layout_max_width >= 1100:
+            layout_test_widths = (1100, 1150, 1300, 1600, 1450, 1200, 1100)
+        else:
+            layout_test_widths = tuple(
+                max(600, int(layout_max_width * fraction))
+                for fraction in (0.72, 0.80, 0.90, 1.0, 0.85, 0.75, 1.0)
+            )
+        for width in layout_test_widths:
             window.resize(width, 750)
             app.processEvents()
             QTest.qWait(30)
@@ -408,42 +419,76 @@ def main() -> int:
                     f"UI-076 points label clipped at {width}px: "
                     f"{points_label.width()} vs {points_label.sizeHint().width()}"
                 )
-            sorting_y = window.games_tab.sorting_rules_btn.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).y()
-            badge_y = points_label.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).y()
-            if abs(sorting_y - badge_y) > 3:
-                raise AssertionError(
-                    f"UI-076 points not on sorting actions row at {width}px: "
-                    f"{sorting_y} vs {badge_y}"
+            if window.games_tab._compact_controls_enabled:
+                # At narrow widths the UI-076 badge joins the right-hand
+                # vertical action stack, after preview and before clear-list.
+                compact_stack = (
+                    window.games_tab.sorting_rules_btn,
+                    window.games_tab.copy_list_overlay_url_btn,
+                    window.games_tab.open_list_overlay_preview_btn,
+                    points_label,
+                    window.games_tab.clear_all_btn,
                 )
-            last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
-                window.games_tab,
-                window.games_tab.open_list_overlay_preview_btn.rect().topRight()
-            ).x()
-            badge_left = points_label.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).x()
-            gap = badge_left - last_action_right - 1
-            if not 4 <= gap <= 16:
-                raise AssertionError(
-                    f"UI-076 points not immediately after preview at {width}px: gap={gap}"
-                )
-            if measured_action_gap is None:
-                measured_action_gap = gap
-                measured_badge_left = badge_left
-            if abs(gap - measured_action_gap) > 1:
-                raise AssertionError(
-                    f"UI-076 badge jitters relative to preview at {width}px: "
-                    f"{gap} vs {measured_action_gap}"
-                )
-            if abs(badge_left - measured_badge_left) > 1:
-                raise AssertionError(
-                    f"UI-076 badge position shifts with window width at {width}px: "
-                    f"{badge_left} vs {measured_badge_left}"
-                )
+                stack_positions = [
+                    (
+                        widget.mapTo(window.games_tab, QPoint(0, 0)).y(),
+                        widget.mapTo(
+                            window.games_tab, widget.rect().topRight()
+                        ).x(),
+                    )
+                    for widget in compact_stack
+                ]
+                if any(
+                    stack_positions[index + 1][0] <= stack_positions[index][0]
+                    for index in range(len(stack_positions) - 1)
+                ):
+                    raise AssertionError(
+                        f"P06 compact actions not stacked in order at {width}px"
+                    )
+                stack_right_edges = [position[1] for position in stack_positions]
+                if max(stack_right_edges) - min(stack_right_edges) > 3:
+                    raise AssertionError(
+                        f"P06 compact actions are not right-aligned at {width}px: "
+                        f"{stack_right_edges}"
+                    )
+            else:
+                sorting_y = window.games_tab.sorting_rules_btn.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).y()
+                badge_y = points_label.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).y()
+                if abs(sorting_y - badge_y) > 3:
+                    raise AssertionError(
+                        f"UI-076 points not on sorting actions row at {width}px: "
+                        f"{sorting_y} vs {badge_y}"
+                    )
+                last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
+                    window.games_tab,
+                    window.games_tab.open_list_overlay_preview_btn.rect().topRight()
+                ).x()
+                badge_left = points_label.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).x()
+                gap = badge_left - last_action_right - 1
+                if not 4 <= gap <= 16:
+                    raise AssertionError(
+                        f"UI-076 points not immediately after preview at {width}px: "
+                        f"gap={gap}"
+                    )
+                if measured_action_gap is None:
+                    measured_action_gap = gap
+                    measured_badge_left = badge_left
+                if abs(gap - measured_action_gap) > 1:
+                    raise AssertionError(
+                        f"UI-076 badge jitters relative to preview at {width}px: "
+                        f"{gap} vs {measured_action_gap}"
+                    )
+                if abs(badge_left - measured_badge_left) > 1:
+                    raise AssertionError(
+                        f"UI-076 badge position shifts with window width at {width}px: "
+                        f"{badge_left} vs {measured_badge_left}"
+                    )
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
         window.resize(initial_ui076_size)
@@ -650,13 +695,82 @@ def main() -> int:
         if not window.public_tab.search.isClearButtonEnabled():
             raise AssertionError("UI-028 native Public search clear disabled")
 
+        # P06: the approved order and small technical minimum keep the shell usable.
+        expected_tab_titles = [
+            "Список",
+            "Публичный список",
+            "Музыка",
+            "Аукцион",
+            "История аукционов",
+            "Журнал",
+            "Стрим / OBS",
+            "Настройки",
+        ]
+        actual_tab_titles = [
+            window.tabs.tabText(index) for index in range(window.tabs.count())
+        ]
+        if actual_tab_titles != expected_tab_titles:
+            raise AssertionError(f"P06 main tab order mismatch: {actual_tab_titles!r}")
+        if window.minimumWidth() >= 800 or window.minimumHeight() >= 600:
+            raise AssertionError("P06 main-window minimum is still tied to content size")
+        main_tab_pages = (
+            window.games_tab,
+            window.public_tab,
+            window.music_tab,
+            window.auction_tab,
+            window.completed_history_tab,
+            window.log_tab,
+            window.stream_tab,
+            window.settings_tab,
+        )
+        for page in main_tab_pages:
+            scroll = window._main_tab_scroll_by_page[page]
+            if not isinstance(scroll, QScrollArea):
+                raise AssertionError("P06 workspace is missing its scroll host")
+            if scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAlwaysOff:
+                raise AssertionError("P06 workspace-level horizontal scrolling is enabled")
+            if scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
+                raise AssertionError("P06 workspace vertical scrolling is unavailable")
+        if window.tabs.usesScrollButtons():
+            raise AssertionError("P06 tab strip still displays horizontal navigation arrows")
+
+        # Old installations persisted numeric indices in the former tab order.
+        legacy_pages = [
+            ("list", window.games_tab),
+            ("public", window.public_tab),
+            ("stream", window.stream_tab),
+            ("music", window.music_tab),
+            ("auction", window.auction_tab),
+            ("auction_history", window.completed_history_tab),
+            ("log", window.log_tab),
+            ("settings", window.settings_tab),
+        ]
+        for legacy_index, (expected_key, expected_page) in enumerate(legacy_pages):
+            window._ui_settings.remove("main_window/tab_key")
+            window._ui_settings.setValue("main_window/tab_index", legacy_index)
+            window._ui_settings.sync()
+            window._restore_ui_state()
+            app.processEvents()
+            if window._current_main_page() is not expected_page:
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} restored the wrong page"
+                )
+            if window._ui_settings.value("main_window/tab_key", "", type=str) != expected_key:
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} did not save its stable key"
+                )
+            if window._ui_settings.value("main_window/tab_index", -1, type=int) != window.tabs.indexOf(window._main_tab_scroll_by_page[expected_page]):
+                raise AssertionError(
+                    f"P06 legacy tab index {legacy_index} did not migrate to the new index"
+                )
+
         # P04-A: upgrading from hidden-list preferences must still show both
         # tables, preserve window state and keep explicit Enter navigation.
         original_size = window.size()
-        if window.tabs.currentIndex() != 0:
-            raise AssertionError("retiring list visibility changed the restored tab")
+        if window.tabs.currentIndex() != window.tabs.indexOf(window._main_tab_scroll_by_page[window.settings_tab]):
+            raise AssertionError("P06 legacy-index fixture did not finish at Settings")
         for tab in (window.games_tab, window.public_tab):
-            window.tabs.setCurrentWidget(tab)
+            window._set_current_main_page(tab)
             app.processEvents()
             if not tab.table.isVisible() or tab.table.rowCount() != 2:
                 raise AssertionError("legacy hidden-list preference hid or changed a table")
@@ -676,6 +790,411 @@ def main() -> int:
             app.processEvents()
             if window.size() != original_size:
                 raise AssertionError("list tab/search changed the outer window size")
+
+        # The narrow shell reflows tabs while preserving top-level geometry.
+        window._set_current_main_page(window.auction_tab)
+        narrow_width = window.minimumWidth()
+        narrow_height = max(window.minimumHeight() + 80, 440)
+        window.resize(narrow_width, narrow_height)
+        app.processEvents()
+        narrow_size = window.size()
+        if narrow_size.width() >= 1100 or narrow_size.height() >= 700:
+            raise AssertionError("P06 could not resize below 1100x700")
+        auction_scroll = window._main_tab_scroll_by_page[window.auction_tab]
+        window._update_responsive_layout()
+        app.processEvents()
+        if auction_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 narrow Auction page still scrolls horizontally")
+        if auction_scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAlwaysOff:
+            raise AssertionError("P06 Auction page-level horizontal bar is enabled")
+
+        # The Conduct page collapses the combined operator panes vertically;
+        # the table keeps its own columns while the nested page never pans.
+        auction = window.auction_tab
+        auction.auction_tabs.setCurrentWidget(auction.conduct_page)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        if auction.conduct_content_layout.direction() != QBoxLayout.TopToBottom:
+            raise AssertionError("P06 narrow Auction Conduct panes did not stack")
+        if auction.conduct_content_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Auction Conduct content still scrolls horizontally")
+        auction.auction_tabs.setCurrentWidget(auction.lots_page)
+        app.processEvents()
+
+        # Compact tabs retain readable short captions and distinct accent colors.
+        expected_compact_titles = [
+            "Спис", "Публ", "Муз", "Аук", "Ист", "Жур", "OBS", "Наст",
+        ]
+        if not window._main_tabs_compact:
+            raise AssertionError("P06 minimum-width tab strip did not compact")
+        if [window.tabs.tabText(index) for index in range(window.tabs.count())] != expected_compact_titles:
+            raise AssertionError("P06 compact tab captions are unclear or out of order")
+        if any(window.tabs.tabIcon(index).isNull() for index in range(window.tabs.count())):
+            raise AssertionError("P06 compact tab strip is missing a colored icon")
+        if any(
+            not window.tabs.tabToolTip(index)
+            for index in range(window.tabs.count())
+        ):
+            raise AssertionError("P06 compact tabs lost their full-name tooltips")
+        compact_icon_colors = []
+        for index in range(window.tabs.count()):
+            icon_image = window.tabs.tabIcon(index).pixmap(18, 18).toImage()
+            pixels = []
+            for y in range(icon_image.height()):
+                for x in range(icon_image.width()):
+                    color = icon_image.pixelColor(x, y)
+                    if color.alpha() > 32:
+                        rgb = (color.red(), color.green(), color.blue())
+                        if max(rgb) - min(rgb) > 20:
+                            pixels.append(rgb)
+            if not pixels:
+                raise AssertionError("P06 compact tab icon rendered white or grayscale")
+            compact_icon_colors.append(
+                tuple(round(sum(pixel[channel] for pixel in pixels) / len(pixels)) for channel in range(3))
+            )
+        if len(set(compact_icon_colors)) != window.tabs.count():
+            raise AssertionError("P06 compact tab icons do not use distinct colors")
+        compact_bar = window.tabs.tabBar()
+        if compact_bar.tabRect(window.tabs.count() - 1).right() >= compact_bar.width():
+            raise AssertionError("P06 compact tab labels do not fit in the tab strip")
+
+        # Each main workspace must fit the tab viewport; only table widgets
+        # may own horizontal column scrolling.
+        for page in main_tab_pages:
+            window._set_current_main_page(page)
+            app.processEvents()
+            QTest.qWait(20)
+            if page is window.music_tab:
+                # First visit must settle its responsive layout without a
+                # manual resize or direct call to _update_responsive_layout().
+                QTest.qWait(80)
+                app.processEvents()
+                transport_buttons = (
+                    window.music_tab.previous_btn,
+                    window.music_tab.stop_btn,
+                    window.music_tab.play_pause_btn,
+                    window.music_tab.next_btn,
+                )
+                transport_centers = [
+                    button.geometry().center().y()
+                    for button in transport_buttons
+                ]
+                if max(transport_centers) - min(transport_centers) > 4:
+                    raise AssertionError(
+                        "P06 Music transport buttons stayed vertically stretched "
+                        "on first visit"
+                    )
+                if any(
+                    button.width() > button.sizeHint().width() + 20
+                    for button in transport_buttons
+                ):
+                    raise AssertionError(
+                        "P06 Music transport buttons filled the row on first visit"
+                    )
+            else:
+                window._update_responsive_layout()
+                app.processEvents()
+            page_scroll = window._main_tab_scroll_by_page[page]
+            if page_scroll.horizontalScrollBar().maximum() != 0:
+                raise AssertionError(
+                    f"P06 {page_scroll.accessibleName()} page still scrolls horizontally"
+                )
+            if page.width() > page_scroll.viewport().width() + 1:
+                raise AssertionError(
+                    f"P06 {page_scroll.accessibleName()} content exceeds its viewport"
+                )
+        # Music volume controls stay together because they fit the compact row.
+        window._set_current_main_page(window.music_tab)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        music_step_layout = window.music_tab.volume_control.layout()
+        if music_step_layout is None or music_step_layout.direction() != QBoxLayout.LeftToRight:
+            raise AssertionError("P06 Music volume controls split vertically at minimum width")
+        if window.music_tab.volume_control.width() < music_step_layout.sizeHint().width():
+            raise AssertionError("P06 Music volume control is clipped at minimum width")
+
+        # Every OBS eyedropper is square, compact, and grouped beside its color field.
+        window._set_current_main_page(window.stream_tab)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        stream_pipettes = [
+            button
+            for button in window.stream_tab.findChildren(QPushButton)
+            if button.property("screenColorPicker")
+        ]
+        if not stream_pipettes:
+            raise AssertionError("P06 OBS screen-color pipettes were not marked for layout QA")
+        if any("padding: 0px" not in button.styleSheet() for button in stream_pipettes):
+            raise AssertionError("P06 OBS eyedropper glyph is clipped by button padding")
+        for pipette in stream_pipettes:
+            if (
+                pipette.minimumWidth() != pipette.maximumWidth()
+                or pipette.minimumHeight() != pipette.maximumHeight()
+                or pipette.minimumWidth() != pipette.minimumHeight()
+            ):
+                raise AssertionError("P06 OBS eyedropper is not a compact square button")
+            group = pipette.parentWidget()
+            if group is None:
+                raise AssertionError("P06 OBS eyedropper has no color-field container")
+            contents = group.contentsRect()
+            pipette_rect = pipette.geometry()
+            if (
+                contents.height() < pipette.minimumHeight()
+                or pipette_rect.top() < contents.top()
+                or pipette_rect.bottom() > contents.bottom()
+            ):
+                raise AssertionError("P06 OBS eyedropper is clipped vertically by its color row")
+            if (
+                group.layout() is None
+                or group.layout().direction() != QBoxLayout.LeftToRight
+            ):
+                raise AssertionError("P06 OBS eyedropper is separated from its color field")
+
+        typography_groups = window.stream_tab.typography_control_groups
+        if len(typography_groups) != len(window.stream_tab.typography_controls):
+            raise AssertionError("P06 OBS typography control groups are incomplete")
+        for key, (size_group, color_group) in typography_groups.items():
+            if (
+                size_group.layout() is None
+                or size_group.layout().direction() != QBoxLayout.LeftToRight
+                or color_group.layout() is None
+                or color_group.layout().direction() != QBoxLayout.LeftToRight
+            ):
+                raise AssertionError(
+                    f"P06 OBS typography controls split inside their groups: {key}"
+                )
+            size_spin = window.stream_tab.typography_controls[key][1]
+            if size_spin.width() < 140:
+                raise AssertionError(
+                    f"P06 OBS font-size field is squeezed: {key}"
+                )
+            arrows = [
+                button
+                for button in size_group.findChildren(QPushButton)
+                if button.text() in {"▲", "▼"}
+            ]
+            if {button.text() for button in arrows} != {"▲", "▼"}:
+                raise AssertionError(
+                    f"P06 OBS font-size arrows are missing from one row: {key}"
+                )
+            control_y = [
+                size_spin.geometry().center().y(),
+                *(button.geometry().center().y() for button in arrows),
+            ]
+            if max(control_y) - min(control_y) > 4:
+                raise AssertionError(
+                    f"P06 OBS font-size arrows are not beside the size field: {key}"
+                )
+            color_button = window.stream_tab.typography_controls[key][2]
+            if color_button.width() < 220:
+                raise AssertionError(
+                    f"P06 OBS typography color field is squeezed: {key}"
+                )
+            size_labels = [
+                label for label in size_group.findChildren(QLabel)
+                if label.text() == "Размер:"
+            ]
+            color_labels = [
+                label for label in color_group.findChildren(QLabel)
+                if label.text() == "Цвет:"
+            ]
+            if len(size_labels) != 1 or len(color_labels) != 1:
+                raise AssertionError(
+                    f"P06 OBS typography group labels are missing: {key}"
+                )
+            size_label, color_label = size_labels[0], color_labels[0]
+            if (
+                size_spin.geometry().left()
+                - (size_label.geometry().left() + size_label.width())
+                > size_group.layout().spacing() + 2
+                or color_button.geometry().left()
+                - (color_label.geometry().left() + color_label.width())
+                > color_group.layout().spacing() + 2
+            ):
+                raise AssertionError(
+                    f"P06 OBS typography labels leave gaps before their fields: {key}"
+                )
+            for group in (size_group, color_group):
+                child_widths = []
+                for index in range(group.layout().count()):
+                    child = group.layout().itemAt(index).widget()
+                    if child is not None:
+                        child_widths.append(
+                            max(
+                                child.minimumWidth(),
+                                child.minimumSizeHint().width(),
+                                child.sizeHint().width(),
+                            )
+                        )
+                required_width = sum(child_widths) + max(
+                    0, group.layout().spacing()
+                ) * max(0, len(child_widths) - 1)
+                if group.width() < required_width:
+                    raise AssertionError(
+                        f"P06 OBS typography group is clipped: {key}"
+                    )
+
+        # The narrow Settings → Auction image selector and import action remain
+        # in one compact row instead of leaving the label isolated.
+        window._set_current_main_page(window.settings_tab)
+        settings = window.settings_tab
+        settings.settings_tabs.setCurrentWidget(settings.auction_page)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        image_center_y = (
+            settings.wheel_center_image_label.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.wheel_center_image_label.height() / 2
+        )
+        combo_center_y = (
+            settings.wheel_center_image_combo.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.wheel_center_image_combo.height() / 2
+        )
+        file_center_y = (
+            settings.add_wheel_center_file_btn.mapTo(settings.auction_page, QPoint(0, 0)).y()
+            + settings.add_wheel_center_file_btn.height() / 2
+        )
+        if (
+            settings.wheel_center_select_row.direction() != QBoxLayout.LeftToRight
+            or max(image_center_y, combo_center_y, file_center_y)
+            - min(image_center_y, combo_center_y, file_center_y) > 8
+        ):
+            raise AssertionError("P06 Settings → Auction image field did not stay compact and inline")
+        if settings.wheel_center_image_combo.width() > 260:
+            raise AssertionError("P06 Settings → Auction image selector grew excessively wide")
+
+        # The main-list table keeps its own vertical bar inside the visible
+        # workspace while its horizontal bar stays attached to the table.
+        window._set_current_main_page(window.games_tab)
+        app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
+        games_scroll = window._main_tab_scroll_by_page[window.games_tab]
+        games_scroll.horizontalScrollBar().setValue(0)
+        window._update_responsive_layout()
+        app.processEvents()
+        if games_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Games page still scrolls as one wide panel")
+        if not window.games_tab._compact_controls_enabled:
+            raise AssertionError("P06 minimum-width List controls did not reflow")
+        if window.games_tab._sorting_actions_layout.direction() != QBoxLayout.TopToBottom:
+            raise AssertionError("P06 List sort and preview actions are not stacked")
+        toolbar_controls = (
+            window.games_tab.sorting_rules_btn,
+            window.games_tab.copy_list_overlay_url_btn,
+            window.games_tab.open_list_overlay_preview_btn,
+            window.games_tab.total_points_label,
+            window.games_tab.clear_all_btn,
+        )
+        toolbar_positions = [
+            widget.mapTo(window.games_tab, QPoint(0, 0))
+            for widget in toolbar_controls
+        ]
+        if any(
+            toolbar_positions[index + 1].y() <= toolbar_positions[index].y()
+            for index in range(len(toolbar_positions) - 1)
+        ):
+            raise AssertionError("P06 compact List toolbar order changed")
+        toolbar_right_edges = [
+            widget.mapTo(window.games_tab, QPoint(widget.width(), 0)).x()
+            for widget in toolbar_controls
+        ]
+        if max(toolbar_right_edges) - min(toolbar_right_edges) > 8:
+            raise AssertionError("P06 compact List toolbar is not aligned on the right")
+        toolbar_buttons = (
+            window.games_tab.sorting_rules_btn,
+            window.games_tab.copy_list_overlay_url_btn,
+            window.games_tab.open_list_overlay_preview_btn,
+            window.games_tab.clear_all_btn,
+        )
+        for previous, following in zip(toolbar_buttons, toolbar_buttons[1:]):
+            gap = (
+                following.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.height()
+            )
+            if gap < 6:
+                raise AssertionError(
+                    f"P06 compact List toolbar buttons have no breathing room: {gap}px"
+                )
+        left_actions = [
+            widget for widget in window.games_tab._action_buttons if widget.isVisible()
+        ]
+        for previous, following in zip(left_actions, left_actions[1:]):
+            gap = (
+                following.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.height()
+            )
+            if gap < 6:
+                raise AssertionError(
+                    f"P06 compact List action buttons have no breathing room: {gap}px"
+                )
+        if left_actions:
+            left_action_right = max(
+                widget.mapTo(window.games_tab, QPoint(widget.width(), 0)).x()
+                for widget in left_actions
+            )
+            toolbar_left = min(point.x() for point in toolbar_positions)
+            if toolbar_left <= left_action_right:
+                raise AssertionError("P06 List action toolbar did not move to the right column")
+        table = window.games_tab.table
+        games_viewport = games_scroll.viewport()
+        if table.width() > games_viewport.width():
+            raise AssertionError("P06 main-list table exceeds its visible viewport width")
+        if table.width() < games_viewport.width() - 40:
+            raise AssertionError("P06 main-list table does not fill its visible viewport")
+        table_bar = table.verticalScrollBar()
+        table_bar_right = table.mapTo(
+            games_viewport,
+            table_bar.geometry().topRight(),
+        ).x()
+        if table_bar_right >= games_viewport.width():
+            raise AssertionError("P06 main-list vertical bar moved outside the visible workspace")
+
+        # Settings keeps its vertical bar at the visible right edge without
+        # introducing a workspace-level horizontal scrollbar.
+        settings_scroll = window._main_tab_scroll_by_page[window.settings_tab]
+        window._set_current_main_page(window.settings_tab)
+        app.processEvents()
+        settings_scroll.horizontalScrollBar().setValue(0)
+        app.processEvents()
+        if settings_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Settings page still scrolls horizontally")
+        if settings_scroll.verticalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 Settings workspace has no vertical scrolling")
+        if not settings_scroll.verticalScrollBar().isVisible():
+            raise AssertionError("P06 Settings vertical scrollbar is not visible at the viewport edge")
+        window._set_current_main_page(window.public_tab)
+        app.processEvents()
+        if window.size() != narrow_size:
+            raise AssertionError("switching tabs resized the narrow main window")
+        narrow_geometry = window.saveGeometry()
+        window.resize(original_size)
+        window._ui_settings.setValue("main_window/geometry", narrow_geometry)
+        window._ui_settings.sync()
+        window._restore_ui_state()
+        app.processEvents()
+        if window.width() >= 1100 or window.height() >= 700:
+            raise AssertionError("P06 did not restore saved geometry below 1100x700")
+        window.resize(original_size)
+        app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
+        if window._main_tabs_compact:
+            raise AssertionError(
+                "P06 wide window did not restore tab captions "
+                f"(window={window.width()}x{window.height()}, "
+                f"tabs={window.tabs.width()}px)"
+            )
+        if [window.tabs.tabText(index) for index in range(window.tabs.count())] != expected_tab_titles:
+            raise AssertionError("P06 wide tab captions were not restored after compact mode")
+        window._set_current_main_page(window.public_tab)
+        app.processEvents()
+
         window._save_ui_state()
         reopened = open_ui_settings(paths.data_dir, migrate_native=False)
         if any(reopened.contains(key) for key in obsolete_list_keys):
@@ -684,7 +1203,9 @@ def main() -> int:
             raise AssertionError("retiring list visibility removed saved window geometry")
         if reopened.value("main_window/tab_index", -1, type=int) != 1:
             raise AssertionError("retiring list visibility changed saved tab persistence")
-        window.tabs.setCurrentWidget(window.games_tab)
+        if reopened.value("main_window/tab_key", "", type=str) != "public":
+            raise AssertionError("P06 stable tab key was not persisted")
+        window._set_current_main_page(window.games_tab)
         app.processEvents()
 
         # P04-B / BUG-003: ordinary refresh/filter must not invent a new
@@ -748,7 +1269,7 @@ def main() -> int:
         # on empty table space clears the current selection and ordinary refresh
         # must not invent a replacement selection.
         public_tab = window.public_tab
-        window.tabs.setCurrentWidget(public_tab)
+        window._set_current_main_page(public_tab)
         app.processEvents()
         if not public_tab.select_synced_search_result(first_id):
             raise AssertionError("P04-C fixture could not select the public row")
@@ -813,7 +1334,7 @@ def main() -> int:
 
         if not public_tab.select_synced_search_result(first_id):
             raise AssertionError("P04-C fixture could not restore explicit Public selection")
-        window.tabs.setCurrentWidget(window.games_tab)
+        window._set_current_main_page(window.games_tab)
         app.processEvents()
 
         # P04-D / UI-007: non-empty main-list search ignores the active
@@ -1330,6 +1851,58 @@ def main() -> int:
             raise AssertionError(f"settings tabs mismatch: {settings_tabs}")
         if hasattr(window.settings_tab, "export_page"):
             raise AssertionError("removed Settings Export page is still constructed")
+        p06_general_page = window.settings_tab.general_page
+        p06_general_labels = [
+            label.text() for label in p06_general_page.findChildren(QLabel)
+        ]
+        if "Резервная копия базы данных" not in p06_general_labels:
+            raise AssertionError("P06 database-backup section heading is missing")
+        db_path_label = next(
+            (
+                label
+                for label in p06_general_page.findChildren(QLabel)
+                if label.text().startswith("База данных:\n")
+            ),
+            None,
+        )
+        if db_path_label is None:
+            raise AssertionError("P06 current database path is not visible")
+        if not (db_path_label.textInteractionFlags() & Qt.TextSelectableByMouse):
+            raise AssertionError("P06 current database path is not selectable")
+        if "Полная резервная копия программы" not in p06_general_labels:
+            raise AssertionError("P06 full-backup section is not visually separated")
+        if (
+            "Полная резервная копия предназначена для восстановления данных после "
+            "полного удаления и повторной установки InOneLine."
+            not in p06_general_labels
+        ):
+            raise AssertionError("P06 full-backup explanation is missing")
+        if not any(
+            label.startswith(
+                "Защищённые данные подключений предназначены для восстановления "
+            )
+            for label in p06_general_labels
+        ):
+            raise AssertionError("P06 DPAPI limitation is not shown in advance")
+        if "Интеграции" in p06_general_labels:
+            raise AssertionError("P06 redundant Integrations explainer remains")
+        settings_titles = [
+            window.settings_tab.settings_tabs.tabText(index)
+            for index in range(window.settings_tab.settings_tabs.count())
+        ]
+        if "Интеграции" not in settings_titles:
+            raise AssertionError("P06 removed the real Integrations settings tab")
+        p06_backup_buttons = {
+            button.text() for button in p06_general_page.findChildren(QPushButton)
+        }
+        if "Создать полную резервную копию…" not in p06_backup_buttons:
+            raise AssertionError("P06 full-backup button caption mismatch")
+        if "Восстановить из полной резервной копии…" not in p06_backup_buttons:
+            raise AssertionError("P06 full-restore button caption mismatch")
+        if not {"Открыть папку данных", "Открыть папку резервных копий"}.issubset(
+            p06_backup_buttons
+        ):
+            raise AssertionError("P06 data-folder button captions mismatch")
         if hasattr(window.settings_tab, "export_public_csv_btn"):
             raise AssertionError("duplicate public export buttons remain in Settings")
         if hasattr(window.auction_tab, "legacy_export_page") or hasattr(
@@ -1482,6 +2055,54 @@ def main() -> int:
             raise AssertionError("re-selected external wheel soundtrack was not adopted")
         if "доступен" not in auction.wheel_soundtrack_status.text().lower():
             raise AssertionError("re-selected wheel soundtrack stayed unavailable")
+
+        # Populate the temporary database so the main-list row scrollbar is
+        # genuinely visible, then verify it stays inside the viewport at x=0.
+        window.games_tab.search.clear()
+        window.games_tab.active_filter = "all"
+        for index in range(80):
+            db.add_game(
+                Game(
+                    None,
+                    f"Scrollbar Fixture {index:02d}",
+                    None,
+                    0,
+                    0,
+                    STATUS_NOT_PLAYED,
+                    "",
+                )
+            )
+        window.games_tab.refresh()
+        window._set_current_main_page(window.games_tab)
+        window.resize(
+            window.minimumWidth(),
+            max(window.minimumHeight() + 80, 440),
+        )
+        app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
+        games_scroll = window._main_tab_scroll_by_page[window.games_tab]
+        games_scroll.horizontalScrollBar().setValue(0)
+        window._update_responsive_layout()
+        app.processEvents()
+        main_table = window.games_tab.table
+        main_vertical_bar = main_table.verticalScrollBar()
+        if games_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 narrow main-list page still has horizontal scrolling")
+        if main_table.horizontalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 narrow main-list table has no column scrolling")
+        main_table.horizontalScrollBar().setValue(
+            main_table.horizontalScrollBar().maximum()
+        )
+        app.processEvents()
+        if main_vertical_bar.maximum() <= 0 or not main_vertical_bar.isVisible():
+            raise AssertionError("P06 narrow main-list vertical scrollbar is not usable")
+        main_bar_right = main_table.mapTo(
+            games_scroll.viewport(),
+            main_vertical_bar.geometry().topRight(),
+        ).x()
+        if main_bar_right >= games_scroll.viewport().width():
+            raise AssertionError("P06 vertical row scrollbar moved off-screen when columns scroll")
 
         print("[4/4] Clean shutdown")
         window.close()

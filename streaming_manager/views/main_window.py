@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QTabWidget, QWidget
+from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
+from PySide6.QtWidgets import (
+    QFrame,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QScrollArea,
+    QSizePolicy,
+    QTableView,
+    QStyle,
+    QTabWidget,
+    QWidget,
+)
 
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
@@ -19,7 +30,7 @@ from ..donationalerts import DonationAlertsAdapter
 from ..donationalerts_runtime import DonationAlertsDonationService, DonationAlertsRuntime
 from ..database import Database
 from ..workers import FunctionWorker
-from .common import APP_STYLE, autosize_compact_columns_once
+from .common import APP_STYLE, autosize_compact_columns_once, reflow_narrow_rows
 from .games import GamesTab
 from .public import PublicTab
 from .stream import StreamTab
@@ -28,6 +39,40 @@ from .auction import AuctionTab
 from .completed_auction_history import CompletedAuctionHistoryTab
 from .log import LogTab
 from .settings import SettingsTab
+
+
+_LEGACY_MAIN_TAB_ORDER = (
+    "list",
+    "public",
+    "stream",
+    "music",
+    "auction",
+    "auction_history",
+    "log",
+    "settings",
+)
+
+_COMPACT_TAB_LABELS = {
+    "Список": "Спис",
+    "Публичный список": "Публ",
+    "Музыка": "Муз",
+    "Аукцион": "Аук",
+    "История аукционов": "Ист",
+    "Журнал": "Жур",
+    "Стрим / OBS": "OBS",
+    "Настройки": "Наст",
+}
+_TAB_ICON_COLORS = {
+    "Список": "#54C7A2",
+    "Публичный список": "#57A8E8",
+    "Музыка": "#B889F5",
+    "Аукцион": "#F2A65A",
+    "История аукционов": "#E5C454",
+    "Журнал": "#59B8C9",
+    "Стрим / OBS": "#EA6F78",
+    "Настройки": "#87A9FF",
+}
+
 
 class MainWindow(QMainWindow):
     def __init__(self, db: Database, paths: AppPaths):
@@ -81,7 +126,7 @@ class MainWindow(QMainWindow):
             pass
 
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
-        self.setMinimumSize(1100, 700)
+        self.setMinimumSize(520, 360)
         self.resize(1550, 900)
         # R1.0.7 pre-release geometry contract: after startup the top-level
         # window size is owned by the user/window manager. Child layouts, tab
@@ -89,7 +134,33 @@ class MainWindow(QMainWindow):
         # resize the outer MainWindow implicitly.
 
         self.tabs = QTabWidget()
+        self.tabs.setUsesScrollButtons(False)
+        self.tabs.setIconSize(QSize(18, 18))
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setElideMode(Qt.ElideRight)
+        self.tabs.setMinimumSize(0, 0)
         self.setCentralWidget(self.tabs)
+        # The MainWindow resize can run before QTabWidget receives its final
+        # geometry. Recheck after the tab shell and tab bar themselves resize.
+        self.tabs.installEventFilter(self)
+        self.tabs.tabBar().installEventFilter(self)
+        self._main_tab_scroll_by_page: dict[QWidget, QScrollArea] = {}
+        self._main_tab_page_by_scroll: dict[QScrollArea, QWidget] = {}
+        self._main_tab_title_by_page: dict[QWidget, str] = {}
+        self._main_tab_compact_title_by_page: dict[QWidget, str] = {}
+        self._main_tab_icon_by_page: dict[QWidget, QIcon] = {}
+        self._responsive_watch_widgets: set[QWidget] = set()
+        self._responsive_nested_scroll_vertical_policy: dict[QScrollArea, Qt.ScrollBarPolicy] = {}
+        self._main_tabs_compact = False
+        self._responsive_layout_timer = QTimer(self)
+        self._responsive_layout_timer.setSingleShot(True)
+        self._responsive_layout_timer.timeout.connect(self._update_responsive_layout)
+        self._responsive_layout_settle_timer = QTimer(self)
+        self._responsive_layout_settle_timer.setSingleShot(True)
+        self._responsive_layout_settle_timer.setInterval(40)
+        self._responsive_layout_settle_timer.timeout.connect(
+            self._queue_responsive_layout_update
+        )
 
         self._dirty_tabs: set[QWidget] = set()
 
@@ -168,20 +239,33 @@ class MainWindow(QMainWindow):
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
 
-        self.tabs.addTab(self.games_tab, "Список")
-        self.tabs.addTab(self.public_tab, "Публичный список")
-        self.tabs.addTab(self.stream_tab, "Стрим / OBS")
-        self.tabs.addTab(self.music_tab, "Музыка")
-        self.tabs.addTab(self.auction_tab, "Аукцион")
-        self.tabs.addTab(self.completed_history_tab, "История аукционов")
-        self.tabs.addTab(self.log_tab, "Журнал")
-        self.tabs.addTab(self.settings_tab, "Настройки")
+        self._add_main_tab(self.games_tab, "Список", QStyle.SP_FileDialogListView)
+        self._add_main_tab(self.public_tab, "Публичный список", QStyle.SP_DirLinkIcon)
+        self._add_main_tab(self.music_tab, "Музыка", QStyle.SP_MediaVolume)
+        self._add_main_tab(self.auction_tab, "Аукцион", QStyle.SP_DialogApplyButton)
+        self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
+        self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
+        self._add_main_tab(self.settings_tab, "Настройки", QStyle.SP_FileDialogContentsView)
+        self._main_tab_pages = {
+            "list": self.games_tab,
+            "public": self.public_tab,
+            "music": self.music_tab,
+            "auction": self.auction_tab,
+            "auction_history": self.completed_history_tab,
+            "log": self.log_tab,
+            "stream": self.stream_tab,
+            "settings": self.settings_tab,
+        }
+        self._main_tab_key_by_page = {
+            page: key for key, page in self._main_tab_pages.items()
+        }
         self.tabs.currentChanged.connect(self._handle_tab_changed)
         # AuctionTab создаётся до добавления в основной QTabWidget, поэтому
         # сразу синхронизируем его high-frequency visual timers с фактической
         # видимостью первой основной вкладки.
         self.auction_tab.set_main_tab_visible(
-            self.tabs.currentWidget() is self.auction_tab
+            self._current_main_page() is self.auction_tab
         )
 
         self._make_menu()
@@ -282,12 +366,236 @@ class MainWindow(QMainWindow):
         self._refresh_dirty_search_target(self.auction_tab, force=True)
         self.auction_tab.select_synced_search_result(game_id)
 
+    def _add_main_tab(
+        self, page: QWidget, title: str, icon_pixmap: QStyle.StandardPixmap
+    ) -> QScrollArea:
+        """Give each workspace its own scrollbars inside the fixed tab shell."""
+        scroll = QScrollArea(self.tabs)
+        scroll.setObjectName(
+            f"main_tab_scroll_{len(self._main_tab_scroll_by_page)}"
+        )
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setMinimumSize(0, 0)
+        scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+        page.setMinimumWidth(0)
+        page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.MinimumExpanding)
+        for nested_tabs in page.findChildren(QTabWidget):
+            nested_tabs.currentChanged.connect(
+                lambda *_: self._queue_responsive_layout_update()
+            )
+            for index in range(nested_tabs.count()):
+                nested_page = nested_tabs.widget(index)
+                nested_page.setMinimumWidth(0)
+                nested_page.setSizePolicy(
+                    QSizePolicy.Ignored, QSizePolicy.MinimumExpanding
+                )
+        for nested_scroll in page.findChildren(QScrollArea):
+            self._responsive_nested_scroll_vertical_policy[nested_scroll] = (
+                nested_scroll.verticalScrollBarPolicy()
+            )
+            nested_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            if nested_scroll.widget() is not None:
+                nested_scroll.widget().setMinimumWidth(0)
+                nested_scroll.widget().setSizePolicy(
+                    QSizePolicy.Ignored, QSizePolicy.MinimumExpanding
+                )
+        for watched in (page, *page.findChildren(QWidget)):
+            if watched not in self._responsive_watch_widgets:
+                watched.installEventFilter(self)
+                self._responsive_watch_widgets.add(watched)
+        scroll.setWidget(page)
+        scroll.setAccessibleName(title)
+        self._main_tab_scroll_by_page[page] = scroll
+        self._main_tab_page_by_scroll[scroll] = page
+        self._main_tab_title_by_page[page] = title
+        self._main_tab_compact_title_by_page[page] = _COMPACT_TAB_LABELS[title]
+        self._main_tab_icon_by_page[page] = self._make_tinted_tab_icon(
+            icon_pixmap,
+            _TAB_ICON_COLORS[title],
+        )
+        tab_index = self.tabs.addTab(scroll, title)
+        self.tabs.setTabToolTip(tab_index, title)
+        self.tabs.setTabWhatsThis(tab_index, title)
+        scroll.viewport().installEventFilter(self)
+        self._queue_responsive_layout_update()
+        return scroll
+
+    def _make_tinted_tab_icon(
+        self, icon_pixmap: QStyle.StandardPixmap, tint_color: str
+    ) -> QIcon:
+        source_icon = self.style().standardIcon(icon_pixmap)
+        if source_icon.isNull():
+            source_icon = self.style().standardIcon(QStyle.SP_FileIcon)
+        source = source_icon.pixmap(QSize(18, 18))
+        if source.isNull():
+            return source_icon
+
+        def tinted(color: str) -> QPixmap:
+            pixmap = QPixmap(source.size())
+            pixmap.fill(Qt.transparent)
+            painter = QPainter(pixmap)
+            painter.drawPixmap(0, 0, source)
+            painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+            painter.fillRect(pixmap.rect(), QColor(color))
+            painter.end()
+            return pixmap
+
+        icon = QIcon()
+        for mode in (QIcon.Mode.Normal, QIcon.Mode.Active, QIcon.Mode.Selected):
+            for state in (QIcon.State.Off, QIcon.State.On):
+                icon.addPixmap(tinted(tint_color), mode, state)
+        return icon
+
+    def _queue_responsive_layout_update(self) -> None:
+        timer = getattr(self, "_responsive_layout_timer", None)
+        if timer is not None:
+            timer.start(0)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._queue_responsive_layout_update()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Resize:
+            is_tab_layout = watched is self.tabs or watched is self.tabs.tabBar()
+            is_workspace_viewport = any(
+                watched is scroll.viewport()
+                for scroll in self._main_tab_scroll_by_page.values()
+            )
+            if is_tab_layout or is_workspace_viewport:
+                self._queue_responsive_layout_update()
+        elif (
+            watched in self._responsive_watch_widgets
+            and event.type()
+            in (
+                QEvent.Type.LayoutRequest,
+                QEvent.Type.Show,
+                QEvent.Type.Hide,
+                QEvent.Type.ChildAdded,
+                QEvent.Type.ChildRemoved,
+            )
+        ):
+            self._queue_responsive_layout_update()
+        return super().eventFilter(watched, event)
+
+    def _update_responsive_layout(self) -> None:
+        if not self.tabs.count():
+            return
+
+        tab_bar = self.tabs.tabBar()
+        metrics = tab_bar.fontMetrics()
+        full_width = sum(
+            metrics.horizontalAdvance(title) + 40
+            for title in self._main_tab_title_by_page.values()
+        )
+        available_width = max(0, self.tabs.width() - 20)
+        compact = full_width > available_width
+        if compact != self._main_tabs_compact:
+            self._main_tabs_compact = compact
+            tab_bar.setExpanding(compact)
+            self.tabs.setIconSize(QSize(14, 14) if compact else QSize(18, 18))
+            tab_bar.setStyleSheet(
+                "QTabBar::tab { padding: 4px 3px; }" if compact else ""
+            )
+            for index in range(self.tabs.count()):
+                scroll = self.tabs.widget(index)
+                page = self._main_tab_page_by_scroll[scroll]
+                title = self._main_tab_title_by_page[page]
+                compact_title = self._main_tab_compact_title_by_page[page]
+                self.tabs.setTabText(index, compact_title if compact else title)
+                self.tabs.setTabIcon(
+                    index,
+                    self._main_tab_icon_by_page[page] if compact else QIcon(),
+                )
+                self.tabs.setTabToolTip(index, title)
+                self.tabs.setTabWhatsThis(index, title)
+
+        for page, scroll in self._main_tab_scroll_by_page.items():
+            viewport_width = scroll.viewport().width()
+            if viewport_width <= 0:
+                continue
+
+            if page.minimumWidth() != 0:
+                page.setMinimumWidth(0)
+            if page.maximumWidth() != viewport_width:
+                page.setMaximumWidth(viewport_width)
+            page_policy = page.sizePolicy()
+            if page_policy.horizontalPolicy() != QSizePolicy.Ignored:
+                page.setSizePolicy(
+                    QSizePolicy.Ignored,
+                    page_policy.verticalPolicy(),
+                )
+
+            compact_workspace = viewport_width <= 980
+            if page is self.games_tab:
+                page.set_compact_controls(compact_workspace, viewport_width)
+                margins = page.layout().contentsMargins()
+                table_width = max(
+                    1,
+                    viewport_width - margins.left() - margins.right(),
+                )
+                if page.table.maximumWidth() != table_width:
+                    page.table.setMaximumWidth(table_width)
+            else:
+                reflow_narrow_rows(
+                    page,
+                    viewport_width,
+                    compact=compact_workspace,
+                )
+
+            for table in page.findChildren(QTableView):
+                if page is self.games_tab and table is page.table:
+                    continue
+                if table.minimumWidth() != 0:
+                    table.setMinimumWidth(0)
+                if table.maximumWidth() != viewport_width:
+                    table.setMaximumWidth(viewport_width)
+                table_policy = table.sizePolicy()
+                if table_policy.horizontalPolicy() != QSizePolicy.Ignored:
+                    table.setSizePolicy(
+                        QSizePolicy.Ignored,
+                        table_policy.verticalPolicy(),
+                    )
+
+            for nested_scroll, normal_vertical_policy in (
+                self._responsive_nested_scroll_vertical_policy.items()
+            ):
+                if nested_scroll is page or not page.isAncestorOf(nested_scroll):
+                    continue
+                target_vertical_policy = (
+                    Qt.ScrollBarAsNeeded
+                    if compact_workspace
+                    else normal_vertical_policy
+                )
+                if (
+                    nested_scroll.horizontalScrollBarPolicy()
+                    != Qt.ScrollBarAlwaysOff
+                ):
+                    nested_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                if nested_scroll.verticalScrollBarPolicy() != target_vertical_policy:
+                    nested_scroll.setVerticalScrollBarPolicy(target_vertical_policy)
+
+    def _current_main_page(self) -> QWidget | None:
+        current = self.tabs.currentWidget()
+        return self._main_tab_page_by_scroll.get(current, current)
+
+    def _set_current_main_page(self, page: QWidget) -> None:
+        self.tabs.setCurrentWidget(self._main_tab_scroll_by_page.get(page, page))
+
     def _handle_tab_changed(self, index: int):
         """Refresh the selected tab without changing the outer window geometry."""
         if index < 0 or index >= self.tabs.count():
             return
 
-        current = self.tabs.widget(index)
+        self._queue_responsive_layout_update()
+        # QScrollArea can assign its final viewport width after currentChanged.
+        # Reflow once more after that first layout pass, without needing a resize.
+        self._responsive_layout_settle_timer.start()
+        current = self._main_tab_page_by_scroll.get(self.tabs.widget(index))
 
         auction_refreshed = self.auction_tab.set_main_tab_visible(
             current is self.auction_tab,
@@ -342,9 +650,26 @@ class MainWindow(QMainWindow):
         if geometry is not None:
             self.restoreGeometry(geometry)
 
-        tab_index = settings.value("main_window/tab_index", 0, type=int)
-        if 0 <= tab_index < self.tabs.count():
-            self.tabs.setCurrentIndex(tab_index)
+        stored_tab_key = settings.value("main_window/tab_key", "", type=str)
+        stored_page = self._main_tab_pages.get(stored_tab_key)
+        if stored_page is None:
+            tab_index = settings.value("main_window/tab_index", 0, type=int)
+            if not settings.contains("main_window/tab_key"):
+                if 0 <= tab_index < len(_LEGACY_MAIN_TAB_ORDER):
+                    migrated_key = _LEGACY_MAIN_TAB_ORDER[tab_index]
+                    stored_page = self._main_tab_pages[migrated_key]
+                    settings.setValue("main_window/tab_key", migrated_key)
+                    settings.setValue(
+                        "main_window/tab_index",
+                        self.tabs.indexOf(self._main_tab_scroll_by_page[stored_page]),
+                    )
+                    settings.sync()
+            elif 0 <= tab_index < self.tabs.count():
+                stored_page = self._main_tab_page_by_scroll.get(
+                    self.tabs.widget(tab_index)
+                )
+        if stored_page is not None:
+            self._set_current_main_page(stored_page)
 
         # Синхронизируем runtime-видимость текущей вкладки после restoreGeometry,
         # но обработчик больше не меняет размеры MainWindow.
@@ -363,6 +688,10 @@ class MainWindow(QMainWindow):
         settings.setValue("main_window/geometry", self.saveGeometry())
         settings.setValue("main_window/maximized", self.isMaximized())
         settings.setValue("main_window/tab_index", self.tabs.currentIndex())
+        current_page = self._current_main_page()
+        tab_key = self._main_tab_key_by_page.get(current_page)
+        if tab_key is not None:
+            settings.setValue("main_window/tab_key", tab_key)
 
         settings.sync()
 
@@ -447,9 +776,9 @@ class MainWindow(QMainWindow):
     def open_integrations_settings(self) -> None:
         if not hasattr(self, "settings_tab"):
             return
-        self.tabs.setCurrentWidget(self.settings_tab)
+        self._set_current_main_page(self.settings_tab)
         self.settings_tab.settings_tabs.setCurrentWidget(
-            self.settings_tab.integration_scroll
+            self.settings_tab.integration_page
         )
         self.settings_tab._refresh_integrations()
 
@@ -534,7 +863,7 @@ class MainWindow(QMainWindow):
         self.statusBar().hide()
 
     def _refresh_visible_or_mark_dirty(self, widgets):
-        current = self.tabs.currentWidget()
+        current = self._current_main_page()
         for widget in widgets:
             if widget is current:
                 widget.refresh()
