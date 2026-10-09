@@ -264,7 +264,7 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
         for width, height in test_sizes:
             window.resize(width, height)
             app.processEvents()
-            QTest.qWait(60)
+            QTest.qWait(150)
             app.processEvents()
             if window.width() != width or window.height() != height:
                 raise AssertionError(
@@ -291,7 +291,15 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
             else:
                 for button in games_tab._stat_filter_buttons_order:
                     if button.width() < button.fontMetrics().horizontalAdvance(button.text()) + 12:
-                        raise AssertionError("compact filter caption clipped after wide resize")
+                        raise AssertionError(
+                            f"compact filter caption clipped after wide resize: "
+                            f"platform={QApplication.platformName()}, size={window.size()}, "
+                            f"text={button.text()!r}, actual={button.width()}, "
+                            f"caption={button.fontMetrics().horizontalAdvance(button.text())}, "
+                            f"hint={button.sizeHint().width()}, minimum={button.minimumSizeHint().width()}, "
+                            f"viewport={window._main_tab_scroll_by_page[games_tab].viewport().width()}, "
+                            f"grid={games_tab._stats_layout.geometry()}"
+                        )
 
             # An attempted manual shrink must protect the title itself,
             # including an empty table, without widening the date column.
