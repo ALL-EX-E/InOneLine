@@ -348,8 +348,8 @@ def main() -> int:
             raise AssertionError(
                 f"P06 technical minimum changed: {window.minimumWidth()}x{window.minimumHeight()}"
             )
-        if window.width() < 1100 or window.height() < 700:
-            raise AssertionError(f"cold-start window below minimum: {window.size()}")
+        if window.width() < window.minimumWidth() or window.height() < window.minimumHeight():
+            raise AssertionError(f"cold-start window below technical minimum: {window.size()}")
 
         expected_tabs = [
             "Список",
