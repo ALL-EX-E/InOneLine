@@ -1,4 +1,5 @@
 name: Regression Foundation 1.0.8
+# P05 post-merge verification trigger
 
 on:
   push:
