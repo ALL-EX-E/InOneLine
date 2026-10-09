@@ -832,8 +832,14 @@ def main() -> int:
             raise AssertionError("P06 did not restore saved geometry below 1100x700")
         window.resize(original_size)
         app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
         if window._main_tabs_compact:
-            raise AssertionError("P06 wide window did not restore tab captions")
+            raise AssertionError(
+                "P06 wide window did not restore tab captions "
+                f"(window={window.width()}x{window.height()}, "
+                f"tabs={window.tabs.width()}px)"
+            )
         if [window.tabs.tabText(index) for index in range(window.tabs.count())] != expected_tab_titles:
             raise AssertionError("P06 wide tab captions were not restored after compact mode")
         window._set_current_main_page(window.public_tab)
