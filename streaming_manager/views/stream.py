@@ -1302,12 +1302,17 @@ class StreamTab(QWidget):
         return set(supported_media_extensions(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS))
 
     def _background_assets(self):
-        # One available-only category view for both overlay selectors.
-        return [
-            asset
-            for asset in self.db.sync_managed_media_category(
+        # An in-flight video copy is not a completed managed file. Do not
+        # auto-register it before the existing worker promotes its external ID.
+        assets = (
+            self.db.list_media_assets(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
+            if self._background_copy_worker is not None
+            else self.db.sync_managed_media_category(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
             )
+        )
+        return [
+            asset for asset in assets
             if media_asset_available(self.db.path.parent, asset)
         ]
 
