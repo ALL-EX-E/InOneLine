@@ -10,7 +10,7 @@ from openpyxl.styles import Font, Alignment
 from .database import Database
 
 
-PUBLIC_HEADERS = ["НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
+PUBLIC_HEADERS = ["НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
 
 
 def export_public_csv(db: Database, path: str | Path) -> Path:
