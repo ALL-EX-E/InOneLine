@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -246,6 +247,63 @@ def assert_position_xlsx_mirrors(db: Database, root: Path) -> None:
         if public_state_hash(changed_public_rows) == public_result["hash"]:
             raise AssertionError("Public mirror hash ignored derived position")
 
+
+
+def assert_wide_window_layout(app, window, test_sizes) -> None:
+    # Wide-window manual QA: metadata filters stay adjacent after repeated
+    # compact/wide transitions, for both populated and empty projections.
+    games_tab = window.games_tab
+    games_table = games_tab.table
+    original_title_width = games_table.columnWidth(2)
+    for filter_key in ("all", "archive"):
+        games_tab.apply_stat_filter(filter_key)
+        expected_rows = tuple(
+            games_table.item(row, 2).text()
+            for row in range(games_table.rowCount())
+        )
+        for width, height in test_sizes:
+            window.resize(width, height)
+            app.processEvents()
+            QTest.qWait(60)
+            app.processEvents()
+            if window.width() != width or window.height() != height:
+                raise AssertionError(
+                    f"wide-window resize refused {width}x{height}: {window.size()}"
+                )
+            actual_rows = tuple(
+                games_table.item(row, 2).text()
+                for row in range(games_table.rowCount())
+            )
+            if actual_rows != expected_rows:
+                raise AssertionError("resizing changed the main-list projection")
+            if not games_tab._compact_controls_enabled:
+                filters = games_tab._stat_filter_buttons_order
+                for previous, following in zip(filters, filters[1:]):
+                    previous_right = previous.mapTo(
+                        games_tab, QPoint(previous.width(), 0)
+                    ).x()
+                    following_left = following.mapTo(games_tab, QPoint(0, 0)).x()
+                    gap = following_left - previous_right
+                    if not 4 <= gap <= 16:
+                        raise AssertionError(
+                            f"wide-window filters spread at {width}px: gap={gap}"
+                        )
+            else:
+                for button in games_tab._stat_filter_buttons_order:
+                    if button.width() < button.fontMetrics().horizontalAdvance(button.text()) + 12:
+                        raise AssertionError("compact filter caption clipped after wide resize")
+
+            # An attempted manual shrink must protect the title itself,
+            # including an empty table, without widening the date column.
+            date_width = games_table.columnWidth(3)
+            required_title_width = games_tab._game_title_header_min_width()
+            games_table.setColumnWidth(2, 1)
+            if games_table.columnWidth(2) < required_title_width:
+                raise AssertionError("main-list title header width floor was not enforced")
+            if games_table.columnWidth(3) != date_width:
+                raise AssertionError("title width floor resized the adjacent date column")
+            games_table.setColumnWidth(2, original_title_width)
+    games_tab.apply_stat_filter("all")
 
 
 def main() -> int:
@@ -503,6 +561,16 @@ def main() -> int:
         QTest.qWait(250)
         app.processEvents()
 
+        if "--wide-window-probe" in sys.argv:
+            assert_wide_window_layout(
+                app, window,
+                ((2560, 1440), (520, 640), (2560, 1440), (1100, 750)),
+            )
+            if uncaught:
+                raise AssertionError(f"wide-window GUI exception: {uncaught[0]!r}")
+            print("WIDE_WINDOW_2560x1440_GEOMETRY=PASS")
+            return 0
+
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
@@ -651,60 +719,22 @@ def main() -> int:
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
 
-        # Wide-window manual QA: metadata filters stay adjacent after repeated
-        # compact/wide transitions, for both populated and empty projections.
-        games_tab = window.games_tab
-        games_table = games_tab.table
-        original_title_width = games_table.columnWidth(2)
-        for filter_key in ("all", "archive"):
-            games_tab.apply_stat_filter(filter_key)
-            expected_rows = tuple(
-                games_table.item(row, 2).text()
-                for row in range(games_table.rowCount())
-            )
-            for width, height in ((2560, 1440), (520, 640), (2560, 1440), (1100, 750)):
-                window.resize(width, height)
-                app.processEvents()
-                QTest.qWait(60)
-                app.processEvents()
-                if window.width() != width or window.height() != height:
-                    raise AssertionError(
-                        f"wide-window resize refused {width}x{height}: {window.size()}"
-                    )
-                actual_rows = tuple(
-                    games_table.item(row, 2).text()
-                    for row in range(games_table.rowCount())
-                )
-                if actual_rows != expected_rows:
-                    raise AssertionError("resizing changed the main-list projection")
-                if not games_tab._compact_controls_enabled:
-                    filters = games_tab._stat_filter_buttons_order
-                    for previous, following in zip(filters, filters[1:]):
-                        previous_right = previous.mapTo(
-                            games_tab, QPoint(previous.width(), 0)
-                        ).x()
-                        following_left = following.mapTo(games_tab, QPoint(0, 0)).x()
-                        gap = following_left - previous_right
-                        if not 4 <= gap <= 16:
-                            raise AssertionError(
-                                f"wide-window filters spread at {width}px: gap={gap}"
-                            )
-                else:
-                    for button in games_tab._stat_filter_buttons_order:
-                        if button.width() < button.fontMetrics().horizontalAdvance(button.text()) + 12:
-                            raise AssertionError("compact filter caption clipped after wide resize")
-
-                # An attempted manual shrink must protect the title itself,
-                # including an empty table, without widening the date column.
-                date_width = games_table.columnWidth(3)
-                required_title_width = games_tab._game_title_header_min_width()
-                games_table.setColumnWidth(2, 1)
-                if games_table.columnWidth(2) < required_title_width:
-                    raise AssertionError("main-list title header width floor was not enforced")
-                if games_table.columnWidth(3) != date_width:
-                    raise AssertionError("title width floor resized the adjacent date column")
-                games_table.setColumnWidth(2, original_title_width)
-        games_tab.apply_stat_filter("all")
+        # Native Windows sizes stay within the runner's actual desktop.
+        # An isolated offscreen process also exercises the exact 2560x1440 size.
+        native_screen = window.screen().availableGeometry()
+        native_width = max(520, min(2560, native_screen.width() - 80))
+        native_height = max(360, min(1440, native_screen.height() - 80))
+        assert_wide_window_layout(
+            app, window,
+            ((native_width, native_height), (520, min(640, native_height)),
+             (native_width, native_height)),
+        )
+        subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--wide-window-probe"],
+            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+            check=True,
+            timeout=60,
+        )
         window.resize(initial_ui076_size)
         app.processEvents()
 

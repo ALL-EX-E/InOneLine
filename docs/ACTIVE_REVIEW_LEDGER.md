@@ -3797,3 +3797,9 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Existing GUI regression дополнена переходами `2560×1440 → 520×640 → 2560×1440 → 1100×750` для заполненного списка и пустого архива: проверяет соседство фильтров, читаемость подписей, сохранность видимых строк и корректный title-width floor без изменения соседнего столбца.
 - Python compilation: **PASS**. Windows full regression/build/installer gates для исправления ещё ожидаются. Опубликованный выпуск, app version 1.0.8, schema 19 и 15 migrations не изменяются.
 - **P07 = CORRECTIVE CANDIDATE / WINDOWS QA PENDING / NOT MERGED.**
+
+### P07 wide-window test environment correction — 2026-10-09
+
+- Windows run #188 (`37946557309`) остановился на exact-size assertion: native runner ограничил запрошенные `2560×1440` до `1028×749` ещё до проверки положения кнопок. Это ограничение доступного desktop, не подтверждённый runtime FAIL исправления.
+- Exact-width geometry regression теперь запускается отдельным процессом с Qt offscreen platform (`--wide-window-probe`); общий helper проверяет те же размеры, фильтры, строки и title-width floor. Native Windows regression дополнительно использует доступный desktop для циклов resize. Производственный diff не изменился.
+- Полные Windows gates и новый установщик должны успешно собраться до повторной ручной QA. **P07 остаётся REOPENED / NOT MERGED.**
