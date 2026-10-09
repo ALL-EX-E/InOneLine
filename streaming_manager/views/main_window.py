@@ -3,7 +3,15 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QLabel, QMainWindow, QMessageBox, QTabWidget, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QScrollArea,
+    QTabWidget,
+    QWidget,
+)
 
 from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
@@ -28,6 +36,19 @@ from .auction import AuctionTab
 from .completed_auction_history import CompletedAuctionHistoryTab
 from .log import LogTab
 from .settings import SettingsTab
+
+
+_LEGACY_MAIN_TAB_ORDER = (
+    "list",
+    "public",
+    "stream",
+    "music",
+    "auction",
+    "auction_history",
+    "log",
+    "settings",
+)
+
 
 class MainWindow(QMainWindow):
     def __init__(self, db: Database, paths: AppPaths):
@@ -81,7 +102,7 @@ class MainWindow(QMainWindow):
             pass
 
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
-        self.setMinimumSize(1100, 700)
+        self.setMinimumSize(520, 360)
         self.resize(1550, 900)
         # R1.0.7 pre-release geometry contract: after startup the top-level
         # window size is owned by the user/window manager. Child layouts, tab
@@ -89,7 +110,14 @@ class MainWindow(QMainWindow):
         # resize the outer MainWindow implicitly.
 
         self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+        self.main_scroll = QScrollArea(self)
+        self.main_scroll.setObjectName("main_window_scroll")
+        self.main_scroll.setFrameShape(QFrame.NoFrame)
+        self.main_scroll.setWidgetResizable(True)
+        self.main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.main_scroll.setWidget(self.tabs)
+        self.setCentralWidget(self.main_scroll)
 
         self._dirty_tabs: set[QWidget] = set()
 
@@ -170,12 +198,25 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(self.games_tab, "Список")
         self.tabs.addTab(self.public_tab, "Публичный список")
-        self.tabs.addTab(self.stream_tab, "Стрим / OBS")
         self.tabs.addTab(self.music_tab, "Музыка")
         self.tabs.addTab(self.auction_tab, "Аукцион")
         self.tabs.addTab(self.completed_history_tab, "История аукционов")
         self.tabs.addTab(self.log_tab, "Журнал")
+        self.tabs.addTab(self.stream_tab, "Стрим / OBS")
         self.tabs.addTab(self.settings_tab, "Настройки")
+        self._main_tab_pages = {
+            "list": self.games_tab,
+            "public": self.public_tab,
+            "music": self.music_tab,
+            "auction": self.auction_tab,
+            "auction_history": self.completed_history_tab,
+            "log": self.log_tab,
+            "stream": self.stream_tab,
+            "settings": self.settings_tab,
+        }
+        self._main_tab_key_by_page = {
+            page: key for key, page in self._main_tab_pages.items()
+        }
         self.tabs.currentChanged.connect(self._handle_tab_changed)
         # AuctionTab создаётся до добавления в основной QTabWidget, поэтому
         # сразу синхронизируем его high-frequency visual timers с фактической
@@ -342,9 +383,23 @@ class MainWindow(QMainWindow):
         if geometry is not None:
             self.restoreGeometry(geometry)
 
-        tab_index = settings.value("main_window/tab_index", 0, type=int)
-        if 0 <= tab_index < self.tabs.count():
-            self.tabs.setCurrentIndex(tab_index)
+        stored_tab_key = settings.value("main_window/tab_key", "", type=str)
+        stored_page = self._main_tab_pages.get(stored_tab_key)
+        if stored_page is None:
+            tab_index = settings.value("main_window/tab_index", 0, type=int)
+            if not settings.contains("main_window/tab_key"):
+                if 0 <= tab_index < len(_LEGACY_MAIN_TAB_ORDER):
+                    migrated_key = _LEGACY_MAIN_TAB_ORDER[tab_index]
+                    stored_page = self._main_tab_pages[migrated_key]
+                    settings.setValue("main_window/tab_key", migrated_key)
+                    settings.setValue(
+                        "main_window/tab_index", self.tabs.indexOf(stored_page)
+                    )
+                    settings.sync()
+            elif 0 <= tab_index < self.tabs.count():
+                stored_page = self.tabs.widget(tab_index)
+        if stored_page is not None:
+            self.tabs.setCurrentWidget(stored_page)
 
         # Синхронизируем runtime-видимость текущей вкладки после restoreGeometry,
         # но обработчик больше не меняет размеры MainWindow.
@@ -363,6 +418,10 @@ class MainWindow(QMainWindow):
         settings.setValue("main_window/geometry", self.saveGeometry())
         settings.setValue("main_window/maximized", self.isMaximized())
         settings.setValue("main_window/tab_index", self.tabs.currentIndex())
+        current_page = self.tabs.currentWidget()
+        tab_key = self._main_tab_key_by_page.get(current_page)
+        if tab_key is not None:
+            settings.setValue("main_window/tab_key", tab_key)
 
         settings.sync()
 
