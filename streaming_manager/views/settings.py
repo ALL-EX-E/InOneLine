@@ -30,7 +30,6 @@ from PySide6.QtWidgets import (
     QLayout,
     QMessageBox,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -264,8 +263,8 @@ class SettingsTab(QWidget):
         full_btns.addStretch()
         layout.addLayout(full_btns)
         layout.addStretch()
-        self.general_scroll = self._wrap_settings_page(self.general_page, layout)
-        self.settings_tabs.addTab(self.general_scroll, "Общие")
+        self._prepare_settings_page(self.general_page, layout)
+        self.settings_tabs.addTab(self.general_page, "Общие")
 
         self.auction_page = QWidget()
         auction_layout = QVBoxLayout(self.auction_page)
@@ -529,8 +528,8 @@ class SettingsTab(QWidget):
         auction_layout.addWidget(save_auction, 0, Qt.AlignLeft)
         auction_layout.addStretch()
 
-        self.auction_scroll = self._wrap_settings_page(self.auction_page, auction_layout)
-        self.settings_tabs.addTab(self.auction_scroll, "Аукцион")
+        self._prepare_settings_page(self.auction_page, auction_layout)
+        self.settings_tabs.addTab(self.auction_page, "Аукцион")
 
         # B1 — единый центр реальных поддерживаемых сервисных адаптеров.
         # Registry пуст до B2, поэтому никаких фальшивых карточек
@@ -597,8 +596,8 @@ class SettingsTab(QWidget):
         self.integration_cards_layout.setSpacing(10)
         integration_layout.addWidget(self.integration_cards_host)
         integration_layout.addStretch()
-        self.integration_scroll = self._wrap_settings_page(self.integration_page, integration_layout)
-        self.settings_tabs.addTab(self.integration_scroll, "Интеграции")
+        self._prepare_settings_page(self.integration_page, integration_layout)
+        self.settings_tabs.addTab(self.integration_page, "Интеграции")
         self._refresh_integrations()
 
         self.conversion_page = QWidget()
@@ -692,29 +691,18 @@ class SettingsTab(QWidget):
         conversion_layout.addWidget(save_conversion, 0, Qt.AlignLeft)
         conversion_layout.addStretch()
 
-        self.conversion_scroll = self._wrap_settings_page(self.conversion_page, conversion_layout)
-        self.settings_tabs.addTab(self.conversion_scroll, "Конвертация")
+        self._prepare_settings_page(self.conversion_page, conversion_layout)
+        self.settings_tabs.addTab(self.conversion_page, "Конвертация")
 
         self.settings_tabs.currentChanged.connect(self._handle_settings_page_changed)
         self._refresh_conversion_rate_rows(force=True)
         self._refresh_pending_conversion_rows()
 
     @staticmethod
-    def _wrap_settings_page(page: QWidget, page_layout: QLayout) -> QScrollArea:
-        """Keep long settings pages readable instead of vertically compressing them."""
-        # Keep each long page at its layout minimum. The scroll area handles
-        # width/height pressure so controls remain reachable without resizing
-        # the main window.
+    def _prepare_settings_page(page: QWidget, page_layout: QLayout) -> None:
+        """Keep each page at its natural size for the active workspace scroller."""
         page_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         page.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Minimum)
-
-        scroll = QScrollArea()
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setWidget(page)
-        return scroll
 
     @staticmethod
     def _format_duration_ms(milliseconds: int) -> str:
@@ -1150,9 +1138,9 @@ class SettingsTab(QWidget):
         self._conversion_units_signature = signature
 
     def _handle_settings_page_changed(self, _index: int) -> None:
-        if self.settings_tabs.currentWidget() is self.integration_scroll:
+        if self.settings_tabs.currentWidget() is self.integration_page:
             self._refresh_integrations()
-        if self.settings_tabs.currentWidget() is self.conversion_scroll:
+        if self.settings_tabs.currentWidget() is self.conversion_page:
             # Rebuild only if the connected-adapter capability set changed, so
             # ordinary tab switching does not discard unsaved editor text.
             self._refresh_conversion_rate_rows()

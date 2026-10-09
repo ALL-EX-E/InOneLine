@@ -306,25 +306,17 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # ==========================================================
         # ПРОВЕДЕНИЕ
         # ==========================================================
-        # R1.0.8: Conduct is a long-form operator page. Keep its content at a
-        # usable minimum height and let the page scroll vertically when the
-        # main window is near its 1100x700 minimum. This prevents the table,
-        # history and wheel area from collapsing to a few rows.
-        self.conduct_page = QScrollArea()
-        self.conduct_page.setFrameShape(QFrame.NoFrame)
-        self.conduct_page.setWidgetResizable(True)
-        self.conduct_page.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.conduct_page.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-        self.conduct_page_content = FocusClearingWidget()
-        self.conduct_page_content.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Minimum
+        # Page-level overflow is handled by MainWindow's active-tab scroll host,
+        # keeping the vertical scrollbar at the visible edge of the workspace.
+        self.conduct_page = FocusClearingWidget()
+        self.conduct_page_content = self.conduct_page
+        self.conduct_page.setSizePolicy(
+            QSizePolicy.MinimumExpanding, QSizePolicy.Minimum
         )
-        conduct_layout = QVBoxLayout(self.conduct_page_content)
+        conduct_layout = QVBoxLayout(self.conduct_page)
         conduct_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         conduct_layout.setContentsMargins(10, 10, 10, 10)
         conduct_layout.setSpacing(12)
-        self.conduct_page.setWidget(self.conduct_page_content)
 
         conduct_rules_row = QHBoxLayout()
         self.conduct_rules_btn = QPushButton("Правила вкладки")

@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
-    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QVBoxLayout,
@@ -126,31 +125,11 @@ class StreamTab(QWidget):
         )
         self.background_dir.mkdir(parents=True, exist_ok=True)
 
-        # Вкладка может быть длиннее доступной высоты окна из-за большого
-        # количества настроек. Поэтому весь её контент находится в QScrollArea:
-        # элементы больше не сжимаются и не исчезают при уменьшении окна.
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
-
-        self.stream_scroll = QScrollArea(self)
-        self.stream_scroll.setWidgetResizable(True)
-        self.stream_scroll.setFrameShape(QFrame.NoFrame)
-        self.stream_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.stream_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-        self.stream_content = QWidget()
-        self.stream_content.setSizePolicy(
-            QSizePolicy.MinimumExpanding,
-            QSizePolicy.Preferred,
-        )
-
-        layout = QVBoxLayout(self.stream_content)
+        # The active main-tab scroll host owns page overflow and keeps its
+        # vertical scrollbar at the visible right edge of the workspace.
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(12)
-
-        self.stream_scroll.setWidget(self.stream_content)
-        outer_layout.addWidget(self.stream_scroll)
 
         heading = QLabel("Данные для OBS")
         heading.setStyleSheet("font-size: 15pt; font-weight: 700;")

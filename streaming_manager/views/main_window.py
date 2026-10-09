@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QWidget,
 )
@@ -110,14 +111,11 @@ class MainWindow(QMainWindow):
         # resize the outer MainWindow implicitly.
 
         self.tabs = QTabWidget()
-        self.main_scroll = QScrollArea(self)
-        self.main_scroll.setObjectName("main_window_scroll")
-        self.main_scroll.setFrameShape(QFrame.NoFrame)
-        self.main_scroll.setWidgetResizable(True)
-        self.main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.main_scroll.setWidget(self.tabs)
-        self.setCentralWidget(self.main_scroll)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.setMinimumSize(0, 0)
+        self.setCentralWidget(self.tabs)
+        self._main_tab_scroll_by_page: dict[QWidget, QScrollArea] = {}
+        self._main_tab_page_by_scroll: dict[QScrollArea, QWidget] = {}
 
         self._dirty_tabs: set[QWidget] = set()
 
@@ -196,14 +194,14 @@ class MainWindow(QMainWindow):
         # sync_search_text(). MainWindow централизованно решает, какую таблицу
         # обновить сейчас, а какую только пометить dirty.
 
-        self.tabs.addTab(self.games_tab, "Список")
-        self.tabs.addTab(self.public_tab, "Публичный список")
-        self.tabs.addTab(self.music_tab, "Музыка")
-        self.tabs.addTab(self.auction_tab, "Аукцион")
-        self.tabs.addTab(self.completed_history_tab, "История аукционов")
-        self.tabs.addTab(self.log_tab, "Журнал")
-        self.tabs.addTab(self.stream_tab, "Стрим / OBS")
-        self.tabs.addTab(self.settings_tab, "Настройки")
+        self._add_main_tab(self.games_tab, "Список")
+        self._add_main_tab(self.public_tab, "Публичный список")
+        self._add_main_tab(self.music_tab, "Музыка")
+        self._add_main_tab(self.auction_tab, "Аукцион")
+        self._add_main_tab(self.completed_history_tab, "История аукционов")
+        self._add_main_tab(self.log_tab, "Журнал")
+        self._add_main_tab(self.stream_tab, "Стрим / OBS")
+        self._add_main_tab(self.settings_tab, "Настройки")
         self._main_tab_pages = {
             "list": self.games_tab,
             "public": self.public_tab,
@@ -222,7 +220,7 @@ class MainWindow(QMainWindow):
         # сразу синхронизируем его high-frequency visual timers с фактической
         # видимостью первой основной вкладки.
         self.auction_tab.set_main_tab_visible(
-            self.tabs.currentWidget() is self.auction_tab
+            self._current_main_page() is self.auction_tab
         )
 
         self._make_menu()
@@ -323,12 +321,37 @@ class MainWindow(QMainWindow):
         self._refresh_dirty_search_target(self.auction_tab, force=True)
         self.auction_tab.select_synced_search_result(game_id)
 
+    def _add_main_tab(self, page: QWidget, title: str) -> QScrollArea:
+        """Give each workspace its own scrollbars inside the fixed tab shell."""
+        scroll = QScrollArea(self.tabs)
+        scroll.setObjectName(
+            f"main_tab_scroll_{len(self._main_tab_scroll_by_page)}"
+        )
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setMinimumSize(0, 0)
+        scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        scroll.setWidget(page)
+        self._main_tab_scroll_by_page[page] = scroll
+        self._main_tab_page_by_scroll[scroll] = page
+        self.tabs.addTab(scroll, title)
+        return scroll
+
+    def _current_main_page(self) -> QWidget | None:
+        current = self.tabs.currentWidget()
+        return self._main_tab_page_by_scroll.get(current, current)
+
+    def _set_current_main_page(self, page: QWidget) -> None:
+        self.tabs.setCurrentWidget(self._main_tab_scroll_by_page.get(page, page))
+
     def _handle_tab_changed(self, index: int):
         """Refresh the selected tab without changing the outer window geometry."""
         if index < 0 or index >= self.tabs.count():
             return
 
-        current = self.tabs.widget(index)
+        current = self._main_tab_page_by_scroll.get(self.tabs.widget(index))
 
         auction_refreshed = self.auction_tab.set_main_tab_visible(
             current is self.auction_tab,
@@ -393,13 +416,16 @@ class MainWindow(QMainWindow):
                     stored_page = self._main_tab_pages[migrated_key]
                     settings.setValue("main_window/tab_key", migrated_key)
                     settings.setValue(
-                        "main_window/tab_index", self.tabs.indexOf(stored_page)
+                        "main_window/tab_index",
+                        self.tabs.indexOf(self._main_tab_scroll_by_page[stored_page]),
                     )
                     settings.sync()
             elif 0 <= tab_index < self.tabs.count():
-                stored_page = self.tabs.widget(tab_index)
+                stored_page = self._main_tab_page_by_scroll.get(
+                    self.tabs.widget(tab_index)
+                )
         if stored_page is not None:
-            self.tabs.setCurrentWidget(stored_page)
+            self._set_current_main_page(stored_page)
 
         # Синхронизируем runtime-видимость текущей вкладки после restoreGeometry,
         # но обработчик больше не меняет размеры MainWindow.
@@ -418,7 +444,7 @@ class MainWindow(QMainWindow):
         settings.setValue("main_window/geometry", self.saveGeometry())
         settings.setValue("main_window/maximized", self.isMaximized())
         settings.setValue("main_window/tab_index", self.tabs.currentIndex())
-        current_page = self.tabs.currentWidget()
+        current_page = self._current_main_page()
         tab_key = self._main_tab_key_by_page.get(current_page)
         if tab_key is not None:
             settings.setValue("main_window/tab_key", tab_key)
@@ -506,9 +532,9 @@ class MainWindow(QMainWindow):
     def open_integrations_settings(self) -> None:
         if not hasattr(self, "settings_tab"):
             return
-        self.tabs.setCurrentWidget(self.settings_tab)
+        self._set_current_main_page(self.settings_tab)
         self.settings_tab.settings_tabs.setCurrentWidget(
-            self.settings_tab.integration_scroll
+            self.settings_tab.integration_page
         )
         self.settings_tab._refresh_integrations()
 
@@ -593,7 +619,7 @@ class MainWindow(QMainWindow):
         self.statusBar().hide()
 
     def _refresh_visible_or_mark_dirty(self, widgets):
-        current = self.tabs.currentWidget()
+        current = self._current_main_page()
         for widget in widgets:
             if widget is current:
                 widget.refresh()

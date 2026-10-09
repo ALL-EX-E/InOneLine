@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QToolButton,
 )
 from openpyxl import load_workbook
@@ -677,12 +678,26 @@ def main() -> int:
             raise AssertionError(f"P06 main tab order mismatch: {actual_tab_titles!r}")
         if window.minimumWidth() >= 800 or window.minimumHeight() >= 600:
             raise AssertionError("P06 main-window minimum is still tied to content size")
-        if window.main_scroll.widget() is not window.tabs:
-            raise AssertionError("P06 main tabs are outside the reusable scroll area")
-        if window.main_scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
-            raise AssertionError("P06 main horizontal scrolling is not available")
-        if window.main_scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
-            raise AssertionError("P06 main vertical scrolling is not available")
+        main_tab_pages = (
+            window.games_tab,
+            window.public_tab,
+            window.music_tab,
+            window.auction_tab,
+            window.completed_history_tab,
+            window.log_tab,
+            window.stream_tab,
+            window.settings_tab,
+        )
+        for page in main_tab_pages:
+            scroll = window._main_tab_scroll_by_page[page]
+            if not isinstance(scroll, QScrollArea):
+                raise AssertionError("P06 workspace is missing its scroll host")
+            if scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
+                raise AssertionError("P06 workspace horizontal scrolling is unavailable")
+            if scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
+                raise AssertionError("P06 workspace vertical scrolling is unavailable")
+        if not window.tabs.usesScrollButtons():
+            raise AssertionError("P06 tab navigation is not available at narrow widths")
 
         # Old installations persisted numeric indices in the former tab order.
         legacy_pages = [
@@ -701,7 +716,7 @@ def main() -> int:
             window._ui_settings.sync()
             window._restore_ui_state()
             app.processEvents()
-            if window.tabs.currentWidget() is not expected_page:
+            if window._current_main_page() is not expected_page:
                 raise AssertionError(
                     f"P06 legacy tab index {legacy_index} restored the wrong page"
                 )
@@ -709,7 +724,7 @@ def main() -> int:
                 raise AssertionError(
                     f"P06 legacy tab index {legacy_index} did not save its stable key"
                 )
-            if window._ui_settings.value("main_window/tab_index", -1, type=int) != window.tabs.indexOf(expected_page):
+            if window._ui_settings.value("main_window/tab_index", -1, type=int) != window.tabs.indexOf(window._main_tab_scroll_by_page[expected_page]):
                 raise AssertionError(
                     f"P06 legacy tab index {legacy_index} did not migrate to the new index"
                 )
@@ -717,10 +732,10 @@ def main() -> int:
         # P04-A: upgrading from hidden-list preferences must still show both
         # tables, preserve window state and keep explicit Enter navigation.
         original_size = window.size()
-        if window.tabs.currentIndex() != window.tabs.indexOf(window.settings_tab):
+        if window.tabs.currentIndex() != window.tabs.indexOf(window._main_tab_scroll_by_page[window.settings_tab]):
             raise AssertionError("P06 legacy-index fixture did not finish at Settings")
         for tab in (window.games_tab, window.public_tab):
-            window.tabs.setCurrentWidget(tab)
+            window._set_current_main_page(tab)
             app.processEvents()
             if not tab.table.isVisible() or tab.table.rowCount() != 2:
                 raise AssertionError("legacy hidden-list preference hid or changed a table")
@@ -742,7 +757,7 @@ def main() -> int:
                 raise AssertionError("list tab/search changed the outer window size")
 
         # The narrow shell scrolls its content while preserving top-level geometry.
-        window.tabs.setCurrentWidget(window.auction_tab)
+        window._set_current_main_page(window.auction_tab)
         narrow_width = max(window.minimumWidth() + 80, 600)
         narrow_height = max(window.minimumHeight() + 80, 440)
         window.resize(narrow_width, narrow_height)
@@ -750,9 +765,22 @@ def main() -> int:
         narrow_size = window.size()
         if narrow_size.width() >= 1100 or narrow_size.height() >= 700:
             raise AssertionError("P06 could not resize below 1100x700")
-        if window.main_scroll.horizontalScrollBar().maximum() <= 0:
-            raise AssertionError("P06 narrow main window did not expose horizontal scrolling")
-        window.tabs.setCurrentWidget(window.public_tab)
+        auction_scroll = window._main_tab_scroll_by_page[window.auction_tab]
+        if auction_scroll.horizontalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 narrow Auction workspace did not expose horizontal scrolling")
+
+        # Settings keeps its vertical bar at the visible right edge, even when
+        # its own horizontal scrollbar remains at the far left.
+        settings_scroll = window._main_tab_scroll_by_page[window.settings_tab]
+        window._set_current_main_page(window.settings_tab)
+        app.processEvents()
+        settings_scroll.horizontalScrollBar().setValue(0)
+        app.processEvents()
+        if settings_scroll.verticalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 Settings workspace has no vertical scrolling")
+        if not settings_scroll.verticalScrollBar().isVisible():
+            raise AssertionError("P06 Settings vertical scrollbar is not visible at the viewport edge")
+        window._set_current_main_page(window.public_tab)
         app.processEvents()
         if window.size() != narrow_size:
             raise AssertionError("switching tabs resized the narrow main window")
@@ -766,7 +794,7 @@ def main() -> int:
             raise AssertionError("P06 did not restore saved geometry below 1100x700")
         window.resize(original_size)
         app.processEvents()
-        window.tabs.setCurrentWidget(window.public_tab)
+        window._set_current_main_page(window.public_tab)
         app.processEvents()
 
         window._save_ui_state()
@@ -779,7 +807,7 @@ def main() -> int:
             raise AssertionError("retiring list visibility changed saved tab persistence")
         if reopened.value("main_window/tab_key", "", type=str) != "public":
             raise AssertionError("P06 stable tab key was not persisted")
-        window.tabs.setCurrentWidget(window.games_tab)
+        window._set_current_main_page(window.games_tab)
         app.processEvents()
 
         # P04-B / BUG-003: ordinary refresh/filter must not invent a new
@@ -843,7 +871,7 @@ def main() -> int:
         # on empty table space clears the current selection and ordinary refresh
         # must not invent a replacement selection.
         public_tab = window.public_tab
-        window.tabs.setCurrentWidget(public_tab)
+        window._set_current_main_page(public_tab)
         app.processEvents()
         if not public_tab.select_synced_search_result(first_id):
             raise AssertionError("P04-C fixture could not select the public row")
@@ -908,7 +936,7 @@ def main() -> int:
 
         if not public_tab.select_synced_search_result(first_id):
             raise AssertionError("P04-C fixture could not restore explicit Public selection")
-        window.tabs.setCurrentWidget(window.games_tab)
+        window._set_current_main_page(window.games_tab)
         app.processEvents()
 
         # P04-D / UI-007: non-empty main-list search ignores the active
