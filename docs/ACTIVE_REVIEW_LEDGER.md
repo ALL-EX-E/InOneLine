@@ -3823,3 +3823,24 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Повторный полный для этого corrective scope manual checklist: (1) `Список → Всего`, максимальное окно на 2560×1440: фильтры компактно слева, с нормальными промежутками; (2) несколько переходов максимум → минимум → максимум: подписи читаемы, порядок сохранён, строки списка не меняются, прокрутка таблицы доступна; (3) попробовать сузить `НАЗВАНИЕ`: заголовок не обрезается, `ДАТА ВЫХОДА` не расширяется вместо него. При `Архив: 0` пустая таблица ожидаема; `Всего` снова возвращает записи.
 - User-confirmed функциональные сценарии P07 сохраняются PASS; повторять их целиком без причины не нужно. Этот documents-only record не меняет протестированные runtime blobs. До нового manual PASS promotion и P08 не начинать.
 - **P07 = AWAITING MANUAL RETEST / NOT ACCEPTED / NOT MERGED.**
+
+
+## P07 — MANUALLY ACCEPTED; exact-blob promotion pending — 2026-10-09
+
+- Пользователь подтвердил повторную ручную QA: «Работает. Записываем и идём дальше». Приняты 2560×1440 / minimum / repeated resize transitions, compact filters и корректный title-column clamp. Ранее подтверждённые функциональные P07 сценарии сохраняются PASS.
+- Tested installer: run #192 (`37948159785`), artifact `11624039603`, 46 788 497 bytes, SHA-256 `65993b99073cd22e906ed4992a1c1d89b720e8b0ed1efc00ef53f2ef12e30b15`. Exact candidate head `950084b6d18d70af40a87c5b3544eea0f723d855`; fresh Regression Foundation #193 (`37949052091`) и wording #1356 (`37949052094`): **SUCCESS**.
+- Clean promotion должен переиспользовать все 12 exact tested runtime/test blobs candidate PR #68 поверх main `ef110927fe7d869b748ae55397cba28f833150f9`; ledger дополняется записью ручного PASS. Candidate history не вливается в main.
+- Review перед merge и обязательные clean-promotion / exact post-merge gates ещё выполняются. Не объявлять пакет MERGED/CLOSED до их завершения. Выпуск, version 1.0.8, schema 19 и 15 migrations не изменяются.
+- Следующий уже согласованный пакет — P08 (BUG-005/UI-039), existing shared media dedup/availability. Fresh read-only review разрешён, runtime P08 начинается после closure P07.
+- **P07 = MANUALLY ACCEPTED / CLEAN PROMOTION IN PROGRESS.**
+
+
+## P07 — premerge review: elimination lifecycle correction — REOPENED — 2026-10-09
+
+- Ручной PASS пользователя записан и сохраняется для уже проверенных функциональных/resize сценариев. Promotion PR #69 создан, но не merged; main остаётся `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Independent read-only review выявил Important нарушение утверждённого P07 требования. Fresh reproduction через реальные `Database.create_auction_session / run_weighted_wheel / archive_elimination_result / set_auction_wheel_format` подтверждает: после первого выбора local/overlay = `start_current`; после архивации и смены формата = `position`, хотя сессия ещё открыта.
+- Причина: оба callers передают helper только active=1 rows. Existing archive transition сохраняет `result='eliminated'` в inactive row и очищает result на оставшихся active rows. Табличная проекция правильно исключает архив, но теряет evidence о состоявшемся выбывании.
+- До runtime diff записан минимальный corrective scope: общий read-only DB adapter выводит elimination progress из существующих session entries без active filter и передаёт derived evidence в тот же presentation helper. Отображаемые rows/order остаются active-only; новая persistence/schema, изменение RNG или archive semantics не нужны.
+- Regression должна проходить реальный lifecycle: до выбора → выбранный лот → «В архив» → следующий раунд → смена формата → закрытие сессии; обе локальные таблицы и overlay должны совпадать. Current helper-only synthetic test этот переход не покрывал.
+- Дополнительно review отметил расширение существующего Shared XLSX local/cloud write race на position-only refresh; это ещё не подтверждённый data-loss incident. Проверить конкретный derived-only trigger перед завершением P07, не объявлять inherited risk новым наблюдённым сбоем.
+- **P07 = REOPENED / PREMERGE CORRECTION / NOT MERGED.** Прежняя promotion не сливается; P08 runtime не начинается до исправления, свежих Windows gates и точечного manual retest.
