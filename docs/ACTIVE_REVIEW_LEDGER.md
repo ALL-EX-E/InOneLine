@@ -3812,3 +3812,14 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Исправляется тот же reopened responsive пункт; **P07 NOT MERGED**.
 
 - Corrective runtime теперь учитывает natural button size hints перед перестройкой stats grid; при недостатке места число колонок уменьшается. Header clamp и trailing stretch сохранены. Python compile повторно **PASS**. Wide/compact regression проверяет один ряд на 2560 px и читаемость wrapped grids; Windows gates запускаются заново.
+
+
+## P07 — wide-window correction: Windows gates PASS; awaiting manual retest — 2026-10-09
+
+- Tested runtime candidate `da0ffcae9c687e3fbadee3e429c4905eee7d7e94`, PR #68. Windows Regression Foundation #192 (`37948159785`) завершён **SUCCESS**: native GUI + isolated 2560×1440 geometry probe, frozen startup/browser regression, installer build и silent installer startup. Publication wording #1354 (`37948159776`): **SUCCESS**.
+- В логе подтверждены `WIDE_WINDOW_2560x1440_GEOMETRY=PASS`, `1.0.8 GUI REGRESSION CORE: OK`, `FROZEN_STARTUP_BROWSER_REGRESSION=PASS`, `SILENT_INSTALL_STARTUP_REGRESSION=PASS`, `CLEAN_INSTALL_FILESYSTEM=PASS`. Новый corrective runtime diff не меняет filtering/data, app version, schema, migrations или auction logic.
+- Актуальная QA сборка: Actions run https://github.com/ALL-EX-E/InOneLine/actions/runs/37948159785 → `InOneLine_1.0.8_WINDOWS_QA`, artifact ID `11624039603`, 46 788 497 bytes, SHA-256 `65993b99073cd22e906ed4992a1c1d89b720e8b0ed1efc00ef53f2ef12e30b15`, expires 2026-10-16. В ZIP — `InOneLine_Setup_1.0.8.exe`. Предыдущие QA artifacts считаются superseded для текущего resize follow-up.
+- Drive QA folder по metadata прежней P06 сборки подтверждена: `1m7ed82NYoojIFN0-QdDKO8OnAn83qeU4`. Копирование новой сборки пока не выполнено: authenticated GitHub artifact reference получен, но скачивание в локальный workspace (требование текущего Drive uploader) вернуло HTTP 403 до записи файла. Сборка доступна через GitHub Actions. Bearer download URLs не публикуются и в ledger не сохраняются.
+- Повторный полный для этого corrective scope manual checklist: (1) `Список → Всего`, максимальное окно на 2560×1440: фильтры компактно слева, с нормальными промежутками; (2) несколько переходов максимум → минимум → максимум: подписи читаемы, порядок сохранён, строки списка не меняются, прокрутка таблицы доступна; (3) попробовать сузить `НАЗВАНИЕ`: заголовок не обрезается, `ДАТА ВЫХОДА` не расширяется вместо него. При `Архив: 0` пустая таблица ожидаема; `Всего` снова возвращает записи.
+- User-confirmed функциональные сценарии P07 сохраняются PASS; повторять их целиком без причины не нужно. Этот documents-only record не меняет протестированные runtime blobs. До нового manual PASS promotion и P08 не начинать.
+- **P07 = AWAITING MANUAL RETEST / NOT ACCEPTED / NOT MERGED.**
