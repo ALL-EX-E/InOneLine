@@ -733,6 +733,9 @@ class GamesTab(QWidget):
 
         for column in range(max(len(self._stat_filter_buttons_order), stats_columns) + 1):
             self._stats_layout.setColumnStretch(column, 0)
+        # Keep each filter at its natural width; let the trailing empty column
+        # absorb extra workspace width instead of spreading the buttons apart.
+        self._stats_layout.setColumnStretch(stats_columns, 1)
         for index, button in enumerate(self._stat_filter_buttons_order):
             row, column = divmod(index, stats_columns)
             self._stats_layout.addWidget(
@@ -846,7 +849,7 @@ class GamesTab(QWidget):
             return
         required = self._game_title_header_min_width()
         if new_size < required:
-            self.table.setColumnWidth(3, required)
+            self.table.setColumnWidth(2, required)
 
     def eventFilter(self, watched, event):
         if (

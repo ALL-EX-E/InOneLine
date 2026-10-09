@@ -650,6 +650,61 @@ def main() -> int:
                     )
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
+
+        # Wide-window manual QA: metadata filters stay adjacent after repeated
+        # compact/wide transitions, for both populated and empty projections.
+        games_tab = window.games_tab
+        games_table = games_tab.table
+        original_title_width = games_table.columnWidth(2)
+        for filter_key in ("all", "archive"):
+            games_tab.apply_stat_filter(filter_key)
+            expected_rows = tuple(
+                games_table.item(row, 2).text()
+                for row in range(games_table.rowCount())
+            )
+            for width, height in ((2560, 1440), (520, 640), (2560, 1440), (1100, 750)):
+                window.resize(width, height)
+                app.processEvents()
+                QTest.qWait(60)
+                app.processEvents()
+                if window.width() != width or window.height() != height:
+                    raise AssertionError(
+                        f"wide-window resize refused {width}x{height}: {window.size()}"
+                    )
+                actual_rows = tuple(
+                    games_table.item(row, 2).text()
+                    for row in range(games_table.rowCount())
+                )
+                if actual_rows != expected_rows:
+                    raise AssertionError("resizing changed the main-list projection")
+                if not games_tab._compact_controls_enabled:
+                    filters = games_tab._stat_filter_buttons_order
+                    for previous, following in zip(filters, filters[1:]):
+                        previous_right = previous.mapTo(
+                            games_tab, QPoint(previous.width(), 0)
+                        ).x()
+                        following_left = following.mapTo(games_tab, QPoint(0, 0)).x()
+                        gap = following_left - previous_right
+                        if not 4 <= gap <= 16:
+                            raise AssertionError(
+                                f"wide-window filters spread at {width}px: gap={gap}"
+                            )
+                else:
+                    for button in games_tab._stat_filter_buttons_order:
+                        if button.width() < button.fontMetrics().horizontalAdvance(button.text()) + 12:
+                            raise AssertionError("compact filter caption clipped after wide resize")
+
+                # An attempted manual shrink must protect the title itself,
+                # including an empty table, without widening the date column.
+                date_width = games_table.columnWidth(3)
+                required_title_width = games_tab._game_title_header_min_width()
+                games_table.setColumnWidth(2, 1)
+                if games_table.columnWidth(2) < required_title_width:
+                    raise AssertionError("main-list title header width floor was not enforced")
+                if games_table.columnWidth(3) != date_width:
+                    raise AssertionError("title width floor resized the adjacent date column")
+                games_table.setColumnWidth(2, original_title_width)
+        games_tab.apply_stat_filter("all")
         window.resize(initial_ui076_size)
         app.processEvents()
 
