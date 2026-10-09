@@ -910,6 +910,50 @@ def main() -> int:
             if group is None or group.layout() is None or group.layout().direction() != QBoxLayout.LeftToRight:
                 raise AssertionError("P06 OBS eyedropper is separated from its color field")
 
+        typography_groups = window.stream_tab.typography_control_groups
+        if len(typography_groups) != len(window.stream_tab.typography_controls):
+            raise AssertionError("P06 OBS typography control groups are incomplete")
+        for key, (size_group, color_group) in typography_groups.items():
+            if (
+                size_group.layout() is None
+                or size_group.layout().direction() != QBoxLayout.LeftToRight
+                or color_group.layout() is None
+                or color_group.layout().direction() != QBoxLayout.LeftToRight
+            ):
+                raise AssertionError(
+                    f"P06 OBS typography controls split inside their groups: {key}"
+                )
+            size_spin = window.stream_tab.typography_controls[key][1]
+            arrows = [
+                button
+                for button in size_group.findChildren(QPushButton)
+                if button.text() in {"▲", "▼"}
+            ]
+            if {button.text() for button in arrows} != {"▲", "▼"}:
+                raise AssertionError(
+                    f"P06 OBS font-size arrows are missing from one row: {key}"
+                )
+            control_y = [
+                size_spin.geometry().center().y(),
+                *(button.geometry().center().y() for button in arrows),
+            ]
+            if max(control_y) - min(control_y) > 4:
+                raise AssertionError(
+                    f"P06 OBS font-size arrows are not beside the size field: {key}"
+                )
+            color_button = window.stream_tab.typography_controls[key][2]
+            if color_button.width() < 140:
+                raise AssertionError(
+                    f"P06 OBS typography color field is squeezed: {key}"
+                )
+            if (
+                size_group.width() < size_group.layout().sizeHint().width()
+                or color_group.width() < color_group.layout().sizeHint().width()
+            ):
+                raise AssertionError(
+                    f"P06 OBS typography group is clipped: {key}"
+                )
+
         # The narrow Settings → Auction image selector and import action remain
         # in one compact row instead of leaving the label isolated.
         window._set_current_main_page(window.settings_tab)

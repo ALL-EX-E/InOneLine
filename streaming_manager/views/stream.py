@@ -398,6 +398,7 @@ class StreamTab(QWidget):
 
         self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
         self.typography_row_widgets: dict[str, tuple[QLabel, QWidget]] = {}
+        self.typography_control_groups: dict[str, tuple[QWidget, QWidget]] = {}
         typography_layout = QVBoxLayout()
         typography_layout.setSpacing(10)
 
@@ -1739,9 +1740,23 @@ class StreamTab(QWidget):
         step_up_btn.clicked.connect(size_spin.stepUp)
         step_down_btn.clicked.connect(size_spin.stepDown)
 
+        size_label = QLabel("Размер:")
+        size_controls_group = QWidget()
+        size_controls_layout = QHBoxLayout(size_controls_group)
+        size_controls_layout.setContentsMargins(0, 0, 0, 0)
+        size_controls_layout.setSpacing(6)
+        size_controls_layout.addWidget(size_label)
+        size_controls_layout.addWidget(size_spin)
+        size_controls_layout.addWidget(step_up_btn)
+        size_controls_layout.addWidget(step_down_btn)
+        size_controls_group.setFixedSize(
+            size_controls_layout.sizeHint().width() + 4,
+            max(size_label.sizeHint().height(), size_spin.sizeHint().height(), step_button_size),
+        )
+
         color_btn = QPushButton()
         color_text_width = color_btn.fontMetrics().horizontalAdvance("#FFFFFF")
-        color_btn.setMinimumWidth(max(112, color_text_width + 38))
+        color_btn.setMinimumWidth(max(140, color_text_width + 54))
         color_btn.setMaximumWidth(max(150, color_text_width + 54))
         color_btn.setToolTip("Выбрать цвет шрифта")
         self._set_color_button(color_btn, default_color)
@@ -1756,6 +1771,24 @@ class StreamTab(QWidget):
             lambda checked=False, button=color_btn: self._pick_color_from_screen(button)
         )
 
+        color_picker_group = QWidget()
+        color_picker_layout = QHBoxLayout(color_picker_group)
+        color_picker_layout.setContentsMargins(0, 0, 0, 0)
+        color_picker_layout.setSpacing(6)
+        color_picker_layout.addWidget(QLabel("Цвет:"))
+        color_picker_layout.addWidget(color_btn)
+        color_picker_layout.addWidget(pipette_btn)
+        color_picker_group.setFixedSize(
+            color_picker_layout.sizeHint().width() + 4,
+            max(
+                color_btn.sizeHint().height(),
+                pipette_btn.sizeHint().height(),
+                color_picker_layout.itemAt(0).widget().sizeHint().height(),
+            ),
+        )
+
+        # При переносе строки в узком окне размер и цвет переходят компактными
+        # горизонтальными группами: стрелки остаются у поля, цвет не сжимается.
         row = QWidget()
         row.setSizePolicy(
             QSizePolicy.Expanding,
@@ -1765,38 +1798,23 @@ class StreamTab(QWidget):
         row_layout.setContentsMargins(0, 0, 0, 0)
         row_layout.setSpacing(8)
         row_layout.addWidget(font_combo, 1)
-        row_layout.addWidget(QLabel("Размер:"))
-        row_layout.addWidget(size_spin)
-        row_layout.addWidget(step_up_btn)
-        row_layout.addWidget(step_down_btn)
-        row_layout.addWidget(QLabel("Цвет:"))
-        color_picker_group = QWidget()
-        color_picker_layout = QHBoxLayout(color_picker_group)
-        color_picker_layout.setContentsMargins(0, 0, 0, 0)
-        color_picker_layout.setSpacing(8)
-        color_picker_layout.addWidget(color_btn)
-        color_picker_layout.addWidget(pipette_btn)
-        color_picker_layout.addStretch()
-        color_picker_group.setFixedSize(
-            color_picker_layout.sizeHint().width() + 4,
-            max(color_btn.sizeHint().height(), pipette_btn.sizeHint().height()),
-        )
+        row_layout.addWidget(size_controls_group)
         row_layout.addWidget(color_picker_group)
 
-        # Запрещаем вертикальное схлопывание строки, которое раньше было
-        # заметно в невысоком окне.
         row.setMinimumHeight(
             max(
                 font_combo.sizeHint().height(),
-                size_spin.sizeHint().height(),
-                step_button_size,
-                color_btn.sizeHint().height(),
-                pipette_btn.sizeHint().height(),
+                size_controls_group.sizeHint().height(),
+                color_picker_group.sizeHint().height(),
             )
         )
 
         self.typography_controls[key] = (font_combo, size_spin, color_btn)
         self.typography_row_widgets[key] = (item_label, row)
+        self.typography_control_groups[key] = (
+            size_controls_group,
+            color_picker_group,
+        )
         parent_layout.addWidget(row)
 
     @staticmethod
