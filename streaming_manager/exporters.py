@@ -7,10 +7,10 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 
-from .database import Database, format_points
+from .database import Database
 
 
-PUBLIC_HEADERS = ["НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
+PUBLIC_HEADERS = ["НАЗВАНИЕ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС"]
 
 
 def export_public_csv(db: Database, path: str | Path) -> Path:
@@ -55,18 +55,3 @@ def export_public_xlsx(db: Database, path: str | Path) -> Path:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
     wb.save(path)
     return path
-
-
-def export_auction_pipe_csv(db: Database, path: str | Path) -> Path:
-    """Legacy pipe-delimited text: Название|целые баллы SM, без заголовка."""
-    path = Path(path)
-    with path.open("w", encoding="utf-8-sig", newline="") as f:
-        for game in db.auction_eligible_games():
-            f.write(f"{game.title}|{format_points(game.sm_points)}\n")
-    return path
-
-
-def auction_pipe_text(db: Database) -> str:
-    return "\n".join(
-        f"{game.title}|{format_points(game.sm_points)}" for game in db.auction_eligible_games()
-    )

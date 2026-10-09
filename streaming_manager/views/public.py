@@ -75,6 +75,37 @@ class PublicTab(QWidget):
         top.addWidget(self.count_label)
         layout.addLayout(top)
 
+        public_export_separator = QFrame()
+        public_export_separator.setFrameShape(QFrame.HLine)
+        public_export_separator.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(public_export_separator)
+
+        public_export_title = QLabel("Экспорт списка")
+        public_export_title.setStyleSheet("font-size: 12pt; font-weight: 700;")
+        layout.addWidget(public_export_title)
+
+        public_export_note = QLabel(
+            "CSV, JSON и Excel создают одноразовый снимок текущего публичного списка "
+            "и автоматически не обновляются. «Публичная таблица» ниже — отдельное "
+            "одностороннее зеркало с автоматическим обновлением."
+        )
+        public_export_note.setWordWrap(True)
+        public_export_note.setProperty("muted", True)
+        layout.addWidget(public_export_note)
+
+        public_export_buttons = QHBoxLayout()
+        self.public_export_csv_btn = QPushButton("Экспорт CSV")
+        self.public_export_json_btn = QPushButton("Экспорт JSON")
+        self.public_export_xlsx_btn = QPushButton("Экспорт Excel")
+        self.public_export_csv_btn.clicked.connect(self.export_csv)
+        self.public_export_json_btn.clicked.connect(self.export_json)
+        self.public_export_xlsx_btn.clicked.connect(self.export_xlsx)
+        public_export_buttons.addWidget(self.public_export_csv_btn)
+        public_export_buttons.addWidget(self.public_export_json_btn)
+        public_export_buttons.addWidget(self.public_export_xlsx_btn)
+        public_export_buttons.addStretch()
+        layout.addLayout(public_export_buttons)
+
         public_xlsx_separator = QFrame()
         public_xlsx_separator.setFrameShape(QFrame.HLine)
         public_xlsx_separator.setFrameShadow(QFrame.Sunken)
@@ -523,13 +554,19 @@ class PublicTab(QWidget):
             pass
 
     def _save(self, title: str, suffix: str, fn):
-        path, _ = QFileDialog.getSaveFileName(self, title, f"public_games{suffix}", f"*{suffix}")
-        if path:
-            try:
-                fn(self.db, path)
-                QMessageBox.information(self, "Экспорт", f"Файл сохранён:\n{path}")
-            except Exception as exc:
-                QMessageBox.critical(self, "Ошибка экспорта", str(exc))
+        path, _ = QFileDialog.getSaveFileName(
+            self, title, f"public_list{suffix}", f"*{suffix}"
+        )
+        if not path:
+            return
+        target = Path(path)
+        if target.suffix.lower() != suffix.lower():
+            target = target.with_suffix(suffix)
+        try:
+            fn(self.db, target)
+            QMessageBox.information(self, "Экспорт", f"Файл сохранён:\n{target}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Ошибка экспорта", str(exc))
 
     def export_csv(self):
         self._save("Экспорт CSV", ".csv", export_public_csv)

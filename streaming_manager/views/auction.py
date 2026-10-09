@@ -997,98 +997,37 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.auction_tabs.addTab(self.conduct_page, "Проведение")
         self.refresh_integration_status()
 
-        # ==========================================================
-        # LEGACY COMPATIBLE EXPORT
-        # ==========================================================
-        self.legacy_export_page = QWidget()
-        legacy_export_layout = QVBoxLayout(self.legacy_export_page)
-        legacy_export_layout.setContentsMargins(10, 10, 10, 10)
-        legacy_export_layout.setSpacing(10)
-
-        export_rules_row = QHBoxLayout()
-        self.export_rules_btn = QPushButton("Правила вкладки")
-        self.export_rules_btn.clicked.connect(
-            lambda: self._toggle_rules(
-                self.export_rules_label,
-                self.export_rules_btn,
-            )
+        # Main-list XLSX controls are re-parented to GamesTab by MainWindow.
+        # Keep only their temporary widget host here; the synchronization engine
+        # stays on AuctionTab so the established mirror workflow remains intact.
+        self._shared_xlsx_controls_host = QWidget(self)
+        self.shared_xlsx_create_btn = QPushButton(
+            "Создать таблицу", self._shared_xlsx_controls_host
         )
-        export_rules_row.addWidget(self.export_rules_btn)
-        export_rules_row.addStretch()
-        legacy_export_layout.addLayout(export_rules_row)
-
-        self.export_rules_label = QLabel(
-            "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
-            "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
-            "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
+        self.shared_xlsx_connect_btn = QPushButton(
+            "Подключить таблицу", self._shared_xlsx_controls_host
         )
-        self.export_rules_label.setWordWrap(True)
-        self.export_rules_label.setProperty("muted", True)
-        self.export_rules_label.setVisible(False)
-        legacy_export_layout.addWidget(self.export_rules_label)
-
-        buttons = QHBoxLayout()
-        export_btn = QPushButton("Экспорт CSV")
-        export_btn.clicked.connect(self.export_auction_csv)
-        copy_btn = QPushButton("Копировать список")
-        copy_btn.clicked.connect(self.copy_auction_list)
-        buttons.addWidget(export_btn)
-        buttons.addWidget(copy_btn)
-        buttons.addStretch()
-        legacy_export_layout.addLayout(buttons)
-
-        shared_separator = QFrame()
-        shared_separator.setFrameShape(QFrame.HLine)
-        shared_separator.setFrameShadow(QFrame.Sunken)
-        legacy_export_layout.addWidget(shared_separator)
-
-        shared_title = QLabel("Совместная таблица")
-        shared_title.setStyleSheet("font-size: 12pt; font-weight: 700;")
-        legacy_export_layout.addWidget(shared_title)
-
-        shared_description = QLabel(
-            "Обычный XLSX с основным списком игр. Файл можно хранить в папке "
-            "Google Drive Desktop и редактировать через Google Таблицы. Все "
-            "подключённые экземпляры In one line равноправны; применяется "
-            "последняя полученная версия файла."
+        self.shared_xlsx_disconnect_btn = QPushButton(
+            "Отключить", self._shared_xlsx_controls_host
         )
-        shared_description.setWordWrap(True)
-        shared_description.setProperty("muted", True)
-        legacy_export_layout.addWidget(shared_description)
-
-        shared_buttons = QHBoxLayout()
-        self.shared_xlsx_create_btn = QPushButton("Создать таблицу")
-        self.shared_xlsx_connect_btn = QPushButton("Подключить таблицу")
-        self.shared_xlsx_disconnect_btn = QPushButton("Отключить")
         self.shared_xlsx_create_btn.clicked.connect(self._shared_xlsx_create)
         self.shared_xlsx_connect_btn.clicked.connect(self._shared_xlsx_connect)
         self.shared_xlsx_disconnect_btn.clicked.connect(self._shared_xlsx_disconnect)
-        shared_buttons.addWidget(self.shared_xlsx_create_btn)
-        shared_buttons.addWidget(self.shared_xlsx_connect_btn)
-        shared_buttons.addWidget(self.shared_xlsx_disconnect_btn)
-        shared_buttons.addStretch()
-        legacy_export_layout.addLayout(shared_buttons)
 
-        shared_form = QFormLayout()
-        self.shared_xlsx_path_label = QLabel("Не подключена")
+        self.shared_xlsx_path_label = QLabel(
+            "Не подключена", self._shared_xlsx_controls_host
+        )
         self.shared_xlsx_path_label.setWordWrap(True)
         self.shared_xlsx_path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.shared_xlsx_status_label = QLabel("Выключено")
+        self.shared_xlsx_status_label = QLabel(
+            "Выключено", self._shared_xlsx_controls_host
+        )
         self.shared_xlsx_status_label.setWordWrap(True)
-        self.shared_xlsx_modified_label = QLabel("—")
-        shared_form.addRow("Таблица:", self.shared_xlsx_path_label)
-        shared_form.addRow("Состояние:", self.shared_xlsx_status_label)
-        shared_form.addRow("Последнее изменение:", self.shared_xlsx_modified_label)
-        legacy_export_layout.addLayout(shared_form)
-        legacy_export_layout.addStretch()
+        self.shared_xlsx_modified_label = QLabel(
+            "—", self._shared_xlsx_controls_host
+        )
 
         self._init_shared_xlsx_sync()
-
-        # R1.0.9: the former Auction -> Export page is no longer exposed as an
-        # auction subtab. Compatible export actions live in Settings -> Export,
-        # while the proven shared-XLSX synchronization controls are re-hosted
-        # on the main Games page by MainWindow. The sync engine remains here so
-        # no accepted synchronization semantics/timers are rewritten.
 
         # Подключаем currentChanged только после создания всех внутренних страниц.
         # QTabWidget испускает currentChanged уже при добавлении первой вкладки;

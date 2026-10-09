@@ -92,10 +92,6 @@ from ..twitch_b4 import (
     TwitchRewardDefinition,
 )
 from ..database import Database
-from ..exporters import (
-    export_auction_pipe_csv, export_public_csv, export_public_json, export_public_xlsx,
-    auction_pipe_text,
-)
 from ..random_sources import RandomOrgClient
 from ..media import (
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
@@ -692,69 +688,6 @@ class SettingsTab(QWidget):
         self.conversion_scroll = self._wrap_settings_page(self.conversion_page, conversion_layout)
         self.settings_tabs.addTab(self.conversion_scroll, "Конвертация")
 
-        # R1.0.9 — all file/list export actions are centralized here.
-        self.export_page = QWidget()
-        export_layout = QVBoxLayout(self.export_page)
-        export_layout.setContentsMargins(18, 18, 18, 18)
-        export_layout.setSpacing(12)
-
-        export_heading = QLabel("Экспорт")
-        export_heading.setStyleSheet("font-size: 15pt; font-weight: 700;")
-        export_layout.addWidget(export_heading)
-
-        public_heading = QLabel("Публичный список")
-        public_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        export_layout.addWidget(public_heading)
-        public_note = QLabel(
-            "Экспорт текущего публичного списка в отдельный файл. "
-            "Управление подключённой публичной XLSX-таблицей остаётся на вкладке «Публичный список»."
-        )
-        public_note.setWordWrap(True)
-        public_note.setProperty("muted", True)
-        export_layout.addWidget(public_note)
-
-        public_buttons = QHBoxLayout()
-        self.export_public_csv_btn = QPushButton("Экспорт CSV")
-        self.export_public_json_btn = QPushButton("Экспорт JSON")
-        self.export_public_xlsx_btn = QPushButton("Экспорт Excel")
-        self.export_public_csv_btn.clicked.connect(self.export_public_csv)
-        self.export_public_json_btn.clicked.connect(self.export_public_json)
-        self.export_public_xlsx_btn.clicked.connect(self.export_public_xlsx)
-        public_buttons.addWidget(self.export_public_csv_btn)
-        public_buttons.addWidget(self.export_public_json_btn)
-        public_buttons.addWidget(self.export_public_xlsx_btn)
-        public_buttons.addStretch()
-        export_layout.addLayout(public_buttons)
-
-        export_separator = QFrame()
-        export_separator.setProperty("line", True)
-        export_layout.addWidget(export_separator)
-
-        compatible_export_heading = QLabel("Совместимый экспорт")
-        compatible_export_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        export_layout.addWidget(compatible_export_heading)
-        compatible_export_note = QLabel(
-            "Для совместимого экспорта используется текущий список ДЛЯ АУКА: только активные "
-            "игры ИГРАЛ + НЕ ИГРАЛ. Экспорт и копирование выполняются в формате "
-            "Название|Баллы. ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив исключаются."
-        )
-        compatible_export_note.setWordWrap(True)
-        compatible_export_note.setProperty("muted", True)
-        export_layout.addWidget(compatible_export_note)
-
-        compatible_export_buttons = QHBoxLayout()
-        self.export_auction_csv_btn = QPushButton("Экспорт CSV")
-        self.copy_auction_list_btn = QPushButton("Копировать список")
-        self.export_auction_csv_btn.clicked.connect(self.export_auction_csv)
-        self.copy_auction_list_btn.clicked.connect(self.copy_auction_list)
-        compatible_export_buttons.addWidget(self.export_auction_csv_btn)
-        compatible_export_buttons.addWidget(self.copy_auction_list_btn)
-        compatible_export_buttons.addStretch()
-        export_layout.addLayout(compatible_export_buttons)
-        export_layout.addStretch()
-
-        self.export_scroll = self._wrap_settings_page(self.export_page, export_layout)
-        self.settings_tabs.addTab(self.export_scroll, "Экспорт")
         self.settings_tabs.currentChanged.connect(self._handle_settings_page_changed)
         self._refresh_conversion_rate_rows(force=True)
         self._refresh_pending_conversion_rows()
@@ -844,44 +777,6 @@ class SettingsTab(QWidget):
         if not 1 <= value <= AUCTION_AUTO_EXTEND_MAX_MS:
             return int(default)
         return value
-
-    def _save_export_file(self, title: str, default_name: str, suffix: str, fn) -> None:
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            title,
-            default_name,
-            f"*{suffix}",
-        )
-        if not path:
-            return
-        target = Path(path)
-        if target.suffix.lower() != suffix.lower():
-            target = target.with_suffix(suffix)
-        try:
-            fn(self.db, target)
-            QMessageBox.information(self, "Экспорт", f"Файл сохранён:\n{target}")
-        except Exception as exc:
-            QMessageBox.critical(self, "Ошибка экспорта", str(exc))
-
-    def export_public_csv(self) -> None:
-        self._save_export_file("Экспорт CSV", "public_games.csv", ".csv", export_public_csv)
-
-    def export_public_json(self) -> None:
-        self._save_export_file("Экспорт JSON", "public_games.json", ".json", export_public_json)
-
-    def export_public_xlsx(self) -> None:
-        self._save_export_file("Экспорт Excel", "public_games.xlsx", ".xlsx", export_public_xlsx)
-
-    def export_auction_csv(self) -> None:
-        self._save_export_file("Экспорт CSV", "auction.csv", ".csv", export_auction_pipe_csv)
-
-    def copy_auction_list(self) -> None:
-        QApplication.clipboard().setText(auction_pipe_text(self.db))
-        QMessageBox.information(
-            self,
-            "Экспорт",
-            "Список скопирован в буфер обмена.",
-        )
 
     def _update_auto_extend_conditional_visibility(self, *_args) -> None:
         if hasattr(self, "auto_extend_leader_duration"):
