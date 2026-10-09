@@ -700,9 +700,10 @@ class SettingsTab(QWidget):
 
     @staticmethod
     def _prepare_settings_page(page: QWidget, page_layout: QLayout) -> None:
-        """Keep each page at its natural size for the active workspace scroller."""
-        page_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        page.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Minimum)
+        """Let compact workspaces wrap each Settings page to their viewport."""
+        page_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        page.setMinimumWidth(0)
+        page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Minimum)
 
     @staticmethod
     def _format_duration_ms(milliseconds: int) -> str:

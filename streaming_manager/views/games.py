@@ -445,6 +445,7 @@ class GamesTab(QWidget):
         self._header_layout.addLayout(filters, 0, 0, 1, 2)
 
         actions = QBoxLayout(QBoxLayout.LeftToRight)
+        actions.setSpacing(8)
         self._action_layout = actions
         self.add_btn = QPushButton("Добавить")
         self.add_btn.setProperty("primary", True)
@@ -560,6 +561,7 @@ class GamesTab(QWidget):
         self._header_layout.addLayout(stats, 2, 0, 1, 2)
 
         sorting_actions = QBoxLayout(QBoxLayout.LeftToRight)
+        sorting_actions.setSpacing(8)
         self._sorting_actions_layout = sorting_actions
         self.sorting_rules_btn = QPushButton("Правила сортировки")
         self.sorting_rules_btn.setToolTip(

@@ -727,8 +727,8 @@ def main() -> int:
             scroll = window._main_tab_scroll_by_page[page]
             if not isinstance(scroll, QScrollArea):
                 raise AssertionError("P06 workspace is missing its scroll host")
-            if scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
-                raise AssertionError("P06 workspace horizontal scrolling is unavailable")
+            if scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAlwaysOff:
+                raise AssertionError("P06 workspace-level horizontal scrolling is enabled")
             if scroll.verticalScrollBarPolicy() != Qt.ScrollBarAsNeeded:
                 raise AssertionError("P06 workspace vertical scrolling is unavailable")
         if window.tabs.usesScrollButtons():
@@ -791,7 +791,7 @@ def main() -> int:
             if window.size() != original_size:
                 raise AssertionError("list tab/search changed the outer window size")
 
-        # The narrow shell scrolls its content while preserving top-level geometry.
+        # The narrow shell reflows tabs while preserving top-level geometry.
         window._set_current_main_page(window.auction_tab)
         narrow_width = window.minimumWidth()
         narrow_height = max(window.minimumHeight() + 80, 440)
@@ -801,8 +801,26 @@ def main() -> int:
         if narrow_size.width() >= 1100 or narrow_size.height() >= 700:
             raise AssertionError("P06 could not resize below 1100x700")
         auction_scroll = window._main_tab_scroll_by_page[window.auction_tab]
-        if auction_scroll.horizontalScrollBar().maximum() <= 0:
-            raise AssertionError("P06 narrow Auction workspace did not expose horizontal scrolling")
+        window._update_responsive_layout()
+        app.processEvents()
+        if auction_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 narrow Auction page still scrolls horizontally")
+        if auction_scroll.horizontalScrollBarPolicy() != Qt.ScrollBarAlwaysOff:
+            raise AssertionError("P06 Auction page-level horizontal bar is enabled")
+
+        # The Conduct page collapses the combined operator panes vertically;
+        # the table keeps its own columns while the nested page never pans.
+        auction = window.auction_tab
+        auction.auction_tabs.setCurrentWidget(auction.conduct_page)
+        app.processEvents()
+        window._update_responsive_layout()
+        app.processEvents()
+        if auction.conduct_content_layout.direction() != QBoxLayout.TopToBottom:
+            raise AssertionError("P06 narrow Auction Conduct panes did not stack")
+        if auction.conduct_content_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Auction Conduct content still scrolls horizontally")
+        auction.auction_tabs.setCurrentWidget(auction.lots_page)
+        app.processEvents()
 
         # Compact tabs retain readable short captions and distinct accent colors.
         expected_compact_titles = [
@@ -841,8 +859,25 @@ def main() -> int:
         if compact_bar.tabRect(window.tabs.count() - 1).right() >= compact_bar.width():
             raise AssertionError("P06 compact tab labels do not fit in the tab strip")
 
+        # Each main workspace must fit the tab viewport; only table widgets
+        # may own horizontal column scrolling.
+        for page in main_tab_pages:
+            window._set_current_main_page(page)
+            app.processEvents()
+            QTest.qWait(20)
+            window._update_responsive_layout()
+            app.processEvents()
+            page_scroll = window._main_tab_scroll_by_page[page]
+            if page_scroll.horizontalScrollBar().maximum() != 0:
+                raise AssertionError(
+                    f"P06 {page_scroll.accessibleName()} page still scrolls horizontally"
+                )
+            if page.width() > page_scroll.viewport().width() + 1:
+                raise AssertionError(
+                    f"P06 {page_scroll.accessibleName()} content exceeds its viewport"
+                )
         # The main-list table keeps its own vertical bar inside the visible
-        # workspace even when page-level horizontal scrolling is at the left.
+        # workspace while its horizontal bar stays attached to the table.
         window._set_current_main_page(window.games_tab)
         app.processEvents()
         QTest.qWait(100)
@@ -879,9 +914,35 @@ def main() -> int:
         ]
         if max(toolbar_right_edges) - min(toolbar_right_edges) > 8:
             raise AssertionError("P06 compact List toolbar is not aligned on the right")
+        toolbar_buttons = (
+            window.games_tab.sorting_rules_btn,
+            window.games_tab.copy_list_overlay_url_btn,
+            window.games_tab.open_list_overlay_preview_btn,
+            window.games_tab.clear_all_btn,
+        )
+        for previous, following in zip(toolbar_buttons, toolbar_buttons[1:]):
+            gap = (
+                following.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.height()
+            )
+            if gap < 6:
+                raise AssertionError(
+                    f"P06 compact List toolbar buttons have no breathing room: {gap}px"
+                )
         left_actions = [
             widget for widget in window.games_tab._action_buttons if widget.isVisible()
         ]
+        for previous, following in zip(left_actions, left_actions[1:]):
+            gap = (
+                following.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.mapTo(window.games_tab, QPoint(0, 0)).y()
+                - previous.height()
+            )
+            if gap < 6:
+                raise AssertionError(
+                    f"P06 compact List action buttons have no breathing room: {gap}px"
+                )
         if left_actions:
             left_action_right = max(
                 widget.mapTo(window.games_tab, QPoint(widget.width(), 0)).x()
@@ -904,13 +965,15 @@ def main() -> int:
         if table_bar_right >= games_viewport.width():
             raise AssertionError("P06 main-list vertical bar moved outside the visible workspace")
 
-        # Settings keeps its vertical bar at the visible right edge, even when
-        # its own horizontal scrollbar remains at the far left.
+        # Settings keeps its vertical bar at the visible right edge without
+        # introducing a workspace-level horizontal scrollbar.
         settings_scroll = window._main_tab_scroll_by_page[window.settings_tab]
         window._set_current_main_page(window.settings_tab)
         app.processEvents()
         settings_scroll.horizontalScrollBar().setValue(0)
         app.processEvents()
+        if settings_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Settings page still scrolls horizontally")
         if settings_scroll.verticalScrollBar().maximum() <= 0:
             raise AssertionError("P06 Settings workspace has no vertical scrolling")
         if not settings_scroll.verticalScrollBar().isVisible():

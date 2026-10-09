@@ -3,8 +3,9 @@ from __future__ import annotations
 from PySide6.QtCore import QEventLoop, QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QComboBox, QFontComboBox, QHeaderView, QHBoxLayout, QPushButton,
-    QSpinBox, QTableWidget, QTableWidgetItem, QWidget,
+    QAbstractSpinBox, QBoxLayout, QComboBox, QFontComboBox, QFormLayout,
+    QHeaderView, QHBoxLayout, QPushButton, QScrollArea, QSpinBox,
+    QTabWidget, QTableWidget, QTableWidgetItem, QWidget,
 )
 
 
@@ -87,6 +88,219 @@ QPushButton[statFilter="true"]:checked {
 QFrame[line="true"] { background: #383d42; max-height: 1px; }
 QStatusBar { background: #181a1c; color: #bfc5ca; }
 """
+
+
+
+def reflow_narrow_rows(
+    root: QWidget,
+    available_width: int,
+    *,
+    compact: bool,
+    button_gap: int = 8,
+) -> None:
+    """Stack only overflowing horizontal groups in compact workspaces.
+
+    Original directions and spacing are restored when the workspace grows.
+    Expanding horizontal spacers are temporarily removed from stacked rows so
+    they cannot turn into large vertical gaps. Explicitly hidden widgets are
+    excluded from width measurement; Qt's layouts also omit them from geometry.
+    """
+    if root.layout() is None:
+        return
+
+    box_states = getattr(root, "_responsive_box_layout_states", None)
+    if box_states is None:
+        box_states = {}
+        root._responsive_box_layout_states = box_states
+    form_states = getattr(root, "_responsive_form_layout_states", None)
+    if form_states is None:
+        form_states = {}
+        root._responsive_form_layout_states = form_states
+
+    layouts = []
+    seen_layouts = set()
+    seen_widgets = set()
+
+    def collect_widget(widget: QWidget) -> None:
+        if widget is None or id(widget) in seen_widgets:
+            return
+        seen_widgets.add(id(widget))
+        if (
+            widget.inherits("QAbstractItemView")
+            or widget.inherits("QAbstractButton")
+            or widget.inherits("QComboBox")
+            or widget.inherits("QAbstractSpinBox")
+        ):
+            return
+        if isinstance(widget, QTabWidget):
+            for index in range(widget.count()):
+                collect_widget(widget.widget(index))
+            return
+        if isinstance(widget, QScrollArea):
+            if widget.widget() is not None:
+                collect_widget(widget.widget())
+            return
+        child_layout = widget.layout()
+        if child_layout is not None:
+            collect_layout(child_layout)
+        for child_widget in widget.children():
+            if isinstance(child_widget, QWidget):
+                collect_widget(child_widget)
+
+    def collect_layout(layout) -> None:
+        if layout is None or id(layout) in seen_layouts:
+            return
+        seen_layouts.add(id(layout))
+        layouts.append(layout)
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            child_layout = item.layout()
+            if child_layout is not None:
+                collect_layout(child_layout)
+            child_widget = item.widget()
+            if child_widget is not None:
+                collect_widget(child_widget)
+
+    collect_layout(root.layout())
+
+    for layout in layouts:
+        if not isinstance(layout, QFormLayout):
+            continue
+        if layout not in form_states:
+            form_states[layout] = layout.rowWrapPolicy()
+        original_policy = form_states[layout]
+        target = original_policy
+        if compact and original_policy != QFormLayout.WrapAllRows:
+            target = QFormLayout.WrapLongRows
+        if layout.rowWrapPolicy() != target:
+            layout.setRowWrapPolicy(target)
+
+    def spacing_for_width(layout) -> int:
+        spacing = layout.spacing()
+        return spacing if spacing >= 0 else 6
+
+    def item_width(item) -> int:
+        widget = item.widget()
+        if widget is not None:
+            if widget.isHidden():
+                return 0
+            return max(
+                widget.minimumWidth(),
+                widget.minimumSizeHint().width(),
+                widget.sizeHint().width(),
+            )
+        child = item.layout()
+        if child is not None:
+            child_parent = child.parentWidget()
+            if child_parent is not None and child_parent.isHidden():
+                return 0
+            return preferred_width(child)
+        spacer = item.spacerItem()
+        if spacer is not None:
+            if item.expandingDirections() & Qt.Orientation.Horizontal:
+                return 0
+            return max(0, item.sizeHint().width())
+        return 0
+
+    def preferred_width(layout) -> int:
+        margins = layout.contentsMargins()
+        widths = [
+            item_width(layout.itemAt(index))
+            for index in range(layout.count())
+        ]
+        widths = [width for width in widths if width > 0]
+        if not widths:
+            return margins.left() + margins.right()
+        if isinstance(layout, QBoxLayout):
+            state = box_states.get(layout)
+            direction = state["direction"] if state else layout.direction()
+            if direction in (QBoxLayout.LeftToRight, QBoxLayout.RightToLeft):
+                width = sum(widths) + spacing_for_width(layout) * (len(widths) - 1)
+            else:
+                width = max(widths)
+        else:
+            width = layout.sizeHint().width() - margins.left() - margins.right()
+        return max(0, width) + margins.left() + margins.right()
+
+    for layout in reversed(layouts):
+        if not isinstance(layout, QBoxLayout):
+            continue
+        state = box_states.get(layout)
+        if state is None:
+            state = {
+                "direction": layout.direction(),
+                "spacing": layout.spacing(),
+                "removed_spacers": [],
+            }
+            box_states[layout] = state
+
+        original = state["direction"]
+        originally_horizontal = original in (
+            QBoxLayout.LeftToRight,
+            QBoxLayout.RightToLeft,
+        )
+        parent = layout.parentWidget()
+        if parent is not None and parent.isHidden():
+            continue
+
+        if originally_horizontal:
+            parent_width = (
+                parent.contentsRect().width()
+                if parent is not None
+                else available_width
+            )
+            if parent_width <= 0:
+                parent_width = available_width
+            needs_stack = bool(
+                compact
+                and parent_width > 0
+                and preferred_width(layout) > max(0, parent_width - 2)
+            )
+            target_direction = QBoxLayout.TopToBottom if needs_stack else original
+            if needs_stack and layout.direction() != QBoxLayout.TopToBottom:
+                for index in range(layout.count() - 1, -1, -1):
+                    item = layout.itemAt(index)
+                    if (
+                        item.spacerItem() is not None
+                        and item.expandingDirections()
+                        & Qt.Orientation.Horizontal
+                    ):
+                        removed = layout.takeAt(index)
+                        state["removed_spacers"].append((index, removed))
+                state["removed_spacers"].sort(key=lambda entry: entry[0])
+            elif not needs_stack and state["removed_spacers"]:
+                for index, item in state["removed_spacers"]:
+                    layout.insertItem(index, item)
+                state["removed_spacers"].clear()
+
+            if layout.direction() != target_direction:
+                layout.setDirection(target_direction)
+            target_spacing = (
+                max(button_gap, state["spacing"])
+                if needs_stack and state["spacing"] >= 0
+                else button_gap if needs_stack else state["spacing"]
+            )
+            if layout.spacing() != target_spacing:
+                layout.setSpacing(target_spacing)
+        else:
+            visible_button_count = sum(
+                1
+                for index in range(layout.count())
+                if (widget := layout.itemAt(index).widget()) is not None
+                and not widget.isHidden()
+                and widget.inherits("QPushButton")
+            )
+            target_spacing = (
+                max(button_gap, state["spacing"])
+                if compact and visible_button_count > 1 and state["spacing"] >= 0
+                else button_gap
+                if compact and visible_button_count > 1
+                else state["spacing"]
+            )
+            if layout.spacing() != target_spacing:
+                layout.setSpacing(target_spacing)
+
+    root.layout().activate()
 
 
 def suspend_live_content_resize(

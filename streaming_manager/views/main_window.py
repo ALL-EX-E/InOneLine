@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QScrollArea,
     QSizePolicy,
+    QTableView,
     QStyle,
     QTabWidget,
     QWidget,
@@ -29,7 +30,7 @@ from ..donationalerts import DonationAlertsAdapter
 from ..donationalerts_runtime import DonationAlertsDonationService, DonationAlertsRuntime
 from ..database import Database
 from ..workers import FunctionWorker
-from .common import APP_STYLE, autosize_compact_columns_once
+from .common import APP_STYLE, autosize_compact_columns_once, reflow_narrow_rows
 from .games import GamesTab
 from .public import PublicTab
 from .stream import StreamTab
@@ -148,6 +149,8 @@ class MainWindow(QMainWindow):
         self._main_tab_title_by_page: dict[QWidget, str] = {}
         self._main_tab_compact_title_by_page: dict[QWidget, str] = {}
         self._main_tab_icon_by_page: dict[QWidget, QIcon] = {}
+        self._responsive_watch_widgets: set[QWidget] = set()
+        self._responsive_nested_scroll_vertical_policy: dict[QScrollArea, Qt.ScrollBarPolicy] = {}
         self._main_tabs_compact = False
         self._responsive_layout_timer = QTimer(self)
         self._responsive_layout_timer.setSingleShot(True)
@@ -367,10 +370,37 @@ class MainWindow(QMainWindow):
         )
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setMinimumSize(0, 0)
         scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+        page.setMinimumWidth(0)
+        page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.MinimumExpanding)
+        for nested_tabs in page.findChildren(QTabWidget):
+            nested_tabs.currentChanged.connect(
+                lambda *_: self._queue_responsive_layout_update()
+            )
+            for index in range(nested_tabs.count()):
+                nested_page = nested_tabs.widget(index)
+                nested_page.setMinimumWidth(0)
+                nested_page.setSizePolicy(
+                    QSizePolicy.Ignored, QSizePolicy.MinimumExpanding
+                )
+        for nested_scroll in page.findChildren(QScrollArea):
+            self._responsive_nested_scroll_vertical_policy[nested_scroll] = (
+                nested_scroll.verticalScrollBarPolicy()
+            )
+            nested_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            if nested_scroll.widget() is not None:
+                nested_scroll.widget().setMinimumWidth(0)
+                nested_scroll.widget().setSizePolicy(
+                    QSizePolicy.Ignored, QSizePolicy.MinimumExpanding
+                )
+        for watched in (page, *page.findChildren(QWidget)):
+            if watched not in self._responsive_watch_widgets:
+                watched.installEventFilter(self)
+                self._responsive_watch_widgets.add(watched)
         scroll.setWidget(page)
         scroll.setAccessibleName(title)
         self._main_tab_scroll_by_page[page] = scroll
@@ -432,6 +462,18 @@ class MainWindow(QMainWindow):
             )
             if is_tab_layout or is_workspace_viewport:
                 self._queue_responsive_layout_update()
+        elif (
+            watched in self._responsive_watch_widgets
+            and event.type()
+            in (
+                QEvent.Type.LayoutRequest,
+                QEvent.Type.Show,
+                QEvent.Type.Hide,
+                QEvent.Type.ChildAdded,
+                QEvent.Type.ChildRemoved,
+            )
+        ):
+            self._queue_responsive_layout_update()
         return super().eventFilter(watched, event)
 
     def _update_responsive_layout(self) -> None:
@@ -466,23 +508,70 @@ class MainWindow(QMainWindow):
                 self.tabs.setTabToolTip(index, title)
                 self.tabs.setTabWhatsThis(index, title)
 
-        games_scroll = self._main_tab_scroll_by_page.get(
-            getattr(self, "games_tab", None)
-        )
-        if games_scroll is not None:
-            viewport_width = games_scroll.viewport().width()
-            if viewport_width > 0:
-                self.games_tab.set_compact_controls(
-                    viewport_width <= 980,
-                    viewport_width,
+        for page, scroll in self._main_tab_scroll_by_page.items():
+            viewport_width = scroll.viewport().width()
+            if viewport_width <= 0:
+                continue
+
+            if page.minimumWidth() != 0:
+                page.setMinimumWidth(0)
+            if page.maximumWidth() != viewport_width:
+                page.setMaximumWidth(viewport_width)
+            page_policy = page.sizePolicy()
+            if page_policy.horizontalPolicy() != QSizePolicy.Ignored:
+                page.setSizePolicy(
+                    QSizePolicy.Ignored,
+                    page_policy.verticalPolicy(),
                 )
-                margins = self.games_tab.layout().contentsMargins()
+
+            compact_workspace = viewport_width <= 980
+            if page is self.games_tab:
+                page.set_compact_controls(compact_workspace, viewport_width)
+                margins = page.layout().contentsMargins()
                 table_width = max(
                     1,
                     viewport_width - margins.left() - margins.right(),
                 )
-                if self.games_tab.table.maximumWidth() != table_width:
-                    self.games_tab.table.setMaximumWidth(table_width)
+                if page.table.maximumWidth() != table_width:
+                    page.table.setMaximumWidth(table_width)
+            else:
+                reflow_narrow_rows(
+                    page,
+                    viewport_width,
+                    compact=compact_workspace,
+                )
+
+            for table in page.findChildren(QTableView):
+                if page is self.games_tab and table is page.table:
+                    continue
+                if table.minimumWidth() != 0:
+                    table.setMinimumWidth(0)
+                if table.maximumWidth() != viewport_width:
+                    table.setMaximumWidth(viewport_width)
+                table_policy = table.sizePolicy()
+                if table_policy.horizontalPolicy() != QSizePolicy.Ignored:
+                    table.setSizePolicy(
+                        QSizePolicy.Ignored,
+                        table_policy.verticalPolicy(),
+                    )
+
+            for nested_scroll, normal_vertical_policy in (
+                self._responsive_nested_scroll_vertical_policy.items()
+            ):
+                if nested_scroll is page or not page.isAncestorOf(nested_scroll):
+                    continue
+                target_vertical_policy = (
+                    Qt.ScrollBarAsNeeded
+                    if compact_workspace
+                    else normal_vertical_policy
+                )
+                if (
+                    nested_scroll.horizontalScrollBarPolicy()
+                    != Qt.ScrollBarAlwaysOff
+                ):
+                    nested_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+                if nested_scroll.verticalScrollBarPolicy() != target_vertical_policy:
+                    nested_scroll.setVerticalScrollBarPolicy(target_vertical_policy)
 
     def _current_main_page(self) -> QWidget | None:
         current = self.tabs.currentWidget()
@@ -496,6 +585,7 @@ class MainWindow(QMainWindow):
         if index < 0 or index >= self.tabs.count():
             return
 
+        self._queue_responsive_layout_update()
         current = self._main_tab_page_by_scroll.get(self.tabs.widget(index))
 
         auction_refreshed = self.auction_tab.set_main_tab_visible(
