@@ -419,42 +419,76 @@ def main() -> int:
                     f"UI-076 points label clipped at {width}px: "
                     f"{points_label.width()} vs {points_label.sizeHint().width()}"
                 )
-            sorting_y = window.games_tab.sorting_rules_btn.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).y()
-            badge_y = points_label.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).y()
-            if abs(sorting_y - badge_y) > 3:
-                raise AssertionError(
-                    f"UI-076 points not on sorting actions row at {width}px: "
-                    f"{sorting_y} vs {badge_y}"
+            if window.games_tab._compact_controls_enabled:
+                # At narrow widths the UI-076 badge joins the right-hand
+                # vertical action stack, after preview and before clear-list.
+                compact_stack = (
+                    window.games_tab.sorting_rules_btn,
+                    window.games_tab.copy_list_overlay_url_btn,
+                    window.games_tab.open_list_overlay_preview_btn,
+                    points_label,
+                    window.games_tab.clear_all_btn,
                 )
-            last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
-                window.games_tab,
-                window.games_tab.open_list_overlay_preview_btn.rect().topRight()
-            ).x()
-            badge_left = points_label.mapTo(
-                window.games_tab, QPoint(0, 0)
-            ).x()
-            gap = badge_left - last_action_right - 1
-            if not 4 <= gap <= 16:
-                raise AssertionError(
-                    f"UI-076 points not immediately after preview at {width}px: gap={gap}"
-                )
-            if measured_action_gap is None:
-                measured_action_gap = gap
-                measured_badge_left = badge_left
-            if abs(gap - measured_action_gap) > 1:
-                raise AssertionError(
-                    f"UI-076 badge jitters relative to preview at {width}px: "
-                    f"{gap} vs {measured_action_gap}"
-                )
-            if abs(badge_left - measured_badge_left) > 1:
-                raise AssertionError(
-                    f"UI-076 badge position shifts with window width at {width}px: "
-                    f"{badge_left} vs {measured_badge_left}"
-                )
+                stack_positions = [
+                    (
+                        widget.mapTo(window.games_tab, QPoint(0, 0)).y(),
+                        widget.mapTo(
+                            window.games_tab, widget.rect().topRight()
+                        ).x(),
+                    )
+                    for widget in compact_stack
+                ]
+                if any(
+                    stack_positions[index + 1][0] <= stack_positions[index][0]
+                    for index in range(len(stack_positions) - 1)
+                ):
+                    raise AssertionError(
+                        f"P06 compact actions not stacked in order at {width}px"
+                    )
+                stack_right_edges = [position[1] for position in stack_positions]
+                if max(stack_right_edges) - min(stack_right_edges) > 3:
+                    raise AssertionError(
+                        f"P06 compact actions are not right-aligned at {width}px: "
+                        f"{stack_right_edges}"
+                    )
+            else:
+                sorting_y = window.games_tab.sorting_rules_btn.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).y()
+                badge_y = points_label.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).y()
+                if abs(sorting_y - badge_y) > 3:
+                    raise AssertionError(
+                        f"UI-076 points not on sorting actions row at {width}px: "
+                        f"{sorting_y} vs {badge_y}"
+                    )
+                last_action_right = window.games_tab.open_list_overlay_preview_btn.mapTo(
+                    window.games_tab,
+                    window.games_tab.open_list_overlay_preview_btn.rect().topRight()
+                ).x()
+                badge_left = points_label.mapTo(
+                    window.games_tab, QPoint(0, 0)
+                ).x()
+                gap = badge_left - last_action_right - 1
+                if not 4 <= gap <= 16:
+                    raise AssertionError(
+                        f"UI-076 points not immediately after preview at {width}px: "
+                        f"gap={gap}"
+                    )
+                if measured_action_gap is None:
+                    measured_action_gap = gap
+                    measured_badge_left = badge_left
+                if abs(gap - measured_action_gap) > 1:
+                    raise AssertionError(
+                        f"UI-076 badge jitters relative to preview at {width}px: "
+                        f"{gap} vs {measured_action_gap}"
+                    )
+                if abs(badge_left - measured_badge_left) > 1:
+                    raise AssertionError(
+                        f"UI-076 badge position shifts with window width at {width}px: "
+                        f"{badge_left} vs {measured_badge_left}"
+                    )
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
         window.resize(initial_ui076_size)
