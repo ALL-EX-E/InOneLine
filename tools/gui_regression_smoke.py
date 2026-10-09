@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import time
@@ -54,8 +55,29 @@ from streaming_manager.constants import (
 )
 from streaming_manager.database import Database, DuplicateGameError, Game
 from streaming_manager.media import MEDIA_CATEGORY_SOUNDTRACK
+from streaming_manager.position_policy import (
+    POSITION_COLUMNS_SINGLE,
+    POSITION_COLUMNS_START_CURRENT,
+    position_columns_for_surface,
+)
+from streaming_manager.shared_xlsx import (
+    SHARED_XLSX_HEADERS,
+    main_games_rows,
+    presentation_hash,
+    position_projection_matches,
+    read_shared_xlsx,
+    state_hash,
+    write_shared_xlsx,
+)
+from streaming_manager.public_xlsx import (
+    PUBLIC_XLSX_HEADERS,
+    public_mirror_rows,
+    public_state_hash,
+    write_public_xlsx,
+)
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
+from tools.position_policy_smoke import assert_elimination_lifecycle
 
 
 def free_local_port() -> int:
@@ -90,7 +112,289 @@ def cleanup_tree(path: Path) -> None:
         raise last_error
 
 
+
+
+
+def assert_position_policy() -> None:
+    max_amount = {"mode": "max_amount", "status": "running"}
+    tie_wheel = {"mode": "max_amount", "status": "awaiting_wheel"}
+    direct_standard = {"mode": "weighted_wheel", "wheel_format": "standard"}
+    direct_elimination = {
+        "mode": "weighted_wheel",
+        "wheel_format": "elimination",
+    }
+
+    assert position_columns_for_surface("main_list", max_amount) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface("public_list", max_amount) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface("auction", None) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface("auction_overlay", None) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface("auction", max_amount) == POSITION_COLUMNS_START_CURRENT
+    assert position_columns_for_surface("auction_overlay", tie_wheel) == POSITION_COLUMNS_START_CURRENT
+
+    assert position_columns_for_surface("auction", direct_standard) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface(
+        "auction_overlay",
+        direct_standard,
+        [{"result": "winner"}],
+    ) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface("auction", direct_elimination) == POSITION_COLUMNS_SINGLE
+    assert position_columns_for_surface(
+        "auction",
+        direct_elimination,
+        [{"result": "elimination_selected"}],
+    ) == POSITION_COLUMNS_START_CURRENT
+    assert position_columns_for_surface(
+        "auction_overlay",
+        {"mode": "weighted_wheel", "wheel_format": "standard"},
+        [{"result": "eliminated"}],
+    ) == POSITION_COLUMNS_START_CURRENT
+
+
+def assert_shared_projection_preserves_external_edit(app, window, root: Path) -> None:
+    """A derived-only refresh must import an already delivered cloud edit first."""
+    db = window.db
+    auction = window.auction_tab
+    path = root / "p07_shared_projection_race.xlsx"
+    auction_id = db.create_auction_session("max_amount", 60)
+
+    def wait_for_worker() -> None:
+        deadline = time.monotonic() + 8
+        while auction._shared_xlsx_worker is not None:
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                raise AssertionError("P07 Shared XLSX worker did not finish")
+            QTest.qWait(10)
+        app.processEvents()
+
+    try:
+        initial = write_shared_xlsx(db, path)
+        auction._shared_xlsx_activate(
+            path, persist=False, import_now=False,
+            initial_hash=initial["hash"],
+            initial_presentation_hash=initial["presentation_hash"],
+            initial_signature=initial["signature"],
+        )
+        auction._shared_xlsx_poll_timer.stop()
+        workbook = load_workbook(path)
+        edited_title = str(workbook.active["B2"].value)
+        cloud_review = "P07 cloud review delivered before position refresh"
+        workbook.active["G2"] = cloud_review
+        workbook.save(path)
+        workbook.close()
+        top_points = max(game.sm_points for game in db.auction_eligible_games())
+        db.add_or_increment_auction_lot(
+            auction_id, "P07 Shared Temporary", int(top_points) + 10_000,
+        )
+        local_rows = main_games_rows(db)
+        if state_hash(local_rows) != initial["hash"]:
+            raise AssertionError("P07 race fixture changed logical permanent data")
+        if presentation_hash(local_rows) == initial["presentation_hash"]:
+            raise AssertionError("P07 race fixture did not change derived positions")
+
+        auction.shared_xlsx_local_data_changed()
+        auction._shared_xlsx_write_timer.stop()
+        auction._shared_xlsx_start_local_write()
+        wait_for_worker()
+        preserved = read_shared_xlsx(path)
+        if not any(
+            row["title"] == edited_title and row["review"] == cloud_review
+            for row in preserved["rows"]
+        ):
+            raise AssertionError("P07 position-only refresh overwrote a cloud business edit")
+
+        # Reuse the existing stable-file poll/import path, then drain its
+        # projection rewrite without waiting for wall-clock poll intervals.
+        auction._shared_xlsx_poll()
+        auction._shared_xlsx_poll()
+        wait_for_worker()
+        auction._shared_xlsx_write_timer.stop()
+        auction._shared_xlsx_start_local_write()
+        wait_for_worker()
+        local_rows = main_games_rows(db)
+        final_payload = read_shared_xlsx(path)
+        if not any(
+            row["title"] == edited_title and row["review"] == cloud_review
+            for row in local_rows
+        ):
+            raise AssertionError("P07 cloud business edit was not imported into the database")
+        if not position_projection_matches(local_rows, final_payload):
+            raise AssertionError("P07 deferred Shared position projection did not converge")
+        print("P07_SHARED_POSITION_REFRESH_PRESERVES_CLOUD_EDIT=PASS")
+    finally:
+        wait_for_worker()
+        auction._shared_xlsx_disconnect()
+        db.cancel_auction(auction_id)
+
+
+def assert_position_xlsx_mirrors(db: Database, root: Path) -> None:
+    shared_path = root / "p07_shared_position_mirror.xlsx"
+    shared_result = write_shared_xlsx(db, shared_path)
+    shared_rows = main_games_rows(db)
+    shared_workbook = load_workbook(shared_path, read_only=True, data_only=True)
+    try:
+        sheet_rows = list(shared_workbook.active.iter_rows(values_only=True))
+    finally:
+        shared_workbook.close()
+    if tuple(sheet_rows[0]) != SHARED_XLSX_HEADERS:
+        raise AssertionError(f"Shared XLSX header mismatch: {sheet_rows[0]!r}")
+    initial_import = read_shared_xlsx(shared_path)
+    if not position_projection_matches(shared_rows, initial_import):
+        raise AssertionError("Shared XLSX derived positions do not match local projection")
+
+    expected_shared = {
+        str(row["title"]): row["position"]
+        for row in shared_rows
+    }
+    actual_shared = {
+        str(row[1]): row[0]
+        for row in sheet_rows[1:]
+    }
+    if actual_shared != expected_shared:
+        raise AssertionError(
+            f"Shared XLSX position mismatch: {actual_shared!r} != {expected_shared!r}"
+        )
+    if "UI076 Archive" not in actual_shared or "UI076 Temporary" in actual_shared:
+        raise AssertionError("Shared XLSX position mirror included the wrong fixture scope")
+
+    position_only_rows = [dict(row) for row in shared_rows]
+    position_only_rows[0]["position"] = (
+        int(position_only_rows[0]["position"] or 0) + 50
+    )
+    if state_hash(position_only_rows) != shared_result["hash"]:
+        raise AssertionError("Shared logical hash included derived position")
+    if presentation_hash(position_only_rows) == shared_result["presentation_hash"]:
+        raise AssertionError("Shared presentation hash ignored derived position")
+
+    edited = load_workbook(shared_path)
+    edited.active["A2"] = 987654
+    edited.save(shared_path)
+    edited.close()
+    imported = read_shared_xlsx(shared_path)
+    if imported["hash"] != shared_result["hash"]:
+        raise AssertionError("Manual Shared XLSX position edit changed import hash")
+    if position_projection_matches(shared_rows, imported):
+        raise AssertionError("Manual Shared XLSX position edit was not detected for rewrite")
+
+    legacy_path = root / "p07_shared_legacy_headers.xlsx"
+    shutil.copyfile(shared_path, legacy_path)
+    legacy = load_workbook(legacy_path)
+    legacy.active.delete_cols(1)
+    legacy.save(legacy_path)
+    legacy.close()
+    legacy_import = read_shared_xlsx(legacy_path)
+    if legacy_import["hash"] != shared_result["hash"]:
+        raise AssertionError("Legacy Shared XLSX without position no longer imports")
+    if legacy_import["has_position_column"]:
+        raise AssertionError("Legacy Shared XLSX was mistaken for the new position projection")
+    if position_projection_matches(shared_rows, legacy_import):
+        raise AssertionError("Legacy Shared XLSX was not marked for position projection refresh")
+
+    public_path = root / "p07_public_position_mirror.xlsx"
+    public_result = write_public_xlsx(db, public_path)
+    public_rows = public_mirror_rows(db)
+    public_workbook = load_workbook(public_path, read_only=True, data_only=True)
+    try:
+        public_sheet_rows = list(public_workbook.active.iter_rows(values_only=True))
+    finally:
+        public_workbook.close()
+    if tuple(public_sheet_rows[0]) != PUBLIC_XLSX_HEADERS:
+        raise AssertionError(
+            f"Public mirror XLSX header mismatch: {public_sheet_rows[0]!r}"
+        )
+    expected_public = {
+        str(row["title"]): row["position"]
+        for row in public_rows
+    }
+    actual_public = {
+        str(row[1]): row[0]
+        for row in public_sheet_rows[1:]
+    }
+    if actual_public != expected_public:
+        raise AssertionError(
+            f"Public XLSX position mismatch: {actual_public!r} != {expected_public!r}"
+        )
+    if {"UI076 Archive", "UI076 Temporary"} & set(actual_public):
+        raise AssertionError("Public XLSX position mirror included an out-of-scope fixture")
+
+    if public_rows:
+        changed_public_rows = [dict(row) for row in public_rows]
+        changed_public_rows[0]["position"] = (
+            int(changed_public_rows[0]["position"] or 0) + 50
+        )
+        if public_state_hash(changed_public_rows) == public_result["hash"]:
+            raise AssertionError("Public mirror hash ignored derived position")
+
+
+
+def assert_wide_window_layout(app, window, test_sizes) -> None:
+    # Wide-window manual QA: metadata filters stay adjacent after repeated
+    # compact/wide transitions, for both populated and empty projections.
+    games_tab = window.games_tab
+    games_table = games_tab.table
+    original_title_width = games_table.columnWidth(2)
+    for filter_key in ("all", "archive"):
+        games_tab.apply_stat_filter(filter_key)
+        expected_rows = tuple(
+            games_table.item(row, 2).text()
+            for row in range(games_table.rowCount())
+        )
+        for width, height in test_sizes:
+            window.resize(width, height)
+            app.processEvents()
+            QTest.qWait(150)
+            app.processEvents()
+            if window.width() != width or window.height() != height:
+                raise AssertionError(
+                    f"wide-window resize refused {width}x{height}: {window.size()}"
+                )
+            actual_rows = tuple(
+                games_table.item(row, 2).text()
+                for row in range(games_table.rowCount())
+            )
+            if actual_rows != expected_rows:
+                raise AssertionError("resizing changed the main-list projection")
+            if width == 2560 and games_tab._stats_columns != len(games_tab._stat_filter_buttons_order):
+                raise AssertionError("filters did not return to one row at 2560px")
+            if games_tab._stats_columns == len(games_tab._stat_filter_buttons_order):
+                filters = games_tab._stat_filter_buttons_order
+                for previous, following in zip(filters, filters[1:]):
+                    previous_right = previous.mapTo(
+                        games_tab, QPoint(previous.width(), 0)
+                    ).x()
+                    following_left = following.mapTo(games_tab, QPoint(0, 0)).x()
+                    gap = following_left - previous_right
+                    if not 4 <= gap <= 16:
+                        raise AssertionError(
+                            f"wide-window filters spread at {width}px: gap={gap}"
+                        )
+            else:
+                for button in games_tab._stat_filter_buttons_order:
+                    if button.width() < button.fontMetrics().horizontalAdvance(button.text()) + 12:
+                        raise AssertionError(
+                            f"compact filter caption clipped after wide resize: "
+                            f"platform={QApplication.platformName()}, size={window.size()}, "
+                            f"text={button.text()!r}, actual={button.width()}, "
+                            f"caption={button.fontMetrics().horizontalAdvance(button.text())}, "
+                            f"hint={button.sizeHint().width()}, minimum={button.minimumSizeHint().width()}, "
+                            f"viewport={window._main_tab_scroll_by_page[games_tab].viewport().width()}, "
+                            f"grid={games_tab._stats_layout.geometry()}"
+                        )
+
+            # An attempted manual shrink must protect the title itself,
+            # including an empty table, without widening the date column.
+            date_width = games_table.columnWidth(3)
+            required_title_width = games_tab._game_title_header_min_width()
+            games_table.setColumnWidth(2, 1)
+            if games_table.columnWidth(2) < required_title_width:
+                raise AssertionError("main-list title header width floor was not enforced")
+            if games_table.columnWidth(3) != date_width:
+                raise AssertionError("title width floor resized the adjacent date column")
+            games_table.setColumnWidth(2, original_title_width)
+    games_tab.apply_stat_filter("all")
+
+
 def main() -> int:
+    assert_position_policy()
     app = QApplication.instance() or QApplication(sys.argv)
     app.setOrganizationName("Local Streaming Tools QA")
     app.setApplicationName(f"InOneLine 1.0.8 GUI Regression Core {os.getpid()}")
@@ -344,6 +648,16 @@ def main() -> int:
         QTest.qWait(250)
         app.processEvents()
 
+        if "--wide-window-probe" in sys.argv:
+            assert_wide_window_layout(
+                app, window,
+                ((2560, 1440), (520, 640), (2560, 1440), (1100, 750)),
+            )
+            if uncaught:
+                raise AssertionError(f"wide-window GUI exception: {uncaught[0]!r}")
+            print("WIDE_WINDOW_2560x1440_GEOMETRY=PASS")
+            return 0
+
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
@@ -491,6 +805,23 @@ def main() -> int:
                     )
             if points_label.text() != "Всего баллов: 15000":
                 raise AssertionError("UI-076 resizing changed the total")
+
+        # Native Windows sizes stay within the runner's actual desktop.
+        # An isolated offscreen process also exercises the exact 2560x1440 size.
+        native_screen = window.screen().availableGeometry()
+        native_width = max(520, min(2560, native_screen.width() - 80))
+        native_height = max(360, min(1440, native_screen.height() - 80))
+        assert_wide_window_layout(
+            app, window,
+            ((native_width, native_height), (520, min(640, native_height)),
+             (native_width, native_height)),
+        )
+        subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--wide-window-probe"],
+            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+            check=True,
+            timeout=60,
+        )
         window.resize(initial_ui076_size)
         app.processEvents()
 
@@ -511,6 +842,8 @@ def main() -> int:
         app.processEvents()
         if points_label.text() != "Всего баллов: 15321":
             raise AssertionError("UI-076 archive or temporary exclusion wrong")
+
+        assert_position_xlsx_mirrors(db, root)
 
         public_export_expected = db.public_games()
         public_export_titles = {str(row["title"]) for row in public_export_expected}
@@ -642,13 +975,16 @@ def main() -> int:
                 f"public-list description lookup mismatch: {public_descriptions!r}"
             )
         public_description = public_descriptions[0]
-        if "НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС" not in public_description:
+        if "ПОЗИЦИЯ / НАЗВАНИЕ / БАЛЛЫ / ОТЗЫВ / СТАТУС" not in public_description:
             raise AssertionError(
                 f"public-list description title label mismatch: {public_description!r}"
             )
         if "НАЗВАНИЕ ИГРЫ" in public_description:
             raise AssertionError("legacy public-list description title label remains")
-        public_title_header = window.public_tab.table.horizontalHeaderItem(2)
+        public_position_header = window.public_tab.table.horizontalHeaderItem(0)
+        if public_position_header is None or public_position_header.text() != "ПОЗИЦИЯ":
+            raise AssertionError("public-list position header mismatch")
+        public_title_header = window.public_tab.table.horizontalHeaderItem(1)
         if public_title_header is None or public_title_header.text() != "НАЗВАНИЕ":
             raise AssertionError(
                 "public-list table title header mismatch: "
@@ -666,7 +1002,10 @@ def main() -> int:
                 f"add button label mismatch: {window.games_tab.add_btn.text()!r}"
             )
 
-        games_title_header = window.games_tab.table.horizontalHeaderItem(3)
+        games_position_header = window.games_tab.table.horizontalHeaderItem(1)
+        if games_position_header is None or games_position_header.text() != "ПОЗИЦИЯ":
+            raise AssertionError("main-list position header mismatch")
+        games_title_header = window.games_tab.table.horizontalHeaderItem(2)
         if games_title_header is None or games_title_header.text() != "НАЗВАНИЕ":
             raise AssertionError(
                 "main-list title header mismatch: "
@@ -1366,7 +1705,7 @@ def main() -> int:
             raise AssertionError("search changed the selected statistic filter")
         if games_tab.table.rowCount() != 1:
             raise AssertionError("search did not ignore the active statistic filter")
-        searched_title = games_tab.table.item(0, 3)
+        searched_title = games_tab.table.item(0, 2)
         if searched_title is None or searched_title.text() != "P04 Search Archived":
             raise AssertionError("search did not include the archived matching record")
         if not games_tab.filter_buttons[STATUS_NOT_PLAYED].isChecked():
@@ -1392,7 +1731,7 @@ def main() -> int:
             raise AssertionError("UI-009 native clear reset the selected filter button")
         if games_tab.table.rowCount() != 1:
             raise AssertionError("clearing search did not restore the active statistic filter")
-        restored_title = games_tab.table.item(0, 3)
+        restored_title = games_tab.table.item(0, 2)
         if restored_title is None or restored_title.text() != "Smoke Game B":
             raise AssertionError("clearing search restored the wrong filtered result")
 
@@ -1419,7 +1758,7 @@ def main() -> int:
             raise AssertionError("UI-009 native clear unchecked Archive statistic filter")
         if games_tab.table.rowCount() != 1:
             raise AssertionError("UI-009 native clear did not restore archive entries")
-        archived_title = games_tab.table.item(0, 3)
+        archived_title = games_tab.table.item(0, 2)
         if archived_title is None or archived_title.text() != "P04 Search Archived":
             raise AssertionError("UI-009 native clear displayed the wrong archive entry")
 
@@ -1950,16 +2289,16 @@ def main() -> int:
         window.games_tab.refresh()
         window.public_tab.refresh()
         app.processEvents()
-        games_item = window.games_tab.table.item(0, 3)
-        public_item = window.public_tab.table.item(0, 2)
+        games_item = window.games_tab.table.item(0, 2)
+        public_item = window.public_tab.table.item(0, 1)
         if games_item is None or public_item is None:
             raise AssertionError("table reuse smoke has no initial cells")
         window.games_tab.refresh()
         window.public_tab.refresh()
         app.processEvents()
-        if window.games_tab.table.item(0, 3) is not games_item:
+        if window.games_tab.table.item(0, 2) is not games_item:
             raise AssertionError("Games refresh replaced an unchanged Qt cell")
-        if window.public_tab.table.item(0, 2) is not public_item:
+        if window.public_tab.table.item(0, 1) is not public_item:
             raise AssertionError("Public refresh replaced an unchanged Qt cell")
 
         games = window.games_tab
@@ -2001,6 +2340,86 @@ def main() -> int:
 
         print("[3/4] D26 soundtrack selectors / live gain")
         auction = window.auction_tab
+        position_fixture = [{
+            "game_id": 9_999_001,
+            "title": "P07 Table Fixture",
+            "start_position": 2,
+            "current_position": 3,
+            "total_sm_points": 1200,
+            "auction_only": False,
+            "review": "",
+        }]
+        auction._populate_lot_table(
+            auction.table,
+            position_fixture,
+            None,
+            position_mode=POSITION_COLUMNS_SINGLE,
+        )
+        if auction.table.columnCount() != 3 or [
+            auction.table.horizontalHeaderItem(column).text()
+            for column in range(auction.table.columnCount())
+        ] != ["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ"]:
+            raise AssertionError("Auction single-position table schema is wrong")
+        if auction.table.item(0, 0).text() != "3":
+            raise AssertionError("Auction current position value is wrong")
+        if auction._lot_compact_columns != (0, 2):
+            raise AssertionError("Auction single-position compact columns are wrong")
+
+        auction._populate_lot_table(
+            auction.conduct_table,
+            position_fixture,
+            None,
+            position_mode=POSITION_COLUMNS_SINGLE,
+        )
+        auction._sync_wheel_chance_visibility(None)
+        if (
+            auction.conduct_table.columnCount() != 4
+            or getattr(auction, "_conduct_chance_column", None) != 2
+            or not auction.conduct_table.isColumnHidden(2)
+        ):
+            raise AssertionError("Auction compact chance-column layout is wrong")
+
+        auction._populate_lot_table(
+            auction.table,
+            position_fixture,
+            None,
+            position_mode=POSITION_COLUMNS_START_CURRENT,
+        )
+        if (
+            auction.table.columnCount() != 4
+            or [
+                auction.table.horizontalHeaderItem(column).text()
+                for column in range(auction.table.columnCount())
+            ]
+            != ["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ"]
+        ):
+            raise AssertionError("Auction start/current table schema is wrong")
+        if [
+            auction.table.item(0, column).text()
+            for column in (0, 1)
+        ] != ["2", "3"]:
+            raise AssertionError("Auction start/current position values are wrong")
+        if auction._lot_compact_columns != (0, 1, 3):
+            raise AssertionError("Auction start/current compact columns are wrong")
+
+        auction._populate_lot_table(
+            auction.conduct_table,
+            position_fixture,
+            None,
+            position_mode=POSITION_COLUMNS_START_CURRENT,
+        )
+        auction._sync_wheel_chance_visibility(None)
+        if (
+            auction.conduct_table.columnCount() != 5
+            or getattr(auction, "_conduct_chance_column", None) != 3
+            or not auction.conduct_table.isColumnHidden(3)
+        ):
+            raise AssertionError("Auction start/current chance-column layout is wrong")
+        if auction._conduct_compact_columns != (0, 1, 3, 4):
+            raise AssertionError("Auction start/current conduct compact columns are wrong")
+        window._finalize_compact_headers_after_polish()
+        auction.refresh()
+
         if int(auction.wheel_soundtrack_combo.currentData() or 0) != wheel_asset.id:
             raise AssertionError("wheel soundtrack selection was not restored")
         if auction.wheel_soundtrack_volume.value() != 37:
@@ -2055,6 +2474,30 @@ def main() -> int:
             raise AssertionError("re-selected external wheel soundtrack was not adopted")
         if "доступен" not in auction.wheel_soundtrack_status.text().lower():
             raise AssertionError("re-selected wheel soundtrack stayed unavailable")
+
+        assert_shared_projection_preserves_external_edit(app, window, root)
+
+        def check_lifecycle_tables(phase, expected):
+            auction.refresh_force()
+            window._finalize_compact_headers_after_polish()
+            expected_headers = (
+                ["СТАРТ", "ТЕКУЩАЯ"]
+                if expected == POSITION_COLUMNS_START_CURRENT
+                else ["ПОЗИЦИЯ", "НАЗВАНИЕ"]
+            )
+            for table in (auction.table, auction.conduct_table):
+                actual_headers = [
+                    table.horizontalHeaderItem(column).text()
+                    for column in range(2)
+                ]
+                if actual_headers != expected_headers:
+                    raise AssertionError(
+                        f"P07 {phase}: local table headers "
+                        f"{actual_headers!r} != {expected_headers!r}"
+                    )
+
+        assert_elimination_lifecycle(db, check_lifecycle_tables)
+        print("P07_LOCAL_AND_OVERLAY_ELIMINATION_LIFECYCLE=PASS")
 
         # Populate the temporary database so the main-list row scrollbar is
         # genuinely visible, then verify it stays inside the viewport at x=0.

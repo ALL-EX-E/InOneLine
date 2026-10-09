@@ -180,6 +180,7 @@ body.preview #api-state.visible { display: block; }
   let lastPresentationSignature = "";
   let currentRows = [];
   let currentShowChance = false;
+  let currentPositionMode = "position";
   let autoScroll = false;
   let direction = 1;
   let scrollY = 0;
@@ -194,11 +195,13 @@ body.preview #api-state.visible { display: block; }
     row.appendChild(cell);
   }
 
-  function buildColumnGroup(target, widths, showChance) {
+  function buildColumnGroup(target, widths, showChance, positionMode) {
     const fragment = document.createDocumentFragment();
+    const positionWidths = positionMode === "start_current"
+      ? [widths.start, widths.current]
+      : [widths.position];
     const ordered = [
-      widths.start,
-      widths.current,
+      ...positionWidths,
       null,
       ...(showChance ? [widths.chance] : []),
       widths.points,
@@ -246,6 +249,12 @@ body.preview #api-state.visible { display: block; }
     if (!currentRows.length) return;
 
     const widths = {
+      position: maxMeasured(
+        currentRows,
+        row => row.current_position,
+        "col-pos",
+        "ПОЗИЦИЯ"
+      ),
       start: maxMeasured(
         currentRows,
         row => row.start_position,
@@ -274,8 +283,18 @@ body.preview #api-state.visible { display: block; }
       ),
     };
 
-    buildColumnGroup(headerCols, widths, currentShowChance);
-    buildColumnGroup(bodyCols, widths, currentShowChance);
+    buildColumnGroup(
+      headerCols,
+      widths,
+      currentShowChance,
+      currentPositionMode
+    );
+    buildColumnGroup(
+      bodyCols,
+      widths,
+      currentShowChance,
+      currentPositionMode
+    );
     clampScroll();
   }
 
@@ -287,15 +306,23 @@ body.preview #api-state.visible { display: block; }
   function renderRows(payload) {
     const rows = Array.isArray(payload.rows) ? payload.rows : [];
     const showChance = Boolean(payload.show_wheel_chance);
-    const signature = JSON.stringify([showChance, rows]);
+    const positionMode = payload.position_columns === "start_current"
+      ? "start_current"
+      : "position";
+    const signature = JSON.stringify([showChance, positionMode, rows]);
     if (signature === lastRowsSignature) return false;
     lastRowsSignature = signature;
     currentRows = rows;
     currentShowChance = showChance;
+    currentPositionMode = positionMode;
 
     headerRow.replaceChildren();
-    addCell(headerRow, "СТАРТ", "col-pos", true);
-    addCell(headerRow, "ТЕКУЩАЯ", "col-pos", true);
+    if (positionMode === "start_current") {
+      addCell(headerRow, "СТАРТ", "col-pos", true);
+      addCell(headerRow, "ТЕКУЩАЯ", "col-pos", true);
+    } else {
+      addCell(headerRow, "ПОЗИЦИЯ", "col-pos", true);
+    }
     addCell(headerRow, "НАЗВАНИЕ", "col-title", true);
     if (showChance) {
       addCell(headerRow, "ШАНС В КОЛЕСЕ", "col-chance", true);
@@ -305,8 +332,12 @@ body.preview #api-state.visible { display: block; }
     const fragment = document.createDocumentFragment();
     for (const item of rows) {
       const tr = document.createElement("tr");
-      addCell(tr, item.start_position, "col-pos");
-      addCell(tr, item.current_position, "col-pos");
+      if (positionMode === "start_current") {
+        addCell(tr, item.start_position, "col-pos");
+        addCell(tr, item.current_position, "col-pos");
+      } else {
+        addCell(tr, item.current_position, "col-pos");
+      }
       addCell(tr, item.title, "col-title");
       if (showChance) addCell(tr, item.chance_text, "col-chance");
       addCell(tr, item.points_text, "col-points");

@@ -290,10 +290,10 @@ class MainWindow(QMainWindow):
         targets = (
             (self.games_tab.table, self.games_tab._COMPACT_COLUMNS),
             (self.public_tab.table, self.public_tab._COMPACT_COLUMNS),
-            (self.auction_tab.table, self.auction_tab._LOT_COMPACT_COLUMNS),
+            (self.auction_tab.table, self.auction_tab._lot_compact_columns),
             (
                 self.auction_tab.conduct_table,
-                self.auction_tab._CONDUCT_COMPACT_COLUMNS,
+                self.auction_tab._conduct_compact_columns,
             ),
         )
         for table, columns in targets:

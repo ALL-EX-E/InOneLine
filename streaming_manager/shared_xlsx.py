@@ -18,6 +18,7 @@ from .database import Database, display_date, normalize_title_key, parse_date, p
 
 
 SHARED_XLSX_HEADERS = (
+    "ПОЗИЦИЯ",
     "НАЗВАНИЕ ИГРЫ",
     "ДАТА ВЫХОДА",
     "БАЛЛЫ",
@@ -26,6 +27,7 @@ SHARED_XLSX_HEADERS = (
     "ОТЗЫВ",
     "АРХИВ",
 )
+SHARED_XLSX_REQUIRED_HEADERS = SHARED_XLSX_HEADERS[1:]
 SHARED_XLSX_SHEET = "spisok"
 
 
@@ -98,14 +100,15 @@ def _parse_release_date(value, *, row_no: int, title: str) -> str | None:
 
 
 def main_games_rows(db: Database) -> list[dict]:
-    """Return the complete permanent main list, including archive.
-
-    Temporary auction-only lots are intentionally excluded by list_games().
-    """
+    """Return the permanent main list and its authoritative effective positions."""
+    snapshot = db.games_refresh_snapshot(include_archived=True)
+    positions = snapshot["positions"]
     result: list[dict] = []
-    for game in db.list_games(include_archived=True):
+    for game in snapshot["games"]:
+        position = positions.get(int(game.id), (None, None))[1]
         result.append(
             {
+                "position": int(position) if position is not None else None,
                 "title": game.title,
                 "release_date": game.release_date,
                 "sm_points": int(game.sm_points),
@@ -138,6 +141,65 @@ def state_hash(rows: list[dict]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def presentation_hash(rows: list[dict]) -> str:
+    """Hash the complete exported projection, including derived position."""
+    canonical = []
+    for row in rows:
+        position = row.get("position")
+        canonical.append(
+            {
+                "position": int(position) if position is not None else None,
+                "title": str(row.get("title") or "").strip(),
+                "release_date": row.get("release_date") or None,
+                "sm_points": int(row.get("sm_points") or 0),
+                "coop": int(row.get("coop") or 0),
+                "status": str(row.get("status") or STATUS_NOT_PLAYED),
+                "review": str(row.get("review") or "").strip(),
+                "archived": int(row.get("archived") or 0),
+            }
+        )
+    canonical.sort(key=lambda row: normalize_title_key(row["title"]))
+    payload = json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def position_projection_matches(rows: list[dict], source: dict) -> bool:
+    """Check that XLSX's derived position column matches local presentation.
+
+    Position is never imported into database state. This comparison only
+    decides whether the connected mirror should be rewritten from the
+    authoritative local projection.
+    """
+    if not bool(source.get("has_position_column")):
+        return False
+    actual_positions = source.get("position_projection")
+    if not isinstance(actual_positions, dict):
+        return False
+
+    expected_positions = {
+        normalize_title_key(str(row.get("title") or "")): row.get("position")
+        for row in rows
+    }
+    if set(actual_positions) != set(expected_positions):
+        return False
+
+    for title_key, expected in expected_positions.items():
+        raw = actual_positions[title_key]
+        if raw is None or str(raw).strip() == "":
+            actual = None
+        else:
+            try:
+                numeric = float(raw)
+                if not numeric.is_integer():
+                    return False
+                actual = int(numeric)
+            except (TypeError, ValueError, OverflowError):
+                return False
+        if actual != (int(expected) if expected is not None else None):
+            return False
+    return True
+
+
 def write_shared_xlsx(db: Database, path: str | Path) -> dict:
     """Write a normal Google-Sheets-readable XLSX and atomically replace target."""
     path = Path(path)
@@ -161,6 +223,7 @@ def write_shared_xlsx(db: Database, path: str | Path) -> dict:
         release = date.fromisoformat(row["release_date"]) if row.get("release_date") else None
         sheet.append(
             [
+                row.get("position"),
                 row["title"],
                 release,
                 int(row["sm_points"]),
@@ -172,14 +235,17 @@ def write_shared_xlsx(db: Database, path: str | Path) -> dict:
         )
 
     sheet.freeze_panes = "A2"
-    sheet.auto_filter.ref = f"A1:G{max(1, sheet.max_row)}"
-    widths = {"A": 42, "B": 16, "C": 14, "D": 18, "E": 18, "F": 55, "G": 12}
+    sheet.auto_filter.ref = f"A1:H{max(1, sheet.max_row)}"
+    widths = {
+        "A": 12, "B": 42, "C": 16, "D": 14,
+        "E": 18, "F": 18, "G": 55, "H": 12,
+    }
     for column, width in widths.items():
         sheet.column_dimensions[column].width = width
 
     for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row):
-        row[1].number_format = "DD.MM.YYYY"
-        row[2].number_format = "0"
+        row[2].number_format = "DD.MM.YYYY"
+        row[3].number_format = "0"
         for cell in row:
             cell.alignment = Alignment(vertical="top", wrap_text=True)
 
@@ -193,9 +259,9 @@ def write_shared_xlsx(db: Database, path: str | Path) -> dict:
     sheet.add_data_validation(coop_validation)
     sheet.add_data_validation(status_validation)
     sheet.add_data_validation(archive_validation)
-    coop_validation.add(f"D2:D{max_validation_row}")
-    status_validation.add(f"E2:E{max_validation_row}")
-    archive_validation.add(f"G2:G{max_validation_row}")
+    coop_validation.add(f"E2:E{max_validation_row}")
+    status_validation.add(f"F2:F{max_validation_row}")
+    archive_validation.add(f"H2:H{max_validation_row}")
 
     temporary = path.with_name(f".{path.stem}.inone-{os.getpid()}-{uuid4().hex}.tmp.xlsx")
     try:
@@ -221,6 +287,7 @@ def write_shared_xlsx(db: Database, path: str | Path) -> dict:
     return {
         "path": str(path),
         "hash": state_hash(rows),
+        "presentation_hash": presentation_hash(rows),
         "rows": len(rows),
         "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
         "mtime": float(stat.st_mtime),
@@ -267,12 +334,14 @@ def read_shared_xlsx(path: str | Path) -> dict:
         if header_row_no is None:
             raise SharedXlsxError("Не найден заголовок НАЗВАНИЕ ИГРЫ.")
 
-        missing = [header for header in SHARED_XLSX_HEADERS if header not in header_map]
+        missing = [header for header in SHARED_XLSX_REQUIRED_HEADERS if header not in header_map]
         if missing:
             raise SharedXlsxError(
                 "В совместной таблице отсутствуют обязательные столбцы: " + ", ".join(missing)
             )
 
+        has_position_column = "ПОЗИЦИЯ" in header_map
+        position_projection: dict[str, object] = {}
         rows: list[dict] = []
         seen: dict[str, str] = {}
         # Continue the same streaming iterator after the header. This works
@@ -282,7 +351,7 @@ def read_shared_xlsx(path: str | Path) -> dict:
                 index = header_map[header]
                 return cells[index] if index < len(cells) else None
 
-            expected_values = [value(header) for header in SHARED_XLSX_HEADERS]
+            expected_values = [value(header) for header in SHARED_XLSX_REQUIRED_HEADERS]
             if all(item is None or str(item).strip() == "" for item in expected_values):
                 continue
 
@@ -297,6 +366,8 @@ def read_shared_xlsx(path: str | Path) -> dict:
                     f"ранее встречалось как «{seen[title_key]}»)."
                 )
             seen[title_key] = title
+            if has_position_column:
+                position_projection[title_key] = value("ПОЗИЦИЯ")
 
             points_value = value("БАЛЛЫ")
             try:
@@ -332,6 +403,8 @@ def read_shared_xlsx(path: str | Path) -> dict:
         "path": str(path),
         "rows": rows,
         "hash": state_hash(rows),
+        "has_position_column": has_position_column,
+        "position_projection": position_projection,
         "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
         "mtime": float(stat.st_mtime),
     }
