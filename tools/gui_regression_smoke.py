@@ -821,6 +821,36 @@ def main() -> int:
             raise AssertionError("P09 OBS help still exposes old English setting names")
         print("P09_UI033_OBS_HELP=PASS")
 
+        # UI-034: the original title typography row belongs immediately
+        # below Current Game, not in the later generic font section.
+        stream = window.stream_tab
+        form = stream.main_settings_form
+        current_row, _ = form.getWidgetPosition(stream.game_combo)
+        title_row, _ = form.getWidgetPosition(stream.title_typography_host)
+        info_row, _ = form.getWidgetPosition(stream.info_field.parentWidget())
+        if title_row != current_row + 1 or info_row != title_row + 1:
+            raise AssertionError(
+                "P09 UI-034 title typography is not directly below Current Game"
+            )
+        title_label, title_controls_row = stream.typography_row_widgets["title"]
+        if (
+            title_label.parentWidget() is not stream.title_typography_host
+            or title_controls_row.parentWidget() is not stream.title_typography_host
+            or len(stream.typography_controls) != 6
+        ):
+            raise AssertionError("P09 UI-034 title widgets were lost or duplicated")
+        font_combo, size_spin, color_btn = stream.typography_controls["title"]
+        previous_title_size = size_spin.value()
+        size_spin.setValue(previous_title_size + 1)
+        with patch.object(QMessageBox, "information"):
+            stream.save()
+        if db.get_setting("overlay_font_title_size") != str(previous_title_size + 1):
+            raise AssertionError("P09 UI-034 existing title font save key changed")
+        stream.refresh()
+        if size_spin.value() != previous_title_size + 1:
+            raise AssertionError("P09 UI-034 title font did not reload")
+        print("P09_UI034_TITLE_FONT_MOVED_WITH_EXISTING_SAVE=PASS")
+
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
