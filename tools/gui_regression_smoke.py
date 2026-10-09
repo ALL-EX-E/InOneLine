@@ -276,7 +276,9 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
             )
             if actual_rows != expected_rows:
                 raise AssertionError("resizing changed the main-list projection")
-            if not games_tab._compact_controls_enabled:
+            if width == 2560 and games_tab._stats_columns != len(games_tab._stat_filter_buttons_order):
+                raise AssertionError("filters did not return to one row at 2560px")
+            if games_tab._stats_columns == len(games_tab._stat_filter_buttons_order):
                 filters = games_tab._stat_filter_buttons_order
                 for previous, following in zip(filters, filters[1:]):
                     previous_right = previous.mapTo(

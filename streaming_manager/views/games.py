@@ -679,6 +679,23 @@ class GamesTab(QWidget):
         else:
             stats_columns = len(self._stat_filter_buttons_order)
 
+        if available_width > 0:
+            margins = self.layout().contentsMargins()
+            content_width = max(0, available_width - margins.left() - margins.right())
+            button_widths = [
+                max(button.minimumWidth(), button.minimumSizeHint().width(), button.sizeHint().width())
+                for button in self._stat_filter_buttons_order
+            ]
+            spacing = max(0, self._stats_layout.horizontalSpacing())
+            while stats_columns > 1:
+                column_widths = [0] * stats_columns
+                for index, width in enumerate(button_widths):
+                    column = index % stats_columns
+                    column_widths[column] = max(column_widths[column], width)
+                if sum(column_widths) + spacing * stats_columns <= content_width:
+                    break
+                stats_columns -= 1
+
         if (
             compact == self._compact_controls_enabled
             and stats_columns == self._stats_columns

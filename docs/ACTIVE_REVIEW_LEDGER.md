@@ -3810,3 +3810,5 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Причина в существующих фиксированных порогах 3/4/5 колонок: они не проверяют фактические size hints для текущего шрифта. Native Windows transition check прошёл; более крупные метрики offscreen выявили общий geometry edge case.
 - До дополнительного runtime diff записан corrective scope: при заданной ширине viewport уменьшать выбранное число колонок существующей grid до размещения всех её кнопок по их natural size hints. Сохранить порядок, существующие preferred counts и trailing stretch; не менять шрифты, persistence, фильтрацию или бизнес-логику.
 - Исправляется тот же reopened responsive пункт; **P07 NOT MERGED**.
+
+- Corrective runtime теперь учитывает natural button size hints перед перестройкой stats grid; при недостатке места число колонок уменьшается. Header clamp и trailing stretch сохранены. Python compile повторно **PASS**. Wide/compact regression проверяет один ряд на 2560 px и читаемость wrapped grids; Windows gates запускаются заново.
