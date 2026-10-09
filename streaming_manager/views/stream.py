@@ -1405,8 +1405,6 @@ class StreamTab(QWidget):
         if asset is None:
             self.background_path.clear()
             self.background_status.setText("Фон не выбран")
-            self.repair_background_btn.setEnabled(False)
-            self.repair_background_btn.setVisible(False)
             return
 
         try:
