@@ -23,7 +23,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QPoint, QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import (
+from PySide6.QtWidgets (
+    QBoxLayout,
     QApplication,
     QDialog,
     QFileDialog,
@@ -758,7 +759,7 @@ def main() -> int:
 
         # The narrow shell scrolls its content while preserving top-level geometry.
         window._set_current_main_page(window.auction_tab)
-        narrow_width = max(window.minimumWidth() + 80, 600)
+        narrow_width = window.minimumWidth()
         narrow_height = max(window.minimumHeight() + 80, 440)
         window.resize(narrow_width, narrow_height)
         app.processEvents()
@@ -769,30 +770,92 @@ def main() -> int:
         if auction_scroll.horizontalScrollBar().maximum() <= 0:
             raise AssertionError("P06 narrow Auction workspace did not expose horizontal scrolling")
 
-        # The tab strip compacts to accessible icons, with no horizontal arrows.
+        # Compact tabs retain readable short captions and distinct accent colors.
+        expected_compact_titles = [
+            "Спис", "Публ", "Муз", "Аук", "Ист", "Жур", "OBS", "Наст",
+        ]
         if not window._main_tabs_compact:
-            raise AssertionError("P06 narrow tab strip did not switch to icon mode")
-        if any(window.tabs.tabText(index) for index in range(window.tabs.count())):
-            raise AssertionError("P06 compact tab strip still shows full-width captions")
+            raise AssertionError("P06 minimum-width tab strip did not compact")
+        if [window.tabs.tabText(index) for index in range(window.tabs.count())] != expected_compact_titles:
+            raise AssertionError("P06 compact tab captions are unclear or out of order")
         if any(window.tabs.tabIcon(index).isNull() for index in range(window.tabs.count())):
-            raise AssertionError("P06 compact tab strip is missing a tab icon")
+            raise AssertionError("P06 compact tab strip is missing a colored icon")
         if any(
             not window.tabs.tabToolTip(index)
             for index in range(window.tabs.count())
         ):
             raise AssertionError("P06 compact tabs lost their full-name tooltips")
+        compact_icon_colors = []
+        for index in range(window.tabs.count()):
+            icon_image = window.tabs.tabIcon(index).pixmap(18, 18).toImage()
+            pixels = []
+            for y in range(icon_image.height()):
+                for x in range(icon_image.width()):
+                    color = icon_image.pixelColor(x, y)
+                    if color.alpha() > 32:
+                        rgb = (color.red(), color.green(), color.blue())
+                        if max(rgb) - min(rgb) > 20:
+                            pixels.append(rgb)
+            if not pixels:
+                raise AssertionError("P06 compact tab icon rendered white or grayscale")
+            compact_icon_colors.append(
+                tuple(round(sum(pixel[channel] for pixel in pixels) / len(pixels)) for channel in range(3))
+            )
+        if len(set(compact_icon_colors)) != window.tabs.count():
+            raise AssertionError("P06 compact tab icons do not use distinct colors")
         compact_bar = window.tabs.tabBar()
         if compact_bar.tabRect(window.tabs.count() - 1).right() >= compact_bar.width():
-            raise AssertionError("P06 compact tab icons do not all fit in the tab strip")
+            raise AssertionError("P06 compact tab labels do not fit in the tab strip")
 
         # The main-list table keeps its own vertical bar inside the visible
         # workspace even when page-level horizontal scrolling is at the left.
         window._set_current_main_page(window.games_tab)
         app.processEvents()
+        QTest.qWait(100)
+        app.processEvents()
         games_scroll = window._main_tab_scroll_by_page[window.games_tab]
         games_scroll.horizontalScrollBar().setValue(0)
         window._update_responsive_layout()
         app.processEvents()
+        if games_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 Games page still scrolls as one wide panel")
+        if not window.games_tab._compact_controls_enabled:
+            raise AssertionError("P06 minimum-width List controls did not reflow")
+        if window.games_tab._sorting_actions_layout.direction() != QBoxLayout.TopToBottom:
+            raise AssertionError("P06 List sort and preview actions are not stacked")
+        toolbar_controls = (
+            window.games_tab.sorting_rules_btn,
+            window.games_tab.copy_list_overlay_url_btn,
+            window.games_tab.open_list_overlay_preview_btn,
+            window.games_tab.total_points_label,
+            window.games_tab.clear_all_btn,
+        )
+        toolbar_positions = [
+            widget.mapTo(window.games_tab, QPoint(0, 0))
+            for widget in toolbar_controls
+        ]
+        if any(
+            toolbar_positions[index + 1].y() <= toolbar_positions[index].y()
+            for index in range(len(toolbar_positions) - 1)
+        ):
+            raise AssertionError("P06 compact List toolbar order changed")
+        toolbar_right_edges = [
+            widget.mapTo(window.games_tab, QPoint(widget.width(), 0)).x()
+            for widget in toolbar_controls
+        ]
+        if max(toolbar_right_edges) - min(toolbar_right_edges) > 8:
+            raise AssertionError("P06 compact List toolbar is not aligned on the right")
+        left_actions = [
+            widget for widget in window.games_tab._action_buttons if widget.isVisible()
+        ]
+        if left_actions:
+            left_action_right = max(
+                widget.mapTo(window.games_tab, QPoint(widget.width(), 0)).x()
+                for widget in left_actions
+            )
+            toolbar_left = min(point.x() for point in toolbar_positions)
+            if toolbar_left <= left_action_right:
+                raise AssertionError("P06 List action toolbar did not move to the right column")
         table = window.games_tab.table
         games_viewport = games_scroll.viewport()
         if table.width() > games_viewport.width():
@@ -1725,7 +1788,7 @@ def main() -> int:
         window.games_tab.refresh()
         window._set_current_main_page(window.games_tab)
         window.resize(
-            max(window.minimumWidth() + 80, 600),
+            window.minimumWidth(),
             max(window.minimumHeight() + 80, 440),
         )
         app.processEvents()
@@ -1737,6 +1800,14 @@ def main() -> int:
         app.processEvents()
         main_table = window.games_tab.table
         main_vertical_bar = main_table.verticalScrollBar()
+        if games_scroll.horizontalScrollBar().maximum() != 0:
+            raise AssertionError("P06 narrow main-list page still has horizontal scrolling")
+        if main_table.horizontalScrollBar().maximum() <= 0:
+            raise AssertionError("P06 narrow main-list table has no column scrolling")
+        main_table.horizontalScrollBar().setValue(
+            main_table.horizontalScrollBar().maximum()
+        )
+        app.processEvents()
         if main_vertical_bar.maximum() <= 0 or not main_vertical_bar.isVisible():
             raise AssertionError("P06 narrow main-list vertical scrollbar is not usable")
         main_bar_right = main_table.mapTo(
@@ -1744,7 +1815,7 @@ def main() -> int:
             main_vertical_bar.geometry().topRight(),
         ).x()
         if main_bar_right >= games_scroll.viewport().width():
-            raise AssertionError("P06 narrow main-list vertical scrollbar is off-screen at x=0")
+            raise AssertionError("P06 vertical row scrollbar moved off-screen when columns scroll")
 
         print("[4/4] Clean shutdown")
         window.close()

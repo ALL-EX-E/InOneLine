@@ -51,6 +51,27 @@ _LEGACY_MAIN_TAB_ORDER = (
     "settings",
 )
 
+_COMPACT_TAB_LABELS = {
+    "Список": "Спис",
+    "Публичный список": "Публ",
+    "Музыка": "Муз",
+    "Аукцион": "Аук",
+    "История аукционов": "Ист",
+    "Журнал": "Жур",
+    "Стрим / OBS": "OBS",
+    "Настройки": "Наст",
+}
+_TAB_ICON_COLORS = {
+    "Список": "#54C7A2",
+    "Публичный список": "#57A8E8",
+    "Музыка": "#B889F5",
+    "Аукцион": "#F2A65A",
+    "История аукционов": "#E5C454",
+    "Журнал": "#59B8C9",
+    "Стрим / OBS": "#EA6F78",
+    "Настройки": "#87A9FF",
+}
+
 
 class MainWindow(QMainWindow):
     def __init__(self, db: Database, paths: AppPaths):
@@ -125,6 +146,7 @@ class MainWindow(QMainWindow):
         self._main_tab_scroll_by_page: dict[QWidget, QScrollArea] = {}
         self._main_tab_page_by_scroll: dict[QScrollArea, QWidget] = {}
         self._main_tab_title_by_page: dict[QWidget, str] = {}
+        self._main_tab_compact_title_by_page: dict[QWidget, str] = {}
         self._main_tab_icon_by_page: dict[QWidget, QIcon] = {}
         self._main_tabs_compact = False
         self._responsive_layout_timer = QTimer(self)
@@ -354,7 +376,11 @@ class MainWindow(QMainWindow):
         self._main_tab_scroll_by_page[page] = scroll
         self._main_tab_page_by_scroll[scroll] = page
         self._main_tab_title_by_page[page] = title
-        self._main_tab_icon_by_page[page] = self._make_tinted_tab_icon(icon_pixmap)
+        self._main_tab_compact_title_by_page[page] = _COMPACT_TAB_LABELS[title]
+        self._main_tab_icon_by_page[page] = self._make_tinted_tab_icon(
+            icon_pixmap,
+            _TAB_ICON_COLORS[title],
+        )
         tab_index = self.tabs.addTab(scroll, title)
         self.tabs.setTabToolTip(tab_index, title)
         self.tabs.setTabWhatsThis(tab_index, title)
@@ -362,7 +388,9 @@ class MainWindow(QMainWindow):
         self._queue_responsive_layout_update()
         return scroll
 
-    def _make_tinted_tab_icon(self, icon_pixmap: QStyle.StandardPixmap) -> QIcon:
+    def _make_tinted_tab_icon(
+        self, icon_pixmap: QStyle.StandardPixmap, tint_color: str
+    ) -> QIcon:
         source_icon = self.style().standardIcon(icon_pixmap)
         if source_icon.isNull():
             source_icon = self.style().standardIcon(QStyle.SP_FileIcon)
@@ -381,10 +409,9 @@ class MainWindow(QMainWindow):
             return pixmap
 
         icon = QIcon()
-        icon.addPixmap(tinted("#cfd3d6"), QIcon.Mode.Normal, QIcon.State.Off)
-        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Normal, QIcon.State.On)
-        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Active, QIcon.State.Off)
-        icon.addPixmap(tinted("#ffffff"), QIcon.Mode.Active, QIcon.State.On)
+        for mode in (QIcon.Mode.Normal, QIcon.Mode.Active, QIcon.Mode.Selected):
+            for state in (QIcon.State.Off, QIcon.State.On):
+                icon.addPixmap(tinted(tint_color), mode, state)
         return icon
 
     def _queue_responsive_layout_update(self) -> None:
@@ -422,11 +449,16 @@ class MainWindow(QMainWindow):
         if compact != self._main_tabs_compact:
             self._main_tabs_compact = compact
             tab_bar.setExpanding(compact)
+            self.tabs.setIconSize(QSize(14, 14) if compact else QSize(18, 18))
+            tab_bar.setStyleSheet(
+                "QTabBar::tab { padding: 4px 3px; }" if compact else ""
+            )
             for index in range(self.tabs.count()):
                 scroll = self.tabs.widget(index)
                 page = self._main_tab_page_by_scroll[scroll]
                 title = self._main_tab_title_by_page[page]
-                self.tabs.setTabText(index, "" if compact else title)
+                compact_title = self._main_tab_compact_title_by_page[page]
+                self.tabs.setTabText(index, compact_title if compact else title)
                 self.tabs.setTabIcon(
                     index,
                     self._main_tab_icon_by_page[page] if compact else QIcon(),
@@ -440,6 +472,10 @@ class MainWindow(QMainWindow):
         if games_scroll is not None:
             viewport_width = games_scroll.viewport().width()
             if viewport_width > 0:
+                self.games_tab.set_compact_controls(
+                    viewport_width <= 980,
+                    viewport_width,
+                )
                 margins = self.games_tab.layout().contentsMargins()
                 table_width = max(
                     1,
