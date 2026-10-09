@@ -797,6 +797,8 @@ def main() -> int:
         games_viewport = games_scroll.viewport()
         if table.width() > games_viewport.width():
             raise AssertionError("P06 main-list table exceeds its visible viewport width")
+        if table.width() < games_viewport.width() - 40:
+            raise AssertionError("P06 main-list table does not fill its visible viewport")
         table_bar = table.verticalScrollBar()
         table_bar_right = table.mapTo(
             games_viewport,

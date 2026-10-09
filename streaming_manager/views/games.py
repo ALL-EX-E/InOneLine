@@ -628,7 +628,7 @@ class GamesTab(QWidget):
         self.table.doubleClicked.connect(self.edit_game)
         self.table.itemSelectionChanged.connect(self._update_action_state)
         self.table.viewport().installEventFilter(self)
-        layout.addWidget(self.table, 1, Qt.AlignLeft)
+        layout.addWidget(self.table, 1)
 
         self.shortcuts = []
         for key, handler in (
