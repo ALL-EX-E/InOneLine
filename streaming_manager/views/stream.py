@@ -1750,6 +1750,17 @@ class StreamTab(QWidget):
                 widget.sizeHint().width(),
             )
 
+        def preferred_control_height(widget: QWidget) -> int:
+            minimum_height = widget.minimumHeight()
+            maximum_height = widget.maximumHeight()
+            if minimum_height == maximum_height:
+                return max(0, minimum_height)
+            return max(
+                minimum_height,
+                widget.minimumSizeHint().height(),
+                widget.sizeHint().height(),
+            )
+
         size_label = QLabel("Размер:")
         size_label.setFixedWidth(size_label.sizeHint().width())
         size_controls_group = QWidget()
@@ -1801,9 +1812,9 @@ class StreamTab(QWidget):
         color_picker_group.setFixedSize(
             max(color_picker_layout.sizeHint().width(), color_picker_width) + 4,
             max(
-                color_label.sizeHint().height(),
-                color_btn.sizeHint().height(),
-                pipette_btn.sizeHint().height(),
+                preferred_control_height(color_label),
+                preferred_control_height(color_btn),
+                preferred_control_height(pipette_btn),
             ),
         )
 

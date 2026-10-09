@@ -937,9 +937,18 @@ def main() -> int:
             ):
                 raise AssertionError("P06 OBS eyedropper is not a compact square button")
             group = pipette.parentWidget()
+            if group is None:
+                raise AssertionError("P06 OBS eyedropper has no color-field container")
+            contents = group.contentsRect()
+            pipette_rect = pipette.geometry()
             if (
-                group is None
-                or group.layout() is None
+                contents.height() < pipette.minimumHeight()
+                or pipette_rect.top() < contents.top()
+                or pipette_rect.bottom() > contents.bottom()
+            ):
+                raise AssertionError("P06 OBS eyedropper is clipped vertically by its color row")
+            if (
+                group.layout() is None
                 or group.layout().direction() != QBoxLayout.LeftToRight
             ):
                 raise AssertionError("P06 OBS eyedropper is separated from its color field")
