@@ -184,8 +184,12 @@ def reflow_narrow_rows(
         if widget is not None:
             if widget.isHidden():
                 return 0
+            minimum_width = widget.minimumWidth()
+            maximum_width = widget.maximumWidth()
+            if minimum_width == maximum_width:
+                return max(0, minimum_width)
             return max(
-                widget.minimumWidth(),
+                minimum_width,
                 widget.minimumSizeHint().width(),
                 widget.sizeHint().width(),
             )

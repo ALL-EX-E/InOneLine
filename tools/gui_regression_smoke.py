@@ -937,35 +937,12 @@ def main() -> int:
             ):
                 raise AssertionError("P06 OBS eyedropper is not a compact square button")
             group = pipette.parentWidget()
-            group_layout = group.layout() if group is not None else None
             if (
-                group_layout is None
-                or group_layout.direction() != QBoxLayout.LeftToRight
+                group is None
+                or group.layout() is None
+                or group.layout().direction() != QBoxLayout.LeftToRight
             ):
-                child_sizes = []
-                if group_layout is not None:
-                    for index in range(group_layout.count()):
-                        child = group_layout.itemAt(index).widget()
-                        if child is not None:
-                            child_sizes.append(
-                                (
-                                    type(child).__name__,
-                                    child.width(),
-                                    child.minimumWidth(),
-                                    child.maximumWidth(),
-                                    child.minimumSizeHint().width(),
-                                    child.sizeHint().width(),
-                                )
-                            )
-                raise AssertionError(
-                    "P06 OBS eyedropper is separated from its color field: "
-                    f"tooltip={pipette.toolTip()!r}, "
-                    f"parent={group.objectName() if group is not None else None!r}, "
-                    f"parent_width={group.width() if group is not None else None}, "
-                    f"direction={group_layout.direction() if group_layout is not None else None}, "
-                    f"layout_hint={group_layout.sizeHint().width() if group_layout is not None else None}, "
-                    f"children={child_sizes!r}"
-                )
+                raise AssertionError("P06 OBS eyedropper is separated from its color field")
 
         typography_groups = window.stream_tab.typography_control_groups
         if len(typography_groups) != len(window.stream_tab.typography_controls):
