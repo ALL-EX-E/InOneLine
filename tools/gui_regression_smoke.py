@@ -796,6 +796,31 @@ def main() -> int:
             print("WIDE_WINDOW_2560x1440_GEOMETRY=PASS")
             return 0
 
+        # P09 / UI-033: OBS help remains short, Russian and audio-aware.
+        with patch.object(QMessageBox, "information") as show_obs_help:
+            window.stream_tab._show_obs_widget_help()
+        if show_obs_help.call_count != 1:
+            raise AssertionError("P09 OBS help did not open its existing dialog")
+        help_title, help_text = show_obs_help.call_args.args[1:3]
+        if help_title != "Как добавить виджет в OBS":
+            raise AssertionError("P09 OBS help title was changed")
+        required_help = (
+            "Задайте ширину и высоту",
+            "музыкального плеера",
+            "аукциона или колеса",
+            "микшере OBS",
+            "Отключать источник, когда он не виден",
+            "Обновлять браузер при активации сцены",
+        )
+        if any(part not in help_text for part in required_help):
+            raise AssertionError("P09 OBS help lost agreed Russian/audio guidance")
+        if any(part in help_text for part in (
+            "Width / Height", "Shutdown source when not visible",
+            "Refresh browser when scene becomes active",
+        )):
+            raise AssertionError("P09 OBS help still exposes old English setting names")
+        print("P09_UI033_OBS_HELP=PASS")
+
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
