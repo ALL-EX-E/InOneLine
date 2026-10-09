@@ -1,4 +1,5 @@
 name: Publication wording gate
+# P05 post-merge wording verification trigger
 
 on:
   push:
