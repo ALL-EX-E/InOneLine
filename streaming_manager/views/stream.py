@@ -1740,8 +1740,12 @@ class StreamTab(QWidget):
         step_down_btn.clicked.connect(size_spin.stepDown)
 
         def preferred_control_width(widget: QWidget) -> int:
+            minimum_width = widget.minimumWidth()
+            maximum_width = widget.maximumWidth()
+            if minimum_width == maximum_width:
+                return max(0, minimum_width)
             return max(
-                widget.minimumWidth(),
+                minimum_width,
                 widget.minimumSizeHint().width(),
                 widget.sizeHint().width(),
             )
