@@ -23,7 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QPoint, QThreadPool, Qt
 from PySide6.QtGui import QKeySequence
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets (
+from PySide6.QtWidgets import (
     QBoxLayout,
     QApplication,
     QDialog,
