@@ -136,6 +136,12 @@ def assert_p08_background_media(app, window, root: Path) -> None:
         stream._apply_background_import(video_source, MEDIA_STORAGE_EXTERNAL, "main")
         video_id = db.media_assets_by_filename(category, video_source.name)[0].id
         stream._apply_background_import(video_source, MEDIA_STORAGE_MANAGED, "main")
+        # Refreshing the catalog while the copy is in flight must not create
+        # a second managed row before the existing external ID is promoted.
+        stream._background_assets()
+        pending_rows = db.media_assets_by_filename(category, video_source.name)
+        if len(pending_rows) != 1 or pending_rows[0].id != video_id:
+            raise AssertionError("P08 in-flight video copy registered a second row")
         deadline = time.monotonic() + 8
         while stream._background_copy_worker is not None:
             app.processEvents()
