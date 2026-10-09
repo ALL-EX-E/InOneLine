@@ -1338,21 +1338,33 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._shared_xlsx_write_pending = True
             return
         self._shared_xlsx_set_status("Запись таблицы…")
+        previous_hash = self._shared_xlsx_last_hash
         previous_presentation_hash = self._shared_xlsx_last_presentation_hash
+        previous_signature = self._shared_xlsx_last_signature
 
         def write_task():
             if not connect_after and path.exists():
                 rows = main_games_rows(self.db)
                 logical_hash = state_hash(rows)
                 exported_hash = presentation_hash(rows)
+                stat = path.stat()
+                signature = (int(stat.st_mtime_ns), int(stat.st_size))
+                # A position-only refresh must not replace cloud-delivered edits.
+                # Leave the old signature/hash intact so the existing stable-file
+                # polling/import path can consume the external version first.
+                if (
+                    previous_signature is not None
+                    and logical_hash == previous_hash
+                    and signature != previous_signature
+                ):
+                    return {"external_change_pending": True}
                 if exported_hash == previous_presentation_hash:
-                    stat = path.stat()
                     return {
                         "path": str(path),
                         "hash": logical_hash,
                         "presentation_hash": exported_hash,
                         "rows": len(rows),
-                        "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
+                        "signature": signature,
                         "mtime": float(stat.st_mtime),
                         "written": False,
                     }
@@ -1373,6 +1385,13 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def _shared_xlsx_write_succeeded(self, result: dict, *, connect_after: bool) -> None:
         self._shared_xlsx_write_retry = False
+        if result.get("external_change_pending"):
+            # Do not advance the synchronized signature: poll twice for a
+            # stable external file, import it and then repair the projection.
+            self._shared_xlsx_set_status(
+                "Обнаружено внешнее изменение. Ожидание синхронизации…"
+            )
+            return
         signature = tuple(result.get("signature") or ())
         signature = signature if len(signature) == 2 else None
         if connect_after:
