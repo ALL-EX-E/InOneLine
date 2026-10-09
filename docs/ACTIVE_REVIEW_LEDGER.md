@@ -3780,3 +3780,12 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Итоговый Windows Regression Foundation run #185: **SUCCESS**; native GUI regression, frozen app/browser regression, PyInstaller build, installer build и silent installer startup прошли. Publication wording gate run #1340: **SUCCESS**. Python compile, overlay JS syntax и focused position/XLSX checks также прошли.
 - Windows QA artifact run #185: `InOneLine_1.0.8_WINDOWS_QA`, artifact ID `11621074873`, размер `47,802,248` bytes, SHA-256 `c3f35b00bc09cd655b8256c79d14d74fd582a6f97ca3b3be815099a141461b34`; истекает 2026-10-16. PR #68 остаётся draft и не merged до ручного PASS.
 - **P07 = AWAITING MANUAL QA / NOT ACCEPTED / NOT MERGED.** После PASS закрыть candidate отдельно и выполнить exact-blob clean promotion; без PASS main не менять.
+
+## P07 — замечание ручной QA: широкое окно «Список» — REOPENED — 2026-10-09
+
+- Пользователь сообщил: «Всё работает. Но вот что произошло при растяжении окна на максимальный размер на экране 2560х1440» и приложил `{EE600D06-9BC6-4969-9459-8C32C69E556E}.png`.
+- На скриншоте десять фильтров основного списка разнесены по всей ширине окна; `НАЗВАНИЕ` остаётся узким. Выбран `Архив: 0`; пустая таблица в этом состоянии сама по себе не является свидетельством исчезновения записей. Optional уточнение не дало ответа; корректирующий scope ограничен видимым распределением ширины.
+- Fresh exact candidate: PR #68, head `0dd03bd5e53569b142041bd2ce501985a57ad9a4`; Windows run #186 и publication wording run #1342 успешны. Main остаётся `ef110927fe7d869b748ae55397cba28f833150f9`.
+- Existing responsive grid меняет количество колонок, но не отводит остаток ширины в trailing stretch. Применить этот существующий layout mechanism, сохранить порядок/conditional visibility/узкую компоновку. В `GamesTab._clamp_game_title_column_width` после P07 переноса title в index 2 остался `setColumnWidth(3, ...)`: исправить только адресуемую колонку.
+- Runtime пока не менялся. Замечание записано до исправления и возвращает текущий candidate к доработке; это не новый roadmap-пакет. Ранее подтверждённые сценарии P07 не повторять без причины; повторная ручная QA нужна для широкого окна, возврата к минимальному размеру и затронутой ширины столбца.
+- **P07 = REOPENED / CORRECTIVE FIX IN PROGRESS / NOT MERGED.** Переход к P08 и promotion остаются заблокированы до ручной приёмки исправленного candidate.
