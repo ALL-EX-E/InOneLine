@@ -405,7 +405,7 @@ class DeleteAllGamesDialog(QDialog):
 
 
 class GamesTab(QWidget):
-    _COMPACT_COLUMNS = (0, 1, 2, 4, 5, 6, 7)
+    _COMPACT_COLUMNS = (0, 1, 3, 4, 5, 6)
 
     def __init__(self, db: Database, changed: Callable[[], None]):
         super().__init__()
@@ -607,12 +607,12 @@ class GamesTab(QWidget):
         )
         self._header_layout.addLayout(sorting_actions, 3, 0, 1, 2)
 
-        self.table = QTableWidget(0, 9)
+        self.table = QTableWidget(0, 8)
         self.table.setMinimumWidth(0)
         self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table.setHorizontalHeaderLabels([
-            "ID", "СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "ДАТА ВЫХОДА",
+            "ID", "ПОЗИЦИЯ", "НАЗВАНИЕ", "ДАТА ВЫХОДА",
             "БАЛЛЫ", "КООП/НЕ КООП", "СТАТУС", "ОТЗЫВ",
         ])
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -634,16 +634,14 @@ class GamesTab(QWidget):
         header.setResizeContentsPrecision(0)
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        # The game-title header is longer than the short contents often shown
-        # in the first visible rows. Keep it user-resizable but never allow the
-        # native Windows section to become narrower than the full header label.
-        header.setSectionResizeMode(3, QHeaderView.Interactive)
+        # Keep the game-title header user-resizable while protecting its full
+        # label from a too-narrow native Windows section.
+        header.setSectionResizeMode(2, QHeaderView.Interactive)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(8, QHeaderView.Stretch)
+        header.setSectionResizeMode(7, QHeaderView.Stretch)
         header.sectionResized.connect(self._clamp_game_title_column_width)
         self._ensure_game_title_column_width()
         QTimer.singleShot(0, self._ensure_game_title_column_width)
@@ -825,26 +823,26 @@ class GamesTab(QWidget):
         header = self.table.horizontalHeader()
         self.table.ensurePolished()
         header.ensurePolished()
-        item = self.table.horizontalHeaderItem(3)
+        item = self.table.horizontalHeaderItem(2)
         text = item.text() if item is not None else "НАЗВАНИЕ"
         metrics = header.fontMetrics()
         padding = max(44, metrics.horizontalAdvance("MMMM"))
         return max(
             header.minimumSectionSize(),
-            header.sectionSizeHint(3),
+            header.sectionSizeHint(2),
             metrics.horizontalAdvance(text) + padding,
         )
 
     def _ensure_game_title_column_width(self) -> None:
         required = self._game_title_header_min_width()
-        if self.table.columnWidth(3) < required:
-            self.table.setColumnWidth(3, required)
+        if self.table.columnWidth(2) < required:
+            self.table.setColumnWidth(2, required)
 
     def _clamp_game_title_column_width(
         self, logical_index: int, old_size: int, new_size: int
     ) -> None:
         _ = old_size
-        if logical_index != 3:
+        if logical_index != 2:
             return
         required = self._game_title_header_min_width()
         if new_size < required:
@@ -894,7 +892,7 @@ class GamesTab(QWidget):
                 continue
 
             self.table.selectRow(row)
-            visible_item = self.table.item(row, 3)
+            visible_item = self.table.item(row, 2)
             if visible_item is not None:
                 self.table.scrollToItem(visible_item)
             self._update_action_state()
@@ -936,7 +934,7 @@ class GamesTab(QWidget):
         # Выбираем первую найденную запись и синхронизируем этот же результат
         # со второй вкладкой.
         self.table.selectRow(0)
-        target = self.table.item(0, 3)
+        target = self.table.item(0, 2)
         if target is not None:
             self.table.scrollToItem(target)
         self.table.setFocus()
@@ -1080,7 +1078,6 @@ class GamesTab(QWidget):
                 start_position, current_position = positions.get(g.id, (None, None))
                 values = [
                     str(g.id),
-                    "" if start_position is None else str(start_position),
                     "" if current_position is None else str(current_position),
                     g.title,
                     display_date(g.release_date),
@@ -1101,16 +1098,16 @@ class GamesTab(QWidget):
                     if item.text() != value:
                         item.setText(value)
 
-                    if c in (1, 2, 4, 5, 6, 7):
+                    if c in (1, 4, 5, 6):
                         item.setTextAlignment(Qt.AlignCenter)
                     else:
                         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-                    tooltip = g.review if c == 8 and g.review else ""
+                    tooltip = g.review if c == 7 and g.review else ""
                     if g.archived:
                         item.setForeground(QColor("#7e8489"))
                         tooltip = (tooltip + "\n" if tooltip else "") + "Запись находится в архиве"
-                    elif c == 7:
+                    elif c == 6:
                         item.setForeground(status_colors.get(g.status, QColor("#eeeeee")))
                     else:
                         item.setForeground(QBrush())

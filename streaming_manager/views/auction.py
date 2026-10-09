@@ -81,7 +81,9 @@ from ..shared_xlsx import (
     SharedXlsxTransientError,
     main_games_rows,
     read_shared_xlsx,
+    position_projection_matches,
     state_hash,
+    presentation_hash,
     write_shared_xlsx,
 )
 from ..time_input import parse_duration_input
@@ -121,8 +123,6 @@ from .auction_parts.rng import AuctionRngMixin
 class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, AuctionRngMixin, AuctionAudioMixin, QWidget):
     centerImageChanged = Signal(int)
 
-    _LOT_COMPACT_COLUMNS = (0, 1, 3)
-    _CONDUCT_COMPACT_COLUMNS = (0, 1, 3, 4)
 
     MODE_LABELS = {
         "max_amount": "Максимальная сумма",
@@ -288,8 +288,9 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         top.addWidget(self.count_label)
         lots_layout.addLayout(top)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ"])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ"])
+        self._lot_title_column = 1
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setShowGrid(False)
@@ -300,9 +301,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.table.verticalHeader().setDefaultSectionSize(32)
         self.table.horizontalHeader().setResizeContentsPrecision(0)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         lots_layout.addWidget(self.table, 1)
 
         self.auction_tabs.addTab(self.lots_page, "Лоты")
@@ -835,7 +835,9 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         conduct_layout.addLayout(conduct_heading_row)
 
-        self.conduct_table = QTableWidget(0, 5)
+        self.conduct_table = QTableWidget(0, 4)
+        self._conduct_title_column = 1
+        self._conduct_chance_column = 2
         # Keep the operator table readable when the optional wheel panel appears.
         # The enclosing QScrollArea below absorbs width pressure instead of
         # collapsing columns or requesting a wider top-level window.
@@ -844,7 +846,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             QSizePolicy.Ignored, QSizePolicy.Expanding
         )
         self.conduct_table.setHorizontalHeaderLabels(
-            ["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
+            ["ПОЗИЦИЯ", "НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
         )
         self.conduct_table.setEditTriggers(
             QTableWidget.NoEditTriggers
@@ -867,16 +869,13 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             0, QHeaderView.ResizeToContents
         )
         self.conduct_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeToContents
+            1, QHeaderView.Stretch
         )
         self.conduct_table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.Stretch
+            2, QHeaderView.ResizeToContents
         )
         self.conduct_table.horizontalHeader().setSectionResizeMode(
             3, QHeaderView.ResizeToContents
-        )
-        self.conduct_table.horizontalHeader().setSectionResizeMode(
-            4, QHeaderView.ResizeToContents
         )
         self.conduct_content = QWidget()
         self.conduct_content.setMinimumWidth(0)
@@ -1166,6 +1165,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_observed_signature: tuple[int, int] | None = None
         self._shared_xlsx_failed_signature: tuple[int, int] | None = None
         self._shared_xlsx_last_hash = ""
+        self._shared_xlsx_last_presentation_hash = ""
         self._shared_xlsx_write_pending = False
         self._shared_xlsx_write_retry = False
         self._shared_xlsx_applying_external = False
@@ -1262,11 +1262,15 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         persist: bool,
         import_now: bool,
         initial_hash: str = "",
+        initial_presentation_hash: str = "",
         initial_signature: tuple[int, int] | None = None,
         initial_mtime: float | None = None,
     ) -> None:
         self._shared_xlsx_path = Path(path)
         self._shared_xlsx_last_hash = str(initial_hash or "")
+        self._shared_xlsx_last_presentation_hash = str(
+            initial_presentation_hash or ""
+        )
         self._shared_xlsx_last_signature = initial_signature
         self._shared_xlsx_observed_signature = initial_signature
         self._shared_xlsx_failed_signature = None
@@ -1295,6 +1299,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_write_timer.stop()
         self._shared_xlsx_path = None
         self._shared_xlsx_last_hash = ""
+        self._shared_xlsx_last_presentation_hash = ""
         self._shared_xlsx_last_signature = None
         self._shared_xlsx_observed_signature = None
         self._shared_xlsx_failed_signature = None
@@ -1331,17 +1336,19 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._shared_xlsx_write_pending = True
             return
         self._shared_xlsx_set_status("Запись таблицы…")
-        previous_hash = self._shared_xlsx_last_hash
+        previous_presentation_hash = self._shared_xlsx_last_presentation_hash
 
         def write_task():
             if not connect_after and path.exists():
                 rows = main_games_rows(self.db)
                 logical_hash = state_hash(rows)
-                if logical_hash == previous_hash:
+                exported_hash = presentation_hash(rows)
+                if exported_hash == previous_presentation_hash:
                     stat = path.stat()
                     return {
                         "path": str(path),
                         "hash": logical_hash,
+                        "presentation_hash": exported_hash,
                         "rows": len(rows),
                         "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
                         "mtime": float(stat.st_mtime),
@@ -1372,11 +1379,17 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 persist=True,
                 import_now=False,
                 initial_hash=str(result.get("hash") or ""),
+                initial_presentation_hash=str(
+                    result.get("presentation_hash") or ""
+                ),
                 initial_signature=signature,
                 initial_mtime=result.get("mtime"),
             )
         else:
             self._shared_xlsx_last_hash = str(result.get("hash") or "")
+            self._shared_xlsx_last_presentation_hash = str(
+                result.get("presentation_hash") or ""
+            )
             self._shared_xlsx_last_signature = signature
             self._shared_xlsx_observed_signature = signature
             self._shared_xlsx_failed_signature = None
@@ -1430,11 +1443,20 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     "Таблица изменилась до завершения чтения; повторная попытка."
                 )
             incoming_hash = str(payload["hash"])
-            if incoming_hash == expected_hash:
-                return {**payload, "changed": False, "result": None, "backup_path": ""}
-            local_hash = state_hash(main_games_rows(self.db))
-            if incoming_hash == local_hash:
-                return {**payload, "changed": False, "result": None, "backup_path": ""}
+            local_rows = main_games_rows(self.db)
+            local_hash = state_hash(local_rows)
+            local_presentation_hash = presentation_hash(local_rows)
+            if incoming_hash == expected_hash or incoming_hash == local_hash:
+                return {
+                    **payload,
+                    "changed": False,
+                    "rewrite_projection": not position_projection_matches(
+                        local_rows, payload
+                    ),
+                    "result": None,
+                    "backup_path": "",
+                    "local_presentation_hash": local_presentation_hash,
+                }
 
             backup_path = self.db.backup_isolated(backup_dir)
             try:
@@ -1445,11 +1467,17 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 # data-loss situation or leave the three clients divergent.
                 pass
             result = self.db.sync_main_games_state(payload["rows"])
+            imported_rows = main_games_rows(self.db)
+            local_presentation_hash = presentation_hash(imported_rows)
             return {
                 **payload,
                 "changed": bool(result["created"] or result["updated"] or result["deleted"]),
+                "rewrite_projection": not position_projection_matches(
+                    imported_rows, payload
+                ),
                 "result": result,
                 "backup_path": str(backup_path),
+                "local_presentation_hash": local_presentation_hash,
             }
 
         worker = FunctionWorker(import_task)
@@ -1467,6 +1495,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_observed_signature = self._shared_xlsx_last_signature
         self._shared_xlsx_failed_signature = None
         self._shared_xlsx_last_hash = str(payload.get("hash") or "")
+        self._shared_xlsx_last_presentation_hash = (
+            ""
+            if payload.get("rewrite_projection")
+            else str(payload.get("local_presentation_hash") or "")
+        )
         self._shared_xlsx_set_status("Синхронизировано", mtime=payload.get("mtime"))
         if payload.get("changed"):
             self._shared_xlsx_applying_external = True
@@ -1474,6 +1507,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 self.changed()
             finally:
                 self._shared_xlsx_applying_external = False
+        if payload.get("rewrite_projection"):
+            self.shared_xlsx_local_data_changed()
 
     def _shared_xlsx_worker_failed(self, exc: Exception) -> None:
         if isinstance(exc, SharedXlsxTransientError):
@@ -2239,62 +2274,103 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         rows,
         selected_id: int | None,
         wheel_probabilities: dict[int, float] | None = None,
+        position_mode: str = "position",
     ) -> dict[str, float]:
         is_conduct = table is self.conduct_table
         if is_conduct:
             self._clear_history_hover_highlight()
-        compact_columns = (
-            self._CONDUCT_COMPACT_COLUMNS
-            if is_conduct
-            else self._LOT_COMPACT_COLUMNS
+
+        show_start_current = position_mode == "start_current"
+        position_column_count = 2 if show_start_current else 1
+        name_column = position_column_count
+        chance_column = name_column + 1 if is_conduct else None
+        points_column = name_column + (2 if is_conduct else 1)
+        labels = (
+            (["СТАРТ", "ТЕКУЩАЯ"] if show_start_current else ["ПОЗИЦИЯ"])
+            + ["НАЗВАНИЕ"]
+            + (["Шанс в колесе"] if is_conduct else [])
+            + ["БАЛЛЫ"]
         )
+        compact_columns = tuple(range(position_column_count)) + (
+            (chance_column, points_column) if is_conduct else (points_column,)
+        )
+        if is_conduct:
+            self._conduct_title_column = name_column
+            self._conduct_chance_column = int(chance_column)
+        else:
+            self._lot_title_column = name_column
+
         previous_blocked = table.blockSignals(True)
-        suspend_live_content_resize(table, compact_columns)
         table.setUpdatesEnabled(False)
-        fill_started = time.perf_counter()
-        fill_seconds = 0.0
-        autosize_seconds = 0.0
-        reactivate_seconds = 0.0
         try:
+            current_labels = tuple(
+                table.horizontalHeaderItem(column).text()
+                if table.horizontalHeaderItem(column) is not None
+                else ""
+                for column in range(table.columnCount())
+            )
+            if table.columnCount() != len(labels) or current_labels != tuple(labels):
+                table.setColumnCount(len(labels))
+                table.setHorizontalHeaderLabels(labels)
+                header = table.horizontalHeader()
+                header.setResizeContentsPrecision(0)
+                compact_set = set(compact_columns)
+                for column in range(len(labels)):
+                    header.setSectionResizeMode(
+                        column,
+                        QHeaderView.ResizeToContents
+                        if column in compact_set
+                        else QHeaderView.Stretch,
+                    )
+
+            for column in range(table.columnCount()):
+                table.setColumnHidden(column, False)
+            suspend_live_content_resize(table, compact_columns)
+            fill_started = time.perf_counter()
+            fill_seconds = 0.0
+            autosize_seconds = 0.0
+            reactivate_seconds = 0.0
             table.setRowCount(len(rows))
             selected_row = -1
 
             for r, row in enumerate(rows):
+                position_values = (
+                    (
+                        row.get("start_position") or "",
+                        row.get("current_position") or "",
+                    )
+                    if show_start_current
+                    else (row.get("current_position") or "",)
+                )
+                values = position_values + (row["title"],)
                 if is_conduct:
                     probability = (wheel_probabilities or {}).get(
                         int(row["game_id"]),
                         0.0,
                     )
-                    values = (
-                        row.get("start_position") or "",
-                        row.get("current_position") or "",
-                        row["title"],
-                        self._format_wheel_probability(probability),
-                        format_points(int(row["total_sm_points"])),
-                    )
-                    points_column = 4
-                else:
-                    values = (
-                        row.get("start_position") or "",
-                        row.get("current_position") or "",
-                        row["title"],
-                        format_points(int(row["total_sm_points"])),
-                    )
-                    points_column = 3
+                    values += (self._format_wheel_probability(probability),)
+                values += (format_points(int(row["total_sm_points"])),)
 
-                for c, value in enumerate(values):
+                for column, value in enumerate(values):
                     text = str(value)
-                    item = table.item(r, c)
+                    item = table.item(r, column)
                     if item is None:
                         item = QTableWidgetItem()
-                        table.setItem(r, c, item)
+                        table.setItem(r, column, item)
                     if item.text() != text:
                         item.setText(text)
-                    if c == 0:
+                    if column == 0:
                         item.setData(Qt.UserRole, int(row["game_id"]))
-                        item.setData(Qt.UserRole + 1, bool(row.get("auction_only")))
-                    item.setToolTip(str(row.get("review") or "") if c == 2 else "")
-                    if c in (0, 1, 3, points_column):
+                        item.setData(
+                            Qt.UserRole + 1,
+                            bool(row.get("auction_only")),
+                        )
+                    item.setToolTip(
+                        str(row.get("review") or "")
+                        if column == name_column
+                        else ""
+                    )
+                    if column in compact_columns:
                         item.setTextAlignment(Qt.AlignCenter)
                     else:
                         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -2302,10 +2378,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 if int(row["game_id"]) == selected_id:
                     selected_row = r
 
-            if selected_row >= 0:
-                table.selectRow(selected_row)
             fill_seconds = time.perf_counter() - fill_started
-
             autosize_started = time.perf_counter()
             autosize_compact_columns_once(table, compact_columns)
             autosize_seconds = time.perf_counter() - autosize_started
@@ -2313,6 +2386,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             reactivate_started = time.perf_counter()
             table.setUpdatesEnabled(True)
             reactivate_seconds = time.perf_counter() - reactivate_started
+            if selected_row >= 0:
+                table.selectRow(selected_row)
         finally:
             if not table.updatesEnabled():
                 table.setUpdatesEnabled(True)
@@ -2323,6 +2398,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             "autosize": autosize_seconds,
             "reactivate": reactivate_seconds,
         }
+
 
     def _integration_source_label(self, source: str) -> str:
         adapter = self.integration_manager.registry.get(str(source or ""))

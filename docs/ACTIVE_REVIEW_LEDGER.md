@@ -3759,3 +3759,16 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Clean promotion PR #66 reused the exact 15 candidate blobs from main `aae15c30ebd69b79d87bf3aeaf5a58a701e27884`; merged as `e9a8919357eeb4cb182e847ef115058e6c253f58`. Candidate PR #65 closed without merge.
 - Pre-merge Regression Foundation `37936833848` and publication wording gate `37936833837`: **SUCCESS**. Exact post-merge Regression Foundation `37937370459` and wording gate `37937370714`: **SUCCESS**.
 - **P06 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback remain unchanged. Next roadmap package: **P07 — position policy + XLSX derived position**.
+
+
+## P07 — свежая сверка exact CURRENT завершена; реализация разрешена — 2026-10-09
+
+- Exact reviewed `main`: `ef110927fe7d869b748ae55397cba28f833150f9`; app 1.0.8 / schema 19 / 15 migrations. Выпуск, миграции и RNG/business semantics в scope не входят.
+- После принятого P06 пользователь подтвердил: «Всё работает. Записывай и идём дальше». Это разрешает начать следующий пакет очереди P07.
+- Один source of truth: использовать существующий `_auction_position_map_conn()` и его snapshot-обёртки; не менять sorting, filters или ownership данных.
+- Общие «Список» и «Публичный список» всегда показывают одну колонку `ПОЗИЦИЯ` с текущей эффективной позицией. В обеих существующих локальных таблицах «Аукцион» и в `/auction-lots-overlay`: Max Amount до старта — одна позиция; после старта, включая паузу, завершение таймера, допвремя, ничью и колесо — `СТАРТ / ТЕКУЩАЯ`; direct weighted standard wheel остаётся с одной позицией; direct elimination переходит к двум после первого подтверждённого выбора и сохраняет их между раундами/после смены формата. Закрытая сессия возвращается к одной позиции. `Шанс в колесе` остаётся отдельным условным столбцом. Overlay применяет смену режима и ширины без перезагрузки URL.
+- Пока UI-051/P12 не объединил таблицы, обе существующие локальные таблицы применяют один общий helper. P12 consolidation остаётся отдельным пакетом.
+- Оба XLSX mirror получают `ПОЗИЦИЯ`: Shared остаётся двунаправленным, Public — однонаправленным. Позиция вычисляется, не импортируется в базу; logical import hash её игнорирует, presentation fingerprint учитывает. Старый Shared XLSX без колонки продолжает импортироваться; подключённый файл обновляется из local projection. Одноразовые P05 exports остаются без позиции.
+- Для изменения сессии, ставок и временных лотов использовать существующий shared-refresh path, чтобы списки и XLSX получали новые позиции. Новую схему/миграцию и отдельное хранилище не добавлять.
+- Реализация идёт одним candidate-пакетом. Перед ручной проверкой обязательны Windows Regression Foundation, GUI regression, frozen build и Windows QA installer. Пользователь получает полный чек-лист сразу; ранее принятые QA сценарии не повторяются без причины. До ручного PASS candidate не продвигать в main.
+- Статус: **IN PROGRESS**.
