@@ -58,6 +58,8 @@ FULL_BACKUP_MANAGED_DIRS = (
 )
 _FULL_BACKUP_MANIFEST = "manifest.json"
 _FULL_BACKUP_DATABASE = "data/streaming.db"
+_FULL_BACKUP_UI_STATE = "data/ui_state.ini"
+_FULL_BACKUP_UI_STATE_VERSION = 1
 _FULL_BACKUP_MANIFEST_MAX_BYTES = 2 * 1024 * 1024
 
 # Pre-1.0.8 installer artifact. The current UI already contains a richer CSV
@@ -172,7 +174,7 @@ def _is_allowed_full_backup_member(
     name: str,
     managed_directories: tuple[str, ...] | list[str] | None = None,
 ) -> bool:
-    if name == _FULL_BACKUP_DATABASE:
+    if name in (_FULL_BACKUP_DATABASE, _FULL_BACKUP_UI_STATE):
         return True
     directories = (
         tuple(FULL_BACKUP_MANAGED_DIRS)
@@ -275,6 +277,16 @@ def _full_backup_manifest_and_infos(
             raise RestoreValidationError(f"Некорректный размер в manifest.json: {name}")
         manifest_files[name] = {"path": name, "sha256": sha256, "size": size}
 
+    ui_state_metadata = manifest.get("ui_state")
+    if ui_state_metadata is not None:
+        if ui_state_metadata != {
+            "path": _FULL_BACKUP_UI_STATE,
+            "payload_version": _FULL_BACKUP_UI_STATE_VERSION,
+        }:
+            raise RestoreValidationError("manifest.json содержит неверное описание состояния интерфейса.")
+        if _FULL_BACKUP_UI_STATE not in manifest_files:
+            raise RestoreValidationError("manifest.json объявляет состояние интерфейса, но файла нет.")
+
     actual_files = {
         name for name, info in by_name.items()
         if name != _FULL_BACKUP_MANIFEST and not info.is_dir()
@@ -342,6 +354,7 @@ def create_full_backup_archive(
     app_version: str,
     installation_root: str | Path | None = None,
     allow_inside_installation: bool = False,
+    ui_state_snapshot: str | Path | None = None,
 ) -> dict[str, Any]:
     """Create an uninstall-surviving full user-data backup container."""
     snapshot = Path(database_snapshot).resolve()
@@ -364,6 +377,18 @@ def create_full_backup_archive(
                 relative = item.relative_to(source_dir).as_posix()
                 files.append((item, f"data/{directory}/{relative}"))
 
+    ui_state_source = (
+        Path(ui_state_snapshot).resolve()
+        if ui_state_snapshot is not None
+        else data_root / Path(_FULL_BACKUP_UI_STATE).name
+    )
+    if not ui_state_source.is_file():
+        if ui_state_snapshot is not None:
+            raise FileNotFoundError(f"Файл состояния интерфейса не найден: {ui_state_source}")
+        ui_state_source.parent.mkdir(parents=True, exist_ok=True)
+        ui_state_source.touch()
+    files.append((ui_state_source, _FULL_BACKUP_UI_STATE))
+
     manifest_files = [
         {
             "path": archive_name,
@@ -381,6 +406,10 @@ def create_full_backup_archive(
         "database": _FULL_BACKUP_DATABASE,
         "managed_directories": list(FULL_BACKUP_MANAGED_DIRS),
         "credentials_protection": "windows-dpapi-current-user",
+        "ui_state": {
+            "path": _FULL_BACKUP_UI_STATE,
+            "payload_version": _FULL_BACKUP_UI_STATE_VERSION,
+        },
         "files": manifest_files,
     }
 
@@ -534,8 +563,20 @@ def apply_staged_full_restore(
     rollback_database = create_sqlite_backup(paths.database_path, rollback_root)
     moved_directories: list[str] = []
     replacement_database = paths.data_dir / f".full_restore_database_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.db"
+    staged_ui_state = stage_data / Path(_FULL_BACKUP_UI_STATE).name
+    current_ui_state = paths.data_dir / Path(_FULL_BACKUP_UI_STATE).name
+    rollback_ui_state = rollback_root / Path(_FULL_BACKUP_UI_STATE).name
+    has_staged_ui_state = staged_ui_state.is_file()
+    ui_state_had_current = current_ui_state.exists()
+    ui_state_operation_started = False
 
     try:
+        if has_staged_ui_state:
+            ui_state_operation_started = True
+            if ui_state_had_current:
+                os.replace(current_ui_state, rollback_ui_state)
+            os.replace(staged_ui_state, current_ui_state)
+
         for directory in restore_directories:
             current = paths.data_dir / directory
             old = rollback_root / directory
@@ -593,6 +634,11 @@ def apply_staged_full_restore(
     except Exception as exc:
         rollback_error: Exception | None = None
         try:
+            if rollback_ui_state.exists():
+                current_ui_state.unlink(missing_ok=True)
+                os.replace(rollback_ui_state, current_ui_state)
+            elif ui_state_operation_started and not ui_state_had_current:
+                current_ui_state.unlink(missing_ok=True)
             replacement_database.unlink(missing_ok=True)
             for directory in restore_directories:
                 target = paths.data_dir / directory
