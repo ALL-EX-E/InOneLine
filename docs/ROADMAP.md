@@ -440,4 +440,15 @@ Release cadence считает **только принятые CURRENT/released 
 - Clean promotion PR #59 merged as `45bb317751e688054d201ee3d77d5bbe5199c82b`; original candidate PR #58 closed without merge. Promotion Regression Foundation `37883637947` and wording gate `37883637998` succeeded. No release/version/schema/migration changes.
 - При сверке UI-088 обнаружено, что первый promotion изменил файловый заголовок `НАЗВАНИЕ ИГРЫ` на `НАЗВАНИЕ`; утверждённый формат CSV/XLSX и JSON `columns` требует сохранить старый заголовок. Follow-up PR #60 (`886eaa2d96dc1b9576f2e292e2a1af6e6ed2ccee`) восстанавливает его и проверяет все три экспорта. Windows regression `37883971211` и wording `37883971209` succeeded.
 - Follow-up QA ZIP: `InOneLine_P05_HEADER_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1O6PmpJMW8Qqf3ST06YlwTkYZ-1zXfsy-`, 46,764,368 bytes; GitHub artifact SHA-256 `86d03f964c57de19c5fea0da2262d99cb9313709a06eab6c886009c52e57f7ad`.
-- **Current status: initial P05 manual PASS recorded; follow-up header candidate awaits short manual retest. P05 stays open and P06 must wait until the corrected CSV, Excel and JSON headers are accepted and the promotion/post-merge record is complete.**
+- Follow-up manual retest: **PASS** for CSV, Excel and JSON headers; the user replied `PASS` on 2026-10-09 using the exact QA ZIP listed above.
+- Clean promotion PR #62 reused both exact tested file blobs from candidate PR #60 and merged as `777ce8caed26ba05af97adebd0f6c56dd3c48886`. Promotion Regression Foundation `37886832208` and wording gate `37886832239`: **SUCCESS**.
+- Candidate PR #60 and QA-only post-merge PR #63 were closed without merge. Exact post-merge Regression Foundation `37887212648` and wording gate `37887212487`: **SUCCESS**.
+- **P05 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback are unchanged.
+
+
+## P06 — fresh review exact CURRENT complete — 2026-10-09
+
+- Reviewed exact `main` `777ce8caed26ba05af97adebd0f6c56dd3c48886`; app 1.0.8 / schema 19 / migrations 15.
+- P05 is closed with manual PASS, clean merge PR #62, and successful post-merge Regression Foundation `37887212648` plus wording gate `37887212487`. Candidate PR #60 and QA-only PR #63 are closed without merge.
+- The next package is P06: responsive main-window sizing/scrolling, stable selected-tab restoration after the approved tab reorder, and inclusion/restoration of `data/ui_state.ini` in new full backups while preserving legacy archives and ordinary `.db` backups.
+- User authorized continuation with `«Работает. Записывай и идём дальше»`; candidate implementation proceeds within the already accepted P06 scope. Manual QA and clean promotion remain pending.

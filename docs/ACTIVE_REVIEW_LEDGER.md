@@ -3728,11 +3728,25 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - `AuctionTab.legacy_export_page` is constructed but is not registered in `auction_tabs`; its handlers are the other callers of legacy pipe helpers. After removing Settings Export, perform exact repo-wide caller/test audit. Delete this hidden page/helpers only if no required runtime callers, tests or compatibility dependencies remain; do not remove `DatabaseServices.import_csv` pipe-import support.
 - **FRESH REVIEW COMPLETE / READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Existing UI-088/UI-089/UI-090 decisions are individually recorded as ACCEPTED; this review does not authorize runtime edits. Wait for user's direct P05 batch approval.
 
-## P05 — initial manual acceptance recorded; header follow-up awaits retest — 2026-10-09
+## P05 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
 
 - Пользователь подтвердил: «Работает. Записывай и идём дальше». Initial manual PASS относится к Public CSV/JSON/Excel actions, обоим XLSX mirror flows, удалённому Settings Export UI и исчезновению пустого прямоугольника на `Аукцион`.
 - Проверенный кандидат: `9eb8aae28a2d85709e4090dce4cb12badc4b6607`; QA ZIP `InOneLine_P05_AUCTION_HOST_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1TV2hvEz4-uVpk3ax07r9kCfnsmKQcz_y`, 46,762,701 bytes, SHA-256 `1d6df043f106d9656d4476d3cac77376d485cc4a87230a2c2ac076d48909060e`.
 - Clean promotion PR #59 merged as `45bb317751e688054d201ee3d77d5bbe5199c82b`; original candidate PR #58 closed without merge. Promotion Regression Foundation `37883637947` and wording gate `37883637998` succeeded. No release/version/schema/migration changes.
 - При сверке UI-088 обнаружено, что первый promotion изменил файловый заголовок `НАЗВАНИЕ ИГРЫ` на `НАЗВАНИЕ`; утверждённый формат CSV/XLSX и JSON `columns` требует сохранить старый заголовок. Follow-up PR #60 (`886eaa2d96dc1b9576f2e292e2a1af6e6ed2ccee`) восстанавливает его и проверяет все три экспорта. Windows regression `37883971211` и wording `37883971209` succeeded.
 - Follow-up QA ZIP: `InOneLine_P05_HEADER_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1O6PmpJMW8Qqf3ST06YlwTkYZ-1zXfsy-`, 46,764,368 bytes; GitHub artifact SHA-256 `86d03f964c57de19c5fea0da2262d99cb9313709a06eab6c886009c52e57f7ad`.
-- **Current status: initial P05 manual PASS recorded; follow-up header candidate awaits short manual retest. P05 stays open and P06 must wait until the corrected CSV, Excel and JSON headers are accepted and the promotion/post-merge record is complete.**
+- Follow-up manual retest: **PASS** for CSV, Excel and JSON headers; the user replied `PASS` on 2026-10-09 using the exact QA ZIP listed above.
+- Clean promotion PR #62 reused both exact tested file blobs from candidate PR #60 and merged as `777ce8caed26ba05af97adebd0f6c56dd3c48886`. Promotion Regression Foundation `37886832208` and wording gate `37886832239`: **SUCCESS**.
+- Candidate PR #60 and QA-only post-merge PR #63 were closed without merge. Exact post-merge Regression Foundation `37887212648` and wording gate `37887212487`: **SUCCESS**.
+- **P05 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback are unchanged.
+
+
+## P06 — fresh review exact CURRENT complete; implementation authorized — 2026-10-09
+
+- Exact reviewed `main`: `777ce8caed26ba05af97adebd0f6c56dd3c48886`; app 1.0.8 / schema 19 / migrations 15. No release, schema or migration change is in scope.
+- P06 combines GLOBAL-UI-002, UI-032 and UI-082. The user's earlier `«Работает. Записывай и идём дальше»` plus the follow-up header `PASS` authorizes continuing with this next package.
+- Fresh current findings: `MainWindow` still has the 1100×700 minimum; top-level tab order is `Список`, `Публичный список`, `Стрим / OBS`, `Музыка`, `Аукцион`, `История аукционов`, `Журнал`, `Настройки`, and UI state stores only numeric `main_window/tab_index`. Stable logical migration is needed for the approved new order.
+- The `.iolbackup` format 1 validator allowlists the database and managed directories; archive creation, staging and apply currently omit `data/ui_state.ini`. Keep missing state valid for old backups and preserve the current state when restoring one. New archives must include saved UI state, integrity/hash validation, and rollback protection.
+- Main list/table pages do not share a main-window scroll container. Stream and Settings have nested vertical-only scroll areas; Auction's Conduct panel already has its own horizontal scroller. Reuse these controls without introducing conflicting scrollbars or changing table/list scrolling. The main window must remain fixed while tabs/conditional controls change.
+- General Settings currently mixes DB and full-backup controls, uses long backup captions and technical wording, and has a redundant Integrations explainer. Keep DB backup/restore behavior intact, clarify the two backup flows, and remove only that redundant explainer.
+- P06 candidate must cover 1920×1080 and a narrower window, logical tab migration for legacy indices and new stable keys, restore of new archives containing UI state, and legacy archive restore with live UI state preserved. This is the review/implementation scope; manual QA and clean promotion remain pending.
