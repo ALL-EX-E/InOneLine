@@ -432,3 +432,12 @@ Release cadence считает **только принятые CURRENT/released 
 - Объём UI-088/UI-089/UI-090 подтверждён: перенос трёх existing file-export actions на `Публичный список`; отдельное пояснение snapshot vs auto-update XLSX mirror; удаление legacy compatible-export controls и внутренней вкладки `Настройки → Экспорт`.
 - Existing public exporters/data contract и `/api/public` сохраняются; старый импорт `Название|Баллы` остаётся совместимым. Regression gate должен проверять новые кнопки/отсутствие дублей, четыре оставшиеся вкладки настроек и сохранность зеркала/импорта.
 - **READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Код не менять до отдельного прямого одобрения пользователя.
+
+## P05 status update — 2026-10-09
+
+- Пользователь подтвердил: «Работает. Записывай и идём дальше». Initial manual PASS относится к Public CSV/JSON/Excel actions, обоим XLSX mirror flows, удалённому Settings Export UI и исчезновению пустого прямоугольника на `Аукцион`.
+- Проверенный кандидат: `9eb8aae28a2d85709e4090dce4cb12badc4b6607`; QA ZIP `InOneLine_P05_AUCTION_HOST_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1TV2hvEz4-uVpk3ax07r9kCfnsmKQcz_y`, 46,762,701 bytes, SHA-256 `1d6df043f106d9656d4476d3cac77376d485cc4a87230a2c2ac076d48909060e`.
+- Clean promotion PR #59 merged as `45bb317751e688054d201ee3d77d5bbe5199c82b`; original candidate PR #58 closed without merge. Promotion Regression Foundation `37883637947` and wording gate `37883637998` succeeded. No release/version/schema/migration changes.
+- При сверке UI-088 обнаружено, что первый promotion изменил файловый заголовок `НАЗВАНИЕ ИГРЫ` на `НАЗВАНИЕ`; утверждённый формат CSV/XLSX и JSON `columns` требует сохранить старый заголовок. Follow-up PR #60 (`886eaa2d96dc1b9576f2e292e2a1af6e6ed2ccee`) восстанавливает его и проверяет все три экспорта. Windows regression `37883971211` и wording `37883971209` succeeded.
+- Follow-up QA ZIP: `InOneLine_P05_HEADER_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1O6PmpJMW8Qqf3ST06YlwTkYZ-1zXfsy-`, 46,764,368 bytes; GitHub artifact SHA-256 `86d03f964c57de19c5fea0da2262d99cb9313709a06eab6c886009c52e57f7ad`.
+- **Current status: initial P05 manual PASS recorded; follow-up header candidate awaits short manual retest. P05 stays open and P06 must wait until the corrected CSV, Excel and JSON headers are accepted and the promotion/post-merge record is complete.**
