@@ -1723,8 +1723,7 @@ class StreamTab(QWidget):
             QAbstractSpinBox.ButtonSymbols.NoButtons
         )
         size_text_width = size_spin.fontMetrics().horizontalAdvance("96 px")
-        size_spin.setMinimumWidth(max(92, size_text_width + 34))
-        size_spin.setMaximumWidth(max(120, size_text_width + 48))
+        size_spin.setFixedWidth(max(140, size_text_width + 54))
 
         step_up_btn = QPushButton("▲")
         step_down_btn = QPushButton("▼")
@@ -1740,14 +1739,8 @@ class StreamTab(QWidget):
         step_up_btn.clicked.connect(size_spin.stepUp)
         step_down_btn.clicked.connect(size_spin.stepDown)
 
-        def preferred_control_width(widget: QWidget) -> int:
-            return max(
-                widget.minimumWidth(),
-                widget.minimumSizeHint().width(),
-                widget.sizeHint().width(),
-            )
-
         size_label = QLabel("Размер:")
+        size_label.setFixedWidth(size_label.sizeHint().width())
         size_controls_group = QWidget()
         size_controls_layout = QHBoxLayout(size_controls_group)
         size_controls_layout.setContentsMargins(0, 0, 0, 0)
@@ -1756,19 +1749,14 @@ class StreamTab(QWidget):
         size_controls_layout.addWidget(size_spin)
         size_controls_layout.addWidget(step_up_btn)
         size_controls_layout.addWidget(step_down_btn)
-        size_controls_width = sum(
-            preferred_control_width(widget)
-            for widget in (size_label, size_spin, step_up_btn, step_down_btn)
-        ) + size_controls_layout.spacing() * 3
         size_controls_group.setFixedSize(
-            max(size_controls_layout.sizeHint().width(), size_controls_width) + 4,
+            size_controls_layout.sizeHint().width() + 4,
             max(size_label.sizeHint().height(), size_spin.sizeHint().height(), step_button_size),
         )
 
         color_btn = QPushButton()
         color_text_width = color_btn.fontMetrics().horizontalAdvance("#FFFFFF")
-        color_btn.setMinimumWidth(max(140, color_text_width + 54))
-        color_btn.setMaximumWidth(max(150, color_text_width + 54))
+        color_btn.setFixedWidth(max(220, color_text_width + 54))
         color_btn.setToolTip("Выбрать цвет шрифта")
         self._set_color_button(color_btn, default_color)
         color_btn.clicked.connect(
@@ -1783,6 +1771,7 @@ class StreamTab(QWidget):
         )
 
         color_label = QLabel("Цвет:")
+        color_label.setFixedWidth(color_label.sizeHint().width())
         color_picker_group = QWidget()
         color_picker_layout = QHBoxLayout(color_picker_group)
         color_picker_layout.setContentsMargins(0, 0, 0, 0)
@@ -1790,12 +1779,8 @@ class StreamTab(QWidget):
         color_picker_layout.addWidget(color_label)
         color_picker_layout.addWidget(color_btn)
         color_picker_layout.addWidget(pipette_btn)
-        color_picker_width = sum(
-            preferred_control_width(widget)
-            for widget in (color_label, color_btn, pipette_btn)
-        ) + color_picker_layout.spacing() * 2
         color_picker_group.setFixedSize(
-            max(color_picker_layout.sizeHint().width(), color_picker_width) + 4,
+            color_picker_layout.sizeHint().width() + 4,
             max(
                 color_label.sizeHint().height(),
                 color_btn.sizeHint().height(),

@@ -155,6 +155,12 @@ class MainWindow(QMainWindow):
         self._responsive_layout_timer = QTimer(self)
         self._responsive_layout_timer.setSingleShot(True)
         self._responsive_layout_timer.timeout.connect(self._update_responsive_layout)
+        self._responsive_layout_settle_timer = QTimer(self)
+        self._responsive_layout_settle_timer.setSingleShot(True)
+        self._responsive_layout_settle_timer.setInterval(40)
+        self._responsive_layout_settle_timer.timeout.connect(
+            self._queue_responsive_layout_update
+        )
 
         self._dirty_tabs: set[QWidget] = set()
 
@@ -586,6 +592,9 @@ class MainWindow(QMainWindow):
             return
 
         self._queue_responsive_layout_update()
+        # QScrollArea can assign its final viewport width after currentChanged.
+        # Reflow once more after that first layout pass, without needing a resize.
+        self._responsive_layout_settle_timer.start()
         current = self._main_tab_page_by_scroll.get(self.tabs.widget(index))
 
         auction_refreshed = self.auction_tab.set_main_tab_visible(

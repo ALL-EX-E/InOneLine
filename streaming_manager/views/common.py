@@ -641,6 +641,9 @@ def pick_screen_color(parent: QWidget | None = None) -> QColor | None:
 def make_screen_color_picker_button(tooltip: str = "") -> QPushButton:
     """Create a square, compact eyedropper button for screen color picking."""
     button = QPushButton("⌖")
+    # The shared button style adds wide horizontal padding; cancel it inside
+    # this fixed square so the picker glyph is not clipped.
+    button.setStyleSheet("QPushButton { padding: 0px; }")
     size = max(34, button.sizeHint().height())
     button.setFixedSize(size, size)
     button.setProperty("screenColorPicker", True)

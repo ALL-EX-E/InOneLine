@@ -865,8 +865,36 @@ def main() -> int:
             window._set_current_main_page(page)
             app.processEvents()
             QTest.qWait(20)
-            window._update_responsive_layout()
-            app.processEvents()
+            if page is window.music_tab:
+                # First visit must settle its responsive layout without a
+                # manual resize or direct call to _update_responsive_layout().
+                QTest.qWait(80)
+                app.processEvents()
+                transport_buttons = (
+                    window.music_tab.previous_btn,
+                    window.music_tab.stop_btn,
+                    window.music_tab.play_pause_btn,
+                    window.music_tab.next_btn,
+                )
+                transport_centers = [
+                    button.geometry().center().y()
+                    for button in transport_buttons
+                ]
+                if max(transport_centers) - min(transport_centers) > 4:
+                    raise AssertionError(
+                        "P06 Music transport buttons stayed vertically stretched "
+                        "on first visit"
+                    )
+                if any(
+                    button.width() > button.sizeHint().width() + 20
+                    for button in transport_buttons
+                ):
+                    raise AssertionError(
+                        "P06 Music transport buttons filled the row on first visit"
+                    )
+            else:
+                window._update_responsive_layout()
+                app.processEvents()
             page_scroll = window._main_tab_scroll_by_page[page]
             if page_scroll.horizontalScrollBar().maximum() != 0:
                 raise AssertionError(
@@ -899,6 +927,8 @@ def main() -> int:
         ]
         if not stream_pipettes:
             raise AssertionError("P06 OBS screen-color pipettes were not marked for layout QA")
+        if any("padding: 0px" not in button.styleSheet() for button in stream_pipettes):
+            raise AssertionError("P06 OBS eyedropper glyph is clipped by button padding")
         for pipette in stream_pipettes:
             if (
                 pipette.minimumWidth() != pipette.maximumWidth()
@@ -924,6 +954,10 @@ def main() -> int:
                     f"P06 OBS typography controls split inside their groups: {key}"
                 )
             size_spin = window.stream_tab.typography_controls[key][1]
+            if size_spin.width() < 140:
+                raise AssertionError(
+                    f"P06 OBS font-size field is squeezed: {key}"
+                )
             arrows = [
                 button
                 for button in size_group.findChildren(QPushButton)
@@ -942,9 +976,33 @@ def main() -> int:
                     f"P06 OBS font-size arrows are not beside the size field: {key}"
                 )
             color_button = window.stream_tab.typography_controls[key][2]
-            if color_button.width() < 140:
+            if color_button.width() < 220:
                 raise AssertionError(
                     f"P06 OBS typography color field is squeezed: {key}"
+                )
+            size_labels = [
+                label for label in size_group.findChildren(QLabel)
+                if label.text() == "Размер:"
+            ]
+            color_labels = [
+                label for label in color_group.findChildren(QLabel)
+                if label.text() == "Цвет:"
+            ]
+            if len(size_labels) != 1 or len(color_labels) != 1:
+                raise AssertionError(
+                    f"P06 OBS typography group labels are missing: {key}"
+                )
+            size_label, color_label = size_labels[0], color_labels[0]
+            if (
+                size_spin.geometry().left()
+                - (size_label.geometry().left() + size_label.width())
+                > size_group.layout().spacing() + 2
+                or color_button.geometry().left()
+                - (color_label.geometry().left() + color_label.width())
+                > color_group.layout().spacing() + 2
+            ):
+                raise AssertionError(
+                    f"P06 OBS typography labels leave gaps before their fields: {key}"
                 )
             for group in (size_group, color_group):
                 child_widths = []
