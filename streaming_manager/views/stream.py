@@ -168,20 +168,12 @@ class StreamTab(QWidget):
             QSizePolicy.Fixed,
         )
 
-        self.info_enabled = QCheckBox("Показывать")
+        self.info_enabled = QCheckBox("Показывать на оверлее")
         self.info_enabled.setToolTip(
             "Если выключено, информационный блок полностью скрывается, "
             "а остальные элементы занимают освободившееся место."
         )
         self.info_enabled.toggled.connect(self._update_info_enabled_state)
-
-        info_row = QWidget()
-        info_layout = QHBoxLayout(info_row)
-        info_layout.setContentsMargins(0, 0, 0, 0)
-        info_layout.setSpacing(8)
-        info_layout.addWidget(self.info_field, 1)
-        info_layout.addWidget(self.info_enabled)
-        info_layout.addStretch()
 
         self.format_combo = ScrollSafeComboBox()
         self.format_combo.addItems(STREAM_FORMATS)
@@ -199,9 +191,27 @@ class StreamTab(QWidget):
             30, "#FFFFFF",
         )
         form.addRow("", self.title_typography_host)
-        form.addRow("Текст информационного блока:", info_row)
-        form.addRow("Формат:", self.format_combo)
         layout.addLayout(form)
+
+        info_heading = QLabel("Информационный блок")
+        info_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(info_heading)
+
+        info_form = QFormLayout()
+        self.info_form = info_form
+        info_form.setVerticalSpacing(10)
+        info_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        info_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        info_form.addRow("Текст информационного блока:", self.info_field)
+        info_form.addRow("", self.info_enabled)
+        layout.addLayout(info_form)
+
+        format_form = QFormLayout()
+        format_form.setVerticalSpacing(10)
+        format_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        format_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        format_form.addRow("Формат:", self.format_combo)
+        layout.addLayout(format_form)
 
         background_heading = QLabel("Фон оверлея")
         background_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -326,7 +336,7 @@ class StreamTab(QWidget):
             QSizePolicy.Expanding,
             QSizePolicy.Fixed,
         )
-        overlay_form.addRow("Положение информации:", self.info_position)
+        self.info_form.addRow("Положение информационного блока:", self.info_position)
 
         glow_heading = QLabel("Цвета светящегося контура")
         glow_heading.setStyleSheet("font-weight: 600;")
@@ -338,7 +348,7 @@ class StreamTab(QWidget):
             ("game", "Игровая рамка:"),
             ("webcam", "Рамка веб-камеры:"),
             ("list", "Рамка списка:"),
-            ("info", "Рамка доп. информации:"),
+            ("info", "Рамка информационного блока:"),
         )
         for color_key, color_label in frame_color_rows:
             color_btn = QPushButton()
@@ -374,7 +384,9 @@ class StreamTab(QWidget):
             color_row_layout.addStretch()
             self.frame_color_buttons[color_key] = color_btn
             self.frame_color_row_widgets[color_key] = color_row
-            overlay_form.addRow(color_label, color_row)
+            (self.info_form if color_key == "info" else overlay_form).addRow(
+                color_label, color_row
+            )
 
         overlay_help = QLabel(
             "Авто: список и информационный блок следуют за веб-камерой. "
@@ -417,10 +429,19 @@ class StreamTab(QWidget):
         self._add_typography_row(
             typography_layout, "list", "Прокручиваемый список", 17, "#FFFFFF"
         )
-        self._add_typography_row(
-            typography_layout, "info", "Доп. информация", 17, "#FFFFFF"
-        )
         layout.addLayout(typography_layout)
+
+        # UI-035: keep the existing info typography control in the same
+        # thematic block as text, show/hide, placement and frame color.
+        self.info_typography_host = QWidget()
+        info_typography_layout = QVBoxLayout(self.info_typography_host)
+        info_typography_layout.setContentsMargins(0, 0, 0, 0)
+        info_typography_layout.setSpacing(8)
+        self._add_typography_row(
+            info_typography_layout, "info",
+            "Настройки шрифта информационного блока", 17, "#FFFFFF",
+        )
+        self.info_form.addRow("", self.info_typography_host)
 
         save = QPushButton("Сохранить параметры стрима")
         save.setProperty("primary", True)
@@ -1957,7 +1978,7 @@ class StreamTab(QWidget):
             self.overlay_list_side.setVisible(list_enabled)
         if hasattr(self, "info_position"):
             self._set_form_row_visible(
-                self.overlay_form,
+                self.info_form,
                 self.info_position,
                 info_enabled,
             )
@@ -1970,7 +1991,10 @@ class StreamTab(QWidget):
             ):
                 row = self.frame_color_row_widgets.get(key)
                 if row is not None:
-                    self._set_form_row_visible(self.overlay_form, row, visible)
+                    self._set_form_row_visible(
+                        self.info_form if key == "info" else self.overlay_form,
+                        row, visible,
+                    )
 
         if hasattr(self, "typography_row_widgets"):
             for key in ("top1", "top2", "top3", "list"):
@@ -1978,10 +2002,10 @@ class StreamTab(QWidget):
                 if pair is not None:
                     pair[0].setVisible(list_enabled)
                     pair[1].setVisible(list_enabled)
-            pair = self.typography_row_widgets.get("info")
-            if pair is not None:
-                pair[0].setVisible(info_enabled)
-                pair[1].setVisible(info_enabled)
+            if hasattr(self, "info_typography_host"):
+                self._set_form_row_visible(
+                    self.info_form, self.info_typography_host, info_enabled,
+                )
 
     @staticmethod
     def _set_combo_by_data(combo: QComboBox, value: str, fallback: int = 0):
