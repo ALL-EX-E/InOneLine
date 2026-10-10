@@ -1499,6 +1499,7 @@ class StreamTab(QWidget):
         # This category is shared by the main overlay and Auction Lots.
         self._refresh_background_library()
         self._refresh_auction_lots_background_library()
+        self._refresh_timer_background_library()
 
     def _refresh_background_library(self, selected_asset_id: int | str | None = None):
         if selected_asset_id is None:
@@ -1524,48 +1525,53 @@ class StreamTab(QWidget):
         self.background_combo.blockSignals(False)
         self._update_background_path_field()
 
-    def _refresh_auction_lots_background_library(
-        self,
-        selected_asset_id: int | str | None = None,
+    def _refresh_shared_widget_background_library(
+        self, combo: ScrollSafeComboBox,
+        selected_asset_id: int | str | None,
     ) -> None:
+        """One shared asset selector for timer and auction-lots widgets."""
         if selected_asset_id is None:
-            selected_asset_id = self.auction_lots_background_combo.currentData()
-        try:
-            selected_id = (
-                int(selected_asset_id)
-                if str(selected_asset_id or "").isdigit()
-                else None
-            )
-        except (TypeError, ValueError):
-            selected_id = None
-
+            selected_asset_id = combo.currentData()
+        selected_id = (
+            int(selected_asset_id)
+            if str(selected_asset_id or "").isdigit()
+            else None
+        )
         assets = self._background_assets()
-        self.auction_lots_background_combo.blockSignals(True)
-        self.auction_lots_background_combo.clear()
-        self.auction_lots_background_combo.addItem("— без фонового файла —", "")
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("— без фонового файла —", "")
         for asset in assets:
-            available = media_asset_available(self.db.path.parent, asset)
-            self.auction_lots_background_combo.addItem(
-                self._background_asset_label(asset, available),
-                asset.id,
+            combo.addItem(
+                self._background_asset_label(asset, True), asset.id,
             )
-        idx = (
-            self.auction_lots_background_combo.findData(selected_id)
-            if selected_id is not None
-            else 0
+        idx = combo.findData(selected_id) if selected_id is not None else 0
+        combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.blockSignals(False)
+
+    def _refresh_auction_lots_background_library(
+        self, selected_asset_id: int | str | None = None,
+    ) -> None:
+        self._refresh_shared_widget_background_library(
+            self.auction_lots_background_combo, selected_asset_id,
         )
-        self.auction_lots_background_combo.setCurrentIndex(
-            idx if idx >= 0 else 0
+
+    def _refresh_timer_background_library(
+        self, selected_asset_id: int | str | None = None,
+    ) -> None:
+        self._refresh_shared_widget_background_library(
+            self.timer_background_combo, selected_asset_id,
         )
-        self.auction_lots_background_combo.blockSignals(False)
 
     def _select_imported_background(self, target: str, asset_id: int) -> None:
-        if target == "auction_lots":
-            self._refresh_auction_lots_background_library(asset_id)
-            self._refresh_background_library()
-        else:
-            self._refresh_background_library(asset_id)
-            self._refresh_auction_lots_background_library()
+        """Reuse the single importer and refresh all shared-background users."""
+        if target not in {"main", "auction_lots", "timer"}:
+            raise ValueError(f"Неизвестный виджет фона: {target}")
+        self._refresh_background_library(asset_id if target == "main" else None)
+        self._refresh_auction_lots_background_library(
+            asset_id if target == "auction_lots" else None
+        )
+        self._refresh_timer_background_library(asset_id if target == "timer" else None)
 
     def _selected_background_asset(self):
         raw = self.background_combo.currentData()
@@ -1649,7 +1655,9 @@ class StreamTab(QWidget):
         self.choose_background_btn.setEnabled(True)
         self.choose_background_btn.setText("Добавить фон…")
         self.auction_lots_choose_background_btn.setText("Добавить фон…")
+        self.timer_choose_background_btn.setText("Добавить фон…")
         self._update_auction_lots_background_enabled_state()
+        self._update_timer_background_enabled_state()
 
     def _start_background_video_copy(
         self,
@@ -1663,11 +1671,12 @@ class StreamTab(QWidget):
         self._background_copy_target = selection_target
         self.choose_background_btn.setEnabled(False)
         self.auction_lots_choose_background_btn.setEnabled(False)
-        active_button = (
-            self.auction_lots_choose_background_btn
-            if selection_target == "auction_lots"
-            else self.choose_background_btn
-        )
+        self.timer_choose_background_btn.setEnabled(False)
+        active_button = {
+            "main": self.choose_background_btn,
+            "auction_lots": self.auction_lots_choose_background_btn,
+            "timer": self.timer_choose_background_btn,
+        }[selection_target]
         active_button.setText("Копирование…")
         worker = FunctionWorker(self._copy_background_video, source, target)
         self._background_copy_worker = worker
@@ -1710,6 +1719,9 @@ class StreamTab(QWidget):
 
     def _import_auction_lots_background_media(self):
         self._import_background_media_for("auction_lots")
+
+    def _import_timer_background_media(self):
+        self._import_background_media_for("timer")
 
     def _import_background_media_for(self, selection_target: str):
         if self._background_copy_worker is not None:
