@@ -334,7 +334,10 @@ class StreamTab(QWidget):
         webcam_form.addRow("", self.webcam_enabled)
         webcam_form.addRow("Положение веб-камеры:", self.webcam_position)
 
-        self.overlay_list_enabled = QCheckBox("Показывать")
+        self.overlay_list_enabled = QCheckBox("Показывать на оверлее")
+        self.overlay_list_enabled.setToolTip(
+            "Показывать список в главном оверлее. Отдельный виджет списка остаётся доступен."
+        )
         self.overlay_list_side = ScrollSafeComboBox()
         self.overlay_list_side.addItem("Авто — за веб-камерой", "auto")
         self.overlay_list_side.addItem("Справа", "right")
@@ -344,14 +347,8 @@ class StreamTab(QWidget):
             self._update_main_overlay_conditional_visibility
         )
 
-        list_row = QWidget()
-        list_layout = QHBoxLayout(list_row)
-        list_layout.setContentsMargins(0, 0, 0, 0)
-        list_layout.setSpacing(8)
-        list_layout.addWidget(self.overlay_list_enabled)
-        list_layout.addWidget(self.overlay_list_side)
-        list_layout.addStretch()
-        overlay_form.addRow("Список игр:", list_row)
+        overlay_form.addRow("", self.overlay_list_enabled)
+        overlay_form.addRow("Положение списка:", self.overlay_list_side)
 
         self.info_position = ScrollSafeComboBox()
         self.info_position.addItem("Авто — за веб-камерой", "auto")
@@ -365,10 +362,6 @@ class StreamTab(QWidget):
             QSizePolicy.Fixed,
         )
         self.info_form.addRow("Положение информационного блока:", self.info_position)
-
-        glow_heading = QLabel("Цвета светящегося контура")
-        glow_heading.setStyleSheet("font-weight: 600;")
-        overlay_form.addRow("", glow_heading)
 
         self.frame_color_buttons: dict[str, QPushButton] = {}
         self.frame_color_row_widgets: dict[str, QWidget] = {}
@@ -432,28 +425,17 @@ class StreamTab(QWidget):
         overlay_help.setProperty("muted", True)
         overlay_form.addRow("", overlay_help)
 
-        layout.addLayout(overlay_form)
-        add_main_save("appearance")
-
-        # Approved sidebar settings order: Webcam -> List -> Information.
-        layout.addWidget(info_heading)
-        layout.addLayout(info_form)
-        add_main_save("info")
-
-        typography_heading = QLabel("Шрифты оверлея")
-        typography_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        layout.addWidget(typography_heading)
-
+        self.list_typography_host = QWidget()
+        typography_layout = QVBoxLayout(self.list_typography_host)
+        typography_layout.setContentsMargins(0, 0, 0, 0)
+        typography_layout.setSpacing(10)
         typography_help = QLabel(
             "Для каждого элемента можно отдельно выбрать семейство шрифта, "
             "размер и цвет. Настройки применяются после сохранения параметров."
         )
         typography_help.setWordWrap(True)
         typography_help.setProperty("muted", True)
-        layout.addWidget(typography_help)
-
-        typography_layout = QVBoxLayout()
-        typography_layout.setSpacing(10)
+        typography_layout.addWidget(typography_help)
 
         self._add_typography_row(
             typography_layout, "top1", "Top-1", 17, "#FFFFFF"
@@ -467,8 +449,33 @@ class StreamTab(QWidget):
         self._add_typography_row(
             typography_layout, "list", "Прокручиваемый список", 17, "#FFFFFF"
         )
-        layout.addLayout(typography_layout)
-        add_main_save("typography")
+        overlay_form.addRow("", self.list_typography_host)
+
+        list_actions = QWidget()
+        list_btns = QHBoxLayout(list_actions)
+        list_btns.setContentsMargins(0, 0, 0, 0)
+        list_btns.setSpacing(8)
+        copy_list = QPushButton("Копировать URL списка")
+        copy_list.setToolTip(
+            "Скопировать отдельный URL списка игр для второго источника «Браузер» в OBS"
+        )
+        copy_list.clicked.connect(self.copy_list_overlay_url)
+        open_list = QPushButton("Открыть предпросмотр списка")
+        open_list.setToolTip(
+            "Открыть отдельный OBS-оверлей, содержащий только Top-3 и прокручиваемый список"
+        )
+        open_list.clicked.connect(self.open_list_overlay_preview)
+        list_btns.addWidget(copy_list)
+        list_btns.addWidget(open_list)
+        list_btns.addStretch()
+        overlay_form.addRow("", list_actions)
+        layout.addLayout(overlay_form)
+        add_main_save("list")
+
+        # Approved sidebar settings order: Webcam -> List -> Information.
+        layout.addWidget(info_heading)
+        layout.addLayout(info_form)
+        add_main_save("info")
 
         # UI-035: keep the existing info typography control in the same
         # thematic block as text, show/hide, placement and frame color.
@@ -537,23 +544,6 @@ class StreamTab(QWidget):
         # every operator click perform a fresh /api/data request, while the
         # server itself remains no-store and recalculates media availability.
         self._obs_json_open_counter = 0
-
-        list_btns = QHBoxLayout()
-        list_btns.setSpacing(8)
-        copy_list = QPushButton("Копировать URL списка")
-        copy_list.setToolTip(
-            "Скопировать отдельный URL списка игр для второго источника «Браузер» в OBS"
-        )
-        copy_list.clicked.connect(self.copy_list_overlay_url)
-        open_list = QPushButton("Открыть предпросмотр списка")
-        open_list.setToolTip(
-            "Открыть отдельный OBS-оверлей, содержащий только Top-3 и прокручиваемый список"
-        )
-        open_list.clicked.connect(self.open_list_overlay_preview)
-        list_btns.addWidget(copy_list)
-        list_btns.addWidget(open_list)
-        list_btns.addStretch()
-        layout.addLayout(list_btns)
 
         timer_line = QFrame()
         timer_line.setProperty("line", True)
@@ -2011,7 +2001,9 @@ class StreamTab(QWidget):
                 self.webcam_form, self.webcam_position, webcam_enabled,
             )
         if hasattr(self, "overlay_list_side"):
-            self.overlay_list_side.setVisible(list_enabled)
+            self._set_form_row_visible(
+                self.overlay_form, self.overlay_list_side, list_enabled,
+            )
         if hasattr(self, "info_position"):
             self._set_form_row_visible(
                 self.info_form,
@@ -2035,6 +2027,10 @@ class StreamTab(QWidget):
                     )
 
         if hasattr(self, "typography_row_widgets"):
+            if hasattr(self, "list_typography_host"):
+                self._set_form_row_visible(
+                    self.overlay_form, self.list_typography_host, list_enabled,
+                )
             for key in ("top1", "top2", "top3", "list"):
                 pair = self.typography_row_widgets.get(key)
                 if pair is not None:

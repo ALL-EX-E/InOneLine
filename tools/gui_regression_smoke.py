@@ -22,7 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from PySide6.QtCore import QPoint, QThreadPool, Qt
-from PySide6.QtGui import QKeySequence
+from PySide6.QtGui import QDesktopServices, QKeySequence
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -85,6 +85,128 @@ from streaming_manager.public_xlsx import (
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
+
+
+def assert_p09_list_group(app, stream, db) -> None:
+    """UI-041 groups the real controls and preserves both list surfaces."""
+    form = stream.overlay_form
+    if stream.overlay_list_enabled.text() != "Показывать на оверлее":
+        raise AssertionError("P09 UI-041 embedded-list switch label is missing")
+    fields = (
+        stream.overlay_list_enabled,
+        stream.overlay_list_side,
+        stream.frame_color_row_widgets["list"],
+    )
+    if [form.getWidgetPosition(widget)[0] for widget in fields] != [0, 1, 2]:
+        raise AssertionError("P09 UI-041 List show/position/frame are not grouped")
+    side_label = form.labelForField(stream.overlay_list_side)
+    frame_label = form.labelForField(stream.frame_color_row_widgets["list"])
+    if side_label.text() != "Положение списка:" or frame_label.text() != "Рамка списка:":
+        raise AssertionError("P09 UI-041 List position/frame labels changed")
+
+    host = stream.list_typography_host
+    if form.indexOf(host) < 0:
+        raise AssertionError("P09 UI-041 typography is outside the List form")
+    fixtures = (
+        ("top1", "Top-1", 20, "#112233"),
+        ("top2", "Top-2", 21, "#223344"),
+        ("top3", "Top-3", 22, "#334455"),
+        ("list", "Прокручиваемый список", 23, "#445566"),
+    )
+    for key, title, _, _ in fixtures:
+        label, row = stream.typography_row_widgets[key]
+        font, size, color = stream.typography_controls[key]
+        if label.text() != title or label.parentWidget() is not host or row.parentWidget() is not host:
+            raise AssertionError(f"P09 UI-041 typography row not in List: {key}")
+        if not all(row.isAncestorOf(widget) for widget in (font, size, color)):
+            raise AssertionError(f"P09 UI-041 original typography controls lost: {key}")
+    if any(label.text() == "Шрифты оверлея" for label in stream.findChildren(QLabel)):
+        raise AssertionError("P09 UI-041 redundant generic typography block remains")
+
+    def only_button(text):
+        matches = [button for button in stream.findChildren(QPushButton) if button.text() == text]
+        if len(matches) != 1:
+            raise AssertionError(f"P09 UI-041 expected one action: {text}")
+        return matches[0]
+
+    copy = only_button("Копировать URL списка")
+    preview = only_button("Открыть предпросмотр списка")
+    actions = copy.parentWidget()
+    if actions is not preview.parentWidget() or form.indexOf(actions) < form.indexOf(host):
+        raise AssertionError("P09 UI-041 standalone actions are outside the List group")
+    layout = stream.layout()
+    list_save = stream.main_save_buttons["list"]
+    group_index = layout.indexOf(form)
+    if layout.indexOf(list_save) != group_index + 1:
+        raise AssertionError("P09 UI-041 shared Save is not after the List form")
+    if not (layout.indexOf(stream.webcam_heading) < layout.indexOf(stream.list_heading)
+            < group_index < layout.indexOf(list_save) < layout.indexOf(stream.info_heading)):
+        raise AssertionError("P09 UI-041 sidebar group order changed")
+    frame_row = stream.frame_color_row_widgets["list"]
+    if len(frame_row.findChildren(QPushButton)) != 2:
+        raise AssertionError("P09 UI-041 original frame color/pipette was duplicated")
+
+    keys = ["overlay_list_enabled", "overlay_list_side", "overlay_frame_list_color"]
+    keys += [f"overlay_font_{key}_{part}" for key, _, _, _ in fixtures
+             for part in ("family", "size", "color")]
+    original = db.get_settings(keys)
+    clipboard_before = QApplication.clipboard().text()
+    expected = {
+        "overlay_list_enabled": "0", "overlay_list_side": "left",
+        "overlay_frame_list_color": "#456ABC",
+    }
+    try:
+        stream.overlay_list_enabled.setChecked(True)
+        stream.overlay_list_side.setCurrentIndex(stream.overlay_list_side.findData("left"))
+        stream._set_color_button(stream.frame_color_buttons["list"], "#456ABC")
+        for key, _, size_value, color_value in fixtures:
+            font, size, color = stream.typography_controls[key]
+            size.setValue(size_value)
+            stream._set_color_button(color, color_value)
+            expected[f"overlay_font_{key}_family"] = font.currentFont().family()
+            expected[f"overlay_font_{key}_size"] = str(size_value)
+            expected[f"overlay_font_{key}_color"] = color_value
+
+        stream.overlay_list_enabled.click()
+        app.processEvents()
+        if not all(widget.isHidden() for widget in (stream.overlay_list_side, side_label,
+                    frame_row, frame_label, host)):
+            raise AssertionError("P09 UI-041 disabled embedded List leaves dependent controls")
+        if any(widget.isHidden() or not widget.isEnabled() for widget in
+               (stream.overlay_list_enabled, actions, copy, preview, list_save)):
+            raise AssertionError("P09 UI-041 disabled embedded List hides standalone actions")
+        copy.click()
+        if QApplication.clipboard().text() != f"{stream.api.base_url}/list-overlay":
+            raise AssertionError("P09 UI-041 standalone list URL changed")
+        with patch.object(QDesktopServices, "openUrl", return_value=True) as open_url:
+            preview.click()
+        if open_url.call_count != 1 or open_url.call_args.args[0].toString() != f"{stream.api.base_url}/list-overlay":
+            raise AssertionError("P09 UI-041 standalone list preview handler changed")
+
+        with patch.object(QMessageBox, "information") as saved:
+            list_save.click()
+        if saved.call_count != 1 or db.get_settings(keys) != expected:
+            raise AssertionError("P09 UI-041 shared Save lost disabled-list settings")
+        stream.refresh()
+        if stream.overlay_list_enabled.isChecked() or stream.overlay_list_side.currentData() != "left":
+            raise AssertionError("P09 UI-041 embedded-list switch/position not reloaded")
+        if stream.frame_color_buttons["list"].property("fontColor") != "#456ABC":
+            raise AssertionError("P09 UI-041 list frame color not reloaded")
+        for key, _, size_value, color_value in fixtures:
+            font, size, color = stream.typography_controls[key]
+            if (font.currentFont().family() != expected[f"overlay_font_{key}_family"]
+                    or size.value() != size_value or color.property("fontColor") != color_value):
+                raise AssertionError(f"P09 UI-041 typography not reloaded: {key}")
+        stream.overlay_list_enabled.click()
+        app.processEvents()
+        if any(widget.isHidden() for widget in (stream.overlay_list_side, side_label,
+               frame_row, frame_label, host)):
+            raise AssertionError("P09 UI-041 enabled List does not restore its controls")
+    finally:
+        db.set_settings_bulk(original)
+        stream.refresh()
+        QApplication.clipboard().setText(clipboard_before)
+    print("P09_UI041_LIST_GROUP_SHARED_SETTINGS_AND_STANDALONE_ACTIONS=PASS")
 
 
 
@@ -945,11 +1067,13 @@ def main() -> int:
         stream.refresh()
         print("P09_UI035_INFO_PANEL_GROUP_AND_EXISTING_SAVE=PASS")
 
+        assert_p09_list_group(app, stream, db)
+
         # UI-036: every current main-overlay section gets a compact Save
         # button, all wired to the original atomic StreamTab.save() method.
         section_names = (
             "current_game", "game_window", "background", "webcam",
-            "appearance", "info", "typography",
+            "list", "info",
         )
         buttons = stream.main_save_buttons
         if tuple(buttons) != section_names:
@@ -1010,7 +1134,7 @@ def main() -> int:
                 )
         db.set_settings_bulk(settings_before)
         stream.refresh()
-        print("P09_UI036_SEVEN_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
+        print("P09_UI036_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
 
         # UI-037: the existing game-format and game-frame color controls
         # share one Game Window group, with its existing bulk Save action.
