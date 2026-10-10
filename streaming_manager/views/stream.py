@@ -220,13 +220,17 @@ class StreamTab(QWidget):
         layout.addLayout(info_form)
         add_main_save("info")
 
-        format_form = QFormLayout()
-        format_form.setVerticalSpacing(10)
-        format_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
-        format_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        format_form.addRow("Формат:", self.format_combo)
-        layout.addLayout(format_form)
-        add_main_save("format")
+        game_window_heading = QLabel("Игровое окно")
+        game_window_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(game_window_heading)
+        game_window_form = QFormLayout()
+        self.game_window_form = game_window_form
+        game_window_form.setVerticalSpacing(10)
+        game_window_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        game_window_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        game_window_form.addRow("Формат:", self.format_combo)
+        layout.addLayout(game_window_form)
+        add_main_save("game_window")
 
         background_heading = QLabel("Фон оверлея")
         background_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -361,7 +365,7 @@ class StreamTab(QWidget):
         self.frame_color_buttons: dict[str, QPushButton] = {}
         self.frame_color_row_widgets: dict[str, QWidget] = {}
         frame_color_rows = (
-            ("game", "Игровая рамка:"),
+            ("game", "Рамка игрового окна:"),
             ("webcam", "Рамка веб-камеры:"),
             ("list", "Рамка списка:"),
             ("info", "Рамка информационного блока:"),
@@ -400,9 +404,12 @@ class StreamTab(QWidget):
             color_row_layout.addStretch()
             self.frame_color_buttons[color_key] = color_btn
             self.frame_color_row_widgets[color_key] = color_row
-            (self.info_form if color_key == "info" else overlay_form).addRow(
-                color_label, color_row
+            color_form = (
+                self.info_form if color_key == "info" else
+                self.game_window_form if color_key == "game" else
+                overlay_form
             )
+            color_form.addRow(color_label, color_row)
 
         overlay_help = QLabel(
             "Авто: список и информационный блок следуют за веб-камерой. "
