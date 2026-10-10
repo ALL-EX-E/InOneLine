@@ -168,6 +168,28 @@ class StreamTab(QWidget):
         layout.addWidget(overlay_url_label("Оверлей OBS", "/overlay"))
         overlay_access = QHBoxLayout()
         overlay_access.setSpacing(8)
+        copy = QPushButton("Копировать URL оверлея")
+        copy.setToolTip(
+            "Скопировать адрес, который нужно добавить в OBS как источник «Браузер»"
+        )
+        copy.clicked.connect(
+            lambda: QApplication.clipboard().setText(
+                f"{self.api.base_url}/overlay"
+            )
+        )
+
+        overlay_btn = QPushButton("Открыть предпросмотр оверлея")
+        overlay_btn.setToolTip(
+            "Открыть предварительный просмотр оверлея в браузере"
+        )
+        overlay_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.api.base_url}/overlay?preview=1")
+            )
+        )
+        overlay_access.addWidget(copy)
+        overlay_access.addWidget(overlay_btn)
+        overlay_access.addStretch()
         layout.addLayout(overlay_access)
 
         # UI-036: all main-overlay buttons reuse the same existing bulk
@@ -515,64 +537,6 @@ class StreamTab(QWidget):
             "Настройки шрифта информационного блока", 17, "#FFFFFF",
         )
         self.info_form.addRow("", self.info_typography_host)
-
-        line = QFrame()
-        line.setProperty("line", True)
-        layout.addWidget(line)
-
-        api_heading = QLabel("Локальный API")
-        api_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        layout.addWidget(api_heading)
-
-        self.api_diagnostics_label = QLabel()
-        self.api_diagnostics_label.setWordWrap(True)
-        self.api_diagnostics_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.api_diagnostics_label.setProperty("muted", True)
-        layout.addWidget(self.api_diagnostics_label)
-
-        btns = QHBoxLayout()
-        btns.setSpacing(8)
-        copy = QPushButton("Копировать URL оверлея")
-        copy.setToolTip(
-            "Скопировать адрес, который нужно добавить в OBS как источник «Браузер»"
-        )
-        copy.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                f"{self.api.base_url}/overlay"
-            )
-        )
-
-        overlay_btn = QPushButton("Открыть предпросмотр оверлея")
-        overlay_btn.setToolTip(
-            "Открыть предварительный просмотр оверлея в браузере"
-        )
-        overlay_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(
-                QUrl(f"{self.api.base_url}/overlay?preview=1")
-            )
-        )
-
-        health = QPushButton("Проверить API")
-        health.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/health")))
-        data_btn = QPushButton("Открыть JSON OBS")
-        data_btn.setToolTip(
-            "Открыть диагностические данные OBS в читаемом виде. "
-            "Это не графический оверлей."
-        )
-        data_btn.clicked.connect(self._open_obs_json)
-        overlay_access.addWidget(copy)
-        overlay_access.addWidget(overlay_btn)
-        overlay_access.addStretch()
-        btns.addWidget(health)
-        btns.addWidget(data_btn)
-        btns.addStretch()
-        layout.addLayout(btns)
-
-        # Browser applications may reuse an already-open diagnostics tab when
-        # asked to navigate to the exact same URL.  A unique query value makes
-        # every operator click perform a fresh /api/data request, while the
-        # server itself remains no-store and recalculates media availability.
-        self._obs_json_open_counter = 0
 
         timer_line = QFrame()
         timer_line.setProperty("line", True)
@@ -1432,15 +1396,6 @@ class StreamTab(QWidget):
     def open_auction_lots_overlay_preview(self) -> None:
         QDesktopServices.openUrl(
             QUrl(f"{self.api.base_url}/auction-lots-overlay?preview=1")
-        )
-
-    def _open_obs_json(self):
-        self._refresh_selected_background_availability()
-        self._obs_json_open_counter += 1
-        QDesktopServices.openUrl(
-            QUrl(
-                f"{self.api.base_url}/api/data?pretty=1&refresh={self._obs_json_open_counter}"
-            )
         )
 
     @staticmethod
@@ -2423,10 +2378,6 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
-        self.api_diagnostics_label.setText(
-            f"OBS JSON: {self.api.base_url}/api/data\n"
-            f"Публичный JSON: {self.api.base_url}/api/public"
-        )
 
     def save(self):
         background_asset = self._selected_background_asset()
