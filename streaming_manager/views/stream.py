@@ -144,6 +144,18 @@ class StreamTab(QWidget):
         obs_help_actions.addStretch()
         layout.addLayout(obs_help_actions)
 
+        # UI-036: all main-overlay buttons reuse the same existing bulk
+        # save() handler; specialized widget saves are deliberately separate.
+        self.main_save_buttons: dict[str, QPushButton] = {}
+
+        def add_main_save(section: str) -> None:
+            button = QPushButton("Сохранить")
+            button.setProperty("primary", True)
+            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            button.clicked.connect(self.save)
+            self.main_save_buttons[section] = button
+            layout.addWidget(button, 0, Qt.AlignLeft)
+
         # Existing typography controls keep one registry even when individual
         # visual rows move into their corresponding main-overlay sections.
         self.typography_controls: dict[str, tuple[QFontComboBox, QSpinBox, QPushButton]] = {}
@@ -192,6 +204,7 @@ class StreamTab(QWidget):
         )
         form.addRow("", self.title_typography_host)
         layout.addLayout(form)
+        add_main_save("current_game")
 
         info_heading = QLabel("Информационный блок")
         info_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -205,6 +218,7 @@ class StreamTab(QWidget):
         info_form.addRow("Текст информационного блока:", self.info_field)
         info_form.addRow("", self.info_enabled)
         layout.addLayout(info_form)
+        add_main_save("info")
 
         format_form = QFormLayout()
         format_form.setVerticalSpacing(10)
@@ -212,6 +226,7 @@ class StreamTab(QWidget):
         format_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         format_form.addRow("Формат:", self.format_combo)
         layout.addLayout(format_form)
+        add_main_save("format")
 
         background_heading = QLabel("Фон оверлея")
         background_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -269,12 +284,13 @@ class StreamTab(QWidget):
             "Если файл недоступен, он автоматически исключается из выбора; "
             "отсутствующая управляемая копия удаляется из библиотеки, а выбранный фон сбрасывается. "
             "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM. GIF воспроизводится как анимация, "
-            "видео — без звука и по кругу. Фон применяется после «Сохранить параметры стрима»."
+            "видео — без звука и по кругу. Фон применяется после нажатия «Сохранить»."
         )
         background_help.setWordWrap(True)
         background_help.setProperty("muted", True)
         background_form.addRow("", background_help)
         layout.addLayout(background_form)
+        add_main_save("background")
 
         overlay_heading = QLabel("Внешний вид оверлея")
         overlay_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -401,6 +417,7 @@ class StreamTab(QWidget):
         overlay_form.addRow("", overlay_help)
 
         layout.addLayout(overlay_form)
+        add_main_save("appearance")
 
         typography_heading = QLabel("Шрифты оверлея")
         typography_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -430,6 +447,7 @@ class StreamTab(QWidget):
             typography_layout, "list", "Прокручиваемый список", 17, "#FFFFFF"
         )
         layout.addLayout(typography_layout)
+        add_main_save("typography")
 
         # UI-035: keep the existing info typography control in the same
         # thematic block as text, show/hide, placement and frame color.
@@ -442,11 +460,6 @@ class StreamTab(QWidget):
             "Настройки шрифта информационного блока", 17, "#FFFFFF",
         )
         self.info_form.addRow("", self.info_typography_host)
-
-        save = QPushButton("Сохранить параметры стрима")
-        save.setProperty("primary", True)
-        save.clicked.connect(self.save)
-        layout.addWidget(save, 0, Qt.AlignLeft)
 
         line = QFrame()
         line.setProperty("line", True)
