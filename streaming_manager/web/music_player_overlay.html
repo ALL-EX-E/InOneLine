@@ -130,6 +130,7 @@ body { font-family:var(--font); }
   #card { transition-duration:.15s; }
 }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="stage">
@@ -156,8 +157,7 @@ body { font-family:var(--font); }
 <script>
 (() => {
 "use strict";
-const params = new URLSearchParams(location.search);
-const preview = ["1","true","yes","on"].includes((params.get("preview")||"").toLowerCase());
+const preview = ObsVisibility.preview;
 const card = document.getElementById("card");
 const cover = document.getElementById("cover");
 const coverFrame = document.getElementById("coverFrame");
@@ -530,6 +530,11 @@ function applyAppearanceStateTransition(previous,next,state){
 
   clearTimeout(hideTimer);
 
+  if(preview){
+    showCard();
+    return true;
+  }
+
   if(nextMode==="hidden"){
     if(currentVisible) hideCard();
     else syncHiddenPoseInstantly();
@@ -567,7 +572,7 @@ function scheduleHide(seconds){
   hideTimer=setTimeout(hideCard,Math.max(1,Number(seconds)||8)*1000);
 }
 function evaluateVisibility(state, isInitial=false){
-  if(preview && (!state || !state.playing)){
+  if(preview){
     showCard();
     return;
   }
@@ -642,6 +647,7 @@ async function poll(){
     if(!response.ok) return;
     const payload=await response.json();
     const nextAppearance=payload.appearance||{};
+    ObsVisibility.apply(nextAppearance);
     currentState=payload.state||{};
     appearance=nextAppearance;
 
