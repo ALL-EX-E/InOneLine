@@ -945,6 +945,73 @@ def main() -> int:
         stream.refresh()
         print("P09_UI035_INFO_PANEL_GROUP_AND_EXISTING_SAVE=PASS")
 
+        # UI-036: every current main-overlay section gets a compact Save
+        # button, all wired to the original atomic StreamTab.save() method.
+        section_names = (
+            "current_game", "info", "format", "background",
+            "appearance", "typography",
+        )
+        buttons = stream.main_save_buttons
+        if tuple(buttons) != section_names:
+            raise AssertionError(
+                f"P09 UI-036 unexpected Save sections: {list(buttons)}"
+            )
+        main_layout = stream.layout()
+        if main_layout is None:
+            raise AssertionError("P09 UI-036 main layout unavailable")
+        seen_indexes = []
+        for section in section_names:
+            button = buttons[section]
+            if (
+                button.text() != "Сохранить"
+                or button.property("primary") is not True
+                or button.parentWidget() is not stream
+            ):
+                raise AssertionError(
+                    f"P09 UI-036 Save button style/parent changed: {section}"
+                )
+            button_index = main_layout.indexOf(button)
+            if button_index <= 0 or (
+                main_layout.itemAt(button_index - 1).layout() is None
+            ):
+                raise AssertionError(
+                    f"P09 UI-036 Save not after its settings block: {section}"
+                )
+            seen_indexes.append(button_index)
+        if sorted(seen_indexes) != seen_indexes:
+            raise AssertionError("P09 UI-036 main Save buttons are out of order")
+        if any(
+            button.text() == "Сохранить параметры стрима"
+            for button in stream.findChildren(QPushButton)
+        ):
+            raise AssertionError("P09 UI-036 redundant old bottom Save remains")
+
+        settings_before = {
+            "stream_info": db.get_setting("stream_info", ""),
+            "overlay_font_title_size": db.get_setting(
+                "overlay_font_title_size", "30"
+            ),
+        }
+        title_size = stream.typography_controls["title"][1]
+        for index, section in enumerate(section_names):
+            new_info = f"P09 UI-036 Save from {section}"
+            new_size = 21 + index
+            stream.info_field.setText(new_info)
+            title_size.setValue(new_size)
+            with patch.object(QMessageBox, "information") as saved_message:
+                buttons[section].click()
+            if (
+                saved_message.call_count != 1
+                or db.get_setting("stream_info") != new_info
+                or db.get_setting("overlay_font_title_size") != str(new_size)
+            ):
+                raise AssertionError(
+                    f"P09 UI-036 Save did not persist all groups: {section}"
+                )
+        db.set_settings_bulk(settings_before)
+        stream.refresh()
+        print("P09_UI036_SIX_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
+
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
