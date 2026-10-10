@@ -31,7 +31,7 @@ from ..constants import (
 )
 from ..backup_restore import create_sqlite_backup, prune_backup_files
 from ..position_policy import position_columns_for_surface
-from ..obs_visibility import WIDGETS, visibility_payload
+from ..obs_visibility import WIDGETS, show_mode, visibility_payload
 from ..media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     MEDIA_STORAGE_MANAGED,
@@ -1891,7 +1891,7 @@ class ServicesMixin:
             "overlay": {
                 "webcam_enabled": setting("overlay_webcam_enabled", "1") == "1",
                 "webcam_position": setting("overlay_webcam_position", "top_right"),
-                "list_enabled": setting("overlay_list_enabled", "1") == "1",
+                "list_enabled": show_mode(settings, "list") != "hidden",
                 "list_side": setting("overlay_list_side", "auto"),
                 "info_position": setting("overlay_info_position", "auto"),
                 "background": {
