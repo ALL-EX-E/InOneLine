@@ -23,6 +23,11 @@ _HIDDEN = ("hidden", "Не показывать")
 _ALWAYS = ("always", "Показывать постоянно")
 _SIMPLE = (_HIDDEN, _ALWAYS)
 
+# Keep the main-overlay visibility mechanism for future use, but the
+# operator's primary canvas is currently always rendered. Re-enable the
+# existing mode UI and remove this override only when explicitly requested.
+MAIN_OVERLAY_SHOW_MODE_CONTROL_ENABLED = False
+
 WIDGETS = {
     "overlay": WidgetVisibility("overlay_show_mode", "always", _SIMPLE),
     "list": WidgetVisibility("list_overlay_show_mode", "always", _SIMPLE),
@@ -42,6 +47,12 @@ WIDGETS = {
 
 def show_mode(settings: Mapping[str, Any], widget: str) -> str:
     spec = WIDGETS[widget]
+    if widget == "overlay" and not MAIN_OVERLAY_SHOW_MODE_CONTROL_ENABLED:
+        return "always"
+    # Consolidated List mode also owns the list embedded in the main overlay.
+    # Until its first Save, preserve an older embedded-list hide choice.
+    if widget == "list" and spec.key not in settings:
+        return "hidden" if settings.get("overlay_list_enabled", "1") == "0" else "always"
     # Old Rules databases keep their choice until an explicit new-mode Save.
     # Once present, the new key alone is authoritative, even if malformed.
     if widget == "rules" and spec.key not in settings:
