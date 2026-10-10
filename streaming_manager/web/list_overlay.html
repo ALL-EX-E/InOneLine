@@ -113,6 +113,7 @@ html, body {
 }
 #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="list-panel">
@@ -315,14 +316,15 @@ html, body {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      ObsVisibility.apply(data.visibility?.list);
       const overlayConfig = data.overlay || {};
 
       const rowsChanged = renderRows(data.auction_list || []);
       applyTypography(overlayConfig.typography || {});
       applyGlow(overlayConfig);
 
-      // list_enabled намеренно не учитывается: этот URL является независимым
-      // источником OBS и должен работать даже когда список скрыт в основном overlay.
+      // The same saved List show mode now drives this Browser Source and the
+      // embedded list in /overlay; preview=1 remains independently visible.
       // renderRows() already computes the only large row signature we need.
       // Keep the geometry key small so a long game list is not serialized a
       // second time on every 1-second Browser Source poll.
