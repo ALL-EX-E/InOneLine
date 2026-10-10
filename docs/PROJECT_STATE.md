@@ -1,6 +1,6 @@
 # InOneLine — Current Project State
 
-Обновлено: **2026-10-09**
+Обновлено: **2026-10-10**
 
 ## CURRENT / RELEASED
 
@@ -818,3 +818,12 @@ Permanent repository gate:
 - Ledger requested preserving `Фон оверлея` elements and adding its local Save. Source inspection on the **manually accepted and merged UI-037 main** verifies original asset selector, add-background action including managed/external mode, source, status, stretch/contain/cover/center and help text all live together in one unchanged `Фон оверлея` block.
 - `add_main_save("background")` was already delivered and manually accepted with UI-036, all six main-overlay save buttons sharing the existing `StreamTab.save()` atomic/bulk persistence. P08 completed shared media-dedup and availability semantics (BUG-005/UI-039), including removed `Восстановить ссылку` button and safe missing-file fallback; P08 was manually accepted and postmerge Windows passed.
 - Thus **UI-038 fulfilled without new code, new installer or additional user QA**: it is already covered by existing user-accepted builds and regressions. **UI-039 and BUG-005 were CLOSED in P08**. Next genuinely unimplemented substep **UI-040** groups Webcam settings and retains the approved relative order Webcam → List → Info; not to change overlay runtime geometry/placement.
+
+## P09 / UI-040 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- Пользователь подтвердил весь manual checklist: «Всё работает. Принимаю, записываем и идём дальше.» (2026-10-10 15:48:50 +07 / 08:48:50 UTC). Проверены общий порядок Веб-камера → Список → Информационный блок, положение и цвет рамки веб-камеры, пипетка, скрытие зависимых настроек, сохранение/перезапуск и OBS-предпросмотр.
+- Exact accepted QA ZIP: `InOneLine_P09_UI040_WEBCAM_ORDER_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Google Drive](https://drive.google.com/file/d/1fCc3LRnLtbiy8INBT1o0ysSs4V8KmOjc/view); GitHub artifact `11663095396`, 46,784,637 bytes, SHA-256 `ac221638e017f46e2afea4454c1dcfebdd19ee3cfd5e87466576d67ef4ec7433`. Tested source/test commit `7460dd9fb5d2de10cb3d6fbf833ac864681f714b`; accepted Windows run `38031932881` SUCCESS. Manual acceptance recorded on candidate as `5e1cb8c4bfb48e1b7b69741ebf6db8f859635475`.
+- Clean promotion [PR #84](https://github.com/ALL-EX-E/InOneLine/pull/84) copied only the exact two accepted Git blobs, without source changes or replacing the user-tested installer: `streaming_manager/views/stream.py` = `5c557a91f80a6c75818ee2dcf34d6e911152561b`; `tools/gui_regression_smoke.py` = `dbd512c5830ce1745106808c6092f73994b244c5`. Promotion head `590022e5128ed81a7c5da484b73446fc1cf80bfd`; premerge Windows `38039319109` and wording `38039319011` / `38039316918` SUCCESS.
+- Main merge `1d9a906aefc9984cd36439798c200a722c9581b6`: independent Git-tree readback confirms **2/2 exact accepted blobs**. Exact postmerge Windows [38039495072](https://github.com/ALL-EX-E/InOneLine/actions/runs/38039495072) and wording `38039495077`: **SUCCESS**. Original draft candidate PR #83 is superseded by #84 and closed without merge.
+- Existing webcam checkbox, position selector, frame color/pipette and shared local Save now form one `Веб-камера` block. Conditional visibility and stored values preserved; sidebar settings order Webcam → List → Information accepted. Overlay runtime geometry, data, routes, settings keys and specialized saves unchanged.
+- **UI-040 CLOSED; P09 IN PROGRESS.** Next approved isolated step **UI-041**: consolidate existing List show/position/frame, Top-1/2/3/list typography, standalone list URL/preview actions and shared local Save into one `Список` group. App 1.0.8 / SQLite schema 19 / 15 migrations; published release and rollback unchanged.
