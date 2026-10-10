@@ -193,6 +193,12 @@ class MainWindow(QMainWindow):
         self.music_tab.open_player_overlay_preview_btn.clicked.connect(
             self.stream_tab.open_music_player_overlay_preview
         )
+        self.stream_tab.copy_wheel_url_btn.clicked.connect(
+            self.auction_tab.copy_wheel_overlay_url
+        )
+        self.stream_tab.preview_wheel_btn.clicked.connect(
+            self.auction_tab.open_wheel_preview
+        )
         # Duplicate navigation controls call the exact same Stream/OBS actions.
         # No second URL or preview logic is maintained in Games/Auction.
         self.games_tab.copy_list_overlay_url_btn.clicked.connect(
