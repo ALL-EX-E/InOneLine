@@ -330,8 +330,17 @@ def browser_smoke() -> None:
                 views = [QWebEngineView(), QWebEngineView()]
                 try:
                     before_settings = db.get_settings()
-                    for view, suffix in zip(views, ("", "?preview=1")):
-                        view.resize(960, 540)
+                    # On Windows, two same-position top-level Chromium windows
+                    # occlude each other. The covered normal Browser Source can
+                    # suspend its poll timer and never observe a live Save.
+                    # Exercise normal and preview side-by-side on the actual
+                    # available screen to test the real live-update contract.
+                    screen = app.primaryScreen().availableGeometry()
+                    view_width = min(720, max(320, (screen.width() - 32) // 2))
+                    view_height = min(540, max(240, screen.height() - 80))
+                    for index, (view, suffix) in enumerate(zip(views, ("", "?preview=1"))):
+                        view.resize(view_width, view_height)
+                        view.move(screen.x() + 8 + index * (view_width + 8), screen.y() + 8)
                         view.page().setBackgroundColor(QColor(Qt.transparent))
                         view.show()
                         view.load(QUrl(server.base_url + route + suffix))
@@ -367,6 +376,9 @@ def browser_smoke() -> None:
                         wait_js(normal, "document.querySelector('#titleInner').textContent",
                                 "Hidden music stays live", "Hidden Music receives title without event")
                     save(widget, "always")
+                    assert db.get_settings()[WIDGETS[widget].key] == "always", route + " Save did not persist"
+                    if widget in {"overlay", "list"}:
+                        assert read_json(server, "/api/data")["visibility"][widget]["show_mode"] == "always", route + " API stale after Save"
                     wait_js(normal, mode_js, "always", route + " live Save mode")
                     wait_js(normal, visible, "true", route + " live Save show")
                     assert views[0].url().toString() == server.base_url + route, "Save navigated Browser Source"
