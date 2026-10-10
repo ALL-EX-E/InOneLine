@@ -54,6 +54,7 @@ from ..constants import (
     TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT,
     TIMER_OVERLAY_BACKGROUND_KEY,
+    TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
     TIMER_OVERLAY_FONT_COLOR_DEFAULT,
     TIMER_OVERLAY_FONT_COLOR_KEY,
     TIMER_OVERLAY_FONT_FAMILY_DEFAULT,
@@ -581,7 +582,7 @@ class StreamTab(QWidget):
             up_tooltip="Увеличить размер таймера",
             down_tooltip="Уменьшить размер таймера",
         )
-        timer_form.addRow("Размер:", self.timer_overlay_font_size_control)
+        timer_form.addRow("Размер шрифта:", self.timer_overlay_font_size_control)
 
         timer_text_color_row = QWidget()
         timer_text_color_layout = QHBoxLayout(timer_text_color_row)
@@ -597,7 +598,7 @@ class StreamTab(QWidget):
         timer_text_color_layout.addWidget(self.timer_overlay_font_color_btn)
         timer_text_color_layout.addWidget(self.timer_overlay_font_color_pick_btn)
         timer_text_color_layout.addStretch()
-        timer_form.addRow("Цвет текста:", timer_text_color_row)
+        timer_form.addRow("Цвет шрифта:", timer_text_color_row)
 
         timer_background_row = QWidget()
         timer_background_layout = QHBoxLayout(timer_background_row)
@@ -605,10 +606,11 @@ class StreamTab(QWidget):
         timer_background_layout.setSpacing(12)
         self.timer_background_transparent = QRadioButton("Прозрачный")
         self.timer_background_color_mode = QRadioButton("Цвет")
-        self.timer_background_transparent.toggled.connect(self._update_timer_background_enabled_state)
-        self.timer_background_color_mode.toggled.connect(self._update_timer_background_enabled_state)
-        timer_background_layout.addWidget(self.timer_background_transparent)
-        timer_background_layout.addWidget(self.timer_background_color_mode)
+        self.timer_background_media_mode = QRadioButton("Свой")
+        for control in (self.timer_background_transparent, self.timer_background_color_mode,
+                        self.timer_background_media_mode):
+            control.toggled.connect(self._update_timer_background_enabled_state)
+            timer_background_layout.addWidget(control)
         timer_background_layout.addStretch()
         timer_form.addRow("Фон:", timer_background_row)
 
@@ -628,6 +630,27 @@ class StreamTab(QWidget):
         timer_bg_color_layout.addStretch()
         self.timer_background_color_row = timer_bg_color_row
         timer_form.addRow("Цвет фона:", self.timer_background_color_row)
+
+        timer_media_row = QWidget()
+        timer_media_layout = QHBoxLayout(timer_media_row)
+        timer_media_layout.setContentsMargins(0, 0, 0, 0)
+        timer_media_layout.setSpacing(8)
+        self.timer_background_combo = ScrollSafeComboBox()
+        self.timer_background_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.timer_choose_background_btn = QPushButton("Добавить фон…")
+        self.timer_choose_background_btn.clicked.connect(self._import_timer_background_media)
+        timer_media_layout.addWidget(self.timer_background_combo, 1)
+        timer_media_layout.addWidget(self.timer_choose_background_btn)
+        self.timer_background_media_row = timer_media_row
+        timer_form.addRow("Свой фон:", self.timer_background_media_row)
+
+        timer_audio_help = QLabel(
+            "Через этот виджет может выводиться музыка аукциона и колеса. "
+            "Способ вывода настраивается во вкладке «Аукцион» → «Вывод музыки»."
+        )
+        timer_audio_help.setWordWrap(True)
+        timer_audio_help.setProperty("muted", True)
+        timer_form.addRow("", timer_audio_help)
         layout.addLayout(timer_form)
 
         timer_actions = QHBoxLayout()
@@ -1118,6 +1141,12 @@ class StreamTab(QWidget):
             self.timer_background_color_row,
             self.timer_background_color_mode.isChecked(),
         )
+        self._set_form_row_visible(
+            self.timer_overlay_form,
+            self.timer_background_media_row,
+            self.timer_background_media_mode.isChecked(),
+        )
+        self.timer_choose_background_btn.setEnabled(self._background_copy_worker is None)
 
     def _choose_timer_font_color(self) -> None:
         current = QColor(str(self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT))
@@ -1132,7 +1161,14 @@ class StreamTab(QWidget):
             self._set_color_button(self.timer_background_color_btn, selected.name())
 
     def _save_timer_overlay_settings(self) -> None:
-        background = "color" if self.timer_background_color_mode.isChecked() else "transparent"
+        if self.timer_background_media_mode.isChecked():
+            background = "media"
+        elif self.timer_background_color_mode.isChecked():
+            background = "color"
+        else:
+            background = "transparent"
+        media_value = self.timer_background_combo.currentData()
+        media_id = str(media_value) if str(media_value or "").isdigit() else ""
         self.db.set_settings_bulk({
             WIDGETS["timer"].key: str(self.obs_show_modes["timer"].currentData()),
             TIMER_OVERLAY_FONT_FAMILY_KEY: self.timer_overlay_font.currentFont().family(),
@@ -1141,6 +1177,7 @@ class StreamTab(QWidget):
                 self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT
             ),
             TIMER_OVERLAY_BACKGROUND_KEY: background,
+            TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY: media_id,
             TIMER_OVERLAY_BACKGROUND_COLOR_KEY: str(
                 self.timer_background_color_btn.property("fontColor") or TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ),
@@ -1462,6 +1499,7 @@ class StreamTab(QWidget):
         # This category is shared by the main overlay and Auction Lots.
         self._refresh_background_library()
         self._refresh_auction_lots_background_library()
+        self._refresh_timer_background_library()
 
     def _refresh_background_library(self, selected_asset_id: int | str | None = None):
         if selected_asset_id is None:
@@ -1487,48 +1525,53 @@ class StreamTab(QWidget):
         self.background_combo.blockSignals(False)
         self._update_background_path_field()
 
-    def _refresh_auction_lots_background_library(
-        self,
-        selected_asset_id: int | str | None = None,
+    def _refresh_shared_widget_background_library(
+        self, combo: ScrollSafeComboBox,
+        selected_asset_id: int | str | None,
     ) -> None:
+        """One shared asset selector for timer and auction-lots widgets."""
         if selected_asset_id is None:
-            selected_asset_id = self.auction_lots_background_combo.currentData()
-        try:
-            selected_id = (
-                int(selected_asset_id)
-                if str(selected_asset_id or "").isdigit()
-                else None
-            )
-        except (TypeError, ValueError):
-            selected_id = None
-
+            selected_asset_id = combo.currentData()
+        selected_id = (
+            int(selected_asset_id)
+            if str(selected_asset_id or "").isdigit()
+            else None
+        )
         assets = self._background_assets()
-        self.auction_lots_background_combo.blockSignals(True)
-        self.auction_lots_background_combo.clear()
-        self.auction_lots_background_combo.addItem("— без фонового файла —", "")
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("— без фонового файла —", "")
         for asset in assets:
-            available = media_asset_available(self.db.path.parent, asset)
-            self.auction_lots_background_combo.addItem(
-                self._background_asset_label(asset, available),
-                asset.id,
+            combo.addItem(
+                self._background_asset_label(asset, True), asset.id,
             )
-        idx = (
-            self.auction_lots_background_combo.findData(selected_id)
-            if selected_id is not None
-            else 0
+        idx = combo.findData(selected_id) if selected_id is not None else 0
+        combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.blockSignals(False)
+
+    def _refresh_auction_lots_background_library(
+        self, selected_asset_id: int | str | None = None,
+    ) -> None:
+        self._refresh_shared_widget_background_library(
+            self.auction_lots_background_combo, selected_asset_id,
         )
-        self.auction_lots_background_combo.setCurrentIndex(
-            idx if idx >= 0 else 0
+
+    def _refresh_timer_background_library(
+        self, selected_asset_id: int | str | None = None,
+    ) -> None:
+        self._refresh_shared_widget_background_library(
+            self.timer_background_combo, selected_asset_id,
         )
-        self.auction_lots_background_combo.blockSignals(False)
 
     def _select_imported_background(self, target: str, asset_id: int) -> None:
-        if target == "auction_lots":
-            self._refresh_auction_lots_background_library(asset_id)
-            self._refresh_background_library()
-        else:
-            self._refresh_background_library(asset_id)
-            self._refresh_auction_lots_background_library()
+        """Reuse the single importer and refresh all shared-background users."""
+        if target not in {"main", "auction_lots", "timer"}:
+            raise ValueError(f"Неизвестный виджет фона: {target}")
+        self._refresh_background_library(asset_id if target == "main" else None)
+        self._refresh_auction_lots_background_library(
+            asset_id if target == "auction_lots" else None
+        )
+        self._refresh_timer_background_library(asset_id if target == "timer" else None)
 
     def _selected_background_asset(self):
         raw = self.background_combo.currentData()
@@ -1612,7 +1655,9 @@ class StreamTab(QWidget):
         self.choose_background_btn.setEnabled(True)
         self.choose_background_btn.setText("Добавить фон…")
         self.auction_lots_choose_background_btn.setText("Добавить фон…")
+        self.timer_choose_background_btn.setText("Добавить фон…")
         self._update_auction_lots_background_enabled_state()
+        self._update_timer_background_enabled_state()
 
     def _start_background_video_copy(
         self,
@@ -1626,11 +1671,12 @@ class StreamTab(QWidget):
         self._background_copy_target = selection_target
         self.choose_background_btn.setEnabled(False)
         self.auction_lots_choose_background_btn.setEnabled(False)
-        active_button = (
-            self.auction_lots_choose_background_btn
-            if selection_target == "auction_lots"
-            else self.choose_background_btn
-        )
+        self.timer_choose_background_btn.setEnabled(False)
+        active_button = {
+            "main": self.choose_background_btn,
+            "auction_lots": self.auction_lots_choose_background_btn,
+            "timer": self.timer_choose_background_btn,
+        }[selection_target]
         active_button.setText("Копирование…")
         worker = FunctionWorker(self._copy_background_video, source, target)
         self._background_copy_worker = worker
@@ -1673,6 +1719,9 @@ class StreamTab(QWidget):
 
     def _import_auction_lots_background_media(self):
         self._import_background_media_for("auction_lots")
+
+    def _import_timer_background_media(self):
+        self._import_background_media_for("timer")
 
     def _import_background_media_for(self, selection_target: str):
         if self._background_copy_worker is not None:
@@ -2227,12 +2276,17 @@ class StreamTab(QWidget):
             setting(TIMER_OVERLAY_FONT_COLOR_KEY, TIMER_OVERLAY_FONT_COLOR_DEFAULT),
         )
         timer_background = setting(TIMER_OVERLAY_BACKGROUND_KEY, TIMER_OVERLAY_BACKGROUND_DEFAULT)
+        self.timer_background_media_mode.setChecked(timer_background == "media")
         self.timer_background_color_mode.setChecked(timer_background == "color")
-        self.timer_background_transparent.setChecked(timer_background != "color")
+        self.timer_background_transparent.setChecked(timer_background not in {"color", "media"})
         self._set_color_button(
             self.timer_background_color_btn,
             setting(TIMER_OVERLAY_BACKGROUND_COLOR_KEY, TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT),
         )
+        saved_timer_background = setting(TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+        self._refresh_timer_background_library(saved_timer_background)
+        if saved_timer_background and not self.timer_background_combo.currentData():
+            self.db.set_settings_bulk({TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY: ""})
         self._update_timer_background_enabled_state()
 
         self.music_player_overlay_font.setCurrentFont(QFont(
