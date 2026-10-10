@@ -948,7 +948,7 @@ def main() -> int:
         # UI-036: every current main-overlay section gets a compact Save
         # button, all wired to the original atomic StreamTab.save() method.
         section_names = (
-            "current_game", "info", "format", "background",
+            "current_game", "info", "game_window", "background",
             "appearance", "typography",
         )
         buttons = stream.main_save_buttons
@@ -1011,6 +1011,64 @@ def main() -> int:
         db.set_settings_bulk(settings_before)
         stream.refresh()
         print("P09_UI036_SIX_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
+
+        # UI-037: the existing game-format and game-frame color controls
+        # share one Game Window group, with its existing bulk Save action.
+        game_form = stream.game_window_form
+        color_row = stream.frame_color_row_widgets["game"]
+        format_row, _ = game_form.getWidgetPosition(stream.format_combo)
+        color_row_index, _ = game_form.getWidgetPosition(color_row)
+        game_frame_label = game_form.labelForField(color_row)
+        if (
+            format_row != 0 or color_row_index != 1
+            or game_form.rowCount() != 2
+            or game_frame_label is None
+            or game_frame_label.text() != "Рамка игрового окна:"
+            or stream.overlay_form.labelForField(color_row) is not None
+        ):
+            raise AssertionError("P09 UI-037 game window controls are split/duplicated")
+        game_window_button = buttons["game_window"]
+        game_window_idx = main_layout.indexOf(game_window_button)
+        if (
+            game_window_idx <= 0
+            or main_layout.itemAt(game_window_idx - 1).layout() is not game_form
+        ):
+            raise AssertionError("P09 UI-037 Game Window Save is not after game controls")
+        game_frame_color = stream.frame_color_buttons["game"]
+        picker_buttons = [
+            btn for btn in color_row.findChildren(QPushButton)
+            if btn is not game_frame_color
+        ]
+        if len(picker_buttons) != 1:
+            raise AssertionError("P09 UI-037 original game frame eyedropper missing")
+        old_format = db.get_setting("stream_format", "16:9")
+        old_color = db.get_setting("overlay_frame_game_color", "#FFFFFF")
+        changed_format = "4:3" if old_format == "16:9" else "16:9"
+        fmt_index = stream.format_combo.findText(changed_format)
+        if fmt_index < 0:
+            raise AssertionError("P09 UI-037 previously available game format missing")
+        stream.format_combo.setCurrentIndex(fmt_index)
+        stream._set_color_button(game_frame_color, "#23AABB")
+        with patch.object(QMessageBox, "information") as saved_message:
+            game_window_button.click()
+        if (
+            saved_message.call_count != 1
+            or db.get_setting("stream_format") != changed_format
+            or db.get_setting("overlay_frame_game_color") != "#23AABB"
+        ):
+            raise AssertionError("P09 UI-037 existing game format/frame save failed")
+        stream.refresh()
+        if (
+            stream.format_combo.currentText() != changed_format
+            or game_frame_color.property("fontColor") != "#23AABB"
+        ):
+            raise AssertionError("P09 UI-037 game format/frame reload failed")
+        db.set_settings_bulk({
+            "stream_format": old_format,
+            "overlay_frame_game_color": old_color,
+        })
+        stream.refresh()
+        print("P09_UI037_GAME_WINDOW_FORMAT_FRAME_GROUP=PASS")
 
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
