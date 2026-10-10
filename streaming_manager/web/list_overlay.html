@@ -113,6 +113,7 @@ html, body {
 }
 #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="list-panel">
@@ -315,6 +316,7 @@ html, body {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      ObsVisibility.apply(data.visibility?.list);
       const overlayConfig = data.overlay || {};
 
       const rowsChanged = renderRows(data.auction_list || []);

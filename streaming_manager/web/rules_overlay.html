@@ -61,6 +61,7 @@ body.preview {
 }
 body.preview #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="root">
@@ -80,7 +81,7 @@ body.preview #api-state.visible { display: block; }
   const viewport = document.getElementById("viewport");
   const content = document.getElementById("content");
   const apiState = document.getElementById("api-state");
-  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  const preview = ObsVisibility.preview;
   if (preview) document.body.classList.add("preview");
 
   let lastPayloadKey = "";
@@ -115,9 +116,12 @@ body.preview #api-state.visible { display: block; }
 
   function applyPayload(payload) {
     state = payload || {};
+    ObsVisibility.apply(state.visibility);
     const presentation = state.presentation || {};
-    const html = String(state.content_html || "");
-    const visible = !!state.visible && html.trim().length > 0;
+    const savedHtml = String(state.content_html || "");
+    const html = preview && !savedHtml.trim()
+      ? "<p>Предпросмотр правил аукциона</p>" : savedHtml;
+    const visible = (preview || !!state.visible) && html.trim().length > 0;
 
     root.classList.toggle("visible", visible);
     root.style.background = presentation.background === "color"

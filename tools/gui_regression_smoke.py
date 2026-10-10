@@ -152,13 +152,13 @@ def assert_p09_obs_access(app, window, db) -> None:
         ("Главный оверлей", "Оверлей OBS", "/overlay", "Копировать URL оверлея",
          "Открыть предпросмотр оверлея", "main_settings_form", "?preview=1"),
         ("Список", "Отдельный список OBS", "/list-overlay", "Копировать URL списка",
-         "Открыть предпросмотр списка", "overlay_form", ""),
+         "Открыть предпросмотр списка", "overlay_form", "?preview=1"),
         ("Виджет таймера аукциона", "Таймер OBS", "/timer-overlay", "Копировать URL таймера",
          "Открыть предпросмотр таймера", "timer_overlay_form", "?preview=1"),
         ("Виджет музыкального плеера", "Музыкальный плеер OBS", "/music-player-overlay",
          "Копировать URL плеера", "Открыть предпросмотр", "music_player_overlay_form", "?preview=1"),
         ("Виджет колеса", "Колесо OBS", "/wheel-overlay", "Копировать URL колеса",
-         "Открыть предпросмотр колеса", None, "?preview=1"),
+         "Открыть предпросмотр колеса", "wheel_overlay_form", "?preview=1"),
         ("Виджет списка лотов аукциона", "Список лотов OBS", "/auction-lots-overlay",
          "Копировать URL списка лотов", "Открыть предпросмотр списка лотов",
          "auction_lots_overlay_form", "?preview=1"),
@@ -183,12 +183,13 @@ def assert_p09_obs_access(app, window, db) -> None:
     )
     originals = db.get_settings()
     first_fields = {
-        "main_settings_form": stream.game_combo,
-        "overlay_form": stream.overlay_list_enabled,
-        "timer_overlay_form": stream.timer_overlay_font,
-        "music_player_overlay_form": stream.music_player_overlay_font,
-        "auction_lots_overlay_form": stream.auction_lots_overlay_font,
-        "rules_overlay_form": stream.rules_overlay_visible,
+        "main_settings_form": stream.obs_show_modes["overlay"],
+        "overlay_form": stream.obs_show_modes["list"],
+        "timer_overlay_form": stream.obs_show_modes["timer"],
+        "music_player_overlay_form": stream.obs_show_modes["music_player"],
+        "wheel_overlay_form": stream.obs_show_modes["wheel"],
+        "auction_lots_overlay_form": stream.obs_show_modes["auction_lots"],
+        "rules_overlay_form": stream.obs_show_modes["rules"],
     }
     try:
         if original_api.running and stream.api_label.text() != "Состояние: РАБОТАЕТ":
@@ -299,7 +300,7 @@ def assert_p09_list_group(app, stream, db) -> None:
         stream.overlay_list_side,
         stream.frame_color_row_widgets["list"],
     )
-    if [form.getWidgetPosition(widget)[0] for widget in fields] != [2, 3, 4]:
+    if [form.getWidgetPosition(widget)[0] for widget in fields] != [3, 4, 5]:
         raise AssertionError("P09 UI-041 List show/position/frame are not grouped")
     side_label = form.labelForField(stream.overlay_list_side)
     frame_label = form.labelForField(stream.frame_color_row_widgets["list"])
@@ -386,7 +387,7 @@ def assert_p09_list_group(app, stream, db) -> None:
             raise AssertionError("P09 UI-041 standalone list URL changed")
         with patch.object(QDesktopServices, "openUrl", return_value=True) as open_url:
             preview.click()
-        if open_url.call_count != 1 or open_url.call_args.args[0].toString() != f"{stream.api.base_url}/list-overlay":
+        if open_url.call_count != 1 or open_url.call_args.args[0].toString() != f"{stream.api.base_url}/list-overlay?preview=1":
             raise AssertionError("P09 UI-041 standalone list preview handler changed")
 
         with patch.object(QMessageBox, "information") as saved:

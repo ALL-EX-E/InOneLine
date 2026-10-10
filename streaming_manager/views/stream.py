@@ -50,8 +50,6 @@ from ..constants import (
     RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
     RULES_OVERLAY_PADDING_DEFAULT,
     RULES_OVERLAY_PADDING_KEY,
-    RULES_OVERLAY_VISIBLE_DEFAULT,
-    RULES_OVERLAY_VISIBLE_KEY,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
     TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT,
@@ -82,7 +80,6 @@ from ..constants import (
     MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
-    MUSIC_PLAYER_OVERLAY_SHOW_ALWAYS,
     MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN,
     MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
     MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
@@ -104,6 +101,7 @@ from ..media import (
     supported_media_extensions,
 )
 from ..workers import FunctionWorker
+from ..obs_visibility import WIDGETS, show_mode
 from .common import (
     ScrollSafeComboBox,
     ScrollSafeFontComboBox,
@@ -153,6 +151,18 @@ class StreamTab(QWidget):
         # Section labels refresh from the same live server address as the
         # existing copy/preview callbacks; no second URL policy is introduced.
         self.overlay_url_labels: dict[str, tuple[QLabel, str]] = {}
+        self.obs_show_modes: dict[str, ScrollSafeComboBox] = {}
+
+        def add_show_mode(widget: str, form: QFormLayout) -> ScrollSafeComboBox:
+            combo = ScrollSafeComboBox()
+            combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            spec = WIDGETS[widget]
+            for value, text in spec.options:
+                combo.addItem(text, value)
+            combo.setCurrentIndex(combo.findData(spec.default))
+            self.obs_show_modes[widget] = combo
+            form.addRow("Показ виджета:", combo)
+            return combo
 
         def overlay_url_label(title: str, route: str) -> QLabel:
             label = QLabel()
@@ -191,6 +201,12 @@ class StreamTab(QWidget):
         overlay_access.addWidget(overlay_btn)
         overlay_access.addStretch()
         layout.addLayout(overlay_access)
+
+        self.main_visibility_form = QFormLayout()
+        self.main_visibility_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        self.main_visibility_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        add_show_mode("overlay", self.main_visibility_form)
+        layout.addLayout(self.main_visibility_form)
 
         # UI-036: all main-overlay buttons reuse the same existing bulk
         # save() handler; specialized widget saves are deliberately separate.
@@ -368,6 +384,7 @@ class StreamTab(QWidget):
         overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         overlay_form.addRow(overlay_url_label("Отдельный список OBS", "/list-overlay"))
+        add_show_mode("list", overlay_form)
 
         self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
@@ -554,6 +571,7 @@ class StreamTab(QWidget):
         timer_form.setVerticalSpacing(10)
         timer_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         timer_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        add_show_mode("timer", timer_form)
 
         self.timer_overlay_font = ScrollSafeFontComboBox()
         self.timer_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -653,6 +671,7 @@ class StreamTab(QWidget):
         music_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         music_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.music_player_overlay_form = music_form
+        self.music_player_show_mode = add_show_mode("music_player", music_form)
 
         self.music_player_overlay_font = ScrollSafeFontComboBox()
         self.music_player_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -777,14 +796,9 @@ class StreamTab(QWidget):
         )
         music_form.addRow("", self.music_player_auto_colors)
 
-        self.music_player_show_mode = ScrollSafeComboBox()
-        self.music_player_show_mode.addItem("Не показывать", MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN)
-        self.music_player_show_mode.addItem("При смене трека", MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE)
-        self.music_player_show_mode.addItem("Показывать постоянно", MUSIC_PLAYER_OVERLAY_SHOW_ALWAYS)
         self.music_player_show_mode.currentIndexChanged.connect(
             self._update_music_player_overlay_enabled_state
         )
-        music_form.addRow("Показ плашки:", self.music_player_show_mode)
 
         self.music_player_duration_seconds = ScrollSafeSpinBox()
         self.music_player_duration_seconds.setRange(1, 120)
@@ -846,6 +860,15 @@ class StreamTab(QWidget):
         wheel_access.addWidget(self.preview_wheel_btn)
         wheel_access.addStretch()
         layout.addLayout(wheel_access)
+        self.wheel_overlay_form = QFormLayout()
+        self.wheel_overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        self.wheel_overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        add_show_mode("wheel", self.wheel_overlay_form)
+        layout.addLayout(self.wheel_overlay_form)
+        save_wheel = QPushButton("Сохранить виджет колеса")
+        save_wheel.setProperty("primary", True)
+        save_wheel.clicked.connect(self._save_wheel_overlay_settings)
+        layout.addWidget(save_wheel, 0, Qt.AlignLeft)
 
         auction_lots_line = QFrame()
         auction_lots_line.setProperty("line", True)
@@ -863,6 +886,7 @@ class StreamTab(QWidget):
         auction_lots_form.setVerticalSpacing(10)
         auction_lots_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         auction_lots_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        add_show_mode("auction_lots", auction_lots_form)
 
         self.auction_lots_overlay_font = ScrollSafeFontComboBox()
         self.auction_lots_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -972,8 +996,7 @@ class StreamTab(QWidget):
         rules_form.setVerticalSpacing(10)
         rules_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         rules_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        self.rules_overlay_visible = QCheckBox("Показывать правила в OBS")
-        rules_form.addRow("Видимость:", self.rules_overlay_visible)
+        add_show_mode("rules", rules_form)
         self.rules_overlay_autoscroll = QCheckBox("Автопрокрутка")
         rules_form.addRow("Прокрутка:", self.rules_overlay_autoscroll)
 
@@ -1060,21 +1083,24 @@ class StreamTab(QWidget):
 
         # Moving existing actions between layouts must also move keyboard
         # access before the same section's original first settings control.
-        for copy_button, preview_button, first_control in (
-            (copy, overlay_btn, self.game_combo),
-            (copy_list, open_list, self.overlay_list_enabled),
-            (copy_timer, open_timer, self.timer_overlay_font),
-            (copy_music, open_music, self.music_player_overlay_font),
-            (copy_auction_lots, open_auction_lots, self.auction_lots_overlay_font),
-            (copy_rules, open_rules, self.rules_overlay_visible),
+        for widget, copy_button, preview_button, first_control in (
+            ("overlay", copy, overlay_btn, self.game_combo),
+            ("list", copy_list, open_list, self.overlay_list_enabled),
+            ("timer", copy_timer, open_timer, self.timer_overlay_font),
+            ("music_player", copy_music, open_music, self.music_player_overlay_font),
+            ("wheel", self.copy_wheel_url_btn, self.preview_wheel_btn, save_wheel),
+            ("auction_lots", copy_auction_lots, open_auction_lots, self.auction_lots_overlay_font),
+            ("rules", copy_rules, open_rules, self.rules_overlay_autoscroll),
         ):
+            mode_control = self.obs_show_modes[widget]
             previous_control = (
-                obs_help if first_control is self.game_combo
-                else first_control.previousInFocusChain()
+                obs_help if widget == "overlay"
+                else mode_control.previousInFocusChain()
             )
             QWidget.setTabOrder(previous_control, copy_button)
             QWidget.setTabOrder(copy_button, preview_button)
-            QWidget.setTabOrder(preview_button, first_control)
+            QWidget.setTabOrder(preview_button, mode_control)
+            QWidget.setTabOrder(mode_control, first_control)
 
         layout.addStretch()
         self.refresh()
@@ -1112,6 +1138,7 @@ class StreamTab(QWidget):
     def _save_timer_overlay_settings(self) -> None:
         background = "color" if self.timer_background_color_mode.isChecked() else "transparent"
         self.db.set_settings_bulk({
+            WIDGETS["timer"].key: str(self.obs_show_modes["timer"].currentData()),
             TIMER_OVERLAY_FONT_FAMILY_KEY: self.timer_overlay_font.currentFont().family(),
             TIMER_OVERLAY_FONT_SIZE_KEY: str(self.timer_overlay_font_size.value()),
             TIMER_OVERLAY_FONT_COLOR_KEY: str(
@@ -1324,6 +1351,7 @@ class StreamTab(QWidget):
             else ""
         )
         self.db.set_settings_bulk({
+            WIDGETS["auction_lots"].key: str(self.obs_show_modes["auction_lots"].currentData()),
             AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY:
                 self.auction_lots_overlay_font.currentFont().family(),
             AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY:
@@ -1367,7 +1395,7 @@ class StreamTab(QWidget):
     def _save_rules_overlay_settings(self) -> None:
         background = "color" if self.rules_background_color_mode.isChecked() else "transparent"
         self.db.set_settings_bulk({
-            RULES_OVERLAY_VISIBLE_KEY: "1" if self.rules_overlay_visible.isChecked() else "0",
+            WIDGETS["rules"].key: str(self.obs_show_modes["rules"].currentData()),
             RULES_OVERLAY_AUTOSCROLL_KEY: "1" if self.rules_overlay_autoscroll.isChecked() else "0",
             RULES_OVERLAY_BACKGROUND_KEY: background,
             RULES_OVERLAY_BACKGROUND_COLOR_KEY: str(
@@ -1382,11 +1410,20 @@ class StreamTab(QWidget):
             "Настройки виджета правил сохранены. Открытый Browser Source обновится автоматически.",
         )
 
+    def _save_wheel_overlay_settings(self) -> None:
+        self.db.set_settings_bulk({
+            WIDGETS["wheel"].key: str(self.obs_show_modes["wheel"].currentData()),
+        })
+        QMessageBox.information(
+            self, "OBS Wheel",
+            "Настройки виджета колеса сохранены. Открытый Browser Source обновится автоматически.",
+        )
+
     def copy_list_overlay_url(self) -> None:
         QApplication.clipboard().setText(f"{self.api.base_url}/list-overlay")
 
     def open_list_overlay_preview(self) -> None:
-        QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/list-overlay"))
+        QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/list-overlay?preview=1"))
 
     def copy_auction_lots_overlay_url(self) -> None:
         QApplication.clipboard().setText(
@@ -2092,6 +2129,10 @@ class StreamTab(QWidget):
         # of appearance options grows.
         settings = self.db.get_settings()
         setting = settings.get
+        for widget, combo in self.obs_show_modes.items():
+            combo.blockSignals(True)
+            self._set_combo_by_data(combo, show_mode(settings, widget))
+            combo.blockSignals(False)
 
         current = setting("stream_current_game_id", "")
         self.game_combo.blockSignals(True)
@@ -2260,13 +2301,6 @@ class StreamTab(QWidget):
                 "1" if MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT else "0",
             ) == "1"
         )
-        self._set_combo_by_data(
-            self.music_player_show_mode,
-            setting(
-                MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
-                MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
-            ),
-        )
         try:
             music_duration = int(setting(
                 MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
@@ -2346,9 +2380,6 @@ class StreamTab(QWidget):
             })
         self._update_auction_lots_background_enabled_state()
 
-        self.rules_overlay_visible.setChecked(
-            setting(RULES_OVERLAY_VISIBLE_KEY, "1" if RULES_OVERLAY_VISIBLE_DEFAULT else "0") == "1"
-        )
         self.rules_overlay_autoscroll.setChecked(
             setting(RULES_OVERLAY_AUTOSCROLL_KEY, "1" if RULES_OVERLAY_AUTOSCROLL_DEFAULT else "0") == "1"
         )
@@ -2388,6 +2419,8 @@ class StreamTab(QWidget):
             else ""
         )
         values = {
+            WIDGETS["overlay"].key: str(self.obs_show_modes["overlay"].currentData()),
+            WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
             "stream_current_game_id": str(self.game_combo.currentData() or ""),
             # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
             "stream_info": self.info_field.text().strip(),

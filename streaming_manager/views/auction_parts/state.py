@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QTimer
 from ...app_paths import AppPaths
 from ...database import format_points, normalize_text_key
 from ...diagnostic_logs import append_performance_trace
+from ...obs_visibility import wheel_context_relevant
 from ...media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available, resolve_media_asset_path
 
 
@@ -645,19 +646,7 @@ class AuctionStateMixin:
         return result
 
     def _wheel_context_relevant(self, session: dict | None) -> bool:
-        if session is None:
-            return (
-                str(self.mode_combo.currentData() or "")
-                == "weighted_wheel"
-            )
-
-        status = str(session.get("status") or "")
-        mode = str(session.get("mode") or "")
-        return (
-            mode == "weighted_wheel"
-            or status == "awaiting_wheel"
-            or bool(session.get("wheel_spin_id"))
-        )
+        return wheel_context_relevant(session, str(self.mode_combo.currentData() or ""))
 
     def _load_wheel_payload(self, session: dict | None) -> dict:
         try:
