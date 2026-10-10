@@ -16,6 +16,7 @@ import wave
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.request import urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -85,6 +86,41 @@ from streaming_manager.public_xlsx import (
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
+
+
+def assert_p09_api_ui_cleanup(window, db) -> None:
+    """UI-043 removes service controls while the real OBS API stays available."""
+    stream = window.stream_tab
+    for label in stream.findChildren(QLabel):
+        if label.text() == "Локальный API" or label.text().startswith(
+            ("OBS JSON:", "Публичный JSON:")
+        ):
+            raise AssertionError("P09 UI-043 obsolete Local API block remains")
+    if any(button.text() in ("Проверить API", "Открыть JSON OBS")
+           for button in stream.findChildren(QPushButton)):
+        raise AssertionError("P09 UI-043 diagnostic actions remain in Stream/OBS")
+    if not window.api.running:
+        raise AssertionError("P09 UI-043 local API is not running")
+
+    def read_json(route):
+        with urlopen(f"{window.api.base_url}{route}", timeout=5) as response:
+            if response.status != 200 or response.headers.get_content_type() != "application/json":
+                raise AssertionError(f"P09 UI-043 JSON endpoint unavailable: {route}")
+            return json.load(response)
+
+    expected_health = {"ok": True, "service": "In one line", "version": APP_VERSION}
+    for route in ("/health", "/api/health"):
+        if read_json(route) != expected_health:
+            raise AssertionError(f"P09 UI-043 health contract changed: {route}")
+    if read_json("/api/data") != db.current_stream_payload():
+        raise AssertionError("P09 UI-043 OBS data endpoint lost the existing snapshot")
+    if read_json("/api/public") != {"games": db.public_games()}:
+        raise AssertionError("P09 UI-043 live public data contract changed")
+    for route in ("/overlay", "/list-overlay"):
+        with urlopen(f"{window.api.base_url}{route}", timeout=5) as response:
+            if response.status != 200 or "/api/data" not in response.read().decode("utf-8"):
+                raise AssertionError(f"P09 UI-043 OBS browser source lost its data route: {route}")
+    print("P09_UI043_DIAGNOSTIC_UI_REMOVED_AND_LIVE_API_RETAINED=PASS")
 
 
 def assert_p09_obs_access(app, window, db) -> None:
@@ -469,14 +505,31 @@ def assert_p08_background_media(app, window, root: Path) -> None:
         db.set_settings_bulk({
             AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: str(missing_id),
         })
-        missing_source.unlink()
-        stream.refresh()
+        # UI-043 removes the JSON diagnostics action. Returning to Stream/OBS
+        # must still recheck missing backgrounds through the normal tab hook.
+        previous_page = window._current_main_page()
+        previous_focus = app.focusWidget()
+        try:
+            window._set_current_main_page(window.games_tab)
+            app.processEvents()
+            missing_source.unlink()
+            window._set_current_main_page(stream)
+            app.processEvents()
+        finally:
+            window._set_current_main_page(previous_page)
+            app.processEvents()
+            if previous_focus is not None:
+                previous_focus.setFocus()
         if db.get_media_asset(missing_id) is None:
             raise AssertionError("P08 missing external reference should remain registered")
         if stream.background_combo.findData(missing_id) >= 0:
             raise AssertionError("P08 unavailable external asset leaked into main choices")
         if stream.auction_lots_background_combo.findData(missing_id) >= 0:
             raise AssertionError("P08 unavailable external asset leaked into Auction Lots")
+        print("P09_UI043_BACKGROUND_AVAILABILITY_ON_TAB_RETURN=PASS")
+        # The tab hook updates available choices; the existing full refresh
+        # also clears a persisted selection that no longer resolves.
+        stream.refresh()
         if db.get_setting(AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY, ""):
             raise AssertionError("P08 unavailable external lot selection stayed persisted")
 
@@ -1237,6 +1290,7 @@ def main() -> int:
         stream.refresh()
         print("P09_UI035_INFO_PANEL_GROUP_AND_EXISTING_SAVE=PASS")
 
+        assert_p09_api_ui_cleanup(window, db)
         assert_p09_obs_access(app, window, db)
         assert_p09_list_group(app, stream, db)
 
