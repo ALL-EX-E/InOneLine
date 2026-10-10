@@ -42,8 +42,6 @@ from .constants import (
     MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
-    MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
-    MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
     MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
@@ -61,6 +59,7 @@ from .media import (
     media_asset_available,
     resolve_media_asset_path,
 )
+from .obs_visibility import show_mode
 
 
 PLAYER_PLAY = "play"
@@ -902,10 +901,7 @@ def music_player_overlay_appearance(db) -> dict[str, object]:
             MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
             "1" if MUSIC_PLAYER_OVERLAY_AUTO_COLORS_DEFAULT else "0",
         )) == "1",
-        "show_mode": str(setting(
-            MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
-            MUSIC_PLAYER_OVERLAY_SHOW_MODE_DEFAULT,
-        )),
+        "show_mode": show_mode(settings, "music_player"),
         "duration_seconds": duration,
         "animation": str(setting(
             MUSIC_PLAYER_OVERLAY_ANIMATION_KEY,
