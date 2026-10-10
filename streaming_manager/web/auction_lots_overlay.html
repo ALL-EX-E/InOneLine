@@ -133,6 +133,7 @@ td:not(:last-child) {
 }
 body.preview #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="background"></div>
@@ -160,7 +161,7 @@ body.preview #api-state.visible { display: block; }
   const API = "/api/auction-lots";
   const POLL_MS = 200;
   const SPEED_PX_PER_SECOND = 25;
-  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  const preview = ObsVisibility.preview;
   if (preview) document.body.classList.add("preview");
 
   const headerShell = document.getElementById("header-shell");
@@ -419,6 +420,7 @@ body.preview #api-state.visible { display: block; }
   }
 
   function applyPayload(payload) {
+    ObsVisibility.apply(payload?.visibility);
     renderRows(payload || {});
     applyPresentation((payload || {}).presentation || {});
     const nextAutoScroll = Boolean((payload || {}).auto_scroll);
