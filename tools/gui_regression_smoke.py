@@ -131,6 +131,10 @@ def assert_p09_obs_access(app, window, db) -> None:
     )
     clipboard_before = QApplication.clipboard().text()
     original_api = stream.api
+    previous_page = window._current_main_page()
+    previous_focus = app.focusWidget()
+    window._set_current_main_page(stream)
+    app.processEvents()
     save_fixtures = (
         ("Сохранить виджет таймера", "timer_overlay_form", stream.timer_overlay_font_size,
          "timer_overlay_font_size", 49),
@@ -141,8 +145,15 @@ def assert_p09_obs_access(app, window, db) -> None:
         ("Сохранить виджет правил", "rules_overlay_form", stream.rules_background_opacity,
          "rules_overlay_background_opacity", 63),
     )
-    keys = [key for _, _, _, key, _ in save_fixtures]
-    originals = db.get_settings(keys)
+    originals = db.get_settings()
+    first_fields = {
+        "main_settings_form": stream.game_combo,
+        "overlay_form": stream.overlay_list_enabled,
+        "timer_overlay_form": stream.timer_overlay_font,
+        "music_player_overlay_form": stream.music_player_overlay_font,
+        "auction_lots_overlay_form": stream.auction_lots_overlay_font,
+        "rules_overlay_form": stream.rules_overlay_visible,
+    }
     try:
         if original_api.running and stream.api_label.text() != "Состояние: РАБОТАЕТ":
             raise AssertionError("P09 UI-042 running server state was lost")
@@ -180,6 +191,20 @@ def assert_p09_obs_access(app, window, db) -> None:
                     raise AssertionError(f"P09 UI-042 heading/URL/actions order is wrong: {route}")
                 if form_name and root_index(copy) >= root.indexOf(getattr(stream, form_name)):
                     raise AssertionError(f"P09 UI-042 access follows settings: {route}")
+            if route == "/overlay":
+                help_button = only_widget(QPushButton, "Как добавить виджет в OBS")
+                help_button.setFocus()
+                QTest.keyClick(help_button, Qt.Key_Tab)
+                if app.focusWidget() is not copy:
+                    raise AssertionError("P09 UI-042 Tab skips main overlay access after OBS Help")
+            copy.setFocus()
+            QTest.keyClick(copy, Qt.Key_Tab)
+            if app.focusWidget() is not preview:
+                raise AssertionError(f"P09 UI-042 Tab skips the section preview: {route}")
+            if form_name:
+                QTest.keyClick(preview, Qt.Key_Tab)
+                if app.focusWidget() is not first_fields[form_name]:
+                    raise AssertionError(f"P09 UI-042 Tab does not enter the section settings: {route}")
             copy.click()
             if QApplication.clipboard().text() != f"{original_api.base_url}{route}":
                 raise AssertionError(f"P09 UI-042 wrong clipboard URL: {route}")
@@ -213,8 +238,16 @@ def assert_p09_obs_access(app, window, db) -> None:
     finally:
         stream.api = original_api
         db.set_settings_bulk(originals)
+        added_keys = set(db.get_settings()) - set(originals)
+        with db.connect() as conn:
+            conn.executemany("DELETE FROM settings WHERE key=?", [(key,) for key in added_keys])
         stream.refresh()
         QApplication.clipboard().setText(clipboard_before)
+        window._set_current_main_page(previous_page)
+        if previous_focus is not None:
+            previous_focus.setFocus()
+    if db.get_settings() != originals:
+        raise AssertionError("P09 UI-042 helper did not restore its settings fixture")
     app.processEvents()
     print("P09_UI042_SECTION_URL_ACTIONS_STATUS_AND_EXISTING_SAVES=PASS")
 

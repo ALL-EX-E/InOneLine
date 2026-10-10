@@ -1094,6 +1094,24 @@ class StreamTab(QWidget):
         rules_actions.addStretch()
         layout.addLayout(rules_actions)
 
+        # Moving existing actions between layouts must also move keyboard
+        # access before the same section's original first settings control.
+        for copy_button, preview_button, first_control in (
+            (copy, overlay_btn, self.game_combo),
+            (copy_list, open_list, self.overlay_list_enabled),
+            (copy_timer, open_timer, self.timer_overlay_font),
+            (copy_music, open_music, self.music_player_overlay_font),
+            (copy_auction_lots, open_auction_lots, self.auction_lots_overlay_font),
+            (copy_rules, open_rules, self.rules_overlay_visible),
+        ):
+            previous_control = (
+                obs_help if first_control is self.game_combo
+                else first_control.previousInFocusChain()
+            )
+            QWidget.setTabOrder(previous_control, copy_button)
+            QWidget.setTabOrder(copy_button, preview_button)
+            QWidget.setTabOrder(preview_button, first_control)
+
         layout.addStretch()
         self.refresh()
 
