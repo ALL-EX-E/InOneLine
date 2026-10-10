@@ -14,9 +14,9 @@ from ..constants import (
     RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
     RULES_OVERLAY_PADDING_DEFAULT,
     RULES_OVERLAY_PADDING_KEY,
-    RULES_OVERLAY_VISIBLE_DEFAULT,
     RULES_OVERLAY_VISIBLE_KEY,
 )
+from ..obs_visibility import WIDGETS, show_mode, visibility_payload
 from ..rules_html import sanitize_rules_html
 from .common import normalize_text_key, utc_now
 
@@ -374,6 +374,7 @@ class RulesMixin:
         """Read-only data contract for the standalone OBS Rules Browser Source."""
         keys = (
             RULES_OVERLAY_VISIBLE_KEY,
+            WIDGETS["rules"].key,
             RULES_OVERLAY_AUTOSCROLL_KEY,
             RULES_OVERLAY_BACKGROUND_KEY,
             RULES_OVERLAY_BACKGROUND_COLOR_KEY,
@@ -416,10 +417,8 @@ class RulesMixin:
                 color = RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
 
         return {
-            "visible": settings.get(
-                RULES_OVERLAY_VISIBLE_KEY,
-                "1" if RULES_OVERLAY_VISIBLE_DEFAULT else "0",
-            ) == "1",
+            "visible": show_mode(settings, "rules") != "hidden",
+            "visibility": visibility_payload(settings, "rules"),
             "source": source,
             "auction_id": auction_id,
             "template_name": template_name,
