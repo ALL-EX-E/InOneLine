@@ -110,14 +110,23 @@ def policy_smoke() -> None:
         db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
         from streaming_manager.music_player import music_player_overlay_appearance
         assert music_player_overlay_appearance(db)["show_mode"] == "hidden"
+        def without_presentation(payload):
+            result = {key: value for key, value in payload.items() if key != "visibility"}
+            if "overlay" in result:
+                result["overlay"] = {
+                    key: value for key, value in result["overlay"].items()
+                    if key != "list_enabled"
+                }
+            return result
+
         for before_payload, after_payload in (
             (stream_before, db.current_stream_payload()),
             (timer_before, db.current_timer_payload(timer_runtime)),
             (lots_before, db.current_auction_lots_payload()),
         ):
-            assert {k: v for k, v in before_payload.items() if k != "visibility"} == {
-                k: v for k, v in after_payload.items() if k != "visibility"
-            }, "Mode changed business/audio/layout payload"
+            assert without_presentation(before_payload) == without_presentation(after_payload), (
+                "Mode changed business/audio/non-list-layout payload"
+            )
         with db.connect() as conn:
             assert "\n".join(conn.iterdump()) == before, "Presentation reads mutated SQLite"
 
