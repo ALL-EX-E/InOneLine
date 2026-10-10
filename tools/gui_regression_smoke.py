@@ -948,8 +948,8 @@ def main() -> int:
         # UI-036: every current main-overlay section gets a compact Save
         # button, all wired to the original atomic StreamTab.save() method.
         section_names = (
-            "current_game", "info", "game_window", "background",
-            "appearance", "typography",
+            "current_game", "game_window", "background", "webcam",
+            "appearance", "info", "typography",
         )
         buttons = stream.main_save_buttons
         if tuple(buttons) != section_names:
@@ -1010,7 +1010,7 @@ def main() -> int:
                 )
         db.set_settings_bulk(settings_before)
         stream.refresh()
-        print("P09_UI036_SIX_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
+        print("P09_UI036_SEVEN_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
 
         # UI-037: the existing game-format and game-frame color controls
         # share one Game Window group, with its existing bulk Save action.
@@ -1069,6 +1069,97 @@ def main() -> int:
         })
         stream.refresh()
         print("P09_UI037_GAME_WINDOW_FORMAT_FRAME_GROUP=PASS")
+
+        # UI-040: live existing webcam controls are grouped together and
+        # themed in approved Webcam -> List -> Information sidebar order.
+        webcam_form = stream.webcam_form
+        webcam_color_row = stream.frame_color_row_widgets["webcam"]
+        if [
+            webcam_form.getWidgetPosition(widget)[0]
+            for widget in (
+                stream.webcam_enabled, stream.webcam_position,
+                webcam_color_row,
+            )
+        ] != [0, 1, 2]:
+            raise AssertionError("P09 UI-040 webcam controls not in one form")
+        webcam_pos_label = webcam_form.labelForField(stream.webcam_position)
+        webcam_frame_label = webcam_form.labelForField(webcam_color_row)
+        if (
+            stream.webcam_enabled.text() != "Показывать на оверлее"
+            or webcam_pos_label is None
+            or webcam_pos_label.text() != "Положение веб-камеры:"
+            or webcam_frame_label is None
+            or webcam_frame_label.text() != "Рамка веб-камеры:"
+            or stream.overlay_form.labelForField(webcam_color_row) is not None
+        ):
+            raise AssertionError("P09 UI-040 webcam labels/duplicate frame changed")
+        indices = [
+            main_layout.indexOf(item)
+            for item in (
+                stream.webcam_heading, stream.list_heading, stream.info_heading,
+            )
+        ]
+        if indices != sorted(indices) or len(set(indices)) != 3 or min(indices) < 0:
+            raise AssertionError(
+                f"P09 UI-040 sidebar sections out of order: {indices}"
+            )
+        if (
+            main_layout.itemAt(main_layout.indexOf(buttons["webcam"]) - 1).layout()
+            is not webcam_form
+        ):
+            raise AssertionError("P09 UI-040 webcam Save is not below Webcam form")
+        webcam_color_btn = stream.frame_color_buttons["webcam"]
+        webcam_pipettes = [
+            btn for btn in webcam_color_row.findChildren(QPushButton)
+            if btn is not webcam_color_btn
+        ]
+        if len(webcam_pipettes) != 1:
+            raise AssertionError("P09 UI-040 original webcam pipette missing")
+
+        previous_webcam = {
+            "overlay_webcam_enabled": db.get_setting("overlay_webcam_enabled", "1"),
+            "overlay_webcam_position": db.get_setting(
+                "overlay_webcam_position", "top_right"
+            ),
+            "overlay_frame_webcam_color": db.get_setting(
+                "overlay_frame_webcam_color", "#FFFFFF"
+            ),
+        }
+        stream.webcam_enabled.setChecked(False)
+        app.processEvents()
+        if (
+            not stream.webcam_position.isHidden()
+            or not webcam_color_row.isHidden()
+            or not webcam_pos_label.isHidden()
+            or stream.webcam_enabled.isHidden()
+        ):
+            raise AssertionError(
+                "P09 UI-040 webcam conditional hide lost after regrouping"
+            )
+        stream.webcam_enabled.setChecked(True)
+        stream.webcam_position.setCurrentIndex(
+            stream.webcam_position.findData("bottom_left")
+        )
+        stream._set_color_button(webcam_color_btn, "#34ABCD")
+        with patch.object(QMessageBox, "information") as saved_webcam:
+            buttons["webcam"].click()
+        if (
+            saved_webcam.call_count != 1
+            or db.get_setting("overlay_webcam_enabled") != "1"
+            or db.get_setting("overlay_webcam_position") != "bottom_left"
+            or db.get_setting("overlay_frame_webcam_color") != "#34ABCD"
+        ):
+            raise AssertionError("P09 UI-040 webcam controls did not bulk-save")
+        stream.refresh()
+        if (
+            not stream.webcam_enabled.isChecked()
+            or stream.webcam_position.currentData() != "bottom_left"
+            or webcam_color_btn.property("fontColor") != "#34ABCD"
+        ):
+            raise AssertionError("P09 UI-040 webcam controls did not reload")
+        db.set_settings_bulk(previous_webcam)
+        stream.refresh()
+        print("P09_UI040_WEBCAM_GROUP_SIDEBAR_ORDER=PASS")
 
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")

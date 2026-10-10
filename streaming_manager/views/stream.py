@@ -207,8 +207,8 @@ class StreamTab(QWidget):
         add_main_save("current_game")
 
         info_heading = QLabel("Информационный блок")
+        self.info_heading = info_heading
         info_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
-        layout.addWidget(info_heading)
 
         info_form = QFormLayout()
         self.info_form = info_form
@@ -217,8 +217,8 @@ class StreamTab(QWidget):
         info_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         info_form.addRow("Текст информационного блока:", self.info_field)
         info_form.addRow("", self.info_enabled)
-        layout.addLayout(info_form)
-        add_main_save("info")
+        # The information block is constructed here, then attached below
+        # Webcam and List; its original controls are populated further down.
 
         game_window_heading = QLabel("Игровое окно")
         game_window_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -296,7 +296,21 @@ class StreamTab(QWidget):
         layout.addLayout(background_form)
         add_main_save("background")
 
-        overlay_heading = QLabel("Внешний вид оверлея")
+        webcam_heading = QLabel("Веб-камера")
+        self.webcam_heading = webcam_heading
+        webcam_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(webcam_heading)
+
+        webcam_form = QFormLayout()
+        self.webcam_form = webcam_form
+        webcam_form.setVerticalSpacing(10)
+        webcam_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        webcam_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        layout.addLayout(webcam_form)
+        add_main_save("webcam")
+
+        overlay_heading = QLabel("Список")
+        self.list_heading = overlay_heading
         overlay_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(overlay_heading)
 
@@ -306,7 +320,7 @@ class StreamTab(QWidget):
         overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        self.webcam_enabled = QCheckBox("Показывать")
+        self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
         self.webcam_position.addItem("Справа сверху", "top_right")
         self.webcam_position.addItem("Справа снизу", "bottom_right")
@@ -317,14 +331,8 @@ class StreamTab(QWidget):
             self._update_main_overlay_conditional_visibility
         )
 
-        webcam_row = QWidget()
-        webcam_layout = QHBoxLayout(webcam_row)
-        webcam_layout.setContentsMargins(0, 0, 0, 0)
-        webcam_layout.setSpacing(8)
-        webcam_layout.addWidget(self.webcam_enabled)
-        webcam_layout.addWidget(self.webcam_position)
-        webcam_layout.addStretch()
-        overlay_form.addRow("Область веб-камеры:", webcam_row)
+        webcam_form.addRow("", self.webcam_enabled)
+        webcam_form.addRow("Положение веб-камеры:", self.webcam_position)
 
         self.overlay_list_enabled = QCheckBox("Показывать")
         self.overlay_list_side = ScrollSafeComboBox()
@@ -407,6 +415,7 @@ class StreamTab(QWidget):
             color_form = (
                 self.info_form if color_key == "info" else
                 self.game_window_form if color_key == "game" else
+                self.webcam_form if color_key == "webcam" else
                 overlay_form
             )
             color_form.addRow(color_label, color_row)
@@ -425,6 +434,11 @@ class StreamTab(QWidget):
 
         layout.addLayout(overlay_form)
         add_main_save("appearance")
+
+        # Approved sidebar settings order: Webcam -> List -> Information.
+        layout.addWidget(info_heading)
+        layout.addLayout(info_form)
+        add_main_save("info")
 
         typography_heading = QLabel("Шрифты оверлея")
         typography_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -1993,7 +2007,9 @@ class StreamTab(QWidget):
         # Keep the enable/disable switch itself visible. Only controls that
         # have no meaning while that block is disabled disappear.
         if hasattr(self, "webcam_position"):
-            self.webcam_position.setVisible(webcam_enabled)
+            self._set_form_row_visible(
+                self.webcam_form, self.webcam_position, webcam_enabled,
+            )
         if hasattr(self, "overlay_list_side"):
             self.overlay_list_side.setVisible(list_enabled)
         if hasattr(self, "info_position"):
@@ -2012,7 +2028,9 @@ class StreamTab(QWidget):
                 row = self.frame_color_row_widgets.get(key)
                 if row is not None:
                     self._set_form_row_visible(
-                        self.info_form if key == "info" else self.overlay_form,
+                        self.info_form if key == "info" else
+                        self.webcam_form if key == "webcam" else
+                        self.overlay_form,
                         row, visible,
                     )
 
