@@ -47,11 +47,21 @@ def policy_smoke() -> None:
             assert show_mode({}, widget) == default
             assert show_mode({spec.key: "bogus"}, widget) == default
             for mode, label in spec.options:
-                assert show_mode({spec.key: mode}, widget) == mode
+                assert show_mode({spec.key: mode}, widget) == ("always" if widget == "overlay" else mode)
                 assert label in {"Не показывать", "При смене трека", "Когда колесо используется", "Показывать постоянно"}
             assert visibility_payload({spec.key: "hidden"}, widget, False) == {
-                "show_mode": "hidden", "context_visible": False,
+                "show_mode": "always" if widget == "overlay" else "hidden",
+                "context_visible": False,
             }
+        # The dormant primary-overlay mode must never hide the canvas, even
+        # for an older database that still has a saved 'hidden' value.
+        assert show_mode({"overlay_show_mode": "hidden"}, "overlay") == "always"
+        # Legacy embedded-list preference is read-only until the first new
+        # consolidated List Save; the new mode is then authoritative.
+        assert show_mode({"overlay_list_enabled": "0"}, "list") == "hidden"
+        assert show_mode({"overlay_list_enabled": "1"}, "list") == "always"
+        assert show_mode({"overlay_list_enabled": "0", "list_overlay_show_mode": "always"}, "list") == "always"
+        assert show_mode({"overlay_list_enabled": "1", "list_overlay_show_mode": "hidden"}, "list") == "hidden"
         assert show_mode({"rules_overlay_visible": "0"}, "rules") == "hidden"
         assert show_mode({"rules_overlay_visible": "1"}, "rules") == "always"
         assert show_mode({"rules_overlay_visible": "0", "rules_overlay_show_mode": "always"}, "rules") == "always"
@@ -92,8 +102,12 @@ def policy_smoke() -> None:
         db.set_settings_bulk({spec.key: "hidden" for spec in WIDGETS.values()})
         with db.connect() as conn:
             before = "\n".join(conn.iterdump())
-        for read in reads.values():
-            assert read()["show_mode"] == "hidden"
+        for widget, read in reads.items():
+            assert read()["show_mode"] == ("always" if widget == "overlay" else "hidden")
+        assert db.current_stream_payload()["overlay"]["list_enabled"] is False
+        db.set_settings_bulk({"list_overlay_show_mode": "always"})
+        assert db.current_stream_payload()["overlay"]["list_enabled"] is True
+        db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
         from streaming_manager.music_player import music_player_overlay_appearance
         assert music_player_overlay_appearance(db)["show_mode"] == "hidden"
         for before_payload, after_payload in (
@@ -172,13 +186,15 @@ def ui_smoke() -> None:
             app.processEvents()
             QTest.qWait(600)  # Let scheduled startup work start before fixture teardown.
             stream = window.stream_tab
-            assert hasattr(stream, "obs_show_modes"), "Missing seven common OBS mode controls"
-            assert set(stream.obs_show_modes) == set(WIDGETS)
+            assert hasattr(stream, "obs_show_modes"), "Missing common OBS mode controls"
+            assert set(stream.obs_show_modes) == set(WIDGETS) - {"overlay"}
+            assert not hasattr(stream, "main_visibility_form"), "Dormant main-overlay selector still appears"
+            assert db.current_stream_payload()["visibility"]["overlay"]["show_mode"] == "always"
             assert not hasattr(stream, "rules_overlay_visible"), "Competing Rules visibility switch"
             assert stream.music_player_show_mode is stream.obs_show_modes["music_player"]
             assert stream.main_settings_form.rowCount() == 2, "Accepted typography group changed"
             forms = {
-                "overlay": stream.main_visibility_form, "list": stream.overlay_form,
+                "list": stream.overlay_form,
                 "timer": stream.timer_overlay_form, "music_player": stream.music_player_overlay_form,
                 "auction_lots": stream.auction_lots_overlay_form,
                 "rules": stream.rules_overlay_form, "wheel": stream.wheel_overlay_form,
@@ -202,31 +218,37 @@ def ui_smoke() -> None:
             assert auction._wheel_context_relevant(None) is True
             assert read_json(window.api, "/api/wheel")["visibility"]["context_visible"] is True
             auction.mode_combo.setCurrentIndex(auction.mode_combo.findData("max_amount"))
-            stream.overlay_list_enabled.setChecked(False)
+            stream.obs_show_modes["list"].setCurrentIndex(
+                stream.obs_show_modes["list"].findData("hidden")
+            )
             app.processEvents()
             assert stream.obs_show_modes["list"].isVisible() and stream.obs_show_modes["list"].isEnabled()
+            assert stream.overlay_list_side.isHidden(), "Hidden List still exposes position"
             assert_p09_api_ui_cleanup(window, db)
             assert_p09_obs_access(app, window, db)
             assert_p09_list_group(app, stream, db)
 
             saves = {
-                "overlay": "Сохранить", "list": "Сохранить",
+                "list": "Сохранить",
                 "timer": "Сохранить виджет таймера", "music_player": "Сохранить виджет плеера",
                 "auction_lots": "Сохранить виджет списка лотов",
                 "rules": "Сохранить виджет правил", "wheel": "Сохранить виджет колеса",
             }
-            for widget in WIDGETS:
-                combo = stream.obs_show_modes[widget]
+            for widget, combo in stream.obs_show_modes.items():
                 combo.setCurrentIndex(combo.findData("hidden"))
                 before = db.get_settings()
-                if widget in {"overlay", "list"}:
-                    button = stream.main_save_buttons["current_game" if widget == "overlay" else "list"]
+                if widget == "list":
+                    button = stream.main_save_buttons["list"]
                 else:
                     button, = [b for b in stream.findChildren(QPushButton) if b.text() == saves[widget]]
                 with patch.object(QMessageBox, "information"):
                     button.click()
                 after = db.get_settings()
                 assert after[WIDGETS[widget].key] == "hidden", widget
+                if widget == "list":
+                    assert after["overlay_list_enabled"] == "0"
+                    assert read_json(window.api, "/api/data")["overlay"]["list_enabled"] is False
+                assert read_json(window.api, "/api/data")["visibility"]["overlay"]["show_mode"] == "always"
                 for other, spec in WIDGETS.items():
                     if other != widget and not (widget in {"overlay", "list"} and other in {"overlay", "list"}):
                         assert after.get(spec.key) == before.get(spec.key), (widget, other)
@@ -252,6 +274,7 @@ def ui_smoke() -> None:
             QTest.qWait(600)
             assert window.db.get_settings() == saved
             assert all(combo.currentData() == "hidden" for combo in window.stream_tab.obs_show_modes.values())
+            assert read_json(window.api, "/api/data")["visibility"]["overlay"]["show_mode"] == "always"
         finally:
             window.api.stop()
             QThreadPool.globalInstance().waitForDone(15000)
@@ -315,8 +338,11 @@ def browser_smoke() -> None:
         }
 
         def save(widget, mode):
-            combo = stream.obs_show_modes[widget]
-            combo.setCurrentIndex(combo.findData(mode))
+            if widget == "overlay":
+                assert mode == "always", "Main canvas no longer has a hide control"
+            else:
+                combo = stream.obs_show_modes[widget]
+                combo.setCurrentIndex(combo.findData(mode))
             with patch.object(QMessageBox, "information"):
                 handlers[widget]()
 
@@ -347,8 +373,19 @@ def browser_smoke() -> None:
                     normal, preview = (view.page() for view in views)
                     wait_js(normal, "document.documentElement?.dataset.obsPolicyReady", "true", route + " ready")
                     wait_js(preview, "document.documentElement?.dataset.obsPolicyReady", "true", route + " preview ready")
-                    wait_js(normal, visible, "false", route + " hidden")
-                    wait_js(normal, "getComputedStyle(document.documentElement).opacity", "0", route + " transparent")
+                    initial_visible = "true" if widget == "overlay" else "false"
+                    wait_js(normal, visible, initial_visible, route + " initial visibility")
+                    wait_js(normal, "getComputedStyle(document.documentElement).opacity",
+                            "1" if widget == "overlay" else "0", route + " computed opacity")
+                    if widget == "overlay":
+                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
+                                True, "Hidden shared List omitted from main canvas")
+                        db.set_settings_bulk({"list_overlay_show_mode": "always"})
+                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
+                                False, "Shared List live Save shows embedded list")
+                        db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
+                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
+                                True, "Shared List live Save hides embedded list")
                     wait_js(preview, visible, "true", route + " hidden-mode preview")
                     assert db.get_settings() == before_settings, "Preview changed persisted mode"
                     assert music["event_serial"] == 17, "Preview manufactured a music event"
@@ -378,12 +415,19 @@ def browser_smoke() -> None:
                     save(widget, "always")
                     assert db.get_settings()[WIDGETS[widget].key] == "always", route + " Save did not persist"
                     if widget in {"overlay", "list"}:
-                        assert read_json(server, "/api/data")["visibility"][widget]["show_mode"] == "always", route + " API stale after Save"
+                        snapshot = read_json(server, "/api/data")
+                        assert snapshot["visibility"][widget]["show_mode"] == "always", route + " API stale after Save"
+                        if widget == "list":
+                            assert snapshot["overlay"]["list_enabled"] is True, "Shared List Always did not show embedded list"
                     wait_js(normal, mode_js, "always", route + " live Save mode")
                     wait_js(normal, visible, "true", route + " live Save show")
                     assert views[0].url().toString() == server.base_url + route, "Save navigated Browser Source"
-                    save(widget, "hidden")
-                    wait_js(normal, visible, "false", route + " second live Save hide")
+                    if widget != "overlay":
+                        save(widget, "hidden")
+                        wait_js(normal, visible, "false", route + " second live Save hide")
+                        if widget == "list":
+                            snapshot = read_json(server, "/api/data")
+                            assert snapshot["overlay"]["list_enabled"] is False, "Shared List Hide did not hide embedded list"
                     wait_js(preview, visible, "true", route + " preview after Save")
                     if widget == "music_player":
                         save(widget, "track_change")
