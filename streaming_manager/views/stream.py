@@ -54,6 +54,7 @@ from ..constants import (
     TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT,
     TIMER_OVERLAY_BACKGROUND_KEY,
+    TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
     TIMER_OVERLAY_FONT_COLOR_DEFAULT,
     TIMER_OVERLAY_FONT_COLOR_KEY,
     TIMER_OVERLAY_FONT_FAMILY_DEFAULT,
@@ -581,7 +582,7 @@ class StreamTab(QWidget):
             up_tooltip="Увеличить размер таймера",
             down_tooltip="Уменьшить размер таймера",
         )
-        timer_form.addRow("Размер:", self.timer_overlay_font_size_control)
+        timer_form.addRow("Размер шрифта:", self.timer_overlay_font_size_control)
 
         timer_text_color_row = QWidget()
         timer_text_color_layout = QHBoxLayout(timer_text_color_row)
@@ -597,7 +598,7 @@ class StreamTab(QWidget):
         timer_text_color_layout.addWidget(self.timer_overlay_font_color_btn)
         timer_text_color_layout.addWidget(self.timer_overlay_font_color_pick_btn)
         timer_text_color_layout.addStretch()
-        timer_form.addRow("Цвет текста:", timer_text_color_row)
+        timer_form.addRow("Цвет шрифта:", timer_text_color_row)
 
         timer_background_row = QWidget()
         timer_background_layout = QHBoxLayout(timer_background_row)
@@ -605,10 +606,11 @@ class StreamTab(QWidget):
         timer_background_layout.setSpacing(12)
         self.timer_background_transparent = QRadioButton("Прозрачный")
         self.timer_background_color_mode = QRadioButton("Цвет")
-        self.timer_background_transparent.toggled.connect(self._update_timer_background_enabled_state)
-        self.timer_background_color_mode.toggled.connect(self._update_timer_background_enabled_state)
-        timer_background_layout.addWidget(self.timer_background_transparent)
-        timer_background_layout.addWidget(self.timer_background_color_mode)
+        self.timer_background_media_mode = QRadioButton("Свой")
+        for control in (self.timer_background_transparent, self.timer_background_color_mode,
+                        self.timer_background_media_mode):
+            control.toggled.connect(self._update_timer_background_enabled_state)
+            timer_background_layout.addWidget(control)
         timer_background_layout.addStretch()
         timer_form.addRow("Фон:", timer_background_row)
 
@@ -628,6 +630,27 @@ class StreamTab(QWidget):
         timer_bg_color_layout.addStretch()
         self.timer_background_color_row = timer_bg_color_row
         timer_form.addRow("Цвет фона:", self.timer_background_color_row)
+
+        timer_media_row = QWidget()
+        timer_media_layout = QHBoxLayout(timer_media_row)
+        timer_media_layout.setContentsMargins(0, 0, 0, 0)
+        timer_media_layout.setSpacing(8)
+        self.timer_background_combo = ScrollSafeComboBox()
+        self.timer_background_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.timer_choose_background_btn = QPushButton("Добавить фон…")
+        self.timer_choose_background_btn.clicked.connect(self._import_timer_background_media)
+        timer_media_layout.addWidget(self.timer_background_combo, 1)
+        timer_media_layout.addWidget(self.timer_choose_background_btn)
+        self.timer_background_media_row = timer_media_row
+        timer_form.addRow("Свой фон:", self.timer_background_media_row)
+
+        timer_audio_help = QLabel(
+            "Через этот виджет может выводиться музыка аукциона и колеса. "
+            "Способ вывода настраивается во вкладке «Аукцион» → «Вывод музыки»."
+        )
+        timer_audio_help.setWordWrap(True)
+        timer_audio_help.setProperty("muted", True)
+        timer_form.addRow("", timer_audio_help)
         layout.addLayout(timer_form)
 
         timer_actions = QHBoxLayout()
@@ -1118,6 +1141,12 @@ class StreamTab(QWidget):
             self.timer_background_color_row,
             self.timer_background_color_mode.isChecked(),
         )
+        self._set_form_row_visible(
+            self.timer_overlay_form,
+            self.timer_background_media_row,
+            self.timer_background_media_mode.isChecked(),
+        )
+        self.timer_choose_background_btn.setEnabled(self._background_copy_worker is None)
 
     def _choose_timer_font_color(self) -> None:
         current = QColor(str(self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT))
@@ -1132,7 +1161,14 @@ class StreamTab(QWidget):
             self._set_color_button(self.timer_background_color_btn, selected.name())
 
     def _save_timer_overlay_settings(self) -> None:
-        background = "color" if self.timer_background_color_mode.isChecked() else "transparent"
+        if self.timer_background_media_mode.isChecked():
+            background = "media"
+        elif self.timer_background_color_mode.isChecked():
+            background = "color"
+        else:
+            background = "transparent"
+        media_value = self.timer_background_combo.currentData()
+        media_id = str(media_value) if str(media_value or "").isdigit() else ""
         self.db.set_settings_bulk({
             WIDGETS["timer"].key: str(self.obs_show_modes["timer"].currentData()),
             TIMER_OVERLAY_FONT_FAMILY_KEY: self.timer_overlay_font.currentFont().family(),
@@ -1141,6 +1177,7 @@ class StreamTab(QWidget):
                 self.timer_overlay_font_color_btn.property("fontColor") or TIMER_OVERLAY_FONT_COLOR_DEFAULT
             ),
             TIMER_OVERLAY_BACKGROUND_KEY: background,
+            TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY: media_id,
             TIMER_OVERLAY_BACKGROUND_COLOR_KEY: str(
                 self.timer_background_color_btn.property("fontColor") or TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ),
@@ -2227,12 +2264,17 @@ class StreamTab(QWidget):
             setting(TIMER_OVERLAY_FONT_COLOR_KEY, TIMER_OVERLAY_FONT_COLOR_DEFAULT),
         )
         timer_background = setting(TIMER_OVERLAY_BACKGROUND_KEY, TIMER_OVERLAY_BACKGROUND_DEFAULT)
+        self.timer_background_media_mode.setChecked(timer_background == "media")
         self.timer_background_color_mode.setChecked(timer_background == "color")
-        self.timer_background_transparent.setChecked(timer_background != "color")
+        self.timer_background_transparent.setChecked(timer_background not in {"color", "media"})
         self._set_color_button(
             self.timer_background_color_btn,
             setting(TIMER_OVERLAY_BACKGROUND_COLOR_KEY, TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT),
         )
+        saved_timer_background = setting(TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")
+        self._refresh_timer_background_library(saved_timer_background)
+        if saved_timer_background and not self.timer_background_combo.currentData():
+            self.db.set_settings_bulk({TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY: ""})
         self._update_timer_background_enabled_state()
 
         self.music_player_overlay_font.setCurrentFont(QFont(
