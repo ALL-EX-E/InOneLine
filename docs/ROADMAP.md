@@ -126,7 +126,7 @@ Execution rule: each package below is one candidate/review gate. Do not start th
 7. **P06** — window sizing/state/tab-order migration + full backup ui_state — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
 8. **P07** — one position policy + XLSX derived position — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
 9. **P08** — shared media dedup/availability foundation — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-10. **P09** — Stream/OBS structural cleanup and API-control removal.
+10. **P09** — Stream/OBS structural cleanup and API-control removal — **IN PROGRESS** (UI-033/UI-034 closed; UI-035 next).
 11. **P10** — common OBS show-mode + timer/music widget presentation/audio help.
 12. **P11** — Rules composite editor/overlay.
 13. **P12** — single Auction page + lot-search scope.
