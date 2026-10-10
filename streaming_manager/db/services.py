@@ -31,6 +31,7 @@ from ..constants import (
 )
 from ..backup_restore import create_sqlite_backup, prune_backup_files
 from ..position_policy import position_columns_for_surface
+from ..obs_visibility import WIDGETS, show_mode, visibility_payload
 from ..media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     MEDIA_STORAGE_MANAGED,
@@ -1441,6 +1442,7 @@ class ServicesMixin:
         keys = (
             "auction_max_amount_default_duration_ms",
             "auction_wheel_default_duration_ms",
+            WIDGETS["timer"].key,
             TIMER_OVERLAY_FONT_FAMILY_KEY,
             TIMER_OVERLAY_FONT_SIZE_KEY,
             TIMER_OVERLAY_FONT_COLOR_KEY,
@@ -1524,6 +1526,7 @@ class ServicesMixin:
             "remaining_ms": int(remaining_ms),
             "text": self._format_timer_overlay_milliseconds(remaining_ms),
             "audio": audio_payload,
+            "visibility": visibility_payload(settings, "timer"),
             "presentation": {
                 "font_family": family,
                 "font_size": self._timer_overlay_bounded_int(
@@ -1582,6 +1585,7 @@ class ServicesMixin:
 
         keys = (
             AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
+            WIDGETS["auction_lots"].key,
             AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
             AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
             AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
@@ -1721,6 +1725,7 @@ class ServicesMixin:
             "position_columns": position_columns,
             "auto_scroll": auto_scroll,
             "rows": payload_rows,
+            "visibility": visibility_payload(settings, "auction_lots"),
             "presentation": {
                 "font_family": family,
                 "font_size": self._timer_overlay_bounded_int(
@@ -1853,6 +1858,10 @@ class ServicesMixin:
         }
 
         return {
+            "visibility": {
+                widget: visibility_payload(settings, widget)
+                for widget in ("overlay", "list")
+            },
             "game": {
                 "id": int(game["id"]) if game else None,
                 "name": str(game["title"]) if game else "",
@@ -1882,7 +1891,7 @@ class ServicesMixin:
             "overlay": {
                 "webcam_enabled": setting("overlay_webcam_enabled", "1") == "1",
                 "webcam_position": setting("overlay_webcam_position", "top_right"),
-                "list_enabled": setting("overlay_list_enabled", "1") == "1",
+                "list_enabled": show_mode(settings, "list") != "hidden",
                 "list_side": setting("overlay_list_side", "auto"),
                 "info_position": setting("overlay_info_position", "auto"),
                 "background": {
