@@ -244,6 +244,7 @@ def assert_p09_obs_access(app, window, db) -> None:
         stream.refresh()
         QApplication.clipboard().setText(clipboard_before)
         window._set_current_main_page(previous_page)
+        app.processEvents()
         if previous_focus is not None:
             previous_focus.setFocus()
     if db.get_settings() != originals:
