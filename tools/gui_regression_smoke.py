@@ -87,6 +87,172 @@ from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
 
 
+def assert_p09_obs_access(app, window, db) -> None:
+    """UI-042 keeps each working OBS action before its own settings."""
+    stream = window.stream_tab
+    root = stream.layout()
+    if not 0 <= root.indexOf(stream.api_label) < root.indexOf(stream.main_settings_form):
+        raise AssertionError("P09 UI-042 server status is not above main settings")
+    if "http" in stream.api_label.text():
+        raise AssertionError("P09 UI-042 server status still contains the URL catalog")
+
+    def only_widget(kind, text):
+        matches = [widget for widget in stream.findChildren(kind) if widget.text() == text]
+        if len(matches) != 1:
+            raise AssertionError(f"P09 UI-042 expected one visible access element: {text}")
+        return matches[0]
+
+    def root_index(widget):
+        index = root.indexOf(widget)
+        if index >= 0:
+            return index
+        for index in range(root.count()):
+            nested = root.itemAt(index).layout()
+            if nested is not None and nested.indexOf(widget) >= 0:
+                return index
+        raise AssertionError(f"P09 UI-042 access element is outside its section: {widget.text()}")
+
+    fixtures = (
+        ("Главный оверлей", "Оверлей OBS", "/overlay", "Копировать URL оверлея",
+         "Открыть предпросмотр оверлея", "main_settings_form", "?preview=1"),
+        ("Список", "Отдельный список OBS", "/list-overlay", "Копировать URL списка",
+         "Открыть предпросмотр списка", "overlay_form", ""),
+        ("Виджет таймера аукциона", "Таймер OBS", "/timer-overlay", "Копировать URL таймера",
+         "Открыть предпросмотр таймера", "timer_overlay_form", "?preview=1"),
+        ("Виджет музыкального плеера", "Музыкальный плеер OBS", "/music-player-overlay",
+         "Копировать URL плеера", "Открыть предпросмотр", "music_player_overlay_form", "?preview=1"),
+        ("Виджет колеса", "Колесо OBS", "/wheel-overlay", "Копировать URL колеса",
+         "Открыть предпросмотр колеса", None, "?preview=1"),
+        ("Виджет списка лотов аукциона", "Список лотов OBS", "/auction-lots-overlay",
+         "Копировать URL списка лотов", "Открыть предпросмотр списка лотов",
+         "auction_lots_overlay_form", "?preview=1"),
+        ("Виджет правил аукциона", "Правила OBS", "/rules-overlay", "Копировать URL правил",
+         "Открыть предпросмотр правил", "rules_overlay_form", "?preview=1"),
+    )
+    clipboard_before = QApplication.clipboard().text()
+    original_api = stream.api
+    previous_page = window._current_main_page()
+    previous_focus = app.focusWidget()
+    window._set_current_main_page(stream)
+    app.processEvents()
+    save_fixtures = (
+        ("Сохранить виджет таймера", "timer_overlay_form", stream.timer_overlay_font_size,
+         "timer_overlay_font_size", 49),
+        ("Сохранить виджет плеера", "music_player_overlay_form", stream.music_player_overlay_font_size,
+         "music_player_overlay_font_size", 31),
+        ("Сохранить виджет списка лотов", "auction_lots_overlay_form", stream.auction_lots_overlay_font_size,
+         "auction_lots_overlay_font_size", 27),
+        ("Сохранить виджет правил", "rules_overlay_form", stream.rules_background_opacity,
+         "rules_overlay_background_opacity", 63),
+    )
+    originals = db.get_settings()
+    first_fields = {
+        "main_settings_form": stream.game_combo,
+        "overlay_form": stream.overlay_list_enabled,
+        "timer_overlay_form": stream.timer_overlay_font,
+        "music_player_overlay_form": stream.music_player_overlay_font,
+        "auction_lots_overlay_form": stream.auction_lots_overlay_font,
+        "rules_overlay_form": stream.rules_overlay_visible,
+    }
+    try:
+        if original_api.running and stream.api_label.text() != "Состояние: РАБОТАЕТ":
+            raise AssertionError("P09 UI-042 running server state was lost")
+        # Exercise a changed server address and an error without stopping the
+        # real MainWindow server or replacing any save/clipboard callback.
+        stream.api = SimpleNamespace(base_url="http://127.0.0.1:49123", running=False,
+                                     last_error="UI-042 QA error")
+        stream.refresh()
+        if stream.api_label.text() != "Состояние: НЕ ЗАПУЩЕН: UI-042 QA error":
+            raise AssertionError("P09 UI-042 failed server state was lost")
+        for _, title, route, *_ in fixtures:
+            only_widget(QLabel, f"{title}: http://127.0.0.1:49123{route}")
+        stream.api = original_api
+        stream.refresh()
+
+        for heading_text, title, route, copy_text, preview_text, form_name, query in fixtures:
+            heading = only_widget(QLabel, heading_text)
+            url = only_widget(QLabel, f"{title}: {original_api.base_url}{route}")
+            copy = only_widget(QPushButton, copy_text)
+            preview = only_widget(QPushButton, preview_text)
+            if not url.textInteractionFlags() & Qt.TextSelectableByMouse:
+                raise AssertionError(f"P09 UI-042 URL cannot be selected: {route}")
+            if form_name == "overlay_form":
+                form = stream.overlay_form
+                actions = copy.parentWidget()
+                if (actions is not preview.parentWidget()
+                        or not 0 <= form.getWidgetPosition(url)[0]
+                        < form.getWidgetPosition(actions)[0]
+                        < form.getWidgetPosition(stream.overlay_list_enabled)[0]):
+                    raise AssertionError("P09 UI-042 separate List access is not before its settings")
+                if root.indexOf(heading) >= root.indexOf(form):
+                    raise AssertionError("P09 UI-042 List heading order changed")
+            else:
+                if not root.indexOf(heading) < root_index(url) < root_index(copy) == root_index(preview):
+                    raise AssertionError(f"P09 UI-042 heading/URL/actions order is wrong: {route}")
+                if form_name and root_index(copy) >= root.indexOf(getattr(stream, form_name)):
+                    raise AssertionError(f"P09 UI-042 access follows settings: {route}")
+            if route == "/overlay":
+                help_button = only_widget(QPushButton, "Как добавить виджет в OBS")
+                help_button.setFocus()
+                QTest.keyClick(help_button, Qt.Key_Tab)
+                if app.focusWidget() is not copy:
+                    raise AssertionError("P09 UI-042 Tab skips main overlay access after OBS Help")
+            copy.setFocus()
+            QTest.keyClick(copy, Qt.Key_Tab)
+            if app.focusWidget() is not preview:
+                raise AssertionError(f"P09 UI-042 Tab skips the section preview: {route}")
+            if form_name:
+                QTest.keyClick(preview, Qt.Key_Tab)
+                if app.focusWidget() is not first_fields[form_name]:
+                    raise AssertionError(f"P09 UI-042 Tab does not enter the section settings: {route}")
+            copy.click()
+            if QApplication.clipboard().text() != f"{original_api.base_url}{route}":
+                raise AssertionError(f"P09 UI-042 wrong clipboard URL: {route}")
+            with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+                preview.click()
+            if (opened.call_count != 1
+                    or opened.call_args.args[0].toString() != f"{original_api.base_url}{route}{query}"):
+                raise AssertionError(f"P09 UI-042 wrong browser preview: {route}")
+
+        window.auction_tab.copy_wheel_url_btn.click()
+        if QApplication.clipboard().text() != f"{original_api.base_url}/wheel-overlay":
+            raise AssertionError("P09 UI-042 Auction wheel quick-copy differs from Stream/OBS")
+        with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+            window.auction_tab.preview_wheel_btn.click()
+        if (opened.call_count != 1 or opened.call_args.args[0].toString()
+                != f"{original_api.base_url}/wheel-overlay?preview=1"):
+            raise AssertionError("P09 UI-042 Auction wheel quick-preview differs from Stream/OBS")
+
+        for text, form_name, control, key, value in save_fixtures:
+            save = only_widget(QPushButton, text)
+            if root_index(save) <= root.indexOf(getattr(stream, form_name)):
+                raise AssertionError(f"P09 UI-042 Save precedes its settings: {text}")
+            control.setValue(value)
+            with patch.object(QMessageBox, "information"):
+                save.click()
+            if db.get_setting(key) != str(value):
+                raise AssertionError(f"P09 UI-042 existing specialized Save is disconnected: {key}")
+            stream.refresh()
+            if control.value() != value:
+                raise AssertionError(f"P09 UI-042 saved value did not reload: {key}")
+    finally:
+        stream.api = original_api
+        db.set_settings_bulk(originals)
+        added_keys = set(db.get_settings()) - set(originals)
+        with db.connect() as conn:
+            conn.executemany("DELETE FROM settings WHERE key=?", [(key,) for key in added_keys])
+        stream.refresh()
+        QApplication.clipboard().setText(clipboard_before)
+        window._set_current_main_page(previous_page)
+        app.processEvents()
+        if previous_focus is not None:
+            previous_focus.setFocus()
+    if db.get_settings() != originals:
+        raise AssertionError("P09 UI-042 helper did not restore its settings fixture")
+    app.processEvents()
+    print("P09_UI042_SECTION_URL_ACTIONS_STATUS_AND_EXISTING_SAVES=PASS")
+
+
 def assert_p09_list_group(app, stream, db) -> None:
     """UI-041 groups the real controls and preserves both list surfaces."""
     form = stream.overlay_form
@@ -97,7 +263,7 @@ def assert_p09_list_group(app, stream, db) -> None:
         stream.overlay_list_side,
         stream.frame_color_row_widgets["list"],
     )
-    if [form.getWidgetPosition(widget)[0] for widget in fields] != [0, 1, 2]:
+    if [form.getWidgetPosition(widget)[0] for widget in fields] != [2, 3, 4]:
         raise AssertionError("P09 UI-041 List show/position/frame are not grouped")
     side_label = form.labelForField(stream.overlay_list_side)
     frame_label = form.labelForField(stream.frame_color_row_widgets["list"])
@@ -131,8 +297,12 @@ def assert_p09_list_group(app, stream, db) -> None:
 
     copy = only_button("Копировать URL списка")
     preview = only_button("Открыть предпросмотр списка")
+    url = next(label for label in stream.findChildren(QLabel)
+               if label.text() == f"Отдельный список OBS: {stream.api.base_url}/list-overlay")
     actions = copy.parentWidget()
-    if actions is not preview.parentWidget() or form.indexOf(actions) < form.indexOf(host):
+    if (actions is not preview.parentWidget()
+            or form.getWidgetPosition(actions)[0] != 1
+            or form.getWidgetPosition(actions)[0] >= form.getWidgetPosition(fields[0])[0]):
         raise AssertionError("P09 UI-041 standalone actions are outside the List group")
     layout = stream.layout()
     list_save = stream.main_save_buttons["list"]
@@ -173,7 +343,7 @@ def assert_p09_list_group(app, stream, db) -> None:
                     frame_row, frame_label, host)):
             raise AssertionError("P09 UI-041 disabled embedded List leaves dependent controls")
         if any(widget.isHidden() or not widget.isEnabled() for widget in
-               (stream.overlay_list_enabled, actions, copy, preview, list_save)):
+               (stream.overlay_list_enabled, url, actions, copy, preview, list_save)):
             raise AssertionError("P09 UI-041 disabled embedded List hides standalone actions")
         copy.click()
         if QApplication.clipboard().text() != f"{stream.api.base_url}/list-overlay":
@@ -1067,6 +1237,7 @@ def main() -> int:
         stream.refresh()
         print("P09_UI035_INFO_PANEL_GROUP_AND_EXISTING_SAVE=PASS")
 
+        assert_p09_obs_access(app, window, db)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
