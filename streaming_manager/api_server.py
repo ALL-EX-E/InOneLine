@@ -152,6 +152,9 @@ class LocalApiServer:
         auction_lots_overlay_path = (
             Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"
         )
+        obs_visibility_js = (
+            Path(__file__).resolve().parent / "web" / "obs_visibility.js"
+        ).read_text(encoding="utf-8")
         # Static HTML does not change while the program is running. Read once
         # instead of hitting disk for every browser-source navigation/refresh.
         overlay_html = _inject_overlay_version_handshake(
@@ -210,10 +213,13 @@ class LocalApiServer:
                 self.end_headers()
                 self.wfile.write(body)
 
-            def _send_html(self, text: str, status: int = 200) -> None:
+            def _send_text(
+                self, text: str, status: int = 200,
+                *, content_type: str = "text/html; charset=utf-8",
+            ) -> None:
                 body = text.encode("utf-8")
                 self.send_response(status)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header(OVERLAY_VERSION_HEADER, APP_VERSION)
                 self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -436,6 +442,12 @@ class LocalApiServer:
             def do_GET(self):
                 parsed = urlparse(self.path)
                 path = parsed.path.rstrip("/") or "/"
+                if path == "/obs-visibility.js":
+                    self._send_text(
+                        obs_visibility_js,
+                        content_type="application/javascript; charset=utf-8",
+                    )
+                    return
                 query = parse_qs(parsed.query)
                 pretty = str(query.get("pretty", ["0"])[0]).lower() in (
                     "1", "true", "yes", "on"
@@ -443,9 +455,9 @@ class LocalApiServer:
 
                 if path in ("/overlay", "/obs-overlay"):
                     try:
-                        self._send_html(overlay_html)
+                        self._send_text(overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -455,9 +467,9 @@ class LocalApiServer:
 
                 if path in ("/list-overlay", "/obs-list", "/overlay/list"):
                     try:
-                        self._send_html(list_overlay_html)
+                        self._send_text(list_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>List overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -467,9 +479,9 @@ class LocalApiServer:
 
                 if path in ("/wheel-overlay", "/obs-wheel", "/overlay/wheel"):
                     try:
-                        self._send_html(wheel_overlay_html)
+                        self._send_text(wheel_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Wheel overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -483,9 +495,9 @@ class LocalApiServer:
                     "/overlay/auction-lots",
                 ):
                     try:
-                        self._send_html(auction_lots_overlay_html)
+                        self._send_text(auction_lots_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Auction lots overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -495,9 +507,9 @@ class LocalApiServer:
 
                 if path in ("/rules-overlay", "/obs-rules", "/overlay/rules"):
                     try:
-                        self._send_html(rules_overlay_html)
+                        self._send_text(rules_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Rules overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -507,9 +519,9 @@ class LocalApiServer:
 
                 if path in ("/timer-overlay", "/obs-timer", "/overlay/timer"):
                     try:
-                        self._send_html(timer_overlay_html)
+                        self._send_text(timer_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Timer overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -523,9 +535,9 @@ class LocalApiServer:
                     "/overlay/music-player",
                 ):
                     try:
-                        self._send_html(music_player_overlay_html)
+                        self._send_text(music_player_overlay_html)
                     except OSError as exc:
-                        self._send_html(
+                        self._send_text(
                             "<h1>Music Player overlay unavailable</h1><pre>"
                             + str(exc)
                             + "</pre>",
@@ -590,7 +602,9 @@ class LocalApiServer:
                     return
                 if path in ("/api/wheel", "/wheel"):
                     self._send_json(
-                        db.current_wheel_payload(),
+                        db.current_wheel_payload(
+                            str(api_server.auction_lots_state().get("mode") or "max_amount")
+                        ),
                         pretty=pretty,
                     )
                     return

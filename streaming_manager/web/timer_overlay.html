@@ -87,6 +87,7 @@ body.preview {
 }
 body.preview #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="root"><div id="timer" aria-label="00:10:00.000"></div></div>
@@ -103,7 +104,7 @@ body.preview #api-state.visible { display: block; }
   const metricProbe = document.getElementById("metric-probe");
   const apiState = document.getElementById("api-state");
   const auctionAudio = document.getElementById("auction-audio");
-  const preview = new URLSearchParams(location.search).get("preview") === "1";
+  const preview = ObsVisibility.preview;
   if (preview) document.body.classList.add("preview");
 
   let state = null;
@@ -334,6 +335,7 @@ body.preview #api-state.visible { display: block; }
 
   function applyPayload(payload) {
     state = payload || {};
+    ObsVisibility.apply(state.visibility);
     anchorRemainingMs = Math.max(0, Number(state.remaining_ms) || 0);
     anchorPerformanceMs = performance.now();
     setTimerText(formatMilliseconds(anchorRemainingMs));

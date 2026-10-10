@@ -18,6 +18,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;z-index:0}
 #preview-label{position:absolute;top:2%;left:0;right:0;text-align:center;color:#aeb8c0;font-size:clamp(12px,2vmin,22px);display:none}
 body.preview #preview-label{display:block}
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="root">
@@ -38,7 +39,7 @@ const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
 const stage=document.getElementById("stage"),winnerEl=document.getElementById("winner");
 const centerImageEl=document.getElementById("center-image");
 const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
-const preview=new URLSearchParams(location.search).get("preview")==="1";
+const preview=ObsVisibility.preview;
 if(preview)document.body.classList.add("preview");
 let state=null,clockOffset=0,rafId=null;
 let centerImageUrl="";
@@ -252,6 +253,7 @@ async function poll(){
  try{
    const res=await fetch(API,{cache:"no-store"});if(!res.ok)throw new Error(res.status);
    const next=await res.json();
+   ObsVisibility.apply(next.visibility);
    if(next.server_time)clockOffset=Date.parse(next.server_time)-Date.now();
    state=next;
  }catch(e){if(!preview)state=null}

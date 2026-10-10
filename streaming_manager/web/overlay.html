@@ -273,6 +273,7 @@ body.preview .preview-label { display: flex; }
 }
 #api-state.visible { display: block; }
 </style>
+<script src="/obs-visibility.js"></script>
 </head>
 <body>
 <div id="viewport">
@@ -407,7 +408,7 @@ body.preview .preview-label { display: flex; }
   const apiState = document.getElementById("api-state");
 
   const qs = new URLSearchParams(location.search);
-  if (qs.get("preview") === "1") {
+  if (ObsVisibility.preview) {
     document.body.classList.add("preview");
   }
 
@@ -1021,6 +1022,7 @@ body.preview .preview-label { display: flex; }
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      ObsVisibility.apply(data.visibility?.overlay);
       const game = data.game || {};
       const overlayConfig = data.overlay || {};
       renderGame(game);
