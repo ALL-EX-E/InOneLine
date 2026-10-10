@@ -14,6 +14,7 @@ from ..constants import (
     WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
 )
 from ..media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available
+from ..obs_visibility import WIDGETS, visibility_payload, wheel_context_relevant
 from .common import utc_now
 
 
@@ -1248,10 +1249,16 @@ class WheelMixin:
             ),
         }
 
-    def current_wheel_payload(self) -> dict[str, Any]:
+    def current_wheel_payload(self, selected_mode: str = "max_amount") -> dict[str, Any]:
         """Состояние колеса для OBS даже до запуска сессии."""
         with self.connect() as conn:
             session = self._get_open_auction_session_conn(conn)
-            if session is not None:
-                return self._wheel_payload_from_conn(conn, session)
-            return self._preview_wheel_payload_from_conn(conn)
+            settings = self._get_settings_conn(conn, (WIDGETS["wheel"].key,))
+            payload = (
+                self._wheel_payload_from_conn(conn, session)
+                if session is not None else self._preview_wheel_payload_from_conn(conn)
+            )
+            payload["visibility"] = visibility_payload(
+                settings, "wheel", wheel_context_relevant(session, selected_mode),
+            )
+            return payload
