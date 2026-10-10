@@ -827,8 +827,7 @@ def main() -> int:
         form = stream.main_settings_form
         current_row, _ = form.getWidgetPosition(stream.game_combo)
         title_row, _ = form.getWidgetPosition(stream.title_typography_host)
-        info_row, _ = form.getWidgetPosition(stream.info_field.parentWidget())
-        if title_row != current_row + 1 or info_row != title_row + 1:
+        if title_row != current_row + 1 or form.rowCount() != 2:
             raise AssertionError(
                 "P09 UI-034 title typography is not directly below Current Game"
             )
@@ -850,6 +849,101 @@ def main() -> int:
         if size_spin.value() != previous_title_size + 1:
             raise AssertionError("P09 UI-034 title font did not reload")
         print("P09_UI034_TITLE_FONT_MOVED_WITH_EXISTING_SAVE=PASS")
+
+        # UI-035: one information block owns the original five related rows.
+        info_form = stream.info_form
+        info_rows = [
+            stream.info_field,
+            stream.info_enabled,
+            stream.info_position,
+            stream.frame_color_row_widgets["info"],
+            stream.info_typography_host,
+        ]
+        actual_info_rows = [
+            info_form.getWidgetPosition(widget)[0] for widget in info_rows
+        ]
+        if actual_info_rows != list(range(5)):
+            raise AssertionError(
+                f"P09 UI-035 information controls are split: {actual_info_rows}"
+            )
+        position_label = info_form.labelForField(stream.info_position)
+        frame_label = info_form.labelForField(
+            stream.frame_color_row_widgets["info"]
+        )
+        if (
+            stream.info_enabled.text() != "Показывать на оверлее"
+            or position_label is None
+            or position_label.text() != "Положение информационного блока:"
+            or frame_label is None
+            or frame_label.text() != "Рамка информационного блока:"
+        ):
+            raise AssertionError("P09 UI-035 accepted information labels changed")
+        info_title, info_font_row = stream.typography_row_widgets["info"]
+        if (
+            info_title.parentWidget() is not stream.info_typography_host
+            or info_font_row.parentWidget() is not stream.info_typography_host
+            or info_title.text() != "Настройки шрифта информационного блока"
+            or len(stream.typography_controls) != 6
+        ):
+            raise AssertionError("P09 UI-035 info font widgets were duplicated or lost")
+
+        defaults = {
+            "stream_info": "",
+            "stream_info_enabled": "1",
+            "overlay_info_position": "auto",
+            "overlay_frame_info_color": "#FFFFFF",
+            "overlay_font_info_size": "17",
+            "overlay_font_info_color": "#FFFFFF",
+        }
+        originals = {
+            key: db.get_setting(key, value)
+            for key, value in defaults.items()
+        }
+        info_size = stream.typography_controls["info"][1]
+        stream.info_field.setText("P09 UI-035 hidden text is kept")
+        stream.info_position.setCurrentIndex(
+            stream.info_position.findData("bottom_left")
+        )
+        stream._set_color_button(stream.frame_color_buttons["info"], "#12ABCD")
+        stream._set_color_button(stream.typography_controls["info"][2], "#ABCDEF")
+        info_size.setValue(23)
+        stream.info_enabled.setChecked(False)
+        app.processEvents()
+        if (
+            stream.info_field.isEnabled()
+            or stream.info_position.isHidden() is False
+            or stream.frame_color_row_widgets["info"].isHidden() is False
+            or stream.info_typography_host.isHidden() is False
+            or stream.info_enabled.isHidden()
+        ):
+            raise AssertionError("P09 UI-035 disabled info controls have wrong visibility")
+
+        with patch.object(QMessageBox, "information"):
+            stream.save()
+        expected_info = {
+            "stream_info": "P09 UI-035 hidden text is kept",
+            "stream_info_enabled": "0",
+            "overlay_info_position": "bottom_left",
+            "overlay_frame_info_color": "#12ABCD",
+            "overlay_font_info_size": "23",
+            "overlay_font_info_color": "#ABCDEF",
+        }
+        for key, value in expected_info.items():
+            if db.get_setting(key) != value:
+                raise AssertionError(f"P09 UI-035 settings failed to save: {key}")
+        stream.refresh()
+        if (
+            stream.info_enabled.isChecked()
+            or stream.info_field.text() != expected_info["stream_info"]
+            or stream.info_field.isEnabled()
+            or str(stream.info_position.currentData()) != "bottom_left"
+            or info_size.value() != 23
+        ):
+            raise AssertionError("P09 UI-035 existing controls did not reload")
+
+        db.set_settings_bulk(originals)
+        stream.refresh()
+        print("P09_UI035_INFO_PANEL_GROUP_AND_EXISTING_SAVE=PASS")
 
         if APP_VERSION != "1.0.8":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
