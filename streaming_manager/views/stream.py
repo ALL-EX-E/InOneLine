@@ -144,6 +144,32 @@ class StreamTab(QWidget):
         obs_help_actions.addStretch()
         layout.addLayout(obs_help_actions)
 
+        self.api_label = QLabel()
+        self.api_label.setWordWrap(True)
+        self.api_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.api_label.setProperty("muted", True)
+        layout.addWidget(self.api_label)
+
+        # Section labels refresh from the same live server address as the
+        # existing copy/preview callbacks; no second URL policy is introduced.
+        self.overlay_url_labels: dict[str, tuple[QLabel, str]] = {}
+
+        def overlay_url_label(title: str, route: str) -> QLabel:
+            label = QLabel()
+            label.setWordWrap(True)
+            label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            label.setProperty("muted", True)
+            self.overlay_url_labels[route] = (label, title)
+            return label
+
+        main_heading = QLabel("Главный оверлей")
+        main_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(main_heading)
+        layout.addWidget(overlay_url_label("Оверлей OBS", "/overlay"))
+        overlay_access = QHBoxLayout()
+        overlay_access.setSpacing(8)
+        layout.addLayout(overlay_access)
+
         # UI-036: all main-overlay buttons reuse the same existing bulk
         # save() handler; specialized widget saves are deliberately separate.
         self.main_save_buttons: dict[str, QPushButton] = {}
@@ -319,6 +345,7 @@ class StreamTab(QWidget):
         overlay_form.setVerticalSpacing(10)
         overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        overlay_form.addRow(overlay_url_label("Отдельный список OBS", "/list-overlay"))
 
         self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
@@ -468,7 +495,7 @@ class StreamTab(QWidget):
         list_btns.addWidget(copy_list)
         list_btns.addWidget(open_list)
         list_btns.addStretch()
-        overlay_form.addRow("", list_actions)
+        overlay_form.insertRow(1, list_actions)
         layout.addLayout(overlay_form)
         add_main_save("list")
 
@@ -497,10 +524,11 @@ class StreamTab(QWidget):
         api_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(api_heading)
 
-        self.api_label = QLabel()
-        self.api_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.api_label.setProperty("muted", True)
-        layout.addWidget(self.api_label)
+        self.api_diagnostics_label = QLabel()
+        self.api_diagnostics_label.setWordWrap(True)
+        self.api_diagnostics_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.api_diagnostics_label.setProperty("muted", True)
+        layout.addWidget(self.api_diagnostics_label)
 
         btns = QHBoxLayout()
         btns.setSpacing(8)
@@ -532,8 +560,9 @@ class StreamTab(QWidget):
             "Это не графический оверлей."
         )
         data_btn.clicked.connect(self._open_obs_json)
-        btns.addWidget(copy)
-        btns.addWidget(overlay_btn)
+        overlay_access.addWidget(copy)
+        overlay_access.addWidget(overlay_btn)
+        overlay_access.addStretch()
         btns.addWidget(health)
         btns.addWidget(data_btn)
         btns.addStretch()
@@ -551,6 +580,10 @@ class StreamTab(QWidget):
         timer_heading = QLabel("Виджет таймера аукциона")
         timer_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(timer_heading)
+        layout.addWidget(overlay_url_label("Таймер OBS", "/timer-overlay"))
+        timer_access = QHBoxLayout()
+        timer_access.setSpacing(8)
+        layout.addLayout(timer_access)
 
         timer_form = QFormLayout()
         self.timer_overlay_form = timer_form
@@ -634,8 +667,9 @@ class StreamTab(QWidget):
             lambda: QDesktopServices.openUrl(QUrl(f"{self.api.base_url}/timer-overlay?preview=1"))
         )
         timer_actions.addWidget(save_timer)
-        timer_actions.addWidget(copy_timer)
-        timer_actions.addWidget(open_timer)
+        timer_access.addWidget(copy_timer)
+        timer_access.addWidget(open_timer)
+        timer_access.addStretch()
         timer_actions.addStretch()
         layout.addLayout(timer_actions)
 
@@ -645,6 +679,10 @@ class StreamTab(QWidget):
         music_heading = QLabel("Виджет музыкального плеера")
         music_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(music_heading)
+        layout.addWidget(overlay_url_label("Музыкальный плеер OBS", "/music-player-overlay"))
+        music_access = QHBoxLayout()
+        music_access.setSpacing(8)
+        layout.addLayout(music_access)
 
         music_form = QFormLayout()
         music_form.setVerticalSpacing(10)
@@ -821,10 +859,29 @@ class StreamTab(QWidget):
         open_music = QPushButton("Открыть предпросмотр")
         open_music.clicked.connect(self.open_music_player_overlay_preview)
         music_actions.addWidget(save_music)
-        music_actions.addWidget(copy_music)
-        music_actions.addWidget(open_music)
+        music_access.addWidget(copy_music)
+        music_access.addWidget(open_music)
+        music_access.addStretch()
         music_actions.addStretch()
         layout.addLayout(music_actions)
+
+        wheel_line = QFrame()
+        wheel_line.setProperty("line", True)
+        layout.addWidget(wheel_line)
+        wheel_heading = QLabel("Виджет колеса")
+        wheel_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(wheel_heading)
+        layout.addWidget(overlay_url_label("Колесо OBS", "/wheel-overlay"))
+        wheel_access = QHBoxLayout()
+        wheel_access.setSpacing(8)
+        # MainWindow connects these quick actions to the existing Auction
+        # callbacks. Wheel presentation settings remain the later UI-078 scope.
+        self.copy_wheel_url_btn = QPushButton("Копировать URL колеса")
+        self.preview_wheel_btn = QPushButton("Открыть предпросмотр колеса")
+        wheel_access.addWidget(self.copy_wheel_url_btn)
+        wheel_access.addWidget(self.preview_wheel_btn)
+        wheel_access.addStretch()
+        layout.addLayout(wheel_access)
 
         auction_lots_line = QFrame()
         auction_lots_line.setProperty("line", True)
@@ -832,6 +889,10 @@ class StreamTab(QWidget):
         auction_lots_heading = QLabel("Виджет списка лотов аукциона")
         auction_lots_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(auction_lots_heading)
+        layout.addWidget(overlay_url_label("Список лотов OBS", "/auction-lots-overlay"))
+        auction_lots_access = QHBoxLayout()
+        auction_lots_access.setSpacing(8)
+        layout.addLayout(auction_lots_access)
 
         auction_lots_form = QFormLayout()
         self.auction_lots_overlay_form = auction_lots_form
@@ -925,8 +986,9 @@ class StreamTab(QWidget):
         open_auction_lots = QPushButton("Открыть предпросмотр списка лотов")
         open_auction_lots.clicked.connect(self.open_auction_lots_overlay_preview)
         auction_lots_actions.addWidget(save_auction_lots)
-        auction_lots_actions.addWidget(copy_auction_lots)
-        auction_lots_actions.addWidget(open_auction_lots)
+        auction_lots_access.addWidget(copy_auction_lots)
+        auction_lots_access.addWidget(open_auction_lots)
+        auction_lots_access.addStretch()
         auction_lots_actions.addStretch()
         layout.addLayout(auction_lots_actions)
 
@@ -936,6 +998,10 @@ class StreamTab(QWidget):
         rules_heading = QLabel("Виджет правил аукциона")
         rules_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
         layout.addWidget(rules_heading)
+        layout.addWidget(overlay_url_label("Правила OBS", "/rules-overlay"))
+        rules_access = QHBoxLayout()
+        rules_access.setSpacing(8)
+        layout.addLayout(rules_access)
 
         rules_form = QFormLayout()
         self.rules_overlay_form = rules_form
@@ -1022,10 +1088,29 @@ class StreamTab(QWidget):
             )
         )
         rules_actions.addWidget(save_rules)
-        rules_actions.addWidget(copy_rules)
-        rules_actions.addWidget(open_rules)
+        rules_access.addWidget(copy_rules)
+        rules_access.addWidget(open_rules)
+        rules_access.addStretch()
         rules_actions.addStretch()
         layout.addLayout(rules_actions)
+
+        # Moving existing actions between layouts must also move keyboard
+        # access before the same section's original first settings control.
+        for copy_button, preview_button, first_control in (
+            (copy, overlay_btn, self.game_combo),
+            (copy_list, open_list, self.overlay_list_enabled),
+            (copy_timer, open_timer, self.timer_overlay_font),
+            (copy_music, open_music, self.music_player_overlay_font),
+            (copy_auction_lots, open_auction_lots, self.auction_lots_overlay_font),
+            (copy_rules, open_rules, self.rules_overlay_visible),
+        ):
+            previous_control = (
+                obs_help if first_control is self.game_combo
+                else first_control.previousInFocusChain()
+            )
+            QWidget.setTabOrder(previous_control, copy_button)
+            QWidget.setTabOrder(copy_button, preview_button)
+            QWidget.setTabOrder(preview_button, first_control)
 
         layout.addStretch()
         self.refresh()
@@ -2335,14 +2420,10 @@ class StreamTab(QWidget):
         self._update_rules_background_enabled_state()
 
         state = "РАБОТАЕТ" if self.api.running else f"НЕ ЗАПУЩЕН: {self.api.last_error or 'неизвестная ошибка'}"
-        self.api_label.setText(
-            f"Состояние: {state}\n"
-            f"Оверлей OBS: {self.api.base_url}/overlay\n"
-            f"Отдельный список OBS: {self.api.base_url}/list-overlay\n"
-            f"Таймер OBS: {self.api.base_url}/timer-overlay\n"
-            f"Музыкальный плеер OBS: {self.api.base_url}/music-player-overlay\n"
-            f"Список лотов OBS: {self.api.base_url}/auction-lots-overlay\n"
-            f"Правила OBS: {self.api.base_url}/rules-overlay\n"
+        self.api_label.setText(f"Состояние: {state}")
+        for route, (label, title) in self.overlay_url_labels.items():
+            label.setText(f"{title}: {self.api.base_url}{route}")
+        self.api_diagnostics_label.setText(
             f"OBS JSON: {self.api.base_url}/api/data\n"
             f"Публичный JSON: {self.api.base_url}/api/public"
         )
