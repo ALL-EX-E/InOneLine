@@ -183,7 +183,7 @@ def assert_p09_obs_access(app, window, db) -> None:
     )
     originals = db.get_settings()
     first_fields = {
-        "main_settings_form": stream.obs_show_modes["overlay"],
+        "main_settings_form": stream.game_combo,
         "overlay_form": stream.obs_show_modes["list"],
         "timer_overlay_form": stream.obs_show_modes["timer"],
         "music_player_overlay_form": stream.obs_show_modes["music_player"],
@@ -219,7 +219,7 @@ def assert_p09_obs_access(app, window, db) -> None:
                 if (actions is not preview.parentWidget()
                         or not 0 <= form.getWidgetPosition(url)[0]
                         < form.getWidgetPosition(actions)[0]
-                        < form.getWidgetPosition(stream.overlay_list_enabled)[0]):
+                        < form.getWidgetPosition(stream.obs_show_modes["list"])[0]):
                     raise AssertionError("P09 UI-042 separate List access is not before its settings")
                 if root.indexOf(heading) >= root.indexOf(form):
                     raise AssertionError("P09 UI-042 List heading order changed")
@@ -291,17 +291,18 @@ def assert_p09_obs_access(app, window, db) -> None:
 
 
 def assert_p09_list_group(app, stream, db) -> None:
-    """UI-041 groups the real controls and preserves both list surfaces."""
+    """P10 keeps the accepted P09 List grouping with one shared show mode."""
+    from streaming_manager.obs_visibility import WIDGETS
+
     form = stream.overlay_form
-    if stream.overlay_list_enabled.text() != "Показывать на оверлее":
-        raise AssertionError("P09 UI-041 embedded-list switch label is missing")
-    fields = (
-        stream.overlay_list_enabled,
-        stream.overlay_list_side,
-        stream.frame_color_row_widgets["list"],
-    )
-    if [form.getWidgetPosition(widget)[0] for widget in fields] != [3, 4, 5]:
-        raise AssertionError("P09 UI-041 List show/position/frame are not grouped")
+    if hasattr(stream, "overlay_list_enabled"):
+        raise AssertionError("P10 obsolete second List switch remains")
+    mode = stream.obs_show_modes["list"]
+    fields = (mode, stream.overlay_list_side, stream.frame_color_row_widgets["list"])
+    if [form.getWidgetPosition(widget)[0] for widget in fields] != [2, 3, 4]:
+        raise AssertionError("P10 List show/position/frame grouping changed")
+    if form.labelForField(mode).text() != "Показ виджета:":
+        raise AssertionError("P10 common List show label changed")
     side_label = form.labelForField(stream.overlay_list_side)
     frame_label = form.labelForField(stream.frame_color_row_widgets["list"])
     if side_label.text() != "Положение списка:" or frame_label.text() != "Рамка списка:":
@@ -339,8 +340,8 @@ def assert_p09_list_group(app, stream, db) -> None:
     actions = copy.parentWidget()
     if (actions is not preview.parentWidget()
             or form.getWidgetPosition(actions)[0] != 1
-            or form.getWidgetPosition(actions)[0] >= form.getWidgetPosition(fields[0])[0]):
-        raise AssertionError("P09 UI-041 standalone actions are outside the List group")
+            or form.getWidgetPosition(actions)[0] >= form.getWidgetPosition(mode)[0]):
+        raise AssertionError("P10 List copy/preview not ahead of common show mode")
     layout = stream.layout()
     list_save = stream.main_save_buttons["list"]
     group_index = layout.indexOf(form)
@@ -353,17 +354,18 @@ def assert_p09_list_group(app, stream, db) -> None:
     if len(frame_row.findChildren(QPushButton)) != 2:
         raise AssertionError("P09 UI-041 original frame color/pipette was duplicated")
 
-    keys = ["overlay_list_enabled", "overlay_list_side", "overlay_frame_list_color"]
+    keys = ["list_overlay_show_mode", "overlay_list_enabled", "overlay_list_side",
+            "overlay_frame_list_color"]
     keys += [f"overlay_font_{key}_{part}" for key, _, _, _ in fixtures
              for part in ("family", "size", "color")]
-    original = db.get_settings(keys)
+    original = db.get_settings()
     clipboard_before = QApplication.clipboard().text()
     expected = {
+        "list_overlay_show_mode": "hidden",
         "overlay_list_enabled": "0", "overlay_list_side": "left",
         "overlay_frame_list_color": "#456ABC",
     }
     try:
-        stream.overlay_list_enabled.setChecked(True)
         stream.overlay_list_side.setCurrentIndex(stream.overlay_list_side.findData("left"))
         stream._set_color_button(stream.frame_color_buttons["list"], "#456ABC")
         for key, _, size_value, color_value in fixtures:
@@ -374,46 +376,63 @@ def assert_p09_list_group(app, stream, db) -> None:
             expected[f"overlay_font_{key}_size"] = str(size_value)
             expected[f"overlay_font_{key}_color"] = color_value
 
-        stream.overlay_list_enabled.click()
+        mode.setCurrentIndex(mode.findData("hidden"))
         app.processEvents()
-        if not all(widget.isHidden() for widget in (stream.overlay_list_side, side_label,
-                    frame_row, frame_label, host)):
-            raise AssertionError("P09 UI-041 disabled embedded List leaves dependent controls")
+        if not all(widget.isHidden() for widget in
+                   (stream.overlay_list_side, side_label, frame_row, frame_label, host)):
+            raise AssertionError("P10 hidden shared List leaves embedded decoration controls")
         if any(widget.isHidden() or not widget.isEnabled() for widget in
-               (stream.overlay_list_enabled, url, actions, copy, preview, list_save)):
-            raise AssertionError("P09 UI-041 disabled embedded List hides standalone actions")
+               (mode, url, actions, copy, preview, list_save)):
+            raise AssertionError("P10 hidden List lost settings or standalone actions")
         copy.click()
         if QApplication.clipboard().text() != f"{stream.api.base_url}/list-overlay":
-            raise AssertionError("P09 UI-041 standalone list URL changed")
+            raise AssertionError("P09 UI-041 standalone List copy URL changed")
         with patch.object(QDesktopServices, "openUrl", return_value=True) as open_url:
             preview.click()
         if open_url.call_count != 1 or open_url.call_args.args[0].toString() != f"{stream.api.base_url}/list-overlay?preview=1":
-            raise AssertionError("P09 UI-041 standalone list preview handler changed")
+            raise AssertionError("P09 UI-041 standalone List preview URL changed")
 
         with patch.object(QMessageBox, "information") as saved:
             list_save.click()
         if saved.call_count != 1 or db.get_settings(keys) != expected:
-            raise AssertionError("P09 UI-041 shared Save lost disabled-list settings")
+            raise AssertionError("P10 shared List Save lost visibility/appearance settings")
+        payload = db.current_stream_payload()
+        if payload["visibility"]["list"]["show_mode"] != "hidden" or payload["overlay"]["list_enabled"]:
+            raise AssertionError("P10 List hidden mode did not hide both OBS surfaces")
+        if payload["visibility"]["overlay"]["show_mode"] != "always":
+            raise AssertionError("P10 hiding List also hid main canvas")
+
         stream.refresh()
-        if stream.overlay_list_enabled.isChecked() or stream.overlay_list_side.currentData() != "left":
-            raise AssertionError("P09 UI-041 embedded-list switch/position not reloaded")
+        if mode.currentData() != "hidden" or stream.overlay_list_side.currentData() != "left":
+            raise AssertionError("P10 unified List show mode/position not restored")
         if stream.frame_color_buttons["list"].property("fontColor") != "#456ABC":
-            raise AssertionError("P09 UI-041 list frame color not reloaded")
+            raise AssertionError("P09 UI-041 List frame color not reloaded")
         for key, _, size_value, color_value in fixtures:
             font, size, color = stream.typography_controls[key]
             if (font.currentFont().family() != expected[f"overlay_font_{key}_family"]
                     or size.value() != size_value or color.property("fontColor") != color_value):
                 raise AssertionError(f"P09 UI-041 typography not reloaded: {key}")
-        stream.overlay_list_enabled.click()
+
+        mode.setCurrentIndex(mode.findData("always"))
         app.processEvents()
-        if any(widget.isHidden() for widget in (stream.overlay_list_side, side_label,
-               frame_row, frame_label, host)):
-            raise AssertionError("P09 UI-041 enabled List does not restore its controls")
+        if any(widget.isHidden() for widget in
+               (stream.overlay_list_side, side_label, frame_row, frame_label, host)):
+            raise AssertionError("P10 visible shared List did not restore embedded controls")
+        with patch.object(QMessageBox, "information"):
+            list_save.click()
+        payload = db.current_stream_payload()
+        if (payload["visibility"]["list"]["show_mode"] != "always"
+                or not payload["overlay"]["list_enabled"]
+                or db.get_setting("overlay_list_enabled") != "1"):
+            raise AssertionError("P10 shared List Always did not re-enable both surfaces")
     finally:
         db.set_settings_bulk(original)
+        extra_keys = set(db.get_settings()) - set(original)
+        with db.connect() as conn:
+            conn.executemany("DELETE FROM settings WHERE key=?", [(key,) for key in extra_keys])
         stream.refresh()
         QApplication.clipboard().setText(clipboard_before)
-    print("P09_UI041_LIST_GROUP_SHARED_SETTINGS_AND_STANDALONE_ACTIONS=PASS")
+    print("P10_UNIFIED_LIST_GROUP_SETTINGS_BOTH_SURFACES_AND_PREVIEW=PASS")
 
 
 
