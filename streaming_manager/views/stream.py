@@ -307,6 +307,7 @@ class StreamTab(QWidget):
         webcam_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         webcam_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         layout.addLayout(webcam_form)
+        add_main_save("webcam")
 
         overlay_heading = QLabel("Список")
         self.list_heading = overlay_heading
@@ -332,9 +333,6 @@ class StreamTab(QWidget):
 
         webcam_form.addRow("", self.webcam_enabled)
         webcam_form.addRow("Положение веб-камеры:", self.webcam_position)
-        # UI-040: append the shared Save action below the whole Webcam form.
-        # Existing frame/pipette row will be inserted into this form below.
-        add_main_save("webcam")
 
         self.overlay_list_enabled = QCheckBox("Показывать")
         self.overlay_list_side = ScrollSafeComboBox()
