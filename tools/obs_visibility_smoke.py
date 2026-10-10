@@ -100,14 +100,15 @@ def policy_smoke() -> None:
             "wheel": lambda: db.current_wheel_payload()["visibility"],
         }
         db.set_settings_bulk({spec.key: "hidden" for spec in WIDGETS.values()})
-        with db.connect() as conn:
-            before = "\n".join(conn.iterdump())
         for widget, read in reads.items():
             assert read()["show_mode"] == ("always" if widget == "overlay" else "hidden")
         assert db.current_stream_payload()["overlay"]["list_enabled"] is False
         db.set_settings_bulk({"list_overlay_show_mode": "always"})
         assert db.current_stream_payload()["overlay"]["list_enabled"] is True
         db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
+        # Begin the read-only invariant only after deliberate fixture writes.
+        with db.connect() as conn:
+            before = "\n".join(conn.iterdump())
         from streaming_manager.music_player import music_player_overlay_appearance
         assert music_player_overlay_appearance(db)["show_mode"] == "hidden"
         def without_presentation(payload):
