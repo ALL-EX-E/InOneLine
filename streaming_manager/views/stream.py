@@ -202,11 +202,8 @@ class StreamTab(QWidget):
         overlay_access.addStretch()
         layout.addLayout(overlay_access)
 
-        self.main_visibility_form = QFormLayout()
-        self.main_visibility_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
-        self.main_visibility_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        add_show_mode("overlay", self.main_visibility_form)
-        layout.addLayout(self.main_visibility_form)
+        # Main-overlay show mode remains in the shared policy registry but
+        # is intentionally not editable: the primary canvas is always shown.
 
         # UI-036: all main-overlay buttons reuse the same existing bulk
         # save() handler; specialized widget saves are deliberately separate.
@@ -384,7 +381,14 @@ class StreamTab(QWidget):
         overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         overlay_form.addRow(overlay_url_label("Отдельный список OBS", "/list-overlay"))
-        add_show_mode("list", overlay_form)
+        list_show_mode = add_show_mode("list", overlay_form)
+        list_show_mode.setToolTip(
+            "Один режим управляет отдельным OBS-списком и списком в главном оверлее. "
+            "Предпросмотр остаётся доступным даже при скрытом списке."
+        )
+        list_show_mode.currentIndexChanged.connect(
+            self._update_main_overlay_conditional_visibility
+        )
 
         self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
@@ -400,20 +404,11 @@ class StreamTab(QWidget):
         webcam_form.addRow("", self.webcam_enabled)
         webcam_form.addRow("Положение веб-камеры:", self.webcam_position)
 
-        self.overlay_list_enabled = QCheckBox("Показывать на оверлее")
-        self.overlay_list_enabled.setToolTip(
-            "Показывать список в главном оверлее. Отдельный виджет списка остаётся доступен."
-        )
         self.overlay_list_side = ScrollSafeComboBox()
         self.overlay_list_side.addItem("Авто — за веб-камерой", "auto")
         self.overlay_list_side.addItem("Справа", "right")
         self.overlay_list_side.addItem("Слева", "left")
         self.overlay_list_side.setMinimumWidth(190)
-        self.overlay_list_enabled.toggled.connect(
-            self._update_main_overlay_conditional_visibility
-        )
-
-        overlay_form.addRow("", self.overlay_list_enabled)
         overlay_form.addRow("Положение списка:", self.overlay_list_side)
 
         self.info_position = ScrollSafeComboBox()
@@ -1084,8 +1079,7 @@ class StreamTab(QWidget):
         # Moving existing actions between layouts must also move keyboard
         # access before the same section's original first settings control.
         for widget, copy_button, preview_button, first_control in (
-            ("overlay", copy, overlay_btn, self.game_combo),
-            ("list", copy_list, open_list, self.overlay_list_enabled),
+            ("list", copy_list, open_list, self.overlay_list_side),
             ("timer", copy_timer, open_timer, self.timer_overlay_font),
             ("music_player", copy_music, open_music, self.music_player_overlay_font),
             ("wheel", self.copy_wheel_url_btn, self.preview_wheel_btn, save_wheel),
@@ -1093,14 +1087,16 @@ class StreamTab(QWidget):
             ("rules", copy_rules, open_rules, self.rules_overlay_autoscroll),
         ):
             mode_control = self.obs_show_modes[widget]
-            previous_control = (
-                obs_help if widget == "overlay"
-                else mode_control.previousInFocusChain()
-            )
+            previous_control = mode_control.previousInFocusChain()
             QWidget.setTabOrder(previous_control, copy_button)
             QWidget.setTabOrder(copy_button, preview_button)
             QWidget.setTabOrder(preview_button, mode_control)
             QWidget.setTabOrder(mode_control, first_control)
+
+        # Main overlay: help -> copy -> preview -> current game (no show switch).
+        QWidget.setTabOrder(obs_help, copy)
+        QWidget.setTabOrder(copy, overlay_btn)
+        QWidget.setTabOrder(overlay_btn, self.game_combo)
 
         layout.addStretch()
         self.refresh()
@@ -2068,7 +2064,7 @@ class StreamTab(QWidget):
         if not hasattr(self, "overlay_form"):
             return
         webcam_enabled = bool(self.webcam_enabled.isChecked())
-        list_enabled = bool(self.overlay_list_enabled.isChecked())
+        list_enabled = self.obs_show_modes["list"].currentData() != "hidden"
         info_enabled = bool(self.info_enabled.isChecked())
 
         # Keep the enable/disable switch itself visible. Only controls that
@@ -2194,8 +2190,6 @@ class StreamTab(QWidget):
             setting("overlay_webcam_position", "top_right"),
         )
 
-        list_enabled = setting("overlay_list_enabled", "1") == "1"
-        self.overlay_list_enabled.setChecked(list_enabled)
         self._set_combo_by_data(
             self.overlay_list_side,
             setting("overlay_list_side", "auto"),
@@ -2419,7 +2413,9 @@ class StreamTab(QWidget):
             else ""
         )
         values = {
-            WIDGETS["overlay"].key: str(self.obs_show_modes["overlay"].currentData()),
+            # Preserve the dormant main-overlay mode key in its safe visible
+            # state; an older saved 'hidden' must never hide the primary canvas.
+            WIDGETS["overlay"].key: "always",
             WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
             "stream_current_game_id": str(self.game_combo.currentData() or ""),
             # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
@@ -2435,7 +2431,11 @@ class StreamTab(QWidget):
             "overlay_background_mode": str(self.background_mode.currentData() or "stretch"),
             "overlay_webcam_enabled": "1" if self.webcam_enabled.isChecked() else "0",
             "overlay_webcam_position": str(self.webcam_position.currentData() or "top_right"),
-            "overlay_list_enabled": "1" if self.overlay_list_enabled.isChecked() else "0",
+            # Backward-compatible mirror only; list_overlay_show_mode is the
+            # single authoritative setting for both list presentations.
+            "overlay_list_enabled": (
+                "0" if self.obs_show_modes["list"].currentData() == "hidden" else "1"
+            ),
             "overlay_list_side": str(self.overlay_list_side.currentData() or "auto"),
             "overlay_info_position": str(self.info_position.currentData() or "auto"),
         }
