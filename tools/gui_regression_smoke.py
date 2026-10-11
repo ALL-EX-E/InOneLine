@@ -146,7 +146,7 @@ def assert_p10_music_obs_audio_help(window) -> None:
                     )
                 offset = index + len(phrase)
             if (title != "Как выводится звук в OBS?"
-                    or len(explanation.split("\\n\\n")) != 4):
+                    or len(explanation.split("\n\n")) != 4):
                 raise AssertionError("UI-049 OBS audio help omits an approved explanation")
     finally:
         index = music.output_combo.findData(original)
