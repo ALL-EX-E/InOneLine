@@ -105,6 +105,9 @@ class MusicTab(QWidget):
         self.output_combo.addItem("Через OBS Browser Source", MUSIC_PLAYER_OUTPUT_MODE_OBS)
         self.output_combo.currentIndexChanged.connect(self._output_changed)
         output_row.addWidget(self.output_combo)
+        self.obs_audio_help_btn = QPushButton("Как выводится звук в OBS?")
+        self.obs_audio_help_btn.clicked.connect(self._show_obs_audio_help)
+        output_row.addWidget(self.obs_audio_help_btn)
         output_row.addStretch()
         root.addLayout(output_row)
 
@@ -193,6 +196,7 @@ class MusicTab(QWidget):
         self.output_combo.blockSignals(True)
         self.output_combo.setCurrentIndex(index if index >= 0 else 0)
         self.output_combo.blockSignals(False)
+        self._update_obs_audio_help_visibility()
 
         self.volume.blockSignals(True)
         self.volume.setValue(self.controller.volume_percent)
@@ -270,6 +274,34 @@ class MusicTab(QWidget):
 
     def _output_changed(self, _index: int) -> None:
         self.controller.set_output_mode(str(self.output_combo.currentData() or MUSIC_PLAYER_OUTPUT_MODE_APPLICATION))
+        self._update_obs_audio_help_visibility()
+
+    def _update_obs_audio_help_visibility(self) -> None:
+        # Audio-help visibility depends only on the output mode; never alter
+        # the existing music routing or show a permanent warning.
+        self.obs_audio_help_btn.setVisible(
+            self.output_combo.currentData() == MUSIC_PLAYER_OUTPUT_MODE_OBS
+        )
+
+    def _show_obs_audio_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Как выводится звук в OBS?",
+            "Если в InOneLine на вкладке «Музыка» выбрать «Вывод звука: "
+            "Через OBS Browser Source», музыка будет выводиться через виджет "
+            "музыкального плеера, добавленный в OBS как источник «Браузер».\n\n"
+            "При добавлении этого источника в OBS или в его «Свойствах» "
+            "есть галочка «Управление аудио через OBS».\n\n"
+            "Если галочку не включать, звук воспроизводится через "
+            "OBS Browser Page, а его громкость регулируется "
+            "в микшере громкости Windows.\n\n"
+            "Если включить галочку, звук появится как отдельный источник "
+            "в микшере OBS для трансляции и записи. Чтобы слышать музыку "
+            "на своём компьютере, откройте в OBS «Расширенные свойства аудио» "
+            "и для браузерного источника выберите «Мониторинг аудио» → "
+            "«Мониторинг и вывод». Без мониторинга локального звука "
+            "может не быть — это нормально.",
+        )
 
     def _apply_filter(self, text: str) -> None:
         query = str(text or "").strip().casefold()

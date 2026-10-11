@@ -43,6 +43,8 @@ from streaming_manager.app_paths import AppPaths
 from streaming_manager.ui_settings import open_ui_settings
 from streaming_manager.constants import (
     APP_VERSION,
+    MUSIC_PLAYER_OUTPUT_MODE_APPLICATION,
+    MUSIC_PLAYER_OUTPUT_MODE_OBS,
     AUCTION_SOUNDTRACK_LOOP_ONE_KEY,
     AUCTION_SOUNDTRACK_MEDIA_ID_KEY,
     AUCTION_SOUNDTRACK_MUTE_KEY,
@@ -86,6 +88,75 @@ from streaming_manager.public_xlsx import (
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
+
+
+def assert_p10_music_obs_audio_help(window) -> None:
+    """UI-049 contextual explanation changes neither output routing nor saved state."""
+    music = window.music_tab
+    controller = music.controller
+    button = music.obs_audio_help_btn
+    if button.text() != "Как выводится звук в OBS?":
+        raise AssertionError("UI-049 OBS audio help button title differs from accepted spec")
+    original = music.output_combo.currentData()
+    original_settings = window.db.get_settings()
+    try:
+        with patch.object(controller, "set_output_mode") as routed:
+            for mode, should_show in (
+                (MUSIC_PLAYER_OUTPUT_MODE_APPLICATION, False),
+                (MUSIC_PLAYER_OUTPUT_MODE_OBS, True),
+                (MUSIC_PLAYER_OUTPUT_MODE_APPLICATION, False),
+                (MUSIC_PLAYER_OUTPUT_MODE_OBS, True),
+            ):
+                index = music.output_combo.findData(mode)
+                if index < 0:
+                    raise AssertionError(f"UI-049 missing existing output choice: {mode}")
+                music.output_combo.setCurrentIndex(index)
+                if button.isHidden() == should_show:
+                    raise AssertionError(f"UI-049 help visibility wrong in {mode}")
+                # The existing output-mode slot remains responsible for the
+                # controller; the new help must not add routing changes.
+                if music.output_combo.currentData() != mode:
+                    raise AssertionError("UI-049 changed audio output selection")
+            if not routed.called or routed.call_args.args[0] != MUSIC_PLAYER_OUTPUT_MODE_OBS:
+                raise AssertionError("UI-049 disconnected original music output routing")
+            with patch.object(QMessageBox, "information") as info:
+                button.click()
+            if info.call_count != 1:
+                raise AssertionError("UI-049 help did not open the existing message-box pattern")
+            title = info.call_args.args[1]
+            explanation = info.call_args.args[2]
+            # The first read should explain the actual InOneLine -> Browser
+            # Source path before talking about OBS's own checkbox.
+            required_in_order = (
+                "Если в InOneLine", "«Музыка»",
+                "«Вывод звука: Через OBS Browser Source»",
+                "виджет музыкального плеера", "источник «Браузер»",
+                "«Свойствах»", "«Управление аудио через OBS»",
+                "Если галочку не включать", "OBS Browser Page",
+                "микшере громкости Windows", "Если включить галочку",
+                "в микшере OBS", "«Расширенные свойства аудио»",
+                "«Мониторинг аудио»", "«Мониторинг и вывод»",
+            )
+            offset = 0
+            for phrase in required_in_order:
+                index = explanation.find(phrase, offset)
+                if index < 0:
+                    raise AssertionError(
+                        f"UI-049 first-read flow missing or out of order: {phrase}"
+                    )
+                offset = index + len(phrase)
+            if (title != "Как выводится звук в OBS?"
+                    or len(explanation.split("\n\n")) != 4):
+                raise AssertionError("UI-049 OBS audio help omits an approved explanation")
+    finally:
+        index = music.output_combo.findData(original)
+        music.output_combo.blockSignals(True)
+        music.output_combo.setCurrentIndex(index if index >= 0 else 0)
+        music.output_combo.blockSignals(False)
+        music._update_obs_audio_help_visibility()
+    if window.db.get_settings() != original_settings:
+        raise AssertionError("UI-049 help unexpectedly changed persisted audio settings")
+    print("P10_UI049_MUSIC_OBS_AUDIO_HELP_CONTEXT_AND_UNCHANGED_ROUTING=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
@@ -1344,6 +1415,7 @@ def main() -> int:
 
         assert_p09_api_ui_cleanup(window, db)
         assert_p09_obs_access(app, window, db)
+        assert_p10_music_obs_audio_help(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
