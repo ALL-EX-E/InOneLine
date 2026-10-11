@@ -250,12 +250,21 @@ def assert_p11_rules_format_toolbar_cleanup(window) -> None:
             )
         ):
             raise AssertionError("P11-A Rules dialog retains a deprecated control")
-        if (rules.text_color_pick_btn.text() != "Пипетка"
+        picker = rules.text_color_pick_btn
+        if (picker.text() != "⌖"
+                or picker.property("screenColorPicker") is not True
+                or picker.width() != picker.height()
+                or not picker.toolTip()
                 or not rules.text_color_btn.text().startswith("Цвет текста:")
                 or rules.style_combo.count() != 3
                 or rules.size_spin.minimum() != 6
                 or rules.size_spin.maximum() != 96):
             raise AssertionError("P11-A changed existing text-formatting controls")
+        if picker.width() < 34 or picker.minimumWidth() != picker.maximumWidth():
+            raise AssertionError("P11-A Rules picker is not the shared compact fixed square")
+        with patch.object(rules, "_choose_color") as pick_color:
+            picker.click()
+            pick_color.assert_called_once_with(True)
 
         legacy_html = (
             '<p><span style="background-color:#ffdc44; color:#224466;">'

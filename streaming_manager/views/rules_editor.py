@@ -29,6 +29,7 @@ from .common import (
     ScrollSafeFontComboBox,
     ScrollSafeSpinBox,
     make_wide_step_control,
+    make_screen_color_picker_button,
     pick_screen_color,
 )
 
@@ -132,7 +133,9 @@ class AuctionRulesEditorDialog(QDialog):
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
         self.text_color_btn.clicked.connect(lambda: self._choose_color(False))
-        self.text_color_pick_btn = QPushButton("Пипетка")
+        self.text_color_pick_btn = make_screen_color_picker_button(
+            "Выбрать цвет текста с экрана. Левый клик — принять, Escape — отмена."
+        )
         self.text_color_pick_btn.clicked.connect(lambda: self._choose_color(True))
         tools2.addWidget(self.text_color_btn)
         tools2.addWidget(self.text_color_pick_btn)
