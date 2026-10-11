@@ -87,13 +87,6 @@ class AuctionRulesEditorDialog(QDialog):
         root.addLayout(template_row)
 
         tools1 = QHBoxLayout()
-        self.undo_btn = QPushButton("Отменить")
-        self.redo_btn = QPushButton("Повторить")
-        self.undo_btn.clicked.connect(lambda: self.editor.undo())
-        self.redo_btn.clicked.connect(lambda: self.editor.redo())
-        tools1.addWidget(self.undo_btn)
-        tools1.addWidget(self.redo_btn)
-
         self.style_combo = ScrollSafeComboBox()
         self.style_combo.addItem("Обычный текст", "normal")
         self.style_combo.addItem("Заголовок", "heading")
@@ -138,18 +131,11 @@ class AuctionRulesEditorDialog(QDialog):
 
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
-        self.text_color_btn.clicked.connect(lambda: self._choose_color(False, False))
+        self.text_color_btn.clicked.connect(lambda: self._choose_color(False))
         self.text_color_pick_btn = QPushButton("Пипетка")
-        self.text_color_pick_btn.clicked.connect(lambda: self._choose_color(False, True))
-        self.highlight_color_btn = QPushButton("Выделение")
-        self.highlight_color_btn.clicked.connect(lambda: self._choose_color(True, False))
-        self.highlight_color_pick_btn = QPushButton("Пипетка")
-        self.highlight_color_pick_btn.clicked.connect(lambda: self._choose_color(True, True))
+        self.text_color_pick_btn.clicked.connect(lambda: self._choose_color(True))
         tools2.addWidget(self.text_color_btn)
         tools2.addWidget(self.text_color_pick_btn)
-        tools2.addSpacing(8)
-        tools2.addWidget(self.highlight_color_btn)
-        tools2.addWidget(self.highlight_color_pick_btn)
         tools2.addSpacing(14)
 
         for title, alignment in (
@@ -198,7 +184,6 @@ class AuctionRulesEditorDialog(QDialog):
             select_active=self._initial_template_id is None,
         )
         self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
-        self._set_color_button(self.highlight_color_btn, QColor("#000000"), "Выделение")
 
 
     def _reload_templates(
@@ -391,23 +376,21 @@ class AuctionRulesEditorDialog(QDialog):
             f"background: {value}; color: {text}; border: 1px solid #60666c; font-weight: 600;"
         )
 
-    def _choose_color(self, highlight: bool, pipette: bool) -> None:
-        button = self.highlight_color_btn if highlight else self.text_color_btn
-        current = QColor(str(button.property("selectedColor") or ("#000000" if highlight else "#FFFFFF")))
+    def _choose_color(self, pipette: bool) -> None:
+        # Only foreground color remains editable in the toolbar. Existing
+        # rich-text background highlights are preserved in saved template HTML.
+        button = self.text_color_btn
+        current = QColor(str(button.property("selectedColor") or "#FFFFFF"))
         selected = pick_screen_color(self) if pipette else QColorDialog.getColor(
             current,
             self,
-            "Цвет выделения" if highlight else "Цвет текста",
+            "Цвет текста",
         )
         if selected is None or not selected.isValid():
             return
         fmt = QTextCharFormat()
-        if highlight:
-            fmt.setBackground(selected)
-            self._set_color_button(button, selected, "Выделение")
-        else:
-            fmt.setForeground(selected)
-            self._set_color_button(button, selected, "Цвет текста")
+        fmt.setForeground(selected)
+        self._set_color_button(button, selected, "Цвет текста")
         self._merge_char_format(fmt)
 
     def _merge_char_format(self, fmt: QTextCharFormat) -> None:
