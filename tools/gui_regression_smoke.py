@@ -159,6 +159,81 @@ def assert_p10_music_obs_audio_help(window) -> None:
     print("P10_UI049_MUSIC_OBS_AUDIO_HELP_CONTEXT_AND_UNCHANGED_ROUTING=PASS")
 
 
+def assert_p10_auction_obs_audio_help(window) -> None:
+    """UI-055 help is contextual; original Auction/Wheel routing remains intact."""
+    auction = window.auction_tab
+    combo = auction.audio_output_mode_combo
+    button = auction.obs_audio_help_btn
+    if button.text() != "Как выводится звук в OBS?":
+        raise AssertionError("UI-055 unexpected Auction OBS audio help button text")
+    if any(
+        label.text().startswith("OBS-режим: звук аукциона и колеса")
+        for label in auction.findChildren(QLabel)
+    ):
+        raise AssertionError("UI-055 obsolete permanent Auction audio warning remains")
+
+    original = combo.currentData()
+    original_settings = window.db.get_settings()
+    try:
+        # Route selection must still invoke the existing AuctionAudioMixin
+        # callback; block persistence only inside this transient GUI test.
+        with patch.object(window.db, "set_setting") as persisted:
+            for mode, should_show in (
+                ("application", False),
+                ("obs_timer", True),
+                ("application", False),
+                ("obs_timer", True),
+            ):
+                index = combo.findData(mode)
+                if index < 0:
+                    raise AssertionError(f"UI-055 missing original output mode: {mode}")
+                combo.setCurrentIndex(index)
+                if button.isHidden() == should_show:
+                    raise AssertionError(f"UI-055 visibility wrong for {mode}")
+                if combo.currentData() != mode or auction._audio_output_mode != mode:
+                    raise AssertionError("UI-055 changed original Auction audio route")
+            if not persisted.called:
+                raise AssertionError("UI-055 disconnected original Auction settings callback")
+            with patch.object(QMessageBox, "information") as message:
+                button.click()
+            if message.call_count != 1:
+                raise AssertionError("UI-055 help does not show one native dialog")
+            title = message.call_args.args[1]
+            explanation = message.call_args.args[2]
+            required_in_order = (
+                "Если в InOneLine", "«Аукцион»",
+                "«Вывод музыки: Через OBS Browser Source таймера»",
+                "музыка аукциона и колеса", "виджет таймера",
+                "источник «Браузер»", "«Свойствах»",
+                "«Управление аудио через OBS»",
+                "Если галочку не включать", "OBS Browser Page",
+                "микшере громкости Windows", "Если включить галочку",
+                "в микшере OBS", "«Расширенные свойства аудио»",
+                "«Мониторинг аудио»", "«Мониторинг и вывод»",
+                "отключение источника «Браузер»",
+            )
+            offset = 0
+            for phrase in required_in_order:
+                position = explanation.find(phrase, offset)
+                if position < 0:
+                    raise AssertionError(
+                        f"UI-055 Auction OBS help missing or out of order: {phrase}"
+                    )
+                offset = position + len(phrase)
+            if title != "Как выводится звук в OBS?" or len(
+                explanation.split("\n\n")
+            ) != 4:
+                raise AssertionError("UI-055 help has wrong title or paragraph flow")
+    finally:
+        with patch.object(window.db, "set_setting"):
+            index = combo.findData(original)
+            combo.setCurrentIndex(index if index >= 0 else 0)
+            auction._update_obs_audio_help_visibility()
+    if window.db.get_settings() != original_settings:
+        raise AssertionError("UI-055 unexpectedly persisted Auction audio changes")
+    print("P10_UI055_AUCTION_OBS_AUDIO_HELP_CONTEXT_ROUTING_AND_WARNING=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1416,6 +1491,7 @@ def main() -> int:
         assert_p09_api_ui_cleanup(window, db)
         assert_p09_obs_access(app, window, db)
         assert_p10_music_obs_audio_help(window)
+        assert_p10_auction_obs_audio_help(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
