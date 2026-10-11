@@ -301,7 +301,9 @@ def browser_smoke() -> None:
 
             video_file.unlink()
             wait_js(page, video_display, "none", "Missing original hides video")
-            wait_js(page, video_src, None, "Missing original releases src")
+            # Qt Chromium may return an empty string after removeAttribute;
+            # either representation is safe as long as no media URL remains.
+            assert js(page, video_src) in (None, ""), "Missing original still has a media URL"
             assert js(page, "document.querySelector('#timer').getAttribute('aria-label')")
             db.set_settings_bulk({"timer_overlay_background": "color",
                                   "timer_overlay_background_color": "#123456"})
