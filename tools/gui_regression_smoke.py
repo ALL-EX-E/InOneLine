@@ -289,6 +289,38 @@ def assert_p09_obs_access(app, window, db) -> None:
     app.processEvents()
     print("P09_UI042_SECTION_URL_ACTIONS_STATUS_AND_EXISTING_SAVES=PASS")
 
+    # UI-046 is a presentation-only refinement. Keep the existing action
+    # callbacks and specialized Save semantics verified above, while pinning
+    # the common OBS section order and unambiguous user-facing labels.
+    music_form = stream.music_player_overlay_form
+    music_font_color_row = stream.music_player_overlay_text_color_btn.parentWidget()
+    expected_labels = (
+        (stream.music_player_overlay_font, "Шрифт:"),
+        (stream.music_player_overlay_font_size_control, "Размер шрифта:"),
+        (music_font_color_row, "Цвет шрифта:"),
+        (stream.music_player_spectrum_color_row, "Цвет визуализатора:"),
+    )
+    for field, label in expected_labels:
+        field_label = music_form.labelForField(field)
+        if field_label is None or field_label.text() != label:
+            raise AssertionError(f"UI-046 Music OBS label incorrect: {label}")
+    if stream.music_player_overlay_font_size.minimum() != 8 or stream.music_player_overlay_font_size.maximum() != 200:
+        raise AssertionError("UI-046 changed the original music title font range")
+    heading = only_widget(QLabel, "Виджет музыкального плеера")
+    url = only_widget(QLabel, f"Музыкальный плеер OBS: {original_api.base_url}/music-player-overlay")
+    copy = only_widget(QPushButton, "Копировать URL плеера")
+    preview = only_widget(QPushButton, "Открыть предпросмотр")
+    save = only_widget(QPushButton, "Сохранить виджет плеера")
+    if not (root.indexOf(heading) < root.indexOf(url)
+            < root_index(copy) == root_index(preview)
+            < root.indexOf(music_form) < root.indexOf(save)):
+        raise AssertionError("UI-046 Music OBS heading/URL/access/settings/Save order changed")
+    if copy.parentWidget() is not preview.parentWidget():
+        raise AssertionError("UI-046 Music OBS access buttons are split")
+    if save.isHidden() or not save.isEnabled():
+        raise AssertionError("UI-046 Music OBS Save is explicitly hidden or disabled")
+    print("P10_UI046_MUSIC_SECTION_LABELS_ACTIONS_SAVE_ORDER=PASS")
+
 
 def assert_p09_list_group(app, stream, db) -> None:
     """P10 keeps the accepted P09 List grouping with one shared show mode."""

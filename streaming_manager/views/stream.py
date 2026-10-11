@@ -708,7 +708,7 @@ class StreamTab(QWidget):
             up_tooltip="Увеличить размер текста плеера",
             down_tooltip="Уменьшить размер текста плеера",
         )
-        music_form.addRow("Размер:", self.music_player_overlay_font_size_control)
+        music_form.addRow("Размер шрифта:", self.music_player_overlay_font_size_control)
 
         def music_color_row(button_attr: str, picker_attr: str, tooltip: str):
             row = QWidget()
@@ -728,19 +728,19 @@ class StreamTab(QWidget):
         row, self.music_player_overlay_text_color_btn, self.music_player_overlay_text_color_pick_btn = music_color_row(
             "music_player_overlay_text_color_btn",
             "music_player_overlay_text_color_pick_btn",
-            "Выбрать цвет текста плеера с экрана",
+            "Выбрать цвет шрифта названия трека с экрана",
         )
         self.music_player_overlay_text_color_btn.clicked.connect(
             lambda: self._choose_music_overlay_color(
                 self.music_player_overlay_text_color_btn,
-                "Выберите цвет текста плеера",
+                "Выберите цвет шрифта названия трека",
                 MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
             )
         )
         self.music_player_overlay_text_color_pick_btn.clicked.connect(
             lambda: self._pick_color_from_screen(self.music_player_overlay_text_color_btn)
         )
-        music_form.addRow("Цвет текста:", row)
+        music_form.addRow("Цвет шрифта:", row)
 
         bg_mode_row = QWidget()
         bg_mode_layout = QHBoxLayout(bg_mode_row)
@@ -798,12 +798,12 @@ class StreamTab(QWidget):
         row, self.music_player_spectrum_color_btn, self.music_player_spectrum_color_pick_btn = music_color_row(
             "music_player_spectrum_color_btn",
             "music_player_spectrum_color_pick_btn",
-            "Выбрать цвет спектра с экрана",
+            "Выбрать цвет визуализатора с экрана",
         )
         self.music_player_spectrum_color_btn.clicked.connect(
             lambda: self._choose_music_overlay_color(
                 self.music_player_spectrum_color_btn,
-                "Выберите цвет спектра",
+                "Выберите цвет визуализатора",
                 MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
             )
         )
@@ -811,7 +811,7 @@ class StreamTab(QWidget):
             lambda: self._pick_color_from_screen(self.music_player_spectrum_color_btn)
         )
         self.music_player_spectrum_color_row = row
-        music_form.addRow("Цвет спектра:", self.music_player_spectrum_color_row)
+        music_form.addRow("Цвет визуализатора:", self.music_player_spectrum_color_row)
 
         self.music_player_auto_colors = QCheckBox("Подбирать цвета по обложке")
         self.music_player_auto_colors.toggled.connect(
@@ -850,8 +850,6 @@ class StreamTab(QWidget):
 
         layout.addLayout(music_form)
 
-        music_actions = QHBoxLayout()
-        music_actions.setSpacing(8)
         save_music = QPushButton("Сохранить виджет плеера")
         save_music.setProperty("primary", True)
         save_music.clicked.connect(self._save_music_player_overlay_settings)
@@ -859,12 +857,12 @@ class StreamTab(QWidget):
         copy_music.clicked.connect(self.copy_music_player_overlay_url)
         open_music = QPushButton("Открыть предпросмотр")
         open_music.clicked.connect(self.open_music_player_overlay_preview)
-        music_actions.addWidget(save_music)
         music_access.addWidget(copy_music)
         music_access.addWidget(open_music)
         music_access.addStretch()
-        music_actions.addStretch()
-        layout.addLayout(music_actions)
+        # Match other OBS sections: access buttons first, settings in the
+        # middle, the one existing Save button left-aligned immediately after.
+        layout.addWidget(save_music, 0, Qt.AlignLeft)
 
         wheel_line = QFrame()
         wheel_line.setProperty("line", True)
