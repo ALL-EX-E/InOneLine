@@ -105,6 +105,9 @@ class MusicTab(QWidget):
         self.output_combo.addItem("Через OBS Browser Source", MUSIC_PLAYER_OUTPUT_MODE_OBS)
         self.output_combo.currentIndexChanged.connect(self._output_changed)
         output_row.addWidget(self.output_combo)
+        self.obs_audio_help_btn = QPushButton("Как выводится звук в OBS?")
+        self.obs_audio_help_btn.clicked.connect(self._show_obs_audio_help)
+        output_row.addWidget(self.obs_audio_help_btn)
         output_row.addStretch()
         root.addLayout(output_row)
 
@@ -193,6 +196,7 @@ class MusicTab(QWidget):
         self.output_combo.blockSignals(True)
         self.output_combo.setCurrentIndex(index if index >= 0 else 0)
         self.output_combo.blockSignals(False)
+        self._update_obs_audio_help_visibility()
 
         self.volume.blockSignals(True)
         self.volume.setValue(self.controller.volume_percent)
@@ -270,6 +274,31 @@ class MusicTab(QWidget):
 
     def _output_changed(self, _index: int) -> None:
         self.controller.set_output_mode(str(self.output_combo.currentData() or MUSIC_PLAYER_OUTPUT_MODE_APPLICATION))
+        self._update_obs_audio_help_visibility()
+
+    def _update_obs_audio_help_visibility(self) -> None:
+        # Audio-help visibility depends only on the output mode; never alter
+        # the existing music routing or show a permanent warning.
+        self.obs_audio_help_btn.setVisible(
+            self.output_combo.currentData() == MUSIC_PLAYER_OUTPUT_MODE_OBS
+        )
+
+    def _show_obs_audio_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Как выводится звук в OBS?",
+            "Если «Управление аудио через OBS» выключено, звук идёт через "
+            "OBS Browser Page. Слышать его можно через Windows, а громкость "
+            "регулируется в микшере Windows.\n\n"
+            "Если «Управление аудио через OBS» включено, звук поступает "
+            "в отдельный источник микшера OBS для трансляции и записи. "
+            "По умолчанию локально его не слышно.\n\n"
+            "Чтобы одновременно слышать музыку самому и отправлять звук "
+            "на трансляцию, в свойствах аудио Browser Source выберите "
+            "«Мониторинг и вывод».\n\n"
+            "Отсутствие локального звука без мониторинга в этом режиме "
+            "— нормальная работа OBS, а не ошибка программы.",
+        )
 
     def _apply_filter(self, text: str) -> None:
         query = str(text or "").strip().casefold()
