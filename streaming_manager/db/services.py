@@ -23,6 +23,7 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT, TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT, TIMER_OVERLAY_BACKGROUND_KEY,
+    TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
     TIMER_OVERLAY_FONT_COLOR_DEFAULT, TIMER_OVERLAY_FONT_COLOR_KEY,
     TIMER_OVERLAY_FONT_FAMILY_DEFAULT, TIMER_OVERLAY_FONT_FAMILY_KEY,
     TIMER_OVERLAY_FONT_SIZE_DEFAULT, TIMER_OVERLAY_FONT_SIZE_KEY,
@@ -1448,10 +1449,16 @@ class ServicesMixin:
             TIMER_OVERLAY_FONT_COLOR_KEY,
             TIMER_OVERLAY_BACKGROUND_KEY,
             TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
+            TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
         )
         with self.connect() as conn:
             settings = self._get_settings_conn(conn, keys)
             session = self._get_open_auction_session_conn(conn)
+            media_id_raw = str(settings.get(TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY, "")).strip()
+            background_asset = (
+                self._get_media_asset_conn(conn, int(media_id_raw))
+                if media_id_raw.isdigit() else None
+            )
 
         timer_kind = "auction"
         timer_running = False
@@ -1502,8 +1509,24 @@ class ServicesMixin:
             settings.get(TIMER_OVERLAY_BACKGROUND_KEY, TIMER_OVERLAY_BACKGROUND_DEFAULT)
             or TIMER_OVERLAY_BACKGROUND_DEFAULT
         ).strip().casefold()
-        if background not in {"transparent", "color"}:
+        if background not in {"transparent", "color", "media"}:
             background = TIMER_OVERLAY_BACKGROUND_DEFAULT
+
+        if (background_asset is not None
+                and background_asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS):
+            background_file = background_asset.display_name
+            background_type = media_kind_for_name(background_file)
+            background_available = bool(background_type) and media_asset_available(
+                self.path.parent, background_asset,
+            )
+            background_url = f"/media/{background_asset.id}" if background_available else ""
+            background_asset_id: int | None = background_asset.id
+        else:
+            background_file = ""
+            background_type = ""
+            background_available = False
+            background_url = ""
+            background_asset_id = None
 
         family = str(
             settings.get(TIMER_OVERLAY_FONT_FAMILY_KEY, TIMER_OVERLAY_FONT_FAMILY_DEFAULT)
@@ -1542,6 +1565,13 @@ class ServicesMixin:
                     settings.get(TIMER_OVERLAY_BACKGROUND_COLOR_KEY),
                     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
                 ),
+                "background_media": {
+                    "asset_id": background_asset_id,
+                    "file": background_file,
+                    "type": background_type,
+                    "available": bool(background_available),
+                    "url": background_url,
+                },
             },
         }
 
