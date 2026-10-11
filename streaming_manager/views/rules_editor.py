@@ -79,8 +79,14 @@ class AuctionRulesEditorDialog(QDialog):
         self.template_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.template_combo.currentIndexChanged.connect(self._template_index_changed)
         template_row.addWidget(self.template_combo, 1)
-        template_row.addWidget(self.active_label)
+        root.addLayout(template_row)
 
+        # Keep the template selector and the template actions on separate
+        # rows. At the dialog's minimum width they cannot fit side by side:
+        # the old expanding combo overlapped the active badge and Create.
+        template_actions_row = QHBoxLayout()
+        template_actions_row.addWidget(self.active_label)
+        template_actions_row.addStretch(1)
         for title, handler in (
             ("Создать", self._create_template),
             ("Переименовать", self._rename_template),
@@ -89,8 +95,8 @@ class AuctionRulesEditorDialog(QDialog):
         ):
             button = QPushButton(title)
             button.clicked.connect(handler)
-            template_row.addWidget(button)
-        root.addLayout(template_row)
+            template_actions_row.addWidget(button)
+        root.addLayout(template_actions_row)
 
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
