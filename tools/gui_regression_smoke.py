@@ -318,6 +318,35 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
             raise AssertionError("P11-B Rules editor preview lost exact OBS route")
         if not hasattr(auction, "auction_rules_preview_btn"):
             raise AssertionError("P11-B unexpectedly removed separate old text preview")
+
+        # FIX1: real Qt geometry, not just child existence. On the smallest
+        # supported Rules window the selector must be above all action buttons;
+        # no active badge / Create overlap or clipped right-hand controls.
+        editor.show()
+        for width, height in ((760, 560), (1050, 760), (760, 560)):
+            editor.resize(width, height)
+            QApplication.processEvents()
+            combo = editor.template_combo
+            combo_pos = combo.mapTo(editor, QPoint(0, 0))
+            combo_bottom = combo_pos.y() + combo.height()
+            if (combo.width() < 280 or combo_pos.x() < 0
+                    or combo_pos.x() + combo.width() > editor.width()):
+                raise AssertionError("P11-B Rules template selector clipped")
+            actions = [editor.active_label]
+            buttons = editor.findChildren(QPushButton)
+            for label in ("Создать", "Переименовать", "Удалить", "Сделать активным"):
+                matches = [button for button in buttons if button.text() == label]
+                if len(matches) != 1:
+                    raise AssertionError(f"P11-B missing Rules action: {label}")
+                actions.append(matches[0])
+            for action in actions:
+                pos = action.mapTo(editor, QPoint(0, 0))
+                if (pos.y() < combo_bottom
+                        or pos.x() < 0 or pos.x() + action.width() > editor.width()):
+                    raise AssertionError(
+                        f"P11-B Rules template action overlaps or clips at {width}px"
+                    )
+        editor.hide()
     finally:
         editor.deleteLater()
     if window.db.get_settings() != settings_before:
