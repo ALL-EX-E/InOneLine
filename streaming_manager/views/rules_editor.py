@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSignalBlocker, Qt
+from typing import Callable
+
+from PySide6.QtCore import QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
     QColor,
+    QDesktopServices,
     QFont,
     QTextBlockFormat,
     QTextCharFormat,
@@ -10,6 +13,7 @@ from PySide6.QtGui import (
     QTextListFormat,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QColorDialog,
     QDialog,
     QHBoxLayout,
@@ -48,6 +52,7 @@ class AuctionRulesEditorDialog(QDialog):
         parent: QWidget | None = None,
         *,
         initial_template_id: int | None = None,
+        rules_overlay_url: Callable[[], str] | None = None,
     ):
         super().__init__(parent)
         self.db = db
@@ -86,6 +91,35 @@ class AuctionRulesEditorDialog(QDialog):
             button.clicked.connect(handler)
             template_row.addWidget(button)
         root.addLayout(template_row)
+
+        # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
+        # its port resolution nor introduce another OBS route or preview mode.
+        if rules_overlay_url is not None:
+            rules_access = QHBoxLayout()
+            rules_access.addWidget(QLabel("URL виджета правил:"))
+            self.rules_overlay_url_label = QLabel(str(rules_overlay_url()))
+            self.rules_overlay_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            self.rules_overlay_url_label.setSizePolicy(
+                QSizePolicy.Ignored, QSizePolicy.Preferred
+            )
+            rules_access.addWidget(self.rules_overlay_url_label, 1)
+
+            self.copy_rules_url_btn = QPushButton("Копировать URL")
+            self.copy_rules_url_btn.clicked.connect(
+                lambda _checked=False: QApplication.clipboard().setText(
+                    str(rules_overlay_url())
+                )
+            )
+            rules_access.addWidget(self.copy_rules_url_btn)
+
+            self.preview_rules_obs_btn = QPushButton("Открыть предпросмотр OBS")
+            self.preview_rules_obs_btn.clicked.connect(
+                lambda _checked=False: QDesktopServices.openUrl(
+                    QUrl(str(rules_overlay_url()) + "?preview=1")
+                )
+            )
+            rules_access.addWidget(self.preview_rules_obs_btn)
+            root.addLayout(rules_access)
 
         tools1 = QHBoxLayout()
         self.style_combo = ScrollSafeComboBox()
