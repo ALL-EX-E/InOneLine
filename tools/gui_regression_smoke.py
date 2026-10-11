@@ -125,16 +125,28 @@ def assert_p10_music_obs_audio_help(window) -> None:
                 raise AssertionError("UI-049 help did not open the existing message-box pattern")
             title = info.call_args.args[1]
             explanation = info.call_args.args[2]
-            if title != "Как выводится звук в OBS?" or not all(
-                term in explanation for term in (
-                    "OBS Studio", "«Источники»", "источник «Браузер»",
-                    "«Свойства»", "Управление аудио через OBS",
-                    "не в InOneLine", "Галочка снята:", "Галочка установлена:",
-                    "OBS Browser Page", "микшере OBS",
-                    "«Расширенные свойства аудио»", "«Мониторинг аудио»",
-                    "«Мониторинг и вывод»", "нормальная работа OBS",
-                )
-            ):
+            # The first read should explain the actual InOneLine -> Browser
+            # Source path before talking about OBS's own checkbox.
+            required_in_order = (
+                "Если в InOneLine", "«Музыка»",
+                "«Вывод звука: Через OBS Browser Source»",
+                "виджет музыкального плеера", "источник «Браузер»",
+                "«Свойствах»", "«Управление аудио через OBS»",
+                "Если галочку не включать", "OBS Browser Page",
+                "микшере громкости Windows", "Если включить галочку",
+                "в микшере OBS", "«Расширенные свойства аудио»",
+                "«Мониторинг аудио»", "«Мониторинг и вывод»",
+            )
+            offset = 0
+            for phrase in required_in_order:
+                index = explanation.find(phrase, offset)
+                if index < 0:
+                    raise AssertionError(
+                        f"UI-049 first-read flow missing or out of order: {phrase}"
+                    )
+                offset = index + len(phrase)
+            if (title != "Как выводится звук в OBS?"
+                    or len(explanation.split("\\n\\n")) != 4):
                 raise AssertionError("UI-049 OBS audio help omits an approved explanation")
     finally:
         index = music.output_combo.findData(original)
