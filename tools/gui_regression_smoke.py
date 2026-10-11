@@ -317,8 +317,8 @@ def assert_p09_obs_access(app, window, db) -> None:
         raise AssertionError("UI-046 Music OBS heading/URL/access/settings/Save order changed")
     if copy.parentWidget() is not preview.parentWidget():
         raise AssertionError("UI-046 Music OBS access buttons are split")
-    if not (save.isVisible() and save.isEnabled()):
-        raise AssertionError("UI-046 Music OBS Save is hidden or disabled")
+    if save.isHidden() or not save.isEnabled():
+        raise AssertionError("UI-046 Music OBS Save is explicitly hidden or disabled")
     print("P10_UI046_MUSIC_SECTION_LABELS_ACTIONS_SAVE_ORDER=PASS")
 
 
