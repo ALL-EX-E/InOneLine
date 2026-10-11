@@ -292,6 +292,7 @@ def assert_p11_rules_format_toolbar_cleanup(window) -> None:
 def assert_p11_rules_obs_access_relocation(window) -> None:
     """P11-B: editor owns Rules OBS access but uses original Auction route."""
     auction = window.auction_tab
+    settings_before = window.db.get_settings()
     if any(
         hasattr(auction, name)
         for name in ("auction_rules_copy_url_btn", "auction_rules_obs_preview_btn")
@@ -319,6 +320,8 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
             raise AssertionError("P11-B unexpectedly removed separate old text preview")
     finally:
         editor.deleteLater()
+    if window.db.get_settings() != settings_before:
+        raise AssertionError("P11-B URL actions unexpectedly changed saved settings")
     print("P11_B_RULES_EDITOR_URL_COPY_AND_OBS_PREVIEW_REUSED=PASS")
 
 
