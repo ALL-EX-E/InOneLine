@@ -221,8 +221,10 @@ def ui_smoke() -> None:
                     raise TimeoutError("Test worker never received copy release")
                 return actual_copy(source_path, target_path)
 
-            with patch.object(StreamTab, "_copy_background_video", staticmethod(delayed_copy)), \\
-                    patch.object(QMessageBox, "information") as notices:
+            with (
+                patch.object(StreamTab, "_copy_background_video", staticmethod(delayed_copy)),
+                patch.object(QMessageBox, "information") as notices,
+            ):
                 try:
                     stream._apply_background_import(
                         video_source, MEDIA_STORAGE_MANAGED, "timer",
