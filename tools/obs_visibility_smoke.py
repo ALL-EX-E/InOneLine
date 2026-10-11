@@ -315,7 +315,7 @@ def browser_smoke() -> None:
         assert result, "JavaScript callback timed out"
         return result[0]
 
-    def wait_js(page, expression, expected, label, timeout=8):
+    def wait_js(page, expression, expected, label, timeout=20):
         deadline = time.monotonic() + timeout
         actual = None
         while time.monotonic() < deadline:
@@ -380,6 +380,13 @@ def browser_smoke() -> None:
                         view.page().setBackgroundColor(QColor(Qt.transparent))
                         view.show()
                         view.load(QUrl(server.base_url + route + suffix))
+                    # Qt WebEngine may deprioritize Chromium timers in an
+                    # unfocused top-level window on Windows CI. The normal
+                    # source must stay rendered and fully active while we
+                    # verify its live updates beside the preview window.
+                    views[0].raise_()
+                    views[0].activateWindow()
+                    app.processEvents()
                     normal, preview = (view.page() for view in views)
                     wait_js(normal, "document.documentElement?.dataset.obsPolicyReady", "true", route + " ready")
                     wait_js(preview, "document.documentElement?.dataset.obsPolicyReady", "true", route + " preview ready")

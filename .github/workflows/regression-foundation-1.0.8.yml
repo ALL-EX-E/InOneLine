@@ -135,6 +135,14 @@ jobs:
           python tools/obs_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Common OBS visibility regression failed" }
 
+      - name: UI-045 shared Timer media, Qt and Chromium regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/timer_media_background_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "UI-045 Timer media regression failed" }
+
       - name: Build frozen application with accepted toolchain
         shell: pwsh
         run: |

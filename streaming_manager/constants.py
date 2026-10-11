@@ -43,6 +43,7 @@ TIMER_OVERLAY_BACKGROUND_KEY = "timer_overlay_background"
 TIMER_OVERLAY_BACKGROUND_DEFAULT = "transparent"
 TIMER_OVERLAY_BACKGROUND_COLOR_KEY = "timer_overlay_background_color"
 TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT = "#000000"
+TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY = "timer_overlay_background_media_id"
 
 # Standalone OBS view of the existing Auction lot list. Presentation settings
 # reuse the generic settings table; no schema migration is required.

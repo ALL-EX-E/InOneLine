@@ -32,7 +32,18 @@ body.preview {
   justify-content: center;
   overflow: hidden;
 }
+#timer-background-image, #timer-background-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+  pointer-events: none;
+}
 #timer {
+  position: relative;
+  z-index: 1;
   --digit-cell: .72em;
   --colon-cell: .42em;
   --dot-cell: .34em;
@@ -90,7 +101,11 @@ body.preview #api-state.visible { display: block; }
 <script src="/obs-visibility.js"></script>
 </head>
 <body>
-<div id="root"><div id="timer" aria-label="00:10:00.000"></div></div>
+<div id="root">
+  <img id="timer-background-image" alt="" aria-hidden="true">
+  <video id="timer-background-video" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
+  <div id="timer" aria-label="00:10:00.000"></div>
+</div>
 <audio id="auction-audio" preload="auto"></audio>
 <div id="metric-probe" aria-hidden="true">0</div>
 <div id="api-state">Нет связи с In one line</div>
@@ -101,6 +116,8 @@ body.preview #api-state.visible { display: block; }
   const TIMER_PATTERN = "00:00:00.000";
   const root = document.getElementById("root");
   const timer = document.getElementById("timer");
+  const backgroundImage = document.getElementById("timer-background-image");
+  const backgroundVideo = document.getElementById("timer-background-video");
   const metricProbe = document.getElementById("metric-probe");
   const apiState = document.getElementById("api-state");
   const auctionAudio = document.getElementById("auction-audio");
@@ -212,9 +229,16 @@ body.preview #api-state.visible { display: block; }
     const family = String(p.font_family || "Segoe UI").trim() || "Segoe UI";
     const fontSize = Math.max(8, Math.min(300, Number(p.font_size) || 96));
     const fontColor = normalizeHex(p.font_color, "#FFFFFF");
-    const background = p.background === "color" ? "color" : "transparent";
+    const background = ["transparent", "color", "media"].includes(p.background)
+      ? p.background : "transparent";
     const backgroundColor = normalizeHex(p.background_color, "#000000");
-    const signature = [family, fontSize, fontColor, background, backgroundColor].join("\u0000");
+    const asset = p.background_media || {};
+    const mediaUrl = background === "media" && asset.available === true
+      && /^\/media\/\d+$/.test(String(asset.url || "")) ? String(asset.url) : "";
+    const mediaType = mediaUrl && (asset.type === "video" || asset.type === "image")
+      ? asset.type : "";
+    const signature = [family, fontSize, fontColor, background, backgroundColor,
+                       mediaUrl, mediaType].join("\u0000");
     if (signature === presentationSignature) return;
     presentationSignature = signature;
 
@@ -224,6 +248,33 @@ body.preview #api-state.visible { display: block; }
     metricProbe.style.fontFamily = family;
     timer.style.color = fontColor;
     root.style.background = background === "color" ? backgroundColor : "transparent";
+
+    // Source continuity matters for animated/video backgrounds: do not reload
+    // identical media when fonts/colors change or during the 100ms API poll.
+    if (mediaType === "video") {
+      backgroundImage.style.display = "none";
+      backgroundImage.removeAttribute("src");
+      if (backgroundVideo.getAttribute("src") !== mediaUrl) {
+        backgroundVideo.setAttribute("src", mediaUrl);
+        backgroundVideo.load();
+      }
+      backgroundVideo.style.display = "block";
+      const started = backgroundVideo.play();
+      if (started?.catch) started.catch(() => {});
+    } else {
+      backgroundVideo.style.display = "none";
+      backgroundVideo.pause();
+      backgroundVideo.removeAttribute("src");
+      if (mediaType === "image") {
+        if (backgroundImage.getAttribute("src") !== mediaUrl) {
+          backgroundImage.setAttribute("src", mediaUrl);
+        }
+        backgroundImage.style.display = "block";
+      } else {
+        backgroundImage.style.display = "none";
+        backgroundImage.removeAttribute("src");
+      }
+    }
     scheduleGeometryRefresh();
 
     if (document.fonts?.load) {
