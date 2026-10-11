@@ -610,3 +610,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Clean promotion copies exactly accepted `auction.py` + `gui_regression_smoke.py` blobs and updates canonical docs; **P10 can be marked CLOSED only after promotion CI and postmerge blob verification**.
 - **NEXT P11**: `UI-048` and `UI-060` Rules composite template + editor/OBS formatting consolidation. Implement in isolated small steps only; no duplicate independent Rules preset/overlay-settings system, use already existing templates, current routes and visibility/preview policy, preserve active-auction rule changes and persistence compatibility. Start with exact current-source audit and a separately reviewable low-risk step.
 
+## P10 CLOSED; P11-A first isolated step — 2026-10-11
+
+- **P10 DONE:** all approved P10 work (GLOBAL-OBS-VISIBILITY-001, UI-045, UI-046, UI-049, UI-055) manually accepted, exact clean promotions merged. Final UI-055 [PR #102](https://github.com/ALL-EX-E/InOneLine/pull/102) main `7ae552135af67bd42922590c71b03910aa48742a` after native Windows promotion `38150150271` and wording `38150150233` PASS; 2/2 exact source/test Git blobs re-fetched and verified. Original draft #101 closed unmerged.
+- **CURRENT NEXT PACKAGE P11 — Rules composite editor/overlay (UI-048/UI-060).** The first deliberately small step is P11-A — remove Undo, Redo, Highlight and the second pipette from WYSIWYG Rules editor, preserve everything else including saved HTML with legacy highlight and OBS/state. Source/test isolated [draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103), not yet accepted or merged.
+- Subsequent P11 increments remain separately gated: move Rules URL/copy/preview to editor; composite template+save/activate state; integrate OBS appearance and preview without a second style-library, DB backend or duplicating widget visibility policy; preserve session snapshots/sanitizer and live active-template semantics.
+

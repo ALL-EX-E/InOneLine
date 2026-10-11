@@ -4080,3 +4080,8 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Scope: hide help for in-application output, show for `Через OBS Browser Source таймера`, replace the always-on note with dialog, explain Timer Browser Source for shared Auction/Wheel music, OBS checkbox OFF/ON and monitoring, preserve warning not to auto-shut Browser Source when invisible. **No business/audio/backend or new storage changes.**
 - Exact-file clean merge of two tested source/test blobs is queued with new Windows/wording acceptance gates; old candidate PR #101 must close unmerged. Next reviewed implementation package is **P11 UI-048/UI-060 (composite Rules editor/overlay)** with reuse-first/minimal-diff and one manual-acceptance unit at a time.
 
+## P10 closure and first P11-A/UI-060 candidate — 2026-10-11
+
+- UI-055 accepted by user, clean [PR #102](https://github.com/ALL-EX-E/InOneLine/pull/102) merged as `7ae552135af67bd42922590c71b03910aa48742a`; latest accepted source/test blobs verified **2/2 identical** to manual QA candidate `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae`. Native Windows `38150150271` and wording `38150150233` SUCCESS; superseded draft #101 CLOSED WITHOUT MERGE. P10 is **COMPLETE**.
+- Start next package P11 on exact latest main. [Draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103) limits first P11-A/UI-060 unit to text-format toolbar removal: Undo, Redo, Highlight and its paired pipette. Existing rich-text HTML with background color is preserved on round-trip; current other editor controls and session/template/OBS runtime unchanged. Windows QA and user manual acceptance pending; no merge authorization yet.
+
