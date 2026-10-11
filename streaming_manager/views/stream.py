@@ -120,6 +120,10 @@ class StreamTab(QWidget):
         self.thread_pool = QThreadPool.globalInstance()
         self._background_copy_worker: FunctionWorker | None = None
         self._background_copy_target = "main"
+        # A Save pressed while a timer video is copying must apply the newly
+        # imported asset, not the previously selected GIF/image.
+        self._timer_save_waiting_for_video_copy = False
+        self._background_video_copy_succeeded = False
         self.background_dir = managed_media_directory(
             self.db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
         )
@@ -656,6 +660,7 @@ class StreamTab(QWidget):
         timer_actions = QHBoxLayout()
         timer_actions.setSpacing(8)
         save_timer = QPushButton("Сохранить виджет таймера")
+        self.timer_save_button = save_timer
         save_timer.setProperty("primary", True)
         save_timer.clicked.connect(self._save_timer_overlay_settings)
         copy_timer = QPushButton("Копировать URL таймера")
@@ -1161,6 +1166,14 @@ class StreamTab(QWidget):
             self._set_color_button(self.timer_background_color_btn, selected.name())
 
     def _save_timer_overlay_settings(self) -> None:
+        if (self._background_copy_worker is not None
+                and self._background_copy_target == "timer"
+                and self.timer_background_media_mode.isChecked()):
+            # The worker has not yet selected/registered the copied video.
+            # Remember the user's Save and execute it after the copy succeeds.
+            self._timer_save_waiting_for_video_copy = True
+            self.timer_save_button.setText("Сохранение после копирования…")
+            return
         if self.timer_background_media_mode.isChecked():
             background = "media"
         elif self.timer_background_color_mode.isChecked():
@@ -1642,22 +1655,35 @@ class StreamTab(QWidget):
             self._background_video_copy_failed(exc)
             return
         self._select_imported_background(self._background_copy_target, asset.id)
+        self._background_video_copy_succeeded = True
 
     def _background_video_copy_failed(self, exc):
         QMessageBox.critical(
             self,
             "Ошибка копирования фона",
-            f"Не удалось скопировать видео во внутреннюю библиотеку:\n{exc}",
+            f"Не удалось скопировать видео во внутреннюю библиотеку:\n{exc}"
+            + ("\nИзменения фона таймера не сохранены."
+               if self._timer_save_waiting_for_video_copy else ""),
         )
 
     def _background_video_copy_finished(self):
+        apply_pending_timer_save = (
+            self._background_copy_target == "timer"
+            and self._timer_save_waiting_for_video_copy
+            and self._background_video_copy_succeeded
+        )
+        self._timer_save_waiting_for_video_copy = False
+        self._background_video_copy_succeeded = False
         self._background_copy_worker = None
+        self.timer_save_button.setText("Сохранить виджет таймера")
         self.choose_background_btn.setEnabled(True)
         self.choose_background_btn.setText("Добавить фон…")
         self.auction_lots_choose_background_btn.setText("Добавить фон…")
         self.timer_choose_background_btn.setText("Добавить фон…")
         self._update_auction_lots_background_enabled_state()
         self._update_timer_background_enabled_state()
+        if apply_pending_timer_save:
+            self._save_timer_overlay_settings()
 
     def _start_background_video_copy(
         self,
@@ -1669,6 +1695,8 @@ class StreamTab(QWidget):
         if self._background_copy_worker is not None:
             return
         self._background_copy_target = selection_target
+        self._background_video_copy_succeeded = False
+        self._timer_save_waiting_for_video_copy = False
         self.choose_background_btn.setEnabled(False)
         self.auction_lots_choose_background_btn.setEnabled(False)
         self.timer_choose_background_btn.setEnabled(False)
