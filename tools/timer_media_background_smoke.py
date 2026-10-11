@@ -282,8 +282,11 @@ def browser_smoke() -> None:
             wait_js(page, image_src, f"/media/{image.id}", "Image URL")
             wait_js(page, image_display, "block", "Image visible")
             wait_js(page, video_display, "none", "Video hidden in image mode")
-            wait_js(page, "document.querySelector('#auction-audio').getAttribute('src')",
-                    None, "Media selection does not own auction audio")
+            # Existing timer audio sync can leave an empty src attribute: only
+            # nonempty URLs would indicate that the visual background owns audio.
+            assert js(page, "document.querySelector('#auction-audio').getAttribute('src')") in (None, ""), (
+                "Visual timer background unexpectedly started auction audio"
+            )
 
             db.set_settings_bulk({"timer_overlay_background_media_id": str(video.id)})
             wait_js(page, video_src, f"/media/{video.id}", "Video URL")
