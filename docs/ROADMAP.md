@@ -603,3 +603,10 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Only `streaming_manager/views/music.py` plus `tools/gui_regression_smoke.py` accepted implementation/test content may be promoted with these three canonical docs; no underlying audio routing, persistence, version 1.0.8, schema 19, 15 named migrations changed. Require fresh Windows/wording on exact promotion and verified merge.
 - Next isolated P10 item: `UI-055` — Auction contextual button `Как выводится звук в OBS?` only if Auction music output is `Через OBS`; hidden for `В приложении`; reuse the same accepted clear step-by-step help structure as UI-049. No duplicate subsystem, no routing change.
 
+## P10/UI-055 — MANUAL QA PASS; clean promotion gate — 2026-10-11
+
+- User explicitly accepted UI-055 2026-10-11 15:07:19 UTC («Принимаю. Идём дальше.»). It is the **last scheduled P10 feature** following completed GLOBAL-OBS-VISIBILITY-001, UI-045, UI-046 and UI-049. No reopened functionality from P10 is intended.
+- Exact tested candidate `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae`, original [draft PR #101](https://github.com/ALL-EX-E/InOneLine/pull/101); [Drive installer ZIP](https://drive.google.com/file/d/1_Qy9m4ADeQcOuYJiSk4RvyZSEogi7XkL/view?usp=drivesdk); SHA256 `bd23176acce32b7f9072c96531f81cac46643afc2679e413bb50f8d0fcdcc5ed`. Windows `38149238542` and wording `38149238539`: SUCCESS.
+- Clean promotion copies exactly accepted `auction.py` + `gui_regression_smoke.py` blobs and updates canonical docs; **P10 can be marked CLOSED only after promotion CI and postmerge blob verification**.
+- **NEXT P11**: `UI-048` and `UI-060` Rules composite template + editor/OBS formatting consolidation. Implement in isolated small steps only; no duplicate independent Rules preset/overlay-settings system, use already existing templates, current routes and visibility/preview policy, preserve active-auction rule changes and persistence compatibility. Start with exact current-source audit and a separately reviewable low-risk step.
+

@@ -147,6 +147,36 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         "confirmed": "ЗАВЕРШЁН",
         "cancelled": "ОТМЕНЁН",
     }
+    def _update_obs_audio_help_visibility(self, *_args: object) -> None:
+        # UI-055: the explanation belongs to the OBS route only. This method
+        # never changes the existing Auction/Wheel audio routing or settings.
+        self.obs_audio_help_btn.setVisible(
+            self.audio_output_mode_combo.currentData() == "obs_timer"
+        )
+
+    def _show_obs_audio_help(self) -> None:
+        QMessageBox.information(
+            self,
+            "Как выводится звук в OBS?",
+            "Если в InOneLine на вкладке «Аукцион» выбрать «Вывод музыки: "
+            "Через OBS Browser Source таймера», музыка аукциона и колеса "
+            "будет выводиться через виджет таймера, добавленный в OBS как "
+            "источник «Браузер».\n\n"
+            "При добавлении этого источника в OBS или в его «Свойствах» "
+            "есть галочка «Управление аудио через OBS».\n\n"
+            "Если галочку не включать, звук воспроизводится через "
+            "OBS Browser Page, а его громкость регулируется "
+            "в микшере громкости Windows.\n\n"
+            "Если включить галочку, звук появится как отдельный источник "
+            "в микшере OBS для трансляции и записи. Чтобы слышать музыку "
+            "на своём компьютере, откройте в OBS «Расширенные свойства аудио» "
+            "и для браузерного источника выберите «Мониторинг аудио» → "
+            "«Мониторинг и вывод». Без мониторинга локального звука "
+            "может не быть — это нормально. Не включайте в OBS "
+            "отключение источника «Браузер», когда он не виден: "
+            "это может остановить музыку.",
+        )
+
     def __init__(
         self,
         db: Database,
@@ -614,16 +644,15 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.audio_output_mode_combo.currentIndexChanged.connect(
             self._audio_output_mode_changed
         )
-        audio_output_row.addWidget(self.audio_output_mode_combo, 1)
-        timer_layout.addLayout(audio_output_row)
-
-        self.audio_output_hint = QLabel(
-            "OBS-режим: звук аукциона и колеса идёт через этот же источник таймера. "
-            "Не включайте в OBS отключение Browser Source, когда он не виден."
+        self.audio_output_mode_combo.currentIndexChanged.connect(
+            self._update_obs_audio_help_visibility
         )
-        self.audio_output_hint.setWordWrap(True)
-        self.audio_output_hint.setProperty("muted", True)
-        timer_layout.addWidget(self.audio_output_hint)
+        audio_output_row.addWidget(self.audio_output_mode_combo, 1)
+        self.obs_audio_help_btn = QPushButton("Как выводится звук в OBS?")
+        self.obs_audio_help_btn.clicked.connect(self._show_obs_audio_help)
+        audio_output_row.addWidget(self.obs_audio_help_btn)
+        timer_layout.addLayout(audio_output_row)
+        self._update_obs_audio_help_visibility()
 
         self.timer_finish_widget = QWidget()
         timer_finish_row = QHBoxLayout(self.timer_finish_widget)

@@ -4073,3 +4073,10 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Final accepted explanation preserves: InOneLine output `Через OBS Browser Source` → music-player widget as OBS source `Браузер` → OBS checkbox location `Управление аудио через OBS` → unchecked OBS Browser Page / Windows mixer → checked separate OBS mixer track for stream/recording → `Мониторинг аудио` / `Мониторинг и вывод` for local hearing. It is help-only; no audio routing logic changed.
 - Next isolated approved **UI-055** Auction-tab context-sensitive equivalent; reuse exact accepted UI-049 help/dialog pattern, not an independent help backend; show only for `Вывод музыки: Через OBS`. Separate candidate and manual Windows acceptance as usual.
 
+## P10/UI-055 — user accepts final Auction OBS help; P11 follows — 2026-10-11
+
+- User at 15:07:19 UTC: «Принимаю. Идём дальше.» This explicitly accepts the manually installed exact UI-055 help candidate `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae` (draft PR #101; [verified Windows QA ZIP on Drive](https://drive.google.com/file/d/1_Qy9m4ADeQcOuYJiSk4RvyZSEogi7XkL/view?usp=drivesdk); SHA256 `bd23176acce32b7f9072c96531f81cac46643afc2679e413bb50f8d0fcdcc5ed`).
+- Full Windows CI `38149238542` PASS; wording `38149238539` PASS. The native UI-055 tests cover the context-sensitive button, original route callback and persistence guard, dialog explanatory ordering, and hidden-source warning. Manual acceptance is authoritative; prior P10 UI-049 Music-tab help separately accepted.
+- Scope: hide help for in-application output, show for `Через OBS Browser Source таймера`, replace the always-on note with dialog, explain Timer Browser Source for shared Auction/Wheel music, OBS checkbox OFF/ON and monitoring, preserve warning not to auto-shut Browser Source when invisible. **No business/audio/backend or new storage changes.**
+- Exact-file clean merge of two tested source/test blobs is queued with new Windows/wording acceptance gates; old candidate PR #101 must close unmerged. Next reviewed implementation package is **P11 UI-048/UI-060 (composite Rules editor/overlay)** with reuse-first/minimal-diff and one manual-acceptance unit at a time.
+
