@@ -616,3 +616,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - **CURRENT NEXT PACKAGE P11 — Rules composite editor/overlay (UI-048/UI-060).** The first deliberately small step is P11-A — remove Undo, Redo, Highlight and the second pipette from WYSIWYG Rules editor, preserve everything else including saved HTML with legacy highlight and OBS/state. Source/test isolated [draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103), not yet accepted or merged.
 - Subsequent P11 increments remain separately gated: move Rules URL/copy/preview to editor; composite template+save/activate state; integrate OBS appearance and preview without a second style-library, DB backend or duplicating widget visibility policy; preserve session snapshots/sanitizer and live active-template semantics.
 
+## P11-A/UI-060 — USER ACCEPTED with FIX1, clean promotion — 2026-10-11
+
+- User 2026-10-11 16:51:15 UTC «Всё работает. Идём дальше.» explicitly accepts P11-A after the compact eyedropper FIX1; tested candidate 7bd153c7723f28493593f8c3eeb1e48ff1b923fc (draft PR #103). Windows 38155498542 and wording 38155498539 SUCCESS; QA ZIP SHA256 ed6cb4b7de1cff8f187085e580de9997f23c39e62361da915ab2930841eb5e6a.
+- Current accepted scope: remove Undo/Redo/highlight controls only, preserve legacy highlight markup, use shared screen pipette button. Clean promote exact rules_editor.py and gui_regression_smoke.py blobs; no DB/OBS/audio/business changes. Full P11 remains IN PROGRESS.
+- Next isolated **P11-B**: move existing Rules URL and copy/actual OBS preview actions from Auction page into rules editor, reuse existing route and handlers. Do not alter composite template persistence, rules snapshot, Save/Close semantics, visibility show-mode or appearance in same candidate. Separate later changes cover obsolete Show Rules removal and full composite editor.
+

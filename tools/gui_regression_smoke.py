@@ -87,6 +87,7 @@ from streaming_manager.public_xlsx import (
 )
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.games import DeleteAllGamesDialog, GameDialog
+from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
 from tools.position_policy_smoke import assert_elimination_lifecycle
 
 
@@ -232,6 +233,60 @@ def assert_p10_auction_obs_audio_help(window) -> None:
     if window.db.get_settings() != original_settings:
         raise AssertionError("UI-055 unexpectedly persisted Auction audio changes")
     print("P10_UI055_AUCTION_OBS_AUDIO_HELP_CONTEXT_ROUTING_AND_WARNING=PASS")
+
+
+def assert_p11_rules_format_toolbar_cleanup(window) -> None:
+    """P11-A: remove obsolete toolbar UI, preserve existing rich-text HTML."""
+    rules = AuctionRulesEditorDialog(window.db, window)
+    try:
+        labels = [button.text() for button in rules.findChildren(QPushButton)]
+        if any(label in labels for label in ("Отменить", "Повторить", "Выделение")):
+            raise AssertionError("P11-A obsolete Rules formatting toolbar controls remain")
+        if any(
+            hasattr(rules, name)
+            for name in (
+                "undo_btn", "redo_btn", "highlight_color_btn",
+                "highlight_color_pick_btn",
+            )
+        ):
+            raise AssertionError("P11-A Rules dialog retains a deprecated control")
+        picker = rules.text_color_pick_btn
+        if (picker.text() != "⌖"
+                or picker.property("screenColorPicker") is not True
+                or picker.width() != picker.height()
+                or not picker.toolTip()
+                or not rules.text_color_btn.text().startswith("Цвет текста:")
+                or rules.style_combo.count() != 3
+                or rules.size_spin.minimum() != 6
+                or rules.size_spin.maximum() != 96):
+            raise AssertionError("P11-A changed existing text-formatting controls")
+        if picker.width() < 34 or picker.minimumWidth() != picker.maximumWidth():
+            raise AssertionError("P11-A Rules picker is not the shared compact fixed square")
+        with patch.object(rules, "_choose_color") as pick_color:
+            picker.click()
+            pick_color.assert_called_once_with(True)
+
+        legacy_html = (
+            '<p><span style="background-color:#ffdc44; color:#224466;">'
+            'Previously highlighted text</span></p>'
+        )
+        rules.editor.setHtml(legacy_html)
+        current = rules.editor.document().find("Previously highlighted text")
+        if current.isNull():
+            raise AssertionError("P11-A missing loaded legacy highlighted content")
+        if current.charFormat().background().color().name().lower() != "#ffdc44":
+            raise AssertionError("P11-A erased legacy background highlight on load")
+        html_roundtrip = rules.editor.toHtml()
+        rules.editor.setHtml(html_roundtrip)
+        restored = rules.editor.document().find("Previously highlighted text")
+        if (restored.isNull()
+                or restored.charFormat().background().color().name().lower()
+                != "#ffdc44"):
+            raise AssertionError("P11-A lost legacy highlight in rich-text round-trip")
+    finally:
+        # No template is saved or activated by this presentation-only test.
+        rules.deleteLater()
+    print("P11_A_RULES_TEXT_TOOLBAR_PRESERVE_LEGACY_HIGHLIGHT=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
@@ -1492,6 +1547,7 @@ def main() -> int:
         assert_p09_obs_access(app, window, db)
         assert_p10_music_obs_audio_help(window)
         assert_p10_auction_obs_audio_help(window)
+        assert_p11_rules_format_toolbar_cleanup(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
