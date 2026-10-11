@@ -4085,7 +4085,7 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - UI-055 accepted by user, clean [PR #102](https://github.com/ALL-EX-E/InOneLine/pull/102) merged as `7ae552135af67bd42922590c71b03910aa48742a`; latest accepted source/test blobs verified **2/2 identical** to manual QA candidate `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae`. Native Windows `38150150271` and wording `38150150233` SUCCESS; superseded draft #101 CLOSED WITHOUT MERGE. P10 is **COMPLETE**.
 - Start next package P11 on exact latest main. [Draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103) limits first P11-A/UI-060 unit to text-format toolbar removal: Undo, Redo, Highlight and its paired pipette. Existing rich-text HTML with background color is preserved on round-trip; current other editor controls and session/template/OBS runtime unchanged. Windows QA and user manual acceptance pending; no merge authorization yet.
 
-## P11-A — accepted toolbar + compact OBS-style eyedropper; next P11-B — 2026-10-11
+## P11-A — accepted toolbar with compact OBS-style eyedropper; next P11-B — 2026-10-11
 
 - User manually accepted original P11-A functionality and requested visual fix of the remaining Rules text-color picker. FIX1 uses existing make_screen_color_picker_button() identical to Stream/OBS. Final explicit acceptance at 2026-10-11 16:51:15 UTC: «Всё работает. Идём дальше.».
 - Candidate draft PR #103, exact HEAD 7bd153c7723f28493593f8c3eeb1e48ff1b923fc, Windows 38155498542 and wording 38155498539 SUCCESS. Exact tested rules_editor.py blob 296eb93b0fee6b21216a2a9bad83b04c1d674641 and gui_regression_smoke.py blob 90011b91411909fe2cff1e4e4c3543c07dbbfff0. Artifact SHA256 ed6cb4b7de1cff8f187085e580de9997f23c39e62361da915ab2930841eb5e6a.
