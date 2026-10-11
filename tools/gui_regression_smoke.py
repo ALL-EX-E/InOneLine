@@ -127,8 +127,12 @@ def assert_p10_music_obs_audio_help(window) -> None:
             explanation = info.call_args.args[2]
             if title != "Как выводится звук в OBS?" or not all(
                 term in explanation for term in (
-                    "OBS Browser Page", "Управление аудио через OBS",
-                    "микшере OBS", "Мониторинг и вывод", "нормальная работа OBS",
+                    "OBS Studio", "«Источники»", "источник «Браузер»",
+                    "«Свойства»", "Управление аудио через OBS",
+                    "не в InOneLine", "Галочка снята:", "Галочка установлена:",
+                    "OBS Browser Page", "микшере OBS",
+                    "«Расширенные свойства аудио»", "«Мониторинг аудио»",
+                    "«Мониторинг и вывод»", "нормальная работа OBS",
                 )
             ):
                 raise AssertionError("UI-049 OBS audio help omits an approved explanation")
