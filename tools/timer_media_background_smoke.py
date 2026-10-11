@@ -7,6 +7,7 @@ import socket
 import sys
 import time
 from pathlib import Path
+from threading import Event
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from urllib.request import urlopen
@@ -18,6 +19,7 @@ from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database
 from streaming_manager.media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, MEDIA_STORAGE_EXTERNAL,
+    MEDIA_STORAGE_MANAGED,
 )
 
 
@@ -203,8 +205,74 @@ def ui_smoke() -> None:
             # Changing modes must retain the chosen media for the next Save.
             assert db.get_setting("timer_overlay_background_media_id") == str(asset.id)
 
+            # Reproduce the user's exact race: GIF is already saved, user
+            # selects a new MP4 and presses Save while the managed copy is
+            # still in flight. One click must save the NEW video automatically
+            # after registration, without reselecting it in the combo.
             stream.timer_background_media_mode.setChecked(True)
             app.processEvents()
+            video_source = fixture_media(root, ".mp4")
+            copy_started, allow_copy = Event(), Event()
+            actual_copy = stream._copy_background_video
+
+            def delayed_copy(source_path, target_path):
+                copy_started.set()
+                if not allow_copy.wait(10):
+                    raise TimeoutError("Test worker never received copy release")
+                return actual_copy(source_path, target_path)
+
+            with patch.object(StreamTab, "_copy_background_video", staticmethod(delayed_copy)), \\
+                    patch.object(QMessageBox, "information") as notices:
+                try:
+                    stream._apply_background_import(
+                        video_source, MEDIA_STORAGE_MANAGED, "timer",
+                    )
+                    deadline = time.monotonic() + 8
+                    while not copy_started.is_set() and time.monotonic() < deadline:
+                        QTest.qWait(20)
+                    assert copy_started.is_set(), "Managed MP4 copy never began"
+                    assert stream._background_copy_worker is not None
+                    assert stream.timer_background_combo.currentData() == asset.id
+                    stream._save_timer_overlay_settings()
+                    assert stream._timer_save_waiting_for_video_copy, (
+                        "First Save did not wait for the pending managed MP4"
+                    )
+                    assert db.get_setting("timer_overlay_background_media_id") == str(asset.id), (
+                        "First Save incorrectly persisted the old selected GIF"
+                    )
+                finally:
+                    allow_copy.set()
+                deadline = time.monotonic() + 10
+                while stream._background_copy_worker is not None and time.monotonic() < deadline:
+                    QTest.qWait(20)
+                app.processEvents()
+                assert stream._background_copy_worker is None, "MP4 worker stuck"
+                video_rows = db.media_assets_by_filename(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video_source.name,
+                )
+                assert len(video_rows) == 1 and video_rows[0].storage_mode == MEDIA_STORAGE_MANAGED
+                video_asset = video_rows[0]
+                assert stream.timer_background_combo.currentData() == video_asset.id
+                assert db.get_setting("timer_overlay_background_media_id") == str(video_asset.id), (
+                    "A single Save during copy did not apply the new MP4"
+                )
+                assert db.current_timer_payload()["presentation"]["background_media"]["url"] == (
+                    f"/media/{video_asset.id}"
+                )
+                assert notices.call_count == 1, "Deferred MP4 Save was not acknowledged once"
+                assert not stream._timer_save_waiting_for_video_copy
+                assert stream.timer_save_button.text() == "Сохранить виджет таймера"
+
+            # Return to the original GIF before the existing missing-source
+            # regression; this also proves the new asynchronous code doesn't
+            # prevent later manual selection and Save.
+            stream.timer_background_combo.setCurrentIndex(
+                stream.timer_background_combo.findData(asset.id)
+            )
+            with patch.object(QMessageBox, "information"):
+                stream._save_timer_overlay_settings()
+            assert db.get_setting("timer_overlay_background_media_id") == str(asset.id)
+
             source.unlink()
             stream._refresh_selected_background_availability()
             assert stream.timer_background_combo.findData(asset.id) < 0
