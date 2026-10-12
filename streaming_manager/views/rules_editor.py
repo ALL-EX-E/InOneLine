@@ -217,7 +217,9 @@ class AuctionRulesEditorDialog(QDialog):
         bottom.addWidget(self.dirty_label)
         bottom.addStretch()
         save_btn = QPushButton("Сохранить")
-        save_btn.clicked.connect(self._save_and_close)
+        # P11-F: saving must not close the composite Rules editor.
+        # Reuse the existing persistence/dirty-status path unchanged.
+        save_btn.clicked.connect(lambda _checked=False: self._save_current())
         close_btn = QPushButton("Закрыть")
         close_btn.clicked.connect(self.close)
         bottom.addWidget(save_btn)
@@ -536,10 +538,6 @@ class AuctionRulesEditorDialog(QDialog):
         if size > 0:
             with QSignalBlocker(self.size_spin):
                 self.size_spin.setValue(max(6, min(96, int(round(size)))))
-
-    def _save_and_close(self) -> None:
-        if self._save_current():
-            self.accept()
 
     def closeEvent(self, event) -> None:
         if self._confirm_discard_or_save():
