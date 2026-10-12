@@ -460,6 +460,66 @@ def assert_p11_rules_new_template_inactive(window) -> None:
     print("P11_E_RULES_NEW_INACTIVE_DRAFT_SAVE_AND_EXPLICIT_ACTIVATION=PASS")
 
 
+
+def assert_p11_rules_save_keeps_editor_open(window) -> None:
+    """P11-F: Save updates the selected Rules template without dismissing dialog."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11f_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        existing = db.get_active_rule_template()
+        template_id = int(existing["id"])
+        rules = AuctionRulesEditorDialog(db, window)
+        try:
+            save_buttons = [
+                item for item in rules.findChildren(QPushButton)
+                if item.text() == "Сохранить"
+            ]
+            if len(save_buttons) != 1:
+                raise AssertionError("P11-F Rules Save button missing or duplicated")
+            rules.show()
+            QApplication.processEvents()
+            if not rules.isVisible():
+                raise AssertionError("P11-F could not show Rules editor")
+            save_button = save_buttons[0]
+            for number in (1, 2):
+                saved_text = f"P11-F saved text {number}"
+                rules.editor.setPlainText(saved_text)
+                if not rules._is_dirty():
+                    raise AssertionError("P11-F expected dirty changes before Save")
+                save_button.click()
+                QApplication.processEvents()
+                if not rules.isVisible():
+                    raise AssertionError("P11-F Save unexpectedly closed Rules editor")
+                if rules._loaded_template_id != template_id:
+                    raise AssertionError("P11-F Save changed the selected template")
+                persisted = db.get_rule_template(template_id)
+                if persisted is None or saved_text not in persisted["content_html"]:
+                    raise AssertionError("P11-F Save did not persist text")
+                if rules._is_dirty() or rules.dirty_label.text() != "Сохранено":
+                    raise AssertionError("P11-F Save did not clear dirty state")
+
+            rules.editor.setPlainText("P11-F unsaved after saving")
+            if not rules._is_dirty():
+                raise AssertionError("P11-F expected unsaved changes")
+            with patch.object(
+                db, "save_rule_template", side_effect=ValueError("Test failure")
+            ), patch.object(QMessageBox, "critical") as error_dialog:
+                save_button.click()
+            if not rules.isVisible() or not rules._is_dirty() or error_dialog.call_count != 1:
+                raise AssertionError("P11-F failed Save closed dialog or lost dirty state")
+            if "P11-F saved text 2" not in db.get_rule_template(template_id)["content_html"]:
+                raise AssertionError("P11-F failed Save changed persisted content")
+            with patch.object(rules, "_confirm_discard_or_save", return_value=False) as guard:
+                rules.close()
+                QApplication.processEvents()
+            if not rules.isVisible() or guard.call_count != 1:
+                raise AssertionError("P11-F Close no longer honors existing dirty guard")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+    print("P11_F_RULES_SAVE_WITHOUT_CLOSE_DIRTY_GUARD=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1722,6 +1782,7 @@ def main() -> int:
         assert_p11_rules_obs_access_relocation(window)
         assert_p11_rules_active_template_visual_state(window)
         assert_p11_rules_new_template_inactive(window)
+        assert_p11_rules_save_keeps_editor_open(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
