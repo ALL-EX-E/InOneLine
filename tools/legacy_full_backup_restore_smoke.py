@@ -77,6 +77,22 @@ with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
     work = base / "legacy-work"
     work.mkdir()
     legacy_db = create_sqlite_backup(paths.database_path, work)
+    # This fixture represents a real legacy schema-19 backup, not a new
+    # schema-20 database with a deliberately mismatched manifest. Downgrade
+    # ONLY the isolated backup copy; leave the current live test DB intact.
+    with closing(sqlite3.connect(legacy_db)) as old, old:
+        old.execute(
+            "ALTER TABLE auction_rule_templates DROP COLUMN presentation_json"
+        )
+        old.execute(
+            "ALTER TABLE auction_sessions DROP COLUMN rules_presentation_json"
+        )
+        old.execute(
+            "DELETE FROM schema_migrations WHERE name='auction_rules_presentation_storage'"
+        )
+        old.execute(
+            "UPDATE schema_meta SET value='19' WHERE key='schema_version'"
+        )
     database_bytes = legacy_db.read_bytes()
 
     archive_path = base / "legacy_1_0_6.iolbackup"
