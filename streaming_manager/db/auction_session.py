@@ -319,9 +319,10 @@ class AuctionSessionMixin:
                     status, duration_seconds, remaining_seconds,
                     duration_ms, remaining_ms, deadline_at, updated_at,
                     rng_method, rng_ticket_id, wheel_duration_ms, wheel_format,
-                    rules_template_id, rules_template_name, rules_html
+                    rules_template_id, rules_template_name, rules_html,
+                    rules_presentation_json
                 )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     "Новый аукцион",
@@ -343,6 +344,7 @@ class AuctionSessionMixin:
                     rules_snapshot["template_id"],
                     rules_snapshot["template_name"],
                     rules_snapshot["content_html"],
+                    rules_snapshot["presentation_json"],
                 ),
             )
             auction_id = int(cursor.lastrowid)
