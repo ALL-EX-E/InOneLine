@@ -31,7 +31,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         db = Database(Path(tmp) / "rules_editor_k3.db")
         active = int(db.get_active_rule_template()["id"])
-        db.save_rule_template(active, "<p>Active K3</p>")
+        db.save_rule_template(active, "")
         db.set_settings_bulk({
             RULES_OVERLAY_AUTOSCROLL_KEY: "0",
             RULES_OVERLAY_BACKGROUND_KEY: "color",
@@ -42,7 +42,7 @@ def main() -> int:
         original_settings = db.get_settings()
         inactive = db.create_rule_template(
             "P11-K3 Другой шаблон",
-            content_html="<p>Inactive K3</p>",
+            content_html="",
             make_active=False,
         )
         url = "http://127.0.0.1:8765/rules-overlay"
