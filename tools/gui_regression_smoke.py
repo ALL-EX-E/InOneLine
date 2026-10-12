@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QFileDialog,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -408,6 +409,55 @@ def assert_p11_rules_active_template_visual_state(window) -> None:
     if window.db.list_rule_templates() != before:
         raise AssertionError("P11-D template visual test modified database")
     print("P11_D_RULES_ACTIVE_TEMPLATE_GREEN_SELECTOR=PASS")
+
+
+
+def assert_p11_rules_new_template_inactive(window) -> None:
+    """P11-E: Creating a Rules draft must not change the active/on-air Rules."""
+    # Use a clean independent DB: no test creates a template in user settings.
+    with tempfile.TemporaryDirectory(prefix="inone_p11e_") as temp_dir:
+        db = Database(Path(temp_dir) / "p11e_rules.db")
+        original = db.get_active_rule_template()
+        active_id = int(original["id"])
+        original_html = str(original["content_html"] or "")
+        dialog = AuctionRulesEditorDialog(db, window)
+        try:
+            with patch.object(
+                QInputDialog, "getText",
+                return_value=("P11-E неактивный шаблон", True),
+            ) as prompt:
+                dialog._create_template()
+            prompt.assert_called_once()
+            templates = db.list_rule_templates()
+            active = [row for row in templates if row["is_active"]]
+            created = next(
+                (row for row in templates if row["name"] == "P11-E неактивный шаблон"),
+                None,
+            )
+            if (len(templates) != 2 or len(active) != 1
+                    or int(active[0]["id"]) != active_id
+                    or created is None or int(created["is_active"]) != 0):
+                raise AssertionError("P11-E creation modified active template")
+            if (dialog.template_combo.currentData() != created["id"]
+                    or dialog.template_combo.property("ruleTemplateActive") is not False
+                    or dialog.activate_template_btn.isHidden()):
+                raise AssertionError("P11-E new draft not selected as inactive")
+            dialog.editor.setPlainText("P11-E saved draft text")
+            if not dialog._save_current():
+                raise AssertionError("P11-E saving inactive template failed")
+            if (db.get_active_rule_template()["id"] != active_id
+                    or db.get_active_rule_template()["content_html"] != original_html):
+                raise AssertionError("P11-E inactive draft changed active rules")
+            saved = db.get_rule_template(int(created["id"]))
+            if saved is None or "P11-E saved draft text" not in saved["content_html"]:
+                raise AssertionError("P11-E saved inactive content missing")
+            dialog._make_active()
+            if (db.get_active_rule_template()["id"] != created["id"]
+                    or not dialog.activate_template_btn.isHidden()):
+                raise AssertionError("P11-E explicit activation no longer works")
+        finally:
+            dialog.deleteLater()
+    print("P11_E_RULES_NEW_INACTIVE_DRAFT_SAVE_AND_EXPLICIT_ACTIVATION=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
@@ -1671,6 +1721,7 @@ def main() -> int:
         assert_p11_rules_format_toolbar_cleanup(window)
         assert_p11_rules_obs_access_relocation(window)
         assert_p11_rules_active_template_visual_state(window)
+        assert_p11_rules_new_template_inactive(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save

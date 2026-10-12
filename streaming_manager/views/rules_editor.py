@@ -358,7 +358,7 @@ class AuctionRulesEditorDialog(QDialog):
         if not ok:
             return
         try:
-            template_id = self.db.create_rule_template(name, make_active=True)
+            template_id = self.db.create_rule_template(name, make_active=False)
         except Exception as exc:
             QMessageBox.warning(self, "Шаблоны правил", str(exc))
             return
