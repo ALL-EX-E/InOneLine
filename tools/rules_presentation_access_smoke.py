@@ -13,6 +13,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from streaming_manager.constants import (
+    STATUS_PLAYED,
+    STATUS_NOT_PLAYED,
     RULES_OVERLAY_AUTOSCROLL_KEY,
     RULES_OVERLAY_BACKGROUND_KEY,
     RULES_OVERLAY_BACKGROUND_COLOR_KEY,
@@ -20,7 +22,6 @@ from streaming_manager.constants import (
     RULES_OVERLAY_PADDING_KEY,
 )
 from streaming_manager.database import Database, Game
-from streaming_manager.db.common import STATUS_PLAYED, STATUS_NOT_PLAYED
 
 
 def main() -> int:
