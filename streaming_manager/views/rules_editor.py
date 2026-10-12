@@ -63,6 +63,8 @@ class AuctionRulesEditorDialog(QDialog):
         self._loaded_template_id: int | None = None
         self._loaded_html = ""
         self._loading = False
+        # New templates created in this editor can be saved directly once.
+        self._new_template_ids: set[int] = set()
         self.setWindowTitle("Правила аукциона")
         self.resize(1050, 760)
         self.setMinimumSize(760, 560)
@@ -219,7 +221,7 @@ class AuctionRulesEditorDialog(QDialog):
         save_btn = QPushButton("Сохранить")
         # P11-F: saving must not close the composite Rules editor.
         # Reuse the existing persistence/dirty-status path unchanged.
-        save_btn.clicked.connect(lambda _checked=False: self._save_current())
+        save_btn.clicked.connect(lambda _checked=False: self._save_with_choice())
         close_btn = QPushButton("Закрыть")
         close_btn.clicked.connect(self.close)
         bottom.addWidget(save_btn)
@@ -331,8 +333,60 @@ class AuctionRulesEditorDialog(QDialog):
         except Exception as exc:
             QMessageBox.critical(self, "Правила аукциона", str(exc))
             return False
+        self._new_template_ids.discard(self._loaded_template_id)
         self._loaded_html = html
         self._update_status()
+        return True
+
+    def _choose_save_action(self) -> str:
+        """Prompt only for explicitly saving edits to an existing template."""
+        box = QMessageBox(self)
+        box.setWindowTitle("Сохранение шаблона правил")
+        box.setText("Как сохранить изменения в шаблоне правил?")
+        replace_btn = box.addButton("Заменить текущий", QMessageBox.AcceptRole)
+        new_btn = box.addButton("Сохранить как новый", QMessageBox.ActionRole)
+        cancel_btn = box.addButton("Отмена", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is replace_btn:
+            return "replace"
+        if clicked is new_btn:
+            return "new"
+        return "cancel"
+
+    def _save_with_choice(self) -> bool:
+        """P11-G: reuse existing DB save/create paths; no second persistence."""
+        if (self._loaded_template_id is None or not self._is_dirty()
+                or self._loaded_template_id in self._new_template_ids):
+            return self._save_current()
+
+        action = self._choose_save_action()
+        if action == "replace":
+            return self._save_current()
+        if action != "new":
+            return False
+
+        template = self.db.get_rule_template(self._loaded_template_id)
+        if template is None:
+            QMessageBox.warning(self, "Шаблоны правил", "Шаблон правил не найден.")
+            return False
+        name, ok = QInputDialog.getText(
+            self, "Сохранить как новый", "Название нового шаблона:",
+            text=f"{template['name']} (копия)",
+        )
+        if not ok:
+            return False
+        html = self.editor.toHtml() if self.editor.toPlainText().strip() else ""
+        try:
+            new_id = self.db.create_rule_template(
+                name, content_html=html, make_active=False
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Шаблоны правил", str(exc))
+            return False
+        # Source template and active/on-air Rules remain unchanged.
+        self._reload_templates(selected_id=new_id)
         return True
 
     def _confirm_discard_or_save(self) -> bool:
@@ -364,6 +418,7 @@ class AuctionRulesEditorDialog(QDialog):
         except Exception as exc:
             QMessageBox.warning(self, "Шаблоны правил", str(exc))
             return
+        self._new_template_ids.add(template_id)
         self._reload_templates(selected_id=template_id)
 
     def _rename_template(self) -> None:

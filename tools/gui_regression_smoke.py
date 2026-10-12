@@ -485,7 +485,8 @@ def assert_p11_rules_save_keeps_editor_open(window) -> None:
                 rules.editor.setPlainText(saved_text)
                 if not rules._is_dirty():
                     raise AssertionError("P11-F expected dirty changes before Save")
-                save_button.click()
+                with patch.object(rules, "_choose_save_action", return_value="replace"):
+                    save_button.click()
                 QApplication.processEvents()
                 if not rules.isVisible():
                     raise AssertionError("P11-F Save unexpectedly closed Rules editor")
@@ -502,7 +503,9 @@ def assert_p11_rules_save_keeps_editor_open(window) -> None:
                 raise AssertionError("P11-F expected unsaved changes")
             with patch.object(
                 db, "save_rule_template", side_effect=ValueError("Test failure")
-            ), patch.object(QMessageBox, "critical") as error_dialog:
+            ), patch.object(QMessageBox, "critical") as error_dialog, patch.object(
+                rules, "_choose_save_action", return_value="replace"
+            ):
                 save_button.click()
             if not rules.isVisible() or not rules._is_dirty() or error_dialog.call_count != 1:
                 raise AssertionError("P11-F failed Save closed dialog or lost dirty state")
@@ -518,6 +521,89 @@ def assert_p11_rules_save_keeps_editor_open(window) -> None:
                 rules.close()
             rules.deleteLater()
     print("P11_F_RULES_SAVE_WITHOUT_CLOSE_DIRTY_GUARD=PASS")
+
+
+def assert_p11_rules_save_choice(window) -> None:
+    """P11-G: explicit Replace/Save-as/Cancel, independent draft save."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11g_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        active = db.get_active_rule_template()
+        original_id = int(active["id"])
+        rules = AuctionRulesEditorDialog(db, window)
+        try:
+            buttons = [
+                item for item in rules.findChildren(QPushButton)
+                if item.text() == "Сохранить"
+            ]
+            if len(buttons) != 1:
+                raise AssertionError("P11-G expected exactly one Rules Save button")
+            save = buttons[0]
+            rules.show()
+            QApplication.processEvents()
+
+            rules.editor.setPlainText("P11-G replace current")
+            with patch.object(rules, "_choose_save_action", return_value="replace") as choice:
+                save.click()
+            choice.assert_called_once()
+            original_saved = db.get_rule_template(original_id)
+            if ("P11-G replace current" not in original_saved["content_html"]
+                    or rules._is_dirty() or not rules.isVisible()):
+                raise AssertionError("P11-G Replace did not persist in place")
+
+            rules.editor.setPlainText("P11-G copy variant")
+            with patch.object(rules, "_choose_save_action", return_value="new"), patch.object(
+                QInputDialog, "getText", return_value=("P11-G копия", True)
+            ) as name:
+                save.click()
+            name.assert_called_once()
+            templates = db.list_rule_templates()
+            copied = next((row for row in templates if row["name"] == "P11-G копия"), None)
+            if (copied is None or len(templates) != 2
+                    or copied["is_active"] or rules._loaded_template_id != copied["id"]
+                    or "P11-G copy variant" not in copied["content_html"]
+                    or "P11-G replace current" not in db.get_rule_template(original_id)["content_html"]
+                    or db.get_active_rule_template()["id"] != original_id
+                    or rules._is_dirty() or not rules.isVisible()):
+                raise AssertionError("P11-G Save-as copied or activated the wrong template")
+
+            rules.editor.setPlainText("P11-G cancelled unsaved")
+            with patch.object(rules, "_choose_save_action", return_value="cancel"):
+                save.click()
+            if (not rules._is_dirty()
+                    or "P11-G copy variant" not in db.get_rule_template(int(copied["id"]))["content_html"]
+                    or len(db.list_rule_templates()) != 2):
+                raise AssertionError("P11-G Cancel persisted or discarded edits")
+
+            with patch.object(rules, "_choose_save_action", return_value="new"), patch.object(
+                QInputDialog, "getText", return_value=("P11-G копия", True)
+            ), patch.object(QMessageBox, "warning") as duplicate_warning:
+                save.click()
+            if (duplicate_warning.call_count != 1 or not rules._is_dirty()
+                    or len(db.list_rule_templates()) != 2):
+                raise AssertionError("P11-G duplicate failed to preserve unsaved edits")
+
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True), patch.object(
+                QInputDialog, "getText", return_value=("P11-G новый", True)
+            ):
+                rules._create_template()
+            fresh_id = int(rules._loaded_template_id)
+            if db.get_rule_template(fresh_id)["is_active"]:
+                raise AssertionError("P11-G new draft incorrectly active")
+            rules.editor.setPlainText("P11-G first save")
+            with patch.object(
+                rules, "_choose_save_action",
+                side_effect=AssertionError("New unsaved draft must save directly")
+            ):
+                save.click()
+            if (rules._is_dirty() or fresh_id in rules._new_template_ids
+                    or "P11-G first save" not in db.get_rule_template(fresh_id)["content_html"]
+                    or db.get_active_rule_template()["id"] != original_id):
+                raise AssertionError("P11-G new draft did not use direct first Save")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+    print("P11_G_RULES_EXPLICIT_SAVE_CHOICE_AND_INACTIVE_CLONE=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
@@ -1783,6 +1869,7 @@ def main() -> int:
         assert_p11_rules_active_template_visual_state(window)
         assert_p11_rules_new_template_inactive(window)
         assert_p11_rules_save_keeps_editor_open(window)
+        assert_p11_rules_save_choice(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
