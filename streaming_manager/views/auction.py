@@ -421,7 +421,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         setup.setHorizontalSpacing(8)
         setup.setVerticalSpacing(8)
 
-        setup.addWidget(QLabel("Способ определения победителя:"), 0, 0)
+        # Responsive Conduct method form: keep full method label and selector
+        # together and move auxiliary actions off the already crowded row.
+        # Do not shrink/overlay controls when MainWindow is at minimum width.
+        self.method_selector_label = QLabel("Способ определения победителя:")
+        self.method_selector_label.setMinimumWidth(
+            self.method_selector_label.sizeHint().width()
+        )
+        setup.addWidget(self.method_selector_label, 0, 0)
         self.mode_combo = ScrollSafeComboBox()
         self.mode_combo.addItem("Максимальная сумма", "max_amount")
         self.mode_combo.addItem("Взвешенное колесо", "weighted_wheel")
@@ -429,28 +436,28 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         setup.addWidget(self.mode_combo, 0, 1)
 
         self.rng_selector_label = QLabel("Генератор:")
-        setup.addWidget(self.rng_selector_label, 0, 2)
+        setup.addWidget(self.rng_selector_label, 1, 0)
         self.rng_combo = ScrollSafeComboBox()
         self.rng_combo.addItem("Стандартный (локальный)", "local")
         self.rng_combo.addItem("Random.org", "random_org")
         self.rng_combo.addItem("Random.org+", "random_org_plus")
         self.rng_combo.setMinimumWidth(170)
-        setup.addWidget(self.rng_combo, 0, 3)
+        setup.addWidget(self.rng_combo, 1, 1)
 
         self.rng_methods_btn = QPushButton("О методах")
         self.rng_methods_btn.clicked.connect(self.show_rng_methods)
-        setup.addWidget(self.rng_methods_btn, 0, 4)
+        setup.addWidget(self.rng_methods_btn, 3, 0)
 
         self.verification_data_btn = QPushButton("Данные проверки")
         self.verification_data_btn.setToolTip(
             "Предварительный read-only состав и математические диапазоны будущего вращения"
         )
         self.verification_data_btn.clicked.connect(self.show_pre_spin_verification)
-        setup.addWidget(self.verification_data_btn, 0, 5)
-        setup.setColumnStretch(6, 1)
+        setup.addWidget(self.verification_data_btn, 3, 1)
+        setup.setColumnStretch(2, 1)
 
         self.wheel_format_label = QLabel("Формат колеса:")
-        setup.addWidget(self.wheel_format_label, 1, 0)
+        setup.addWidget(self.wheel_format_label, 2, 0)
         self.wheel_format_combo = ScrollSafeComboBox()
         self.wheel_format_combo.addItem(
             "Обычное",
@@ -472,7 +479,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.wheel_format_combo.currentIndexChanged.connect(
             self._handle_wheel_format_changed
         )
-        setup.addWidget(self.wheel_format_combo, 1, 1)
+        setup.addWidget(self.wheel_format_combo, 2, 1)
 
         conduct_layout.addWidget(self.setup_widget)
 
