@@ -1035,3 +1035,8 @@ User-approved permanent workflow rule (2026-10-11): **Use regular ChatGPT as the
 - Exactly accepted source/test Git blobs: streaming_manager/views/rules_editor.py 8fa790e0db60138640dc78f277f5c4c128853cb3; tools/gui_regression_smoke.py ca22851b165810dce24c64d4f8859cd75600cc15. The Rules editor calls existing DB create method with make_active=False, maintaining active Rules and session snapshots, while new template can be edited/saved and explicitly activated. No DB schema, OBS/audio, Save/Close or version change.
 - Clean promotion includes only these two exact blobs and three canonical docs, requiring fresh native Windows and wording CI, plus exact 2/2 Git blob readback on main; close old draft #113 without merging. Next P11-F is Save rules without closing the editor, leveraging existing _save_current without duplicating storage.
 
+## P11-E verified closure and P11-F QA — 2026-10-12
+
+- Accepted P11-E was promoted via [PR #115](https://github.com/ALL-EX-E/InOneLine/pull/115), merged as `a9de5694269cb34ce7537f4c52bed3e14567ec05`. Fresh Windows [38211201717](https://github.com/ALL-EX-E/InOneLine/actions/runs/38211201717) and wording 38211201786 SUCCESS; exact accepted source/test blob identities 2/2 VERIFIED on main. Draft PR #113 CLOSED UNMERGED. P11-E DONE.
+- Next isolated P11-F [draft PR #116](https://github.com/ALL-EX-E/InOneLine/pull/116) saves Rules without closing; full Windows [38211698235](https://github.com/ALL-EX-E/InOneLine/actions/runs/38211698235), wording 38211698257 SUCCESS. [QA ZIP](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view?usp=drivesdk) validated, checksum 7658eb2306ad35c277f3dcbe8122ac0bdff64b57fd2cfa9d9235904f10b3bd60. **Manual user acceptance pending; no merge**.
+
