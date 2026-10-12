@@ -316,8 +316,10 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
                 or opened.call_args.args[0].toString()
                 != expected + "?preview=1"):
             raise AssertionError("P11-B Rules editor preview lost exact OBS route")
-        if not hasattr(auction, "auction_rules_preview_btn"):
-            raise AssertionError("P11-B unexpectedly removed separate old text preview")
+        if hasattr(auction, "auction_rules_preview_btn"):
+            raise AssertionError("P11-C obsolete Auction text-only preview button remains")
+        if hasattr(auction, "show_auction_rules_preview"):
+            raise AssertionError("P11-C dead Auction text-only preview handler remains")
 
         # FIX1: real Qt geometry, not just child existence. On the smallest
         # supported Rules window the selector must be above all action buttons;

@@ -528,36 +528,3 @@ class AuctionRulesEditorDialog(QDialog):
             event.accept()
         else:
             event.ignore()
-
-
-class AuctionRulesPreviewDialog(QDialog):
-    def __init__(
-        self,
-        *,
-        title: str,
-        template_name: str,
-        content_html: str,
-        parent: QWidget | None = None,
-    ):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.resize(800, 620)
-        self.setMinimumSize(520, 360)
-        layout = QVBoxLayout(self)
-        heading = QLabel(f"Шаблон: {template_name or '—'}")
-        heading.setProperty("badge", True)
-        layout.addWidget(heading)
-        viewer = QTextEdit()
-        viewer.setReadOnly(True)
-        viewer.setAcceptRichText(True)
-        if content_html:
-            viewer.setHtml(content_html)
-        else:
-            viewer.setPlainText("Правила не заполнены.")
-        layout.addWidget(viewer, 1)
-        close_btn = QPushButton("Закрыть")
-        close_btn.clicked.connect(self.accept)
-        row = QHBoxLayout()
-        row.addStretch()
-        row.addWidget(close_btn)
-        layout.addLayout(row)
