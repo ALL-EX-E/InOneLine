@@ -98,6 +98,7 @@ def main() -> int:
         assert db.get_auction_rules_presentation_snapshot(auction_id)["padding"] == 17
         # Saving live source style mirrors the current session.
         db.save_rule_template_presentation(a, style_a2)
+        db.save_rule_template_presentation(a, style_a2)  # idempotent Save: no extra audit
         assert db.get_auction_rules_presentation_snapshot(auction_id)["padding"] == 53
         db.set_active_rule_template(b)
         assert db.get_auction_rules_presentation_snapshot(auction_id)["padding"] == 81
