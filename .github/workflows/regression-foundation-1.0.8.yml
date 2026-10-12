@@ -107,7 +107,7 @@ jobs:
           from streaming_manager.database import Database
 
           assert APP_VERSION == "1.0.8"
-          assert SCHEMA_VERSION == 19
+          assert SCHEMA_VERSION == 20
           with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
               Database(path)
@@ -115,10 +115,15 @@ jobs:
                   assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
                   assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
                   assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-                  assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 19
-                  assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 15
+                  assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 20
+                  assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 16
           print("FRESH_DB_1_0_8=PASS")
           '@ | python -
+
+      - name: P11-K Rules presentation schema-19 upgrade compatibility
+        shell: pwsh
+        run: |
+          python tools/rules_presentation_schema_smoke.py
 
       - name: Native GUI regression core
         shell: pwsh
