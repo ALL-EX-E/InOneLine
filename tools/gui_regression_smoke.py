@@ -839,6 +839,76 @@ def assert_p11_rules_live_switch_updates_session_and_obs(window) -> None:
     print("P11_I_FIX1_RULES_LIVE_SWITCH_AUCTION_OBS_NOTICE=PASS")
 
 
+def assert_auction_conduct_compact_method_layout(window) -> None:
+    """UI-MINWIDTH-001: method text and actions never overlap in Conduct."""
+    auction = window.auction_tab
+    old_outer_tab = window.tabs.currentWidget()
+    old_inner_tab = auction.auction_tabs.currentWidget()
+    old_size = window.size()
+    previous_mode = auction.mode_combo.currentData()
+    previous_rng = auction.rng_combo.currentData()
+    previous_format = auction.wheel_format_combo.currentData()
+    try:
+        # MainWindow tabs host scroll areas, not the raw AuctionTab itself.
+        window.tabs.setCurrentWidget(window._main_tab_scroll_by_page[auction])
+        auction.auction_tabs.setCurrentWidget(auction.conduct_page)
+        QApplication.processEvents()
+
+        method = auction.method_selector_label
+        controls = (
+            method, auction.mode_combo, auction.rng_methods_btn,
+            auction.verification_data_btn,
+        )
+        if method.text() != "Способ определения победителя:":
+            raise AssertionError("Conduct method label wording changed")
+        layout = auction.setup_widget.layout()
+        if layout is None or layout.columnCount() != 3:
+            raise AssertionError("Conduct method setup is not a compact two-column form")
+
+        for width, height in ((520, 700), (1100, 800), (520, 700)):
+            window.resize(width, height)
+            QApplication.processEvents()
+            QTest.qWait(60)
+            QApplication.processEvents()
+            if method.width() < method.fontMetrics().horizontalAdvance(method.text()):
+                raise AssertionError(
+                    f"Conduct method label clipped at {width}px: "
+                    f"{method.width()} versus text width "
+                    f"{method.fontMetrics().horizontalAdvance(method.text())}"
+                )
+            if auction.mode_combo.width() < 180:
+                raise AssertionError("Conduct method selector shrank below supported width")
+
+            rects = [
+                (w, w.geometry()) for w in controls if not w.isHidden()
+            ]
+            for i, (left_widget, left_rect) in enumerate(rects):
+                for right_widget, right_rect in rects[i + 1:]:
+                    if left_rect.intersects(right_rect):
+                        raise AssertionError(
+                            "Conduct controls overlapped at "
+                            f"{width}px: {left_widget.objectName() or left_widget.__class__.__name__} "
+                            f"and {right_widget.text() if isinstance(right_widget, QPushButton) else right_widget.__class__.__name__}"
+                        )
+            if (auction.mode_combo.currentData() != previous_mode
+                    or auction.rng_combo.currentData() != previous_rng
+                    or auction.wheel_format_combo.currentData() != previous_format):
+                raise AssertionError("Conduct resize changed selected auction method")
+
+        for label, combo in (
+            (auction.rng_selector_label, auction.rng_combo),
+            (auction.wheel_format_label, auction.wheel_format_combo),
+        ):
+            if label.isHidden() != combo.isHidden():
+                raise AssertionError("Conduct method auxiliary label/control visibility diverged")
+    finally:
+        window.resize(old_size)
+        auction.auction_tabs.setCurrentWidget(old_inner_tab)
+        window.tabs.setCurrentWidget(old_outer_tab)
+        QApplication.processEvents()
+    print("AUCTION_CONDUCT_MINWIDTH_METHOD_LABEL_BUTTONS_NO_OVERLAP=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -2106,6 +2176,7 @@ def main() -> int:
         assert_p11_rules_dirty_activation_guard(window)
         assert_p11_rules_current_auction_notice(window)
         assert_p11_rules_live_switch_updates_session_and_obs(window)
+        assert_auction_conduct_compact_method_layout(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
