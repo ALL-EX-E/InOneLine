@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -110,17 +111,34 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_session_notice_label.hide()
         root.addWidget(self.rules_session_notice_label)
 
+        # P11-J / UI-060: one template selector and shared Save/Activate
+        # remain outside the editor sections. This is a pure layout split:
+        # the same QTextEdit remains the only editable rules text.
+        self.rules_editor_sections = QTabWidget()
+        self.rules_text_page = QWidget()
+        text_layout = QVBoxLayout(self.rules_text_page)
+        text_layout.setContentsMargins(0, 8, 0, 0)
+        text_layout.setSpacing(8)
+        self.rules_obs_page = QWidget()
+        obs_layout = QVBoxLayout(self.rules_obs_page)
+        obs_layout.setContentsMargins(0, 8, 0, 0)
+        obs_layout.setSpacing(8)
+        self.rules_editor_sections.addTab(self.rules_text_page, "Текст правил")
+        self.rules_editor_sections.addTab(self.rules_obs_page, "Оформление OBS")
+        root.addWidget(self.rules_editor_sections, 1)
+
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
         if rules_overlay_url is not None:
-            rules_access = QHBoxLayout()
-            rules_access.addWidget(QLabel("URL виджета правил:"))
+            obs_layout.addWidget(QLabel("URL виджета правил:"))
             self.rules_overlay_url_label = QLabel(str(rules_overlay_url()))
+            self.rules_overlay_url_label.setWordWrap(True)
             self.rules_overlay_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
             self.rules_overlay_url_label.setSizePolicy(
                 QSizePolicy.Ignored, QSizePolicy.Preferred
             )
-            rules_access.addWidget(self.rules_overlay_url_label, 1)
+            obs_layout.addWidget(self.rules_overlay_url_label)
+            rules_access = QHBoxLayout()
 
             self.copy_rules_url_btn = QPushButton("Копировать URL")
             self.copy_rules_url_btn.clicked.connect(
@@ -137,7 +155,8 @@ class AuctionRulesEditorDialog(QDialog):
                 )
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
-            root.addLayout(rules_access)
+            obs_layout.addLayout(rules_access)
+        obs_layout.addStretch(1)
 
         tools1 = QHBoxLayout()
         self.style_combo = ScrollSafeComboBox()
@@ -180,7 +199,7 @@ class AuctionRulesEditorDialog(QDialog):
         tools1.addWidget(self.italic_btn)
         tools1.addWidget(self.underline_btn)
         tools1.addStretch()
-        root.addLayout(tools1)
+        text_layout.addLayout(tools1)
 
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
@@ -212,14 +231,14 @@ class AuctionRulesEditorDialog(QDialog):
         tools2.addWidget(bullet_btn)
         tools2.addWidget(number_btn)
         tools2.addStretch()
-        root.addLayout(tools2)
+        text_layout.addLayout(tools2)
 
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
         self.editor.setPlaceholderText("Введите правила аукциона…")
         self.editor.textChanged.connect(self._editor_changed)
         self.editor.cursorPositionChanged.connect(self._sync_format_controls)
-        root.addWidget(self.editor, 1)
+        text_layout.addWidget(self.editor, 1)
 
         bottom = QHBoxLayout()
         self.dirty_label = QLabel()
