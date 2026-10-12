@@ -4125,3 +4125,8 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - User 06:07:44 UTC: «Всё работает. Идём дальше.» Final manual acceptance of [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), head ccff76a175b838fda4b30b03637d8269942dd2ea. Native Windows 38208259058 and wording 38208259062 PASS; [verified Drive ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk), SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
 - Exact two accepted blobs rules_editor.py 8fa790e0db60138640dc78f277f5c4c128853cb3 and gui_regression_smoke.py ca22851b165810dce24c64d4f8859cd75600cc15. Existing create API now receives make_active=False; explicit activation untouched. Pending clean-promotion CI/merge/blob identity and closure of old draft. Next P11-F update Save button to persist without closing, leaving existing dirty guard and template state intact.
 
+## P11-E accepted and verified; P11-F awaiting manual QA — 2026-10-12
+
+- Accepted P11-E main PR #115 SHA a9de5694269cb34ce7537f4c52bed3e14567ec05, fresh native Windows 38211201717 and publication wording 38211201786 PASS, exact postmerge 2/2 accepted source/test Git blobs reread and verified; obsolete draft PR #113 closed unmerged. P11-E COMPLETE.
+- P11-F [draft PR #116](https://github.com/ALL-EX-E/InOneLine/pull/116) changes Save to persist Rules text while keeping dialog open using existing _save_current; Close dirty guard retained. Native Windows 38211698235 PASS and wording 38211698257 PASS, [verified QA ZIP](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view?usp=drivesdk) 46,786,164 bytes sha256 7658eb2306ad35c277f3dcbe8122ac0bdff64b57fd2cfa9d9235904f10b3bd60. **Await manual user PASS before promotion.**
+

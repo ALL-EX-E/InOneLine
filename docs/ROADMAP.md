@@ -657,3 +657,8 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P11-E creates inactive Rules template via existing create_rule_template(make_active=False), preserves previously active template and on-air settings. Exact two runtime/test blobs to promote cleanly with 3 canonical docs; fresh Windows gate and postmerge identity required. P11 overall IN PROGRESS.
 - Next separate P11-F: Save current Rules text without closing editor; reuse existing _save_current, keep Close/dirty guard and activation as before. Test save/reedit/save and correct current active/inactive template persistence. Composite editor/OBS appearance later.
 
+## P11-E CLOSED; P11-F Windows QA ready — 2026-10-12
+
+- P11-E exact accepted source/test merged via PR #115 as a9de5694269cb34ce7537f4c52bed3e14567ec05. Promotion Windows 38211201717 and wording 38211201786 PASS; source/test Git blob readback 2/2 identical, old draft #113 closed without merge. P11-E DONE.
+- P11-F separate draft PR #116: existing Rules Save persists without closing editor, Close dirty guard unchanged. Full native Windows 38211698235 and wording 38211698257 PASS; verified QA ZIP on [Drive](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view?usp=drivesdk). This candidate remains UNACCEPTED pending user manual QA. No other P11 work merges until this gate.
+
