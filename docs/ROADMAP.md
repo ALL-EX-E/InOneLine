@@ -628,3 +628,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P11-B scope is UI relocation of existing Rules URL and OBS preview to editor plus fixing template-selector overlap with unchanged template operations; three accepted exact source/test blobs on clean latest main, version/schema/audio rules unchanged. P11 overall IN PROGRESS.
 - Next isolated P11-C candidate: inspect and remove approved redundant Auction Show Rules button, preserve original session/preview semantics for real Rules overlay and existing editor; avoid unreviewed changes to template activation, composite appearance or storage. New Windows/manual gate for that separate change.
 
+## P11-C — user accepted; clean promotion before P11-D — 2026-10-12
+
+- User 2026-10-12 05:03:36 UTC: «Всё работает. Идём дальше.» Accepted exact candidate 143f3429e4f5234fa2ee9dd2f1ec72f90fae8f5f (draft PR #108); native Windows 38205668098 PASS, wording 38205668019 PASS; QA ZIP SHA256 51db4676f11f56760c969c12464c964acef74a6880b7afdaf2bd2d70c9ae465c.
+- P11-C removes duplicate Show Rules button and orphan read-only popup, preserving Rules editable text, templates, existing OBS Browser Source and session snapshots. Exact three accepted blobs plus three canonical docs; clean promotion and postmerge gates apply before closing P11-C. P11 overall still in progress.
+- Next P11-D incremental composite editor design: inspect current Rules source/store, current renderer and approved overlay layout. Do not introduce duplicate template/persistence machinery or change on-air auction state as part of an unreviewed refactor. Continue with an isolated small Windows-testable step.
+
