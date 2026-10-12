@@ -270,17 +270,55 @@ class RulesMixin:
             )
 
     def set_active_rule_template(self, template_id: int) -> None:
+        """Activate Rules and switch the current local auction in one transaction."""
+        template_id = int(template_id)
         with self.connect() as conn:
             row = conn.execute(
-                "SELECT id FROM auction_rule_templates WHERE id=?",
-                (int(template_id),),
+                "SELECT id, name, content_html FROM auction_rule_templates WHERE id=?",
+                (template_id,),
             ).fetchone()
             if row is None:
                 raise ValueError("Шаблон правил не найден.")
             conn.execute("UPDATE auction_rule_templates SET is_active=0")
             conn.execute(
                 "UPDATE auction_rule_templates SET is_active=1 WHERE id=?",
-                (int(template_id),),
+                (template_id,),
+            )
+
+            # An open auction reads its own Rules snapshot in /rules-overlay.
+            # Switching the global active template alone left that snapshot
+            # pointing at the pre-auction template. Reuse the authoritative
+            # session instead of introducing a second live-Rules override.
+            session = self._get_open_auction_session_conn(conn)
+            if session is None:
+                return
+            before = {
+                "rules_template_id": session.get("rules_template_id"),
+                "rules_template_name": str(session.get("rules_template_name") or ""),
+                "rules_html": str(session.get("rules_html") or ""),
+            }
+            after = {
+                "rules_template_id": template_id,
+                "rules_template_name": str(row["name"]),
+                "rules_html": str(row["content_html"] or ""),
+            }
+            if before == after:
+                return
+            conn.execute(
+                """
+                UPDATE auction_sessions
+                SET rules_template_id=?, rules_template_name=?,
+                    rules_html=?, updated_at=?
+                WHERE id=?
+                """,
+                (
+                    after["rules_template_id"], after["rules_template_name"],
+                    after["rules_html"], utc_now(), int(session["id"]),
+                ),
+            )
+            self._log_conn(
+                conn, "auction_session", int(session["id"]),
+                "switch_rules_template", before, after,
             )
 
     def delete_rule_template(self, template_id: int) -> int:

@@ -102,6 +102,14 @@ class AuctionRulesEditorDialog(QDialog):
             template_actions_row.addWidget(button)
         root.addLayout(template_actions_row)
 
+        # UI-060 / P11-I: surface the existing session-to-template relationship
+        # before the user changes any rules. No new session state or settings.
+        self.rules_session_notice_label = QLabel()
+        self.rules_session_notice_label.setWordWrap(True)
+        self.rules_session_notice_label.setStyleSheet("font-weight: 600;")
+        self.rules_session_notice_label.hide()
+        root.addWidget(self.rules_session_notice_label)
+
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
         if rules_overlay_url is not None:
@@ -292,7 +300,34 @@ class AuctionRulesEditorDialog(QDialog):
         finally:
             self._loading = False
         self._update_status()
+        self._update_rules_session_notice()
         self._sync_format_controls()
+
+    def _update_rules_session_notice(self) -> None:
+        """Read current auction ownership only on template selection/reload.
+
+        This intentionally does not poll SQLite on each QTextEdit keystroke.
+        A source-template Save already mirrors into matching open local
+        sessions through the existing Database API.
+        """
+        session = self.db.get_open_auction_session()
+        source_id = session.get("rules_template_id") if session else None
+        if session is None:
+            self.rules_session_notice_label.clear()
+            self.rules_session_notice_label.hide()
+            return
+        if source_id is not None and int(source_id) == self._loaded_template_id:
+            self.rules_session_notice_label.setText(
+                "Этот шаблон используется текущим аукционом. "
+                "После сохранения изменения обновят правила текущего аукциона "
+                "и виджет правил, если он показан в OBS."
+            )
+        else:
+            self.rules_session_notice_label.setText(
+                "Текущий аукцион использует другой шаблон. "
+                "Сохранение здесь не изменит правила текущего аукциона."
+            )
+        self.rules_session_notice_label.show()
 
     def _is_dirty(self) -> bool:
         if self._loaded_template_id is None:

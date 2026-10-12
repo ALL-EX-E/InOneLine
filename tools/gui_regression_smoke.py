@@ -686,6 +686,159 @@ def assert_p11_rules_dirty_activation_guard(window) -> None:
     print("P11_H_RULES_ACTIVATE_DIRTY_GUARD_CANCEL_SAVE_FAILURE=PASS")
 
 
+def assert_p11_rules_current_auction_notice(window) -> None:
+    """P11-I: session-bound Rules source clearly marked, without extra writes."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11i_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        current_id = int(db.get_active_rule_template()["id"])
+        other_id = db.create_rule_template("P11-I другой шаблон", make_active=False)
+        originals = db.list_rule_templates()
+        rules = AuctionRulesEditorDialog(db, window)
+        try:
+            rules.show()
+            QApplication.processEvents()
+            notice = rules.rules_session_notice_label
+            with patch.object(db, "get_open_auction_session", return_value=None) as query:
+                rules._load_template(current_id)
+                if not notice.isHidden() or notice.text():
+                    raise AssertionError("P11-I no-auction notice must be hidden")
+                query.assert_called_once()
+
+            with patch.object(
+                db, "get_open_auction_session",
+                return_value={"id": 42, "rules_template_id": current_id, "status": "running"},
+            ) as query:
+                rules._load_template(current_id)
+                if (not notice.isVisible()
+                        or "используется текущим аукционом" not in notice.text()
+                        or "После сохранения" not in notice.text()):
+                    raise AssertionError("P11-I live source template not clearly marked")
+                query.assert_called_once()
+                # Typing must not introduce a new DB read on every keystroke.
+                rules.editor.setPlainText("P11-I unsaved text")
+                query.assert_called_once()
+                if not rules._is_dirty():
+                    raise AssertionError("P11-I notice modified current Save/dirty behavior")
+
+                rules._load_template(other_id)
+                if (not notice.isVisible()
+                        or "использует другой шаблон" not in notice.text()
+                        or "не изменит правила" not in notice.text()):
+                    raise AssertionError("P11-I inactive template warning incorrect")
+
+            with patch.object(
+                db, "get_open_auction_session",
+                return_value={"id": 43, "rules_template_id": None, "status": "paused"},
+            ):
+                rules._load_template(current_id)
+                if ("использует другой шаблон" not in notice.text()
+                        or not notice.isVisible()):
+                    raise AssertionError("P11-I legacy session without source ID mislabelled")
+
+            with patch.object(db, "get_open_auction_session", return_value=None):
+                rules._load_template(other_id)
+                if not notice.isHidden() or notice.text():
+                    raise AssertionError("P11-I ended auction left stale warning")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+        if db.list_rule_templates() != originals:
+            raise AssertionError("P11-I read-only UI notice modified rule templates")
+    print("P11_I_RULES_OPEN_AUCTION_SOURCE_NOTICE_READ_ONLY=PASS")
+
+
+def assert_p11_rules_live_switch_updates_session_and_obs(window) -> None:
+    """P11-I FIX1: activation really changes on-air rules, not only global selection."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11i_live_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        original_id = int(db.get_active_rule_template()["id"])
+        db.save_rule_template(original_id, "<p>P11-I original</p>")
+        replacement_id = db.create_rule_template(
+            "P11-I новый эфирный шаблон",
+            content_html="<p>P11-I on-air replacement</p>",
+            make_active=False,
+        )
+        # Use a real open auction with its genuine persisted Rules snapshot.
+        db.add_game(Game(None, "P11-I Lot A", "2026-01-01", 100, 0, STATUS_PLAYED, ""))
+        db.add_game(Game(None, "P11-I Lot B", "2026-01-01", 200, 0, STATUS_NOT_PLAYED, ""))
+        auction_id = db.create_auction_session("max_amount", 60)
+        initial = db.get_auction_rules_snapshot(auction_id)
+        if (initial["template_id"] != original_id
+                or "P11-I original" not in initial["content_html"]):
+            raise AssertionError("P11-I FIX1 auction did not capture source Rules")
+
+        rules = AuctionRulesEditorDialog(db, window, initial_template_id=replacement_id)
+        try:
+            rules.show()
+            QApplication.processEvents()
+            if ("использует другой шаблон" not in rules.rules_session_notice_label.text()
+                    or db.current_rules_payload()["source"] != "auction_snapshot"):
+                raise AssertionError("P11-I FIX1 pre-switch state not a different template")
+            # Fixture uses minimal raw HTML, not Qt-canonical editor HTML.
+            # Do not trigger the unrelated dirty-activation modal in this
+            # test of DB/OBS session source switching.
+            with patch.object(rules, "_is_dirty", return_value=False):
+                rules._make_active()
+            live = db.get_auction_rules_snapshot(auction_id)
+            payload = db.current_rules_payload()
+            if (db.get_active_rule_template()["id"] != replacement_id
+                    or live["template_id"] != replacement_id
+                    or live["template_name"] != "P11-I новый эфирный шаблон"
+                    or "P11-I on-air replacement" not in live["content_html"]
+                    or payload["source"] != "auction_snapshot"
+                    or payload["auction_id"] != auction_id
+                    or "P11-I on-air replacement" not in payload["content_html"]
+                    or "используется текущим аукционом" not in rules.rules_session_notice_label.text()):
+                raise AssertionError("P11-I FIX1 active Rules did not reach auction/OBS/notice")
+
+            db.save_rule_template(original_id, "<p>P11-I inactive edit</p>")
+            if "P11-I on-air replacement" not in db.current_rules_payload()["content_html"]:
+                raise AssertionError("P11-I FIX1 inactive Save changed on-air Rules")
+            db.save_rule_template(replacement_id, "<p>P11-I active edited</p>")
+            if "P11-I active edited" not in db.current_rules_payload()["content_html"]:
+                raise AssertionError("P11-I FIX1 on-air source Save failed to sync")
+            rules._load_template(original_id)
+            if "использует другой шаблон" not in rules.rules_session_notice_label.text():
+                raise AssertionError("P11-I FIX1 stale source notice after changing selection")
+            with patch.object(rules, "_is_dirty", return_value=False):
+                rules._make_active()
+            if (db.get_active_rule_template()["id"] != original_id
+                    or db.get_auction_rules_snapshot(auction_id)["template_id"] != original_id
+                    or "P11-I inactive edit" not in db.current_rules_payload()["content_html"]):
+                raise AssertionError("P11-I FIX1 returning to original did not switch live Rules")
+
+            with db.connect() as conn:
+                actions = [
+                    str(row["action"])
+                    for row in conn.execute(
+                        "SELECT action FROM change_log WHERE entity_type='auction_session' "
+                        "AND entity_id=? ORDER BY id", (auction_id,),
+                    ).fetchall()
+                ]
+            if actions.count("switch_rules_template") != 2:
+                raise AssertionError("P11-I FIX1 live switches not audited exactly twice")
+
+            # Ended sessions are immutable snapshots; future activations are
+            # ordinary defaults for the next auction, not rewrites of history.
+            with db.connect() as conn:
+                conn.execute(
+                    "UPDATE auction_sessions SET status='cancelled' WHERE id=?",
+                    (auction_id,),
+                )
+            closed_before = db.get_auction_rules_snapshot(auction_id)
+            db.set_active_rule_template(replacement_id)
+            if (db.get_auction_rules_snapshot(auction_id) != closed_before
+                    or db.current_rules_payload()["source"] != "active_template"
+                    or "P11-I active edited" not in db.current_rules_payload()["content_html"]):
+                raise AssertionError("P11-I FIX1 closed Rules snapshot was changed")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+    print("P11_I_FIX1_RULES_LIVE_SWITCH_AUCTION_OBS_NOTICE=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1951,6 +2104,8 @@ def main() -> int:
         assert_p11_rules_save_keeps_editor_open(window)
         assert_p11_rules_save_choice(window)
         assert_p11_rules_dirty_activation_guard(window)
+        assert_p11_rules_current_auction_notice(window)
+        assert_p11_rules_live_switch_updates_session_and_obs(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
