@@ -606,6 +606,96 @@ def assert_p11_rules_save_choice(window) -> None:
     print("P11_G_RULES_EXPLICIT_SAVE_CHOICE_AND_INACTIVE_CLONE=PASS")
 
 
+def assert_p11_rules_dirty_activation_guard(window) -> None:
+    """P11-H: activation must ask first, preserve state on Cancel or failed Save."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11h_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        active = db.get_active_rule_template()
+        active_id = int(active["id"])
+        active_html = str(active["content_html"] or "")
+        inactive_id = db.create_rule_template("P11-H неактивный", make_active=False)
+        rules = AuctionRulesEditorDialog(db, window, initial_template_id=inactive_id)
+        try:
+            rules.show()
+            QApplication.processEvents()
+            rules.editor.setPlainText("P11-H draft - unsaved")
+            before_html = str(db.get_rule_template(inactive_id)["content_html"] or "")
+            if not rules._is_dirty():
+                raise AssertionError("P11-H expected dirty inactive template")
+
+            # Verify actual dialog has both promised Russian actions, with Cancel
+            # the safe default and no implicit Save if dismissed.
+            prompts = []
+            def capture_dialog(box):
+                buttons = [button.text() for button in box.buttons()]
+                default = box.defaultButton()
+                prompts.append((box.windowTitle(), box.text(), buttons,
+                                default.text() if default else None))
+                return 0
+            with patch.object(QMessageBox, "exec", autospec=True,
+                              side_effect=capture_dialog):
+                if rules._confirm_save_before_activation():
+                    raise AssertionError("P11-H dismissed confirmation accepted changes")
+            if (len(prompts) != 1 or
+                    "Сохранить и активировать" not in prompts[0][2] or
+                    "Отмена" not in prompts[0][2] or
+                    prompts[0][3] != "Отмена"):
+                raise AssertionError("P11-H dialog actions/default are incorrect")
+
+            with patch.object(
+                rules, "_confirm_save_before_activation", return_value=False
+            ) as confirm, patch.object(
+                rules, "_save_current",
+                side_effect=AssertionError("Cancel must not save")
+            ):
+                rules._make_active()
+            confirm.assert_called_once()
+            if (db.get_active_rule_template()["id"] != active_id
+                    or db.get_active_rule_template()["content_html"] != active_html
+                    or db.get_rule_template(inactive_id)["content_html"] != before_html
+                    or not rules._is_dirty()):
+                raise AssertionError("P11-H Cancel altered active/on-air or draft state")
+
+            with patch.object(
+                rules, "_confirm_save_before_activation", return_value=True
+            ), patch.object(
+                db, "save_rule_template", side_effect=ValueError("P11-H failing save")
+            ), patch.object(QMessageBox, "critical") as critical:
+                rules._make_active()
+            if (critical.call_count != 1
+                    or db.get_active_rule_template()["id"] != active_id
+                    or db.get_rule_template(inactive_id)["content_html"] != before_html
+                    or not rules._is_dirty()):
+                raise AssertionError("P11-H failed Save activated or destroyed edits")
+
+            with patch.object(
+                rules, "_confirm_save_before_activation", return_value=True
+            ) as confirm:
+                rules._make_active()
+            confirm.assert_called_once()
+            active_after = db.get_active_rule_template()
+            if (int(active_after["id"]) != inactive_id
+                    or "P11-H draft - unsaved" not in active_after["content_html"]
+                    or rules._is_dirty()
+                    or not rules.activate_template_btn.isHidden()):
+                raise AssertionError("P11-H Save+Activate did not persist and activate")
+
+            # Saved template activation still requires no extra confirmation.
+            rules._reload_templates(selected_id=active_id)
+            with patch.object(
+                rules, "_confirm_save_before_activation",
+                side_effect=AssertionError("Clean template should activate directly")
+            ):
+                rules._make_active()
+            if db.get_active_rule_template()["id"] != active_id:
+                raise AssertionError("P11-H clean activation behavior changed")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+    print("P11_H_RULES_ACTIVATE_DIRTY_GUARD_CANCEL_SAVE_FAILURE=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1870,6 +1960,7 @@ def main() -> int:
         assert_p11_rules_new_template_inactive(window)
         assert_p11_rules_save_keeps_editor_open(window)
         assert_p11_rules_save_choice(window)
+        assert_p11_rules_dirty_activation_guard(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save

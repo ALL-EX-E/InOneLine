@@ -469,11 +469,28 @@ class AuctionRulesEditorDialog(QDialog):
             return
         self._reload_templates(selected_id=active_id)
 
+    def _confirm_save_before_activation(self) -> bool:
+        """Do not silently persist a dirty template when the user activates it."""
+        box = QMessageBox(self)
+        box.setWindowTitle("Несохранённые изменения")
+        box.setText(
+            "В выбранном шаблоне есть несохранённые изменения. "
+            "Сохранить их и сделать шаблон активным?"
+        )
+        save = box.addButton("Сохранить и активировать", QMessageBox.AcceptRole)
+        cancel = box.addButton("Отмена", QMessageBox.RejectRole)
+        box.setDefaultButton(cancel)
+        box.exec()
+        return box.clickedButton() is save
+
     def _make_active(self) -> None:
         if self._loaded_template_id is None:
             return
-        if self._is_dirty() and not self._save_current():
-            return
+        if self._is_dirty():
+            if not self._confirm_save_before_activation():
+                return
+            if not self._save_current():
+                return
         try:
             self.db.set_active_rule_template(self._loaded_template_id)
         except Exception as exc:
