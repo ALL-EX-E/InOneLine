@@ -4,7 +4,7 @@ APP_NAME = "In one line"
 APP_VERSION = "1.0.8"
 LEGACY_SETTINGS_APP_NAME = "Streaming Manager"
 DEFAULT_API_HOST = "127.0.0.1"
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 SHARED_XLSX_ENABLED_KEY = "shared_xlsx_enabled"
 SHARED_XLSX_PATH_KEY = "shared_xlsx_path"
