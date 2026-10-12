@@ -400,7 +400,7 @@ class RulesMixin:
         template_id = int(template_id)
         with self.connect() as conn:
             row = conn.execute(
-                "SELECT id, name, content_html FROM auction_rule_templates WHERE id=?",
+                "SELECT id, name, content_html, presentation_json FROM auction_rule_templates WHERE id=?",
                 (template_id,),
             ).fetchone()
             if row is None:
@@ -422,11 +422,13 @@ class RulesMixin:
                 "rules_template_id": session.get("rules_template_id"),
                 "rules_template_name": str(session.get("rules_template_name") or ""),
                 "rules_html": str(session.get("rules_html") or ""),
+                "rules_presentation_json": session.get("rules_presentation_json"),
             }
             after = {
                 "rules_template_id": template_id,
                 "rules_template_name": str(row["name"]),
                 "rules_html": str(row["content_html"] or ""),
+                "rules_presentation_json": row["presentation_json"],
             }
             if before == after:
                 return
@@ -434,12 +436,13 @@ class RulesMixin:
                 """
                 UPDATE auction_sessions
                 SET rules_template_id=?, rules_template_name=?,
-                    rules_html=?, updated_at=?
+                    rules_html=?, rules_presentation_json=?, updated_at=?
                 WHERE id=?
                 """,
                 (
                     after["rules_template_id"], after["rules_template_name"],
-                    after["rules_html"], utc_now(), int(session["id"]),
+                    after["rules_html"], after["rules_presentation_json"],
+                    utc_now(), int(session["id"]),
                 ),
             )
             self._log_conn(
@@ -516,7 +519,7 @@ class RulesMixin:
     def _active_rule_snapshot_conn(self, conn: sqlite3.Connection) -> dict[str, Any]:
         template_id = self._ensure_default_rule_template_conn(conn)
         row = conn.execute(
-            "SELECT id, name, content_html FROM auction_rule_templates WHERE id=?",
+            "SELECT id, name, content_html, presentation_json FROM auction_rule_templates WHERE id=?",
             (template_id,),
         ).fetchone()
         assert row is not None
@@ -524,6 +527,7 @@ class RulesMixin:
             "template_id": int(row["id"]),
             "template_name": str(row["name"]),
             "content_html": str(row["content_html"] or ""),
+            "presentation_json": row["presentation_json"],
         }
 
     @staticmethod
