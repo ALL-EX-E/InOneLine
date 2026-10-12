@@ -151,6 +151,7 @@ class SchemaMixin:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     content_html TEXT NOT NULL DEFAULT '',
+                    presentation_json TEXT DEFAULT NULL,
                     is_active INTEGER NOT NULL DEFAULT 0 CHECK(is_active IN (0,1)),
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -169,7 +170,8 @@ class SchemaMixin:
                     created_at TEXT NOT NULL,
                     rules_template_id INTEGER REFERENCES auction_rule_templates(id) ON DELETE SET NULL,
                     rules_template_name TEXT NOT NULL DEFAULT '',
-                    rules_html TEXT NOT NULL DEFAULT ''
+                    rules_html TEXT NOT NULL DEFAULT '',
+                    rules_presentation_json TEXT DEFAULT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS auction_entries (
@@ -318,6 +320,12 @@ class SchemaMixin:
                 "weighted_wheel_multi_spin_elimination",
                 19,
                 self._migrate_weighted_wheel_multi_spin_elimination,
+            )
+            self._run_migration(
+                conn,
+                "auction_rules_presentation_storage",
+                20,
+                self._migrate_auction_rules_presentation_storage,
             )
             conn.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
@@ -1016,6 +1024,28 @@ class SchemaMixin:
             """
         )
 
+
+    @staticmethod
+    def _migrate_auction_rules_presentation_storage(
+        conn: sqlite3.Connection,
+    ) -> None:
+        """Schema 20: non-destructive storage for future composite Rules templates.
+
+        A NULL is an intentional legacy fallback to the existing global Rules
+        settings. Do not capture global appearance during migration: users can
+        still edit that legacy UI until an isolated template-appearance cutover.
+        OBS and the existing Rules editor keep reading/writing exactly as before.
+        """
+        for table, column in (
+            ("auction_rule_templates", "presentation_json"),
+            ("auction_sessions", "rules_presentation_json"),
+        ):
+            columns = {
+                str(row["name"])
+                for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if column not in columns:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT DEFAULT NULL")
 
     def _migrate_auction_rules_templates_and_session_snapshot(
         self,
