@@ -686,6 +686,68 @@ def assert_p11_rules_dirty_activation_guard(window) -> None:
     print("P11_H_RULES_ACTIVATE_DIRTY_GUARD_CANCEL_SAVE_FAILURE=PASS")
 
 
+def assert_p11_rules_current_auction_notice(window) -> None:
+    """P11-I: session-bound Rules source clearly marked, without extra writes."""
+    with tempfile.TemporaryDirectory(prefix="inone_p11i_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        current_id = int(db.get_active_rule_template()["id"])
+        other_id = db.create_rule_template("P11-I другой шаблон", make_active=False)
+        originals = db.list_rule_templates()
+        rules = AuctionRulesEditorDialog(db, window)
+        try:
+            rules.show()
+            QApplication.processEvents()
+            notice = rules.rules_session_notice_label
+            with patch.object(db, "get_open_auction_session", return_value=None) as query:
+                rules._load_template(current_id)
+                if not notice.isHidden() or notice.text():
+                    raise AssertionError("P11-I no-auction notice must be hidden")
+                query.assert_called_once()
+
+            with patch.object(
+                db, "get_open_auction_session",
+                return_value={"id": 42, "rules_template_id": current_id, "status": "running"},
+            ) as query:
+                rules._load_template(current_id)
+                if (not notice.isVisible()
+                        or "используется текущим аукционом" not in notice.text()
+                        or "После сохранения" not in notice.text()):
+                    raise AssertionError("P11-I live source template not clearly marked")
+                query.assert_called_once()
+                # Typing must not introduce a new DB read on every keystroke.
+                rules.editor.setPlainText("P11-I unsaved text")
+                query.assert_called_once()
+                if not rules._is_dirty():
+                    raise AssertionError("P11-I notice modified current Save/dirty behavior")
+
+                rules._load_template(other_id)
+                if (not notice.isVisible()
+                        or "использует другой шаблон" not in notice.text()
+                        or "не изменит правила" not in notice.text()):
+                    raise AssertionError("P11-I inactive template warning incorrect")
+
+            with patch.object(
+                db, "get_open_auction_session",
+                return_value={"id": 43, "rules_template_id": None, "status": "paused"},
+            ):
+                rules._load_template(current_id)
+                if ("использует другой шаблон" not in notice.text()
+                        or not notice.isVisible()):
+                    raise AssertionError("P11-I legacy session without source ID mislabelled")
+
+            with patch.object(db, "get_open_auction_session", return_value=None):
+                rules._load_template(other_id)
+                if not notice.isHidden() or notice.text():
+                    raise AssertionError("P11-I ended auction left stale warning")
+        finally:
+            with patch.object(rules, "_confirm_discard_or_save", return_value=True):
+                rules.close()
+            rules.deleteLater()
+        if db.list_rule_templates() != originals:
+            raise AssertionError("P11-I read-only UI notice modified rule templates")
+    print("P11_I_RULES_OPEN_AUCTION_SOURCE_NOTICE_READ_ONLY=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1951,6 +2013,7 @@ def main() -> int:
         assert_p11_rules_save_keeps_editor_open(window)
         assert_p11_rules_save_choice(window)
         assert_p11_rules_dirty_activation_guard(window)
+        assert_p11_rules_current_auction_notice(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
