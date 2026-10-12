@@ -849,7 +849,8 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
     previous_rng = auction.rng_combo.currentData()
     previous_format = auction.wheel_format_combo.currentData()
     try:
-        window.tabs.setCurrentWidget(auction)
+        # MainWindow tabs host scroll areas, not the raw AuctionTab itself.
+        window.tabs.setCurrentWidget(window._main_tab_scroll_by_page[auction])
         auction.auction_tabs.setCurrentWidget(auction.conduct_page)
         QApplication.processEvents()
 
