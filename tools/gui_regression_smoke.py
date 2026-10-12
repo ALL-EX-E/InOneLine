@@ -775,7 +775,11 @@ def assert_p11_rules_live_switch_updates_session_and_obs(window) -> None:
             if ("использует другой шаблон" not in rules.rules_session_notice_label.text()
                     or db.current_rules_payload()["source"] != "auction_snapshot"):
                 raise AssertionError("P11-I FIX1 pre-switch state not a different template")
-            rules._make_active()
+            # Fixture uses minimal raw HTML, not Qt-canonical editor HTML.
+            # Do not trigger the unrelated dirty-activation modal in this
+            # test of DB/OBS session source switching.
+            with patch.object(rules, "_is_dirty", return_value=False):
+                rules._make_active()
             live = db.get_auction_rules_snapshot(auction_id)
             payload = db.current_rules_payload()
             if (db.get_active_rule_template()["id"] != replacement_id
@@ -797,7 +801,8 @@ def assert_p11_rules_live_switch_updates_session_and_obs(window) -> None:
             rules._load_template(original_id)
             if "использует другой шаблон" not in rules.rules_session_notice_label.text():
                 raise AssertionError("P11-I FIX1 stale source notice after changing selection")
-            rules._make_active()
+            with patch.object(rules, "_is_dirty", return_value=False):
+                rules._make_active()
             if (db.get_active_rule_template()["id"] != original_id
                     or db.get_auction_rules_snapshot(auction_id)["template_id"] != original_id
                     or "P11-I inactive edit" not in db.current_rules_payload()["content_html"]):
