@@ -334,7 +334,7 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
             if (combo.width() < 280 or combo_pos.x() < 0
                     or combo_pos.x() + combo.width() > editor.width()):
                 raise AssertionError("P11-B Rules template selector clipped")
-            actions = [editor.active_label]
+            actions = []
             buttons = editor.findChildren(QPushButton)
             for label in ("Создать", "Переименовать", "Удалить", "Сделать активным"):
                 matches = [button for button in buttons if button.text() == label]
@@ -342,6 +342,8 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
                     raise AssertionError(f"P11-B missing Rules action: {label}")
                 actions.append(matches[0])
             for action in actions:
+                if action.isHidden():
+                    continue
                 pos = action.mapTo(editor, QPoint(0, 0))
                 if (pos.y() < combo_bottom
                         or pos.x() < 0 or pos.x() + action.width() > editor.width()):
@@ -354,6 +356,58 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
     if window.db.get_settings() != settings_before:
         raise AssertionError("P11-B URL actions unexpectedly changed saved settings")
     print("P11_B_RULES_EDITOR_URL_COPY_AND_OBS_PREVIEW_REUSED=PASS")
+
+
+
+def assert_p11_rules_active_template_visual_state(window) -> None:
+    """P11-D keeps DB/template state but marks active template with green."""
+    rules = AuctionRulesEditorDialog(window.db, window)
+    before = window.db.list_rule_templates()
+    try:
+        if hasattr(rules, "active_label"):
+            raise AssertionError("P11-D obsolete Active badge still exists")
+        if any(rules.template_combo.itemText(i).startswith("★")
+               for i in range(rules.template_combo.count())):
+            raise AssertionError("P11-D star prefix remains in template names")
+        active_ids = [int(row["id"]) for row in before if row["is_active"]]
+        if len(active_ids) != 1:
+            raise AssertionError("P11-D unexpected count of active rule templates")
+        active_id = active_ids[0]
+        combo = rules.template_combo
+        active_index = combo.findData(active_id)
+        if active_index < 0:
+            raise AssertionError("P11-D active template not in selector")
+        background = combo.itemData(active_index, Qt.BackgroundRole)
+        if (background is None or background.color().name() != "#256849"):
+            raise AssertionError("P11-D active option lacks green background")
+        if combo.currentData() != active_id:
+            raise AssertionError("P11-D default selected wrong Rules template")
+        if (combo.property("ruleTemplateActive") is not True
+                or "#256849" not in combo.styleSheet()
+                or not rules.activate_template_btn.isHidden()):
+            raise AssertionError("P11-D active combo not green or activation visible")
+        if rules.delete_template_btn.isHidden() != (len(before) <= 1):
+            raise AssertionError("P11-D delete action incorrect for template count")
+
+        inactive = next(
+            (index for index in range(combo.count())
+             if int(combo.itemData(index)) != active_id), None
+        )
+        if inactive is not None:
+            combo.setCurrentIndex(inactive)
+            if (combo.property("ruleTemplateActive") is not False
+                    or combo.styleSheet() != ""
+                    or rules.activate_template_btn.isHidden()):
+                raise AssertionError("P11-D inactive Rules template UI not restored")
+            combo.setCurrentIndex(active_index)
+            if (combo.property("ruleTemplateActive") is not True
+                    or not rules.activate_template_btn.isHidden()):
+                raise AssertionError("P11-D active Rules status did not restore")
+    finally:
+        rules.deleteLater()
+    if window.db.list_rule_templates() != before:
+        raise AssertionError("P11-D template visual test modified database")
+    print("P11_D_RULES_ACTIVE_TEMPLATE_GREEN_SELECTOR=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
@@ -1616,6 +1670,7 @@ def main() -> int:
         assert_p10_auction_obs_audio_help(window)
         assert_p11_rules_format_toolbar_cleanup(window)
         assert_p11_rules_obs_access_relocation(window)
+        assert_p11_rules_active_template_visual_state(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save

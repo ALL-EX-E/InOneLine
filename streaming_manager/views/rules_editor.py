@@ -4,6 +4,7 @@ from typing import Callable
 
 from PySide6.QtCore import QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
+    QBrush,
     QColor,
     QDesktopServices,
     QFont,
@@ -70,8 +71,6 @@ class AuctionRulesEditorDialog(QDialog):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(8)
 
-        self.active_label = QLabel()
-        self.active_label.setProperty("badge", True)
         template_row = QHBoxLayout()
         template_row.addWidget(QLabel("Шаблон:"))
         self.template_combo = ScrollSafeComboBox()
@@ -85,7 +84,6 @@ class AuctionRulesEditorDialog(QDialog):
         # rows. At the dialog's minimum width they cannot fit side by side:
         # the old expanding combo overlapped the active badge and Create.
         template_actions_row = QHBoxLayout()
-        template_actions_row.addWidget(self.active_label)
         template_actions_row.addStretch(1)
         for title, handler in (
             ("Создать", self._create_template),
@@ -95,6 +93,10 @@ class AuctionRulesEditorDialog(QDialog):
         ):
             button = QPushButton(title)
             button.clicked.connect(handler)
+            if title == "Сделать активным":
+                self.activate_template_btn = button
+            elif title == "Удалить":
+                self.delete_template_btn = button
             template_actions_row.addWidget(button)
         root.addLayout(template_actions_row)
 
@@ -243,8 +245,15 @@ class AuctionRulesEditorDialog(QDialog):
             target_index = 0
             for index, row in enumerate(templates):
                 row_id = int(row["id"])
-                prefix = "★ " if int(row["is_active"]) else ""
-                self.template_combo.addItem(prefix + str(row["name"]), row_id)
+                self.template_combo.addItem(str(row["name"]), row_id)
+                if int(row["is_active"]):
+                    self.template_combo.setItemData(
+                        index, QBrush(QColor("#256849")), Qt.BackgroundRole
+                    )
+                    self.template_combo.setItemData(
+                        index, QBrush(QColor("#F3FFF7")), Qt.ForegroundRole
+                    )
+                    self.template_combo.setItemData(index, "Активный шаблон", Qt.ToolTipRole)
                 if row_id == target_id:
                     target_index = index
             if self.template_combo.count():
@@ -295,12 +304,21 @@ class AuctionRulesEditorDialog(QDialog):
 
     def _update_status(self) -> None:
         current = self.db.get_rule_template(self._loaded_template_id) if self._loaded_template_id else None
-        if current is None:
-            self.active_label.setText("")
-            self.dirty_label.setText("")
-            return
-        self.active_label.setText("Активный" if int(current["is_active"]) else "Неактивный")
-        self.dirty_label.setText("Есть несохранённые изменения" if self._is_dirty() else "Сохранено")
+        is_active = bool(current is not None and int(current["is_active"]))
+        self.template_combo.setProperty("ruleTemplateActive", is_active)
+        active_style = (
+            "QComboBox { background: #256849; color: #F3FFF7; "
+            "border: 1px solid #44AE7D; }"
+            if is_active else ""
+        )
+        if self.template_combo.styleSheet() != active_style:
+            self.template_combo.setStyleSheet(active_style)
+        self.activate_template_btn.setHidden(is_active)
+        self.delete_template_btn.setHidden(self.template_combo.count() <= 1)
+        self.dirty_label.setText(
+            ("Есть несохранённые изменения" if self._is_dirty() else "Сохранено")
+            if current is not None else ""
+        )
 
     def _save_current(self) -> bool:
         if self._loaded_template_id is None:
