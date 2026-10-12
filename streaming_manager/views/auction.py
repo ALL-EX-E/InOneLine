@@ -99,7 +99,7 @@ from .wheel import AuctionWheelWidget
 from .wheel_center_picker import WheelCenterPickerDialog
 from .auction_history import format_auction_history_event
 from .auction_bets import format_integration_bet_event
-from .rules_editor import AuctionRulesEditorDialog, AuctionRulesPreviewDialog
+from .rules_editor import AuctionRulesEditorDialog
 
 
 class _AuctionHistoryList(QListWidget):
@@ -369,12 +369,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         self.auction_rules_editor_btn.clicked.connect(self.open_auction_rules_editor)
         conduct_rules_row.addWidget(self.auction_rules_editor_btn)
-        self.auction_rules_preview_btn = QPushButton("Показать правила")
-        self.auction_rules_preview_btn.setToolTip(
-            "Показать сохранённые правила; для запущенного аукциона используется его замороженный снимок"
-        )
-        self.auction_rules_preview_btn.clicked.connect(self.show_auction_rules_preview)
-        conduct_rules_row.addWidget(self.auction_rules_preview_btn)
         conduct_rules_row.addStretch()
         conduct_layout.addLayout(conduct_rules_row)
 
@@ -2155,37 +2149,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self,
             initial_template_id=initial_template_id,
             rules_overlay_url=self._rules_overlay_url,
-        )
-        dialog.exec()
-
-    def show_auction_rules_preview(self) -> None:
-        session = None
-        if self._active_auction_id is not None:
-            session = self.db.get_auction_session(self._active_auction_id)
-        if session is None:
-            session = self.db.get_open_auction_session()
-
-        if session is not None:
-            snapshot = self.db.get_auction_rules_snapshot(int(session["id"]))
-            if snapshot is None:
-                template = self.db.get_active_rule_template()
-                template_name = str(template["name"])
-                content_html = str(template["content_html"] or "")
-            else:
-                template_name = str(snapshot["template_name"] or "")
-                content_html = str(snapshot["content_html"] or "")
-            title = f"Правила аукциона #{int(session['id'])}"
-        else:
-            template = self.db.get_active_rule_template()
-            template_name = str(template["name"])
-            content_html = str(template["content_html"] or "")
-            title = "Правила аукциона — активный шаблон"
-
-        dialog = AuctionRulesPreviewDialog(
-            title=title,
-            template_name=template_name,
-            content_html=content_html,
-            parent=self,
         )
         dialog.exec()
 
