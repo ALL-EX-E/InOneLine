@@ -645,3 +645,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P11-D implements only approved active-template indication: green selector/option, no star or redundant Active badge, context visibility of Make Active/Delete buttons. Save, Create (still activates newly created templates), templates DB, open auction session, overlay and schema untouched. Two exact candidate source/test blobs require fresh promotion gates and identity check before marking code DONE. P11 overall IN PROGRESS.
 - Next P11-E in separate, small candidate: modify existing create-template handler to pass make_active=False without introducing a new DB/store subsystem; keep active template and on-air session intact, new inactive template editable and saved, and existing Activate action available. Recheck Windows GUI and DB behavior; never combine this step with Save button or styling/template schema changes.
 
+## P11-D completed; P11-E ready for manual QA — 2026-10-12
+
+- P11-D clean accepted [PR #112](https://github.com/ALL-EX-E/InOneLine/pull/112), main 792845b98597de1dda977eee2dd1788b7a3dc370, native promotion Windows 38207833716 PASS, wording 38207833690 PASS, exact 2/2 accepted code/test SHA match. Draft #110 closed unmerged.
+- P11-E draft [PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact tested ccff76a175b838fda4b30b03637d8269942dd2ea. Native Windows 38208259058 and wording 38208259062 PASS. QA ZIP Drive file 1TwN91I4824oHoAXrMqrrFbLQsbmVwEak, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339. Implement new templates initially inactive via current DB API; preserve current active/on-air rules, old Save/Close behavior.
+- User manual QA is the next gate. After acceptance, exact-file clean promotion. Following P11 increments: Save without closing editor with existing dirty-guard prompts and no changes to template activation semantics; composite OBS appearance later. P11 overall IN PROGRESS.
+

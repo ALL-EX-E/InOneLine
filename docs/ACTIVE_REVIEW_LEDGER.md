@@ -4114,3 +4114,9 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Exact two Git blobs: rules_editor.py 954138d6bcb489f280f499b5d22dc62ac636b655; gui_regression_smoke.py 2b94c49933b0a20c4fe0f2036f6e8315519de8ab. Green active Rules selection, removed star/badge, hidden redundant Make Active/Delete buttons. No DB or on-air session changes. Await clean promotion fresh Windows checks, 2/2 postmerge verification, old draft closed unmerged.
 - P11-E next isolated step: create new Rules template INACTIVE without altering the active template, while retaining current text editing/activation logic. First inspect existing Database.create_rule_template implementation and effects on current live auction session; then do minimal regression-tested change.
 
+## P11-D merged and P11-E inactive-template Windows candidate — 2026-10-12
+
+- P11-D user-accepted clean PR #112 merged as 792845b98597de1dda977eee2dd1788b7a3dc370; promotion native Windows 38207833716 PASS, wording 38207833690 PASS; exact 2/2 accepted runtime/test blobs verified; old draft #110 closed without merge.
+- P11-E new [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact tested head ccff76a175b838fda4b30b03637d8269942dd2ea; Windows 38208259058 PASS, wording 38208259062 PASS. [Verified installer ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk), 46,789,610 bytes, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
+- Isolated P11-E uses existing create_rule_template(name, make_active=False), no DB migration nor session synchronization changes; in fresh temporary DB native Qt test creation + save keeps original active template and explicit Make Active works. **Manual user acceptance pending, do not merge.** Next P11-F review Save behavior separately.
+
