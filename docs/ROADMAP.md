@@ -651,3 +651,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P11-E draft [PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact tested ccff76a175b838fda4b30b03637d8269942dd2ea. Native Windows 38208259058 and wording 38208259062 PASS. QA ZIP Drive file 1TwN91I4824oHoAXrMqrrFbLQsbmVwEak, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339. Implement new templates initially inactive via current DB API; preserve current active/on-air rules, old Save/Close behavior.
 - User manual QA is the next gate. After acceptance, exact-file clean promotion. Following P11 increments: Save without closing editor with existing dirty-guard prompts and no changes to template activation semantics; composite OBS appearance later. P11 overall IN PROGRESS.
 
+## P11-E — user accepted; P11-F next — 2026-10-12
+
+- User accepted installed P11-E at 06:07:44 UTC («Всё работает. Идём дальше.»). Exact candidate ccff76a175b838fda4b30b03637d8269942dd2ea (draft PR #113), Windows 38208259058 SUCCESS, wording 38208259062 SUCCESS, accepted ZIP SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
+- P11-E creates inactive Rules template via existing create_rule_template(make_active=False), preserves previously active template and on-air settings. Exact two runtime/test blobs to promote cleanly with 3 canonical docs; fresh Windows gate and postmerge identity required. P11 overall IN PROGRESS.
+- Next separate P11-F: Save current Rules text without closing editor; reuse existing _save_current, keep Close/dirty guard and activation as before. Test save/reedit/save and correct current active/inactive template persistence. Composite editor/OBS appearance later.
+

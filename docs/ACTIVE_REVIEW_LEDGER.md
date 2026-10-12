@@ -4120,3 +4120,8 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - P11-E new [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact tested head ccff76a175b838fda4b30b03637d8269942dd2ea; Windows 38208259058 PASS, wording 38208259062 PASS. [Verified installer ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk), 46,789,610 bytes, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
 - Isolated P11-E uses existing create_rule_template(name, make_active=False), no DB migration nor session synchronization changes; in fresh temporary DB native Qt test creation + save keeps original active template and explicit Make Active works. **Manual user acceptance pending, do not merge.** Next P11-F review Save behavior separately.
 
+## P11-E accepted inactive creation; next P11-F Save without close — 2026-10-12
+
+- User 06:07:44 UTC: «Всё работает. Идём дальше.» Final manual acceptance of [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), head ccff76a175b838fda4b30b03637d8269942dd2ea. Native Windows 38208259058 and wording 38208259062 PASS; [verified Drive ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk), SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
+- Exact two accepted blobs rules_editor.py 8fa790e0db60138640dc78f277f5c4c128853cb3 and gui_regression_smoke.py ca22851b165810dce24c64d4f8859cd75600cc15. Existing create API now receives make_active=False; explicit activation untouched. Pending clean-promotion CI/merge/blob identity and closure of old draft. Next P11-F update Save button to persist without closing, leaving existing dirty guard and template state intact.
+
