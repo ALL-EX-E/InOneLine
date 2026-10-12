@@ -289,6 +289,71 @@ def assert_p11_rules_format_toolbar_cleanup(window) -> None:
     print("P11_A_RULES_TEXT_TOOLBAR_PRESERVE_LEGACY_HIGHLIGHT=PASS")
 
 
+def assert_p11_rules_obs_access_relocation(window) -> None:
+    """P11-B: editor owns Rules OBS access but uses original Auction route."""
+    auction = window.auction_tab
+    settings_before = window.db.get_settings()
+    if any(
+        hasattr(auction, name)
+        for name in ("auction_rules_copy_url_btn", "auction_rules_obs_preview_btn")
+    ):
+        raise AssertionError("P11-B obsolete Auction Rules access buttons remain")
+    editor = AuctionRulesEditorDialog(
+        window.db, auction, rules_overlay_url=auction._rules_overlay_url
+    )
+    try:
+        expected = auction._rules_overlay_url()
+        if (editor.rules_overlay_url_label.text() != expected
+                or not editor.rules_overlay_url_label.textInteractionFlags()
+                & Qt.TextSelectableByMouse):
+            raise AssertionError("P11-B Rules editor does not show selectable URL")
+        editor.copy_rules_url_btn.click()
+        if QApplication.clipboard().text() != expected:
+            raise AssertionError("P11-B Rules editor copy URL differs from Auction URL")
+        with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+            editor.preview_rules_obs_btn.click()
+        if (opened.call_count != 1
+                or opened.call_args.args[0].toString()
+                != expected + "?preview=1"):
+            raise AssertionError("P11-B Rules editor preview lost exact OBS route")
+        if not hasattr(auction, "auction_rules_preview_btn"):
+            raise AssertionError("P11-B unexpectedly removed separate old text preview")
+
+        # FIX1: real Qt geometry, not just child existence. On the smallest
+        # supported Rules window the selector must be above all action buttons;
+        # no active badge / Create overlap or clipped right-hand controls.
+        editor.show()
+        for width, height in ((760, 560), (1050, 760), (760, 560)):
+            editor.resize(width, height)
+            QApplication.processEvents()
+            combo = editor.template_combo
+            combo_pos = combo.mapTo(editor, QPoint(0, 0))
+            combo_bottom = combo_pos.y() + combo.height()
+            if (combo.width() < 280 or combo_pos.x() < 0
+                    or combo_pos.x() + combo.width() > editor.width()):
+                raise AssertionError("P11-B Rules template selector clipped")
+            actions = [editor.active_label]
+            buttons = editor.findChildren(QPushButton)
+            for label in ("Создать", "Переименовать", "Удалить", "Сделать активным"):
+                matches = [button for button in buttons if button.text() == label]
+                if len(matches) != 1:
+                    raise AssertionError(f"P11-B missing Rules action: {label}")
+                actions.append(matches[0])
+            for action in actions:
+                pos = action.mapTo(editor, QPoint(0, 0))
+                if (pos.y() < combo_bottom
+                        or pos.x() < 0 or pos.x() + action.width() > editor.width()):
+                    raise AssertionError(
+                        f"P11-B Rules template action overlaps or clips at {width}px"
+                    )
+        editor.hide()
+    finally:
+        editor.deleteLater()
+    if window.db.get_settings() != settings_before:
+        raise AssertionError("P11-B URL actions unexpectedly changed saved settings")
+    print("P11_B_RULES_EDITOR_URL_COPY_AND_OBS_PREVIEW_REUSED=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -1548,6 +1613,7 @@ def main() -> int:
         assert_p10_music_obs_audio_help(window)
         assert_p10_auction_obs_audio_help(window)
         assert_p11_rules_format_toolbar_cleanup(window)
+        assert_p11_rules_obs_access_relocation(window)
         assert_p09_list_group(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save

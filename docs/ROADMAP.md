@@ -622,3 +622,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Current accepted scope: remove Undo/Redo/highlight controls only, preserve legacy highlight markup, use shared screen pipette button. Clean promote exact rules_editor.py and gui_regression_smoke.py blobs; no DB/OBS/audio/business changes. Full P11 remains IN PROGRESS.
 - Next isolated **P11-B**: move existing Rules URL and copy/actual OBS preview actions from Auction page into rules editor, reuse existing route and handlers. Do not alter composite template persistence, rules snapshot, Save/Close semantics, visibility show-mode or appearance in same candidate. Separate later changes cover obsolete Show Rules removal and full composite editor.
 
+## P11-B — ACCEPTED FIX1; clean promotion gate — 2026-10-12
+
+- User confirms original relocated URL/copy/OBS preview worked 2026-10-11 17:17:20 UTC; follow-up minimum-width badge/Create overlap fixed in new candidate. Final acceptance 2026-10-12 04:47:04 UTC («Всё работает. Идём дальше.»), exact FIX1 tested commit f009c575370ad1a4bc1ebf855f86676f1bd83a6f ([draft PR #106](https://github.com/ALL-EX-E/InOneLine/pull/106)). Windows 38159132258 and wording 38159132287 both SUCCESS, tested ZIP SHA256 68ad4cc84e0aa60bf35a1cd7478c9389aeec0752943af827d01c4c0f03e63980.
+- P11-B scope is UI relocation of existing Rules URL and OBS preview to editor plus fixing template-selector overlap with unchanged template operations; three accepted exact source/test blobs on clean latest main, version/schema/audio rules unchanged. P11 overall IN PROGRESS.
+- Next isolated P11-C candidate: inspect and remove approved redundant Auction Show Rules button, preserve original session/preview semantics for real Rules overlay and existing editor; avoid unreviewed changes to template activation, composite appearance or storage. New Windows/manual gate for that separate change.
+

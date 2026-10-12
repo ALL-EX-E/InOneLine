@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QSignalBlocker, Qt
+from typing import Callable
+
+from PySide6.QtCore import QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
     QColor,
+    QDesktopServices,
     QFont,
     QTextBlockFormat,
     QTextCharFormat,
@@ -10,6 +13,7 @@ from PySide6.QtGui import (
     QTextListFormat,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QColorDialog,
     QDialog,
     QHBoxLayout,
@@ -48,6 +52,7 @@ class AuctionRulesEditorDialog(QDialog):
         parent: QWidget | None = None,
         *,
         initial_template_id: int | None = None,
+        rules_overlay_url: Callable[[], str] | None = None,
     ):
         super().__init__(parent)
         self.db = db
@@ -74,8 +79,14 @@ class AuctionRulesEditorDialog(QDialog):
         self.template_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.template_combo.currentIndexChanged.connect(self._template_index_changed)
         template_row.addWidget(self.template_combo, 1)
-        template_row.addWidget(self.active_label)
+        root.addLayout(template_row)
 
+        # Keep the template selector and the template actions on separate
+        # rows. At the dialog's minimum width they cannot fit side by side:
+        # the old expanding combo overlapped the active badge and Create.
+        template_actions_row = QHBoxLayout()
+        template_actions_row.addWidget(self.active_label)
+        template_actions_row.addStretch(1)
         for title, handler in (
             ("Создать", self._create_template),
             ("Переименовать", self._rename_template),
@@ -84,8 +95,37 @@ class AuctionRulesEditorDialog(QDialog):
         ):
             button = QPushButton(title)
             button.clicked.connect(handler)
-            template_row.addWidget(button)
-        root.addLayout(template_row)
+            template_actions_row.addWidget(button)
+        root.addLayout(template_actions_row)
+
+        # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
+        # its port resolution nor introduce another OBS route or preview mode.
+        if rules_overlay_url is not None:
+            rules_access = QHBoxLayout()
+            rules_access.addWidget(QLabel("URL виджета правил:"))
+            self.rules_overlay_url_label = QLabel(str(rules_overlay_url()))
+            self.rules_overlay_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            self.rules_overlay_url_label.setSizePolicy(
+                QSizePolicy.Ignored, QSizePolicy.Preferred
+            )
+            rules_access.addWidget(self.rules_overlay_url_label, 1)
+
+            self.copy_rules_url_btn = QPushButton("Копировать URL")
+            self.copy_rules_url_btn.clicked.connect(
+                lambda _checked=False: QApplication.clipboard().setText(
+                    str(rules_overlay_url())
+                )
+            )
+            rules_access.addWidget(self.copy_rules_url_btn)
+
+            self.preview_rules_obs_btn = QPushButton("Открыть предпросмотр OBS")
+            self.preview_rules_obs_btn.clicked.connect(
+                lambda _checked=False: QDesktopServices.openUrl(
+                    QUrl(str(rules_overlay_url()) + "?preview=1")
+                )
+            )
+            rules_access.addWidget(self.preview_rules_obs_btn)
+            root.addLayout(rules_access)
 
         tools1 = QHBoxLayout()
         self.style_combo = ScrollSafeComboBox()
