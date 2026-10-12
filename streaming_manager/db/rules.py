@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -170,6 +171,131 @@ class RulesMixin:
             )
             return int(cursor.lastrowid)
 
+    @staticmethod
+    def _validated_rule_presentation(value: Any) -> dict[str, Any]:
+        """Accept only the five existing Rules widget appearance properties.
+
+        Show/visibility mode stays global and never enters a Rules template.
+        Invalid input fails without a partial database write.
+        """
+        keys = {
+            "autoscroll", "background", "background_color",
+            "background_opacity", "padding",
+        }
+        if not isinstance(value, dict) or set(value) != keys:
+            raise ValueError("Оформление правил должно содержать пять известных полей.")
+        if type(value["autoscroll"]) is not bool:
+            raise ValueError("Автопрокрутка должна быть включена или выключена.")
+        background = value["background"]
+        if background not in ("transparent", "color"):
+            raise ValueError("Неизвестный тип фона правил.")
+        color = value["background_color"]
+        if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
+            raise ValueError("Некорректный цвет фона правил.")
+        try:
+            int(color[1:], 16)
+        except ValueError as exc:
+            raise ValueError("Некорректный цвет фона правил.") from exc
+        opacity = value["background_opacity"]
+        padding = value["padding"]
+        if type(opacity) is not int or not 0 <= opacity <= 100:
+            raise ValueError("Непрозрачность должна быть от 0 до 100.")
+        if type(padding) is not int or not 0 <= padding <= 200:
+            raise ValueError("Внутренний отступ должен быть от 0 до 200.")
+        return {
+            "autoscroll": value["autoscroll"],
+            "background": background,
+            "background_color": color.upper(),
+            "background_opacity": opacity,
+            "padding": padding,
+        }
+
+    @classmethod
+    def _read_rule_presentation_json(cls, raw: Any) -> dict[str, Any] | None:
+        """NULL/corrupt legacy values inherit unchanged global OBS styling."""
+        if raw is None:
+            return None
+        try:
+            parsed = json.loads(str(raw))
+            return cls._validated_rule_presentation(parsed)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    def get_rule_template_presentation(
+        self, template_id: int,
+    ) -> dict[str, Any] | None:
+        """Read saved per-template appearance, or None for global fallback."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT presentation_json FROM auction_rule_templates WHERE id=?",
+                (int(template_id),),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Шаблон правил не найден.")
+            return self._read_rule_presentation_json(row["presentation_json"])
+
+    def save_rule_template_presentation(
+        self, template_id: int, presentation: dict[str, Any] | None,
+    ) -> None:
+        """Save style and synchronize its current local-auction source atomically.
+
+        Current OBS rendering stays on legacy global settings until an
+        independently verified UI/renderer cutover.
+        """
+        template_id = int(template_id)
+        clean = None if presentation is None else self._validated_rule_presentation(presentation)
+        serialized = (
+            json.dumps(clean, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+            if clean is not None else None
+        )
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT presentation_json FROM auction_rule_templates WHERE id=?",
+                (template_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Шаблон правил не найден.")
+            if row["presentation_json"] == serialized:
+                return
+            conn.execute(
+                "UPDATE auction_rule_templates SET presentation_json=?, updated_at=? WHERE id=?",
+                (serialized, utc_now(), template_id),
+            )
+            placeholders = ",".join("?" for _ in self.AUCTION_OPEN_STATUSES)
+            sessions = conn.execute(
+                f"""SELECT id, rules_presentation_json FROM auction_sessions
+                    WHERE provider='local' AND status IN ({placeholders})
+                      AND rules_template_id=?""",
+                (*self.AUCTION_OPEN_STATUSES, template_id),
+            ).fetchall()
+            for session in sessions:
+                previous = session["rules_presentation_json"]
+                if previous == serialized:
+                    continue
+                conn.execute(
+                    "UPDATE auction_sessions SET rules_presentation_json=?, updated_at=? WHERE id=?",
+                    (serialized, utc_now(), int(session["id"])),
+                )
+                self._log_conn(
+                    conn, "auction_session", int(session["id"]),
+                    "sync_rules_presentation",
+                    {"rules_presentation_json": previous},
+                    {"rules_presentation_json": serialized},
+                )
+
+    def get_auction_rules_presentation_snapshot(
+        self, auction_id: int,
+    ) -> dict[str, Any] | None:
+        """Read stored session style only; do not change live OBS presentation."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT rules_presentation_json FROM auction_sessions WHERE id=?",
+                (int(auction_id),),
+            ).fetchone()
+            if row is None:
+                raise ValueError("Аукцион не найден.")
+            return self._read_rule_presentation_json(row["rules_presentation_json"])
+
     def _sync_open_sessions_from_rule_template_conn(
         self,
         conn: sqlite3.Connection,
@@ -274,7 +400,7 @@ class RulesMixin:
         template_id = int(template_id)
         with self.connect() as conn:
             row = conn.execute(
-                "SELECT id, name, content_html FROM auction_rule_templates WHERE id=?",
+                "SELECT id, name, content_html, presentation_json FROM auction_rule_templates WHERE id=?",
                 (template_id,),
             ).fetchone()
             if row is None:
@@ -296,11 +422,13 @@ class RulesMixin:
                 "rules_template_id": session.get("rules_template_id"),
                 "rules_template_name": str(session.get("rules_template_name") or ""),
                 "rules_html": str(session.get("rules_html") or ""),
+                "rules_presentation_json": session.get("rules_presentation_json"),
             }
             after = {
                 "rules_template_id": template_id,
                 "rules_template_name": str(row["name"]),
                 "rules_html": str(row["content_html"] or ""),
+                "rules_presentation_json": row["presentation_json"],
             }
             if before == after:
                 return
@@ -308,12 +436,13 @@ class RulesMixin:
                 """
                 UPDATE auction_sessions
                 SET rules_template_id=?, rules_template_name=?,
-                    rules_html=?, updated_at=?
+                    rules_html=?, rules_presentation_json=?, updated_at=?
                 WHERE id=?
                 """,
                 (
                     after["rules_template_id"], after["rules_template_name"],
-                    after["rules_html"], utc_now(), int(session["id"]),
+                    after["rules_html"], after["rules_presentation_json"],
+                    utc_now(), int(session["id"]),
                 ),
             )
             self._log_conn(
@@ -390,7 +519,7 @@ class RulesMixin:
     def _active_rule_snapshot_conn(self, conn: sqlite3.Connection) -> dict[str, Any]:
         template_id = self._ensure_default_rule_template_conn(conn)
         row = conn.execute(
-            "SELECT id, name, content_html FROM auction_rule_templates WHERE id=?",
+            "SELECT id, name, content_html, presentation_json FROM auction_rule_templates WHERE id=?",
             (template_id,),
         ).fetchone()
         assert row is not None
@@ -398,6 +527,7 @@ class RulesMixin:
             "template_id": int(row["id"]),
             "template_name": str(row["name"]),
             "content_html": str(row["content_html"] or ""),
+            "presentation_json": row["presentation_json"],
         }
 
     @staticmethod
