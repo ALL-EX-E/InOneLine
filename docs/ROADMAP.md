@@ -634,3 +634,8 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P11-C removes duplicate Show Rules button and orphan read-only popup, preserving Rules editable text, templates, existing OBS Browser Source and session snapshots. Exact three accepted blobs plus three canonical docs; clean promotion and postmerge gates apply before closing P11-C. P11 overall still in progress.
 - Next P11-D incremental composite editor design: inspect current Rules source/store, current renderer and approved overlay layout. Do not introduce duplicate template/persistence machinery or change on-air auction state as part of an unreviewed refactor. Continue with an isolated small Windows-testable step.
 
+## P11-C CLOSED; P11-D first active-template visual step — 2026-10-12
+
+- P11-C accepted/merged via [PR #109](https://github.com/ALL-EX-E/InOneLine/pull/109) as c352ad1b27612354bd7b05f3dcf3aaaebade5c4f, fresh native Windows 38206473290 and wording 38206473275 SUCCESS; exact 3/3 code/test SHA readback. Candidate draft #108 closed without merge.
+- P11-D isolated candidate [draft PR #110](https://github.com/ALL-EX-E/InOneLine/pull/110): active Rules selector visual cleanup, green active item, no star/badge, hide inapplicable Make Active and Delete buttons. This step makes NO changes to currently active template selection in DB, create-template behavior, Save/Close, session snapshot or overlay. Await Windows CI, final QA ZIP, explicit manual user approval. Subsequent P11 substeps handle remaining composite template semantics and OBS appearance separately.
+

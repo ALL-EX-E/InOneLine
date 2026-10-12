@@ -4103,3 +4103,8 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Accepted exact blobs: auction.py 908404b5ae24e5116a1b80e7f1cf4f65cfccac40, rules_editor.py 952b12ad713cced84d5809a71f4e4887d41abd92, gui_regression_smoke.py d615f6e5b5f231223f21c7cd2d75d61e2c0fce30. Only duplicate old text preview controls are deleted; native Rules editor, templates, active auction snapshot and live OBS Browser Source preview remain.
 - USER ACCEPTED, needs fresh clean promotion with Windows checks and exact postmerge readback; original draft PR #108 must be closed unmerged. Next isolated P11-D: source audit existing template state, live preview and overlay rendering, then modest nonbreaking incremental work.
 
+## P11-C done; P11-D visual active-template candidate — 2026-10-12
+
+- User-accepted P11-C merged in main [PR #109](https://github.com/ALL-EX-E/InOneLine/pull/109), SHA c352ad1b27612354bd7b05f3dcf3aaaebade5c4f. Full promotion Windows 38206473290 PASS, publication wording 38206473275 PASS; exact 3 of 3 accepted runtime/test blobs reread and match. Draft #108 closed without merging.
+- P11-D is a small separate UI change in [draft PR #110](https://github.com/ALL-EX-E/InOneLine/pull/110): replace star and Active/Inactive badge with green active template selector, keep all original db/template operations, hide redundant action buttons by current context. It is NOT yet accepted, not ready for main. Native Windows, manual Windows UI/functional checks, then clean accepted promotion required.
+
