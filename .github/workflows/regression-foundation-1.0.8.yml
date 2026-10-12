@@ -125,6 +125,11 @@ jobs:
         run: |
           python tools/rules_presentation_schema_smoke.py
 
+      - name: P11-K2 Rules template presentation and current-auction source sync
+        shell: pwsh
+        run: |
+          python tools/rules_presentation_access_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:
