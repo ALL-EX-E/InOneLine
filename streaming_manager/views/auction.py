@@ -375,16 +375,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         self.auction_rules_preview_btn.clicked.connect(self.show_auction_rules_preview)
         conduct_rules_row.addWidget(self.auction_rules_preview_btn)
-        self.auction_rules_copy_url_btn = QPushButton("Копировать URL правил")
-        self.auction_rules_copy_url_btn.clicked.connect(
-            lambda: QApplication.clipboard().setText(self._rules_overlay_url())
-        )
-        conduct_rules_row.addWidget(self.auction_rules_copy_url_btn)
-        self.auction_rules_obs_preview_btn = QPushButton("Предпросмотр OBS")
-        self.auction_rules_obs_preview_btn.clicked.connect(
-            lambda: QDesktopServices.openUrl(QUrl(self._rules_overlay_url() + "?preview=1"))
-        )
-        conduct_rules_row.addWidget(self.auction_rules_obs_preview_btn)
         conduct_rules_row.addStretch()
         conduct_layout.addLayout(conduct_rules_row)
 
@@ -2164,6 +2154,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self.db,
             self,
             initial_template_id=initial_template_id,
+            rules_overlay_url=self._rules_overlay_url,
         )
         dialog.exec()
 

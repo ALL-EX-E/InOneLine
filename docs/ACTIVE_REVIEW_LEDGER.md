@@ -4091,3 +4091,9 @@ QA-1.0.8-01 и QA-1.0.8-02 остаются только зафиксирова�
 - Candidate draft PR #103, exact HEAD 7bd153c7723f28493593f8c3eeb1e48ff1b923fc, Windows 38155498542 and wording 38155498539 SUCCESS. Exact tested rules_editor.py blob 296eb93b0fee6b21216a2a9bad83b04c1d674641 and gui_regression_smoke.py blob 90011b91411909fe2cff1e4e4c3543c07dbbfff0. Artifact SHA256 ed6cb4b7de1cff8f187085e580de9997f23c39e62361da915ab2930841eb5e6a.
 - P11-A MANUAL PASS. Clean merge with fresh Windows gate/2-of-2 blob check pending. Next P11-B moves Rules URL/copy/preview from Auction screen into editor without new backend. Later P11 stages cover composite templates/OBS appearance.
 
+## P11-B — final manual acceptance of relocated Rules OBS controls and minimum-width FIX1 — 2026-10-12
+
+- User manually confirms Rules copy URL, live OBS preview, editable templates 2026-10-11 17:17:20 UTC, notes badge Active/Create overlap in the minimum Rules dialog. FIX1 moves active status/action buttons onto a separate row, confirms Qt geometry across min/large/min. Final explicit user PASS 2026-10-12 04:47:04 UTC: «Всё работает. Идём дальше.»
+- Tested candidate [draft PR #106](https://github.com/ALL-EX-E/InOneLine/pull/106), exact head f009c575370ad1a4bc1ebf855f86676f1bd83a6f; Windows 38159132258 PASS; wording 38159132287 PASS; [verified FIX1 QA ZIP](https://drive.google.com/file/d/1GjhljLeS0EzTIEppN63oXGV9Vl51BjpE/view?usp=drivesdk), 46,801,670 bytes, SHA256 68ad4cc84e0aa60bf35a1cd7478c9389aeec0752943af827d01c4c0f03e63980.
+- Three accepted blob SHAs are auction.py bfd24ca8f6105343b6a1f251840bb22929d67d03, rules_editor.py 2e82c4dd78e9c4b3e926524c934221877291c74f, gui_regression_smoke.py f650a2a0301349051f042f56fab1a0fde54cac1e. P11-B USER ACCEPTED, needs fresh promotion Windows check, clean merge, exact blob readback and closure of unmerged candidate PR #106. Next P11-C investigate legacy Auction Show Rules action for isolated removal; composite editor appearance planned later.
+
