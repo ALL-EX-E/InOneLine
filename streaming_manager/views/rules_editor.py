@@ -16,12 +16,15 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
+    QCheckBox,
     QDialog,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -29,6 +32,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..constants import (
+    RULES_OVERLAY_AUTOSCROLL_DEFAULT,
+    RULES_OVERLAY_AUTOSCROLL_KEY,
+    RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_COLOR_KEY,
+    RULES_OVERLAY_BACKGROUND_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_KEY,
+    RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
+    RULES_OVERLAY_PADDING_DEFAULT,
+    RULES_OVERLAY_PADDING_KEY,
+)
 from ..database import Database
 from .common import (
     ScrollSafeComboBox,
@@ -63,6 +78,8 @@ class AuctionRulesEditorDialog(QDialog):
         )
         self._loaded_template_id: int | None = None
         self._loaded_html = ""
+        self._loaded_obs_presentation: dict[str, object] = {}
+        self._loaded_obs_explicit = False
         self._loading = False
         # New templates created in this editor can be saved directly once.
         self._new_template_ids: set[int] = set()
@@ -156,6 +173,71 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
             obs_layout.addLayout(rules_access)
+
+        # P11-K3: the five existing Rules appearance settings now belong
+        # to the selected template, not to a second save in Stream / OBS.
+        obs_form = QFormLayout()
+        obs_form.setVerticalSpacing(10)
+        obs_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        obs_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.rules_obs_autoscroll = QCheckBox("Автопрокрутка")
+        self.rules_obs_autoscroll.toggled.connect(self._editor_changed)
+        obs_form.addRow("Прокрутка:", self.rules_obs_autoscroll)
+
+        background_row = QWidget()
+        background_row_layout = QHBoxLayout(background_row)
+        background_row_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_obs_transparent = QRadioButton("Прозрачный")
+        self.rules_obs_color_mode = QRadioButton("Цвет")
+        self.rules_obs_transparent.toggled.connect(self._obs_background_changed)
+        self.rules_obs_color_mode.toggled.connect(self._obs_background_changed)
+        background_row_layout.addWidget(self.rules_obs_transparent)
+        background_row_layout.addWidget(self.rules_obs_color_mode)
+        background_row_layout.addStretch()
+        obs_form.addRow("Фон:", background_row)
+
+        color_row = QWidget()
+        color_row_layout = QHBoxLayout(color_row)
+        color_row_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_obs_color_btn = QPushButton()
+        self.rules_obs_color_btn.clicked.connect(
+            lambda: self._choose_obs_color(False)
+        )
+        self.rules_obs_color_pick_btn = make_screen_color_picker_button(
+            "Выбрать цвет фона с экрана. Левый клик — принять, Escape — отмена."
+        )
+        self.rules_obs_color_pick_btn.clicked.connect(
+            lambda: self._choose_obs_color(True)
+        )
+        color_row_layout.addWidget(self.rules_obs_color_btn)
+        color_row_layout.addWidget(self.rules_obs_color_pick_btn)
+        color_row_layout.addStretch()
+        obs_form.addRow("Цвет фона:", color_row)
+
+        self.rules_obs_opacity = ScrollSafeSpinBox()
+        self.rules_obs_opacity.setRange(0, 100)
+        self.rules_obs_opacity.setSuffix(" %")
+        self.rules_obs_opacity.valueChanged.connect(self._editor_changed)
+        self.rules_obs_opacity_control = make_wide_step_control(
+            self.rules_obs_opacity,
+            up_tooltip="Увеличить непрозрачность",
+            down_tooltip="Уменьшить непрозрачность",
+        )
+        obs_form.addRow("Непрозрачность:", self.rules_obs_opacity_control)
+
+        self.rules_obs_padding = ScrollSafeSpinBox()
+        self.rules_obs_padding.setRange(0, 200)
+        self.rules_obs_padding.setSuffix(" px")
+        self.rules_obs_padding.valueChanged.connect(self._editor_changed)
+        obs_form.addRow(
+            "Внутренний отступ:",
+            make_wide_step_control(
+                self.rules_obs_padding,
+                up_tooltip="Увеличить внутренний отступ",
+                down_tooltip="Уменьшить внутренний отступ",
+            ),
+        )
+        obs_layout.addLayout(obs_form)
         obs_layout.addStretch(1)
 
         tools1 = QHBoxLayout()
