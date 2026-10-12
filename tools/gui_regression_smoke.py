@@ -909,6 +909,80 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
     print("AUCTION_CONDUCT_MINWIDTH_METHOD_LABEL_BUTTONS_NO_OVERLAP=PASS")
 
 
+def assert_p11_rules_text_and_obs_sections(window) -> None:
+    """P11-J: split existing controls, never split template/data/Save."""
+    auction = window.auction_tab
+    with tempfile.TemporaryDirectory(prefix="inone_p11j_") as directory:
+        db = Database(Path(directory) / "rules.db")
+        old_active = int(db.get_active_rule_template()["id"])
+        dialog = AuctionRulesEditorDialog(
+            db, auction, rules_overlay_url=auction._rules_overlay_url
+        )
+        try:
+            tabs = dialog.rules_editor_sections
+            if (tabs.count() != 2 or tabs.tabText(0) != "Текст правил"
+                    or tabs.tabText(1) != "Оформление OBS"
+                    or tabs.widget(0) is not dialog.rules_text_page
+                    or tabs.widget(1) is not dialog.rules_obs_page):
+                raise AssertionError("P11-J Rules editor tabs/labels missing")
+            if (dialog.editor.parentWidget() is not dialog.rules_text_page
+                    or dialog.rules_overlay_url_label.parentWidget() is not dialog.rules_obs_page
+                    or dialog.copy_rules_url_btn.parentWidget() is not dialog.rules_obs_page
+                    or dialog.preview_rules_obs_btn.parentWidget() is not dialog.rules_obs_page):
+                raise AssertionError("P11-J widget ownership not separated")
+
+            saves = [button for button in dialog.findChildren(QPushButton)
+                     if button.text() == "Сохранить"]
+            if len(saves) != 1 or not dialog.template_combo.isEnabled():
+                raise AssertionError("P11-J composite Rules Save was duplicated")
+            dialog.show()
+            QApplication.processEvents()
+            dialog.editor.setPlainText("P11-J edited rules with shared Save")
+            if not dialog._is_dirty():
+                raise AssertionError("P11-J input failed to mark shared template dirty")
+            tabs.setCurrentIndex(1)
+            QApplication.processEvents()
+            if (not dialog.rules_obs_page.isVisible()
+                    or dialog.editor.toPlainText() != "P11-J edited rules with shared Save"
+                    or not dialog._is_dirty()):
+                raise AssertionError("P11-J switching OBS section lost unsaved Rules")
+
+            url = auction._rules_overlay_url()
+            if (dialog.rules_overlay_url_label.text() != url
+                    or not dialog.rules_overlay_url_label.textInteractionFlags()
+                    & Qt.TextSelectableByMouse):
+                raise AssertionError("P11-J reused Rules URL provider changed")
+            dialog.copy_rules_url_btn.click()
+            if QApplication.clipboard().text() != url:
+                raise AssertionError("P11-J copy URL disconnected")
+            with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+                dialog.preview_rules_obs_btn.click()
+            if (opened.call_count != 1
+                    or opened.call_args.args[0].toString() != url + "?preview=1"):
+                raise AssertionError("P11-J OBS preview route changed")
+
+            tabs.setCurrentIndex(0)
+            QApplication.processEvents()
+            if (dialog.editor.toPlainText() != "P11-J edited rules with shared Save"
+                    or not dialog.editor.isVisible()):
+                raise AssertionError("P11-J text editor not restored on its tab")
+            with patch.object(dialog, "_choose_save_action", return_value="replace"):
+                saves[0].click()
+            if (not dialog.isVisible() or dialog._is_dirty()
+                    or "P11-J edited rules" not in db.get_rule_template(old_active)["content_html"]
+                    or int(db.get_active_rule_template()["id"]) != old_active):
+                raise AssertionError("P11-J global Save/active template changed")
+            tabs.setCurrentIndex(1)
+            QApplication.processEvents()
+            if dialog.dirty_label.text() != "Сохранено":
+                raise AssertionError("P11-J status not shared across text and OBS sections")
+        finally:
+            with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
+                dialog.close()
+            dialog.deleteLater()
+    print("P11_J_RULES_TEXT_OBS_TABS_SHARED_TEMPLATE_SAVE_PREVIEW=PASS")
+
+
 def assert_p09_api_ui_cleanup(window, db) -> None:
     """UI-043 removes service controls while the real OBS API stays available."""
     stream = window.stream_tab
@@ -2176,6 +2250,7 @@ def main() -> int:
         assert_p11_rules_dirty_activation_guard(window)
         assert_p11_rules_current_auction_notice(window)
         assert_p11_rules_live_switch_updates_session_and_obs(window)
+        assert_p11_rules_text_and_obs_sections(window)
         assert_auction_conduct_compact_method_layout(window)
         assert_p09_list_group(app, stream, db)
 
