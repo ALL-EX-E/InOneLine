@@ -27,7 +27,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSizePolicy,
-    QTabWidget,
+    QFrame,
+    QScrollArea,
+    QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -133,21 +135,33 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_session_notice_label.hide()
         root.addWidget(self.rules_session_notice_label)
 
-        # P11-J / UI-060: one template selector and shared Save/Activate
-        # remain outside the editor sections. This is a pure layout split:
-        # the same QTextEdit remains the only editable rules text.
-        self.rules_editor_sections = QTabWidget()
+        # P11-K5 FIX1: text and appearance must remain visible together.
+        # Reparent the SAME existing editable QTextEdit and OBS controls,
+        # never copy text into a secondary preview or create a second model.
+        self.rules_editor_splitter = QSplitter(Qt.Horizontal)
+        self.rules_editor_splitter.setChildrenCollapsible(False)
         self.rules_text_page = QWidget()
         text_layout = QVBoxLayout(self.rules_text_page)
         text_layout.setContentsMargins(0, 8, 0, 0)
         text_layout.setSpacing(8)
+        text_layout.addWidget(QLabel("Текст правил"))
         self.rules_obs_page = QWidget()
         obs_layout = QVBoxLayout(self.rules_obs_page)
-        obs_layout.setContentsMargins(0, 8, 0, 0)
+        obs_layout.setContentsMargins(6, 8, 6, 0)
         obs_layout.setSpacing(8)
-        self.rules_editor_sections.addTab(self.rules_text_page, "Текст правил")
-        self.rules_editor_sections.addTab(self.rules_obs_page, "Оформление OBS")
-        root.addWidget(self.rules_editor_sections, 1)
+        obs_layout.addWidget(QLabel("Оформление OBS"))
+        self.rules_obs_scroll = QScrollArea()
+        self.rules_obs_scroll.setFrameShape(QFrame.NoFrame)
+        self.rules_obs_scroll.setWidgetResizable(True)
+        self.rules_obs_scroll.setMinimumWidth(200)
+        self.rules_obs_scroll.setMinimumHeight(130)
+        self.rules_obs_scroll.setWidget(self.rules_obs_page)
+        self.rules_editor_splitter.addWidget(self.rules_text_page)
+        self.rules_editor_splitter.addWidget(self.rules_obs_scroll)
+        self.rules_editor_splitter.setStretchFactor(0, 2)
+        self.rules_editor_splitter.setStretchFactor(1, 1)
+        self.rules_editor_splitter.setSizes([680, 340])
+        root.addWidget(self.rules_editor_splitter, 1)
 
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
@@ -160,7 +174,7 @@ class AuctionRulesEditorDialog(QDialog):
                 QSizePolicy.Ignored, QSizePolicy.Preferred
             )
             obs_layout.addWidget(self.rules_overlay_url_label)
-            rules_access = QHBoxLayout()
+            rules_access = QVBoxLayout()
 
             self.copy_rules_url_btn = QPushButton("Копировать URL")
             self.copy_rules_url_btn.clicked.connect(
@@ -170,7 +184,7 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.copy_rules_url_btn)
 
-            self.preview_rules_obs_btn = QPushButton("Предпросмотр выбранного шаблона")
+            self.preview_rules_obs_btn = QPushButton("Проверить в браузере")
             self.preview_rules_obs_btn.setToolTip(
                 "Показать сохранённый вариант выбранного шаблона правил. "
                 "Несохранённые изменения появятся после нажатия «Сохранить»."
@@ -291,7 +305,8 @@ class AuctionRulesEditorDialog(QDialog):
         tools1.addWidget(self.italic_btn)
         tools1.addWidget(self.underline_btn)
         tools1.addStretch()
-        text_layout.addLayout(tools1)
+        self.rules_format_toolbars = []
+        self._add_scrollable_toolbar(text_layout, tools1)
 
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
@@ -323,7 +338,7 @@ class AuctionRulesEditorDialog(QDialog):
         tools2.addWidget(bullet_btn)
         tools2.addWidget(number_btn)
         tools2.addStretch()
-        text_layout.addLayout(tools2)
+        self._add_scrollable_toolbar(text_layout, tools2)
 
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
@@ -353,6 +368,37 @@ class AuctionRulesEditorDialog(QDialog):
         )
         self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
 
+
+
+    def _add_scrollable_toolbar(self, layout: QVBoxLayout, buttons: QHBoxLayout) -> None:
+        """Keep the original formatting controls reachable at narrow widths."""
+        wrapper = QWidget()
+        wrapper.setLayout(buttons)
+        wrapper.adjustSize()
+        scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidgetResizable(False)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(wrapper)
+        scroll.setFixedHeight(wrapper.sizeHint().height() + 22)
+        layout.addWidget(scroll)
+        self.rules_format_toolbars.append(scroll)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        if not hasattr(self, "rules_editor_splitter"):
+            return
+        # At small sizes both sections remain accessible without compressing
+        # the editable text to an unusable narrow column.
+        orientation = Qt.Vertical if self.width() < 950 else Qt.Horizontal
+        splitter = self.rules_editor_splitter
+        if splitter.orientation() != orientation:
+            splitter.setOrientation(orientation)
+            splitter.setSizes(
+                [max(180, self.height() * 3 // 5), max(130, self.height() * 2 // 5)]
+                if orientation == Qt.Vertical else [max(420, self.width() * 2 // 3), 320]
+            )
 
     def _open_selected_template_preview(self) -> None:
         """Preview the selected saved template, never switch live OBS source."""
@@ -523,6 +569,7 @@ class AuctionRulesEditorDialog(QDialog):
             self.editor.setHtml(self._loaded_html) if self._loaded_html else self.editor.clear()
         finally:
             self._loading = False
+        self._refresh_local_rules_preview()
         if self._rules_preview_token is not None:
             self.db.set_rules_preview_selection(
                 self._rules_preview_token, self._loaded_template_id
@@ -568,8 +615,39 @@ class AuctionRulesEditorDialog(QDialog):
             return presentation_dirty
         return current != self._loaded_html or presentation_dirty
 
+    def _refresh_local_rules_preview(self) -> None:
+        """Mirror existing OBS background/opacity/padding in the editable area.
+
+        This is a *view-only* treatment of the SAME QTextEdit/document. No HTML
+        rewrite, second rendering backend or template write occurs on preview.
+        Other OBS appearance features are separate future UI-060 increments.
+        """
+        values = self._obs_presentation_values()
+        if values["background"] == "color":
+            color = QColor(str(values["background_color"]))
+            alpha = round(int(values["background_opacity"]) * 255 / 100)
+            background = (
+                f"rgba({color.red()}, {color.green()}, {color.blue()}, {alpha})"
+            )
+        else:
+            background = "transparent"
+
+        # Style the viewport, not the QTextEdit frame: retain the application's
+        # focus border and keep all text editing, selection and shortcuts intact.
+        style = f"background-color: {background};"
+        viewport = self.editor.viewport()
+        if viewport.styleSheet() != style:
+            viewport.setStyleSheet(style)
+
+        # This is the same stored pixel inset used by rules_overlay.html; setting
+        # QTextDocument's layout margin does NOT write CSS into rule content.
+        margin = float(values["padding"])
+        if self.editor.document().documentMargin() != margin:
+            self.editor.document().setDocumentMargin(margin)
+
     def _editor_changed(self) -> None:
         if not self._loading:
+            self._refresh_local_rules_preview()
             self._update_status()
 
     def _update_status(self) -> None:

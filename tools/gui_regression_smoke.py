@@ -910,80 +910,89 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
 
 
 def assert_p11_rules_text_and_obs_sections(window) -> None:
-    """P11-J: split existing controls, never split template/data/Save."""
+    """P11-K5 FIX1: one editable Rules area beside one live OBS settings panel."""
     auction = window.auction_tab
-    with tempfile.TemporaryDirectory(prefix="inone_p11j_") as directory:
+    with tempfile.TemporaryDirectory(prefix="inone_p11k5_") as directory:
         db = Database(Path(directory) / "rules.db")
         old_active = int(db.get_active_rule_template()["id"])
         dialog = AuctionRulesEditorDialog(
             db, auction, rules_overlay_url=auction._rules_overlay_url
         )
         try:
-            tabs = dialog.rules_editor_sections
-            if (tabs.count() != 2 or tabs.tabText(0) != "Текст правил"
-                    or tabs.tabText(1) != "Оформление OBS"
-                    or tabs.widget(0) is not dialog.rules_text_page
-                    or tabs.widget(1) is not dialog.rules_obs_page):
-                raise AssertionError("P11-J Rules editor tabs/labels missing")
+            splitter = dialog.rules_editor_splitter
+            if (splitter.count() != 2
+                    or splitter.widget(0) is not dialog.rules_text_page
+                    or splitter.widget(1) is not dialog.rules_obs_scroll
+                    or dialog.rules_obs_scroll.widget() is not dialog.rules_obs_page):
+                raise AssertionError("P11-K5 must have one shared editor and OBS panel")
             if (dialog.editor.parentWidget() is not dialog.rules_text_page
                     or dialog.rules_overlay_url_label.parentWidget() is not dialog.rules_obs_page
                     or dialog.copy_rules_url_btn.parentWidget() is not dialog.rules_obs_page
                     or dialog.preview_rules_obs_btn.parentWidget() is not dialog.rules_obs_page):
-                raise AssertionError("P11-J widget ownership not separated")
+                raise AssertionError("P11-K5 reused Rules controls were duplicated")
 
             saves = [button for button in dialog.findChildren(QPushButton)
                      if button.text() == "Сохранить"]
             if len(saves) != 1 or not dialog.template_combo.isEnabled():
-                raise AssertionError("P11-J composite Rules Save was duplicated")
+                raise AssertionError("P11-K5 composite Rules Save was duplicated")
             dialog.show()
             QApplication.processEvents()
-            dialog.editor.setPlainText("P11-J edited rules with shared Save")
+            if (splitter.orientation() != Qt.Horizontal
+                    or not dialog.editor.isVisible()
+                    or not dialog.rules_obs_page.isVisible()):
+                raise AssertionError("P11-K5 wide editor/settings not visible together")
+            dialog.editor.setPlainText("P11-K5 edited rules with shared Save")
             if not dialog._is_dirty():
-                raise AssertionError("P11-J input failed to mark shared template dirty")
-            tabs.setCurrentIndex(1)
+                raise AssertionError("P11-K5 input failed to mark template dirty")
+
+            dialog.resize(800, 680)
             QApplication.processEvents()
-            if (not dialog.rules_obs_page.isVisible()
-                    or dialog.editor.toPlainText() != "P11-J edited rules with shared Save"
+            if (splitter.orientation() != Qt.Vertical
+                    or not dialog.editor.isVisible()
+                    or not dialog.rules_obs_page.isVisible()
+                    or dialog.editor.toPlainText() != "P11-K5 edited rules with shared Save"
                     or not dialog._is_dirty()):
-                raise AssertionError("P11-J switching OBS section lost unsaved Rules")
+                raise AssertionError("P11-K5 narrow layout lost editor or OBS panel")
+            if len(dialog.rules_format_toolbars) != 2:
+                raise AssertionError("P11-K5 responsive text formatting toolbar missing")
+            dialog.resize(1100, 760)
+            QApplication.processEvents()
+            if (splitter.orientation() != Qt.Horizontal
+                    or not dialog.editor.isVisible()
+                    or not dialog.rules_obs_page.isVisible()):
+                raise AssertionError("P11-K5 wide layout was not restored")
 
             url = auction._rules_overlay_url()
             if (dialog.rules_overlay_url_label.text() != url
                     or not dialog.rules_overlay_url_label.textInteractionFlags()
                     & Qt.TextSelectableByMouse):
-                raise AssertionError("P11-J reused Rules URL provider changed")
+                raise AssertionError("P11-K5 reused Rules URL changed")
             if ("Предпросмотр:" not in dialog.rules_preview_target_label.text()
                     or "активный шаблон" not in dialog.rules_preview_target_label.text()):
-                raise AssertionError("P11-K4 selected-template preview target is not visible")
+                raise AssertionError("P11-K4 selected-template browser target missing")
             dialog.copy_rules_url_btn.click()
             if QApplication.clipboard().text() != url:
-                raise AssertionError("P11-J copy URL disconnected")
+                raise AssertionError("P11-K5 copy URL disconnected")
             with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
                 dialog.preview_rules_obs_btn.click()
             if (opened.call_count != 1
-                    or opened.call_args.args[0].toString() != dialog._selected_template_preview_url(old_active)):
-                raise AssertionError("P11-J OBS preview route changed")
+                    or opened.call_args.args[0].toString()
+                    != dialog._selected_template_preview_url(old_active)):
+                raise AssertionError("P11-K4 browser preview route changed")
 
-            tabs.setCurrentIndex(0)
-            QApplication.processEvents()
-            if (dialog.editor.toPlainText() != "P11-J edited rules with shared Save"
-                    or not dialog.editor.isVisible()):
-                raise AssertionError("P11-J text editor not restored on its tab")
             with patch.object(dialog, "_choose_save_action", return_value="replace"):
                 saves[0].click()
             if (not dialog.isVisible() or dialog._is_dirty()
-                    or "P11-J edited rules" not in db.get_rule_template(old_active)["content_html"]
+                    or "P11-K5 edited rules" not in db.get_rule_template(old_active)["content_html"]
                     or int(db.get_active_rule_template()["id"]) != old_active):
-                raise AssertionError("P11-J global Save/active template changed")
-            tabs.setCurrentIndex(1)
-            QApplication.processEvents()
+                raise AssertionError("P11-K5 shared Save/active template changed")
             if dialog.dirty_label.text() != "Сохранено":
-                raise AssertionError("P11-J status not shared across text and OBS sections")
+                raise AssertionError("P11-K5 shared status not updated")
         finally:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
                 dialog.close()
             dialog.deleteLater()
-    print("P11_J_RULES_TEXT_OBS_TABS_SHARED_TEMPLATE_SAVE_PREVIEW=PASS")
+    print("P11_K5_RULES_EDITOR_AND_OBS_PANEL_SHARED_SAVE_PREVIEW=PASS")
 
 
 def assert_p09_api_ui_cleanup(window, db) -> None:
