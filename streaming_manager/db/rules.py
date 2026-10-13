@@ -538,6 +538,37 @@ class RulesMixin:
             return int(default)
         return max(int(minimum), min(int(maximum), parsed))
 
+    def set_rules_preview_selection(self, token: str, template_id: int) -> None:
+        """Set one editor's transient preview target; never activate a template.
+
+        Only an explicit preview token can read this value. The normal
+        on-air Rules route is entirely independent of this registry.
+        """
+        if not isinstance(token, str) or not token or len(token) > 128:
+            raise ValueError("Некорректная ссылка предпросмотра правил.")
+        template_id = int(template_id)
+        with self.connect() as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM auction_rule_templates WHERE id=?",
+                (template_id,),
+            ).fetchone()
+        if exists is None:
+            raise ValueError("Шаблон правил для предпросмотра не найден.")
+        with self._rules_preview_selection_lock:
+            self._rules_preview_selections[token] = template_id
+
+    def get_rules_preview_selection(self, token: str) -> int | None:
+        """Resolve a running editor preview, not a stored Rules preference."""
+        if not isinstance(token, str) or not token:
+            return None
+        with self._rules_preview_selection_lock:
+            return self._rules_preview_selections.get(token)
+
+    def clear_rules_preview_selection(self, token: str) -> None:
+        """Expire the editor's preview link on dialog close."""
+        with self._rules_preview_selection_lock:
+            self._rules_preview_selections.pop(token, None)
+
     def current_rules_payload(
         self, *, preview_template_id: int | None = None,
     ) -> dict[str, Any]:
