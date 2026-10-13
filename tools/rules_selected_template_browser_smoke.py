@@ -136,26 +136,42 @@ def main() -> int:
             wait_js(live_page, expr, "A LIVE", "Real on-air browser rules")
             wait_js(preview_page, expr, "B CHOSEN", "Real browser inactive selected rules")
             wait_js(preview_page, "new URLSearchParams(location.search).get('follow_token')", editor._rules_preview_token, "Stable preview token")
-            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "74px", "Preview B styling")
-            wait_js(live_page, "document.querySelector('#viewport').style.padding", "18px", "On-air A styling")
+            padding_is_responsive = (
+                "(() => { const viewport = document.querySelector('#viewport'); "
+                "const actual = parseFloat(getComputedStyle(viewport).paddingTop); "
+                "const expected = Math.max(8, Math.min(24, "
+                "Math.min(innerWidth, innerHeight) * 0.022)); "
+                "return Math.abs(actual - expected) < 0.7 && "
+                "viewport.style.padding === ''; })()"
+            )
+            wait_js(preview_page, padding_is_responsive, True, "Preview B automatic inset")
+            wait_js(live_page, padding_is_responsive, True, "On-air A automatic inset")
+            # Changing the actual browser-source viewport must recalculate
+            # the inset, independently from legacy template padding values.
+            views[1].resize(380, 240)
+            QTest.qWait(150)
+            wait_js(preview_page, padding_is_responsive, True, "Resized Browser Source inset")
+            views[1].resize(width, height)
+            QTest.qWait(150)
+            wait_js(preview_page, padding_is_responsive, True, "Restored Browser Source inset")
             # Saving a new style for inactive B changes preview only.
             db.save_rule_template_presentation(inactive, {
                 "autoscroll": False, "background": "color",
                 "background_color": "#2277DD", "background_opacity": 91, "padding": 91,
             })
-            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "91px", "Preview update B")
+            wait_js(preview_page, padding_is_responsive, True, "Legacy B padding does not override responsive inset")
             wait_js(live_page, expr, "A LIVE", "On-air remains A")
 
             # The SAME already-open preview browser follows Qt selection.
             editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
             app.processEvents()
             wait_js(preview_page, expr, "A LIVE", "Preview follows B -> A")
-            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "18px", "Preview A styling")
+            wait_js(preview_page, padding_is_responsive, True, "Preview A automatic inset")
             assert views[1].url().toString() == preview_url, "Preview should not navigate or spawn another tab"
             editor.template_combo.setCurrentIndex(editor.template_combo.findData(inactive))
             app.processEvents()
             wait_js(preview_page, expr, "B CHOSEN", "Preview follows A -> B")
-            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "91px", "Preview B styling after switch")
+            wait_js(preview_page, padding_is_responsive, True, "Preview B automatic inset after switch")
             assert db.get_auction_rules_snapshot(auction_id) == before_snapshot
             assert db.current_rules_payload() == before_live
 

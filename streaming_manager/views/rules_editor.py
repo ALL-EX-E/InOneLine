@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Callable
 from secrets import token_urlsafe
 
-from PySide6.QtCore import QSignalBlocker, Qt, QUrl
+from PySide6.QtCore import QEvent, QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -249,18 +249,6 @@ class AuctionRulesEditorDialog(QDialog):
         )
         obs_form.addRow("Непрозрачность:", self.rules_obs_opacity_control)
 
-        self.rules_obs_padding = ScrollSafeSpinBox()
-        self.rules_obs_padding.setRange(0, 200)
-        self.rules_obs_padding.setSuffix(" px")
-        self.rules_obs_padding.valueChanged.connect(self._editor_changed)
-        obs_form.addRow(
-            "Внутренний отступ:",
-            make_wide_step_control(
-                self.rules_obs_padding,
-                up_tooltip="Увеличить внутренний отступ",
-                down_tooltip="Уменьшить внутренний отступ",
-            ),
-        )
         obs_layout.addLayout(obs_form)
         obs_layout.addStretch(1)
 
@@ -345,6 +333,7 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor.setPlaceholderText("Введите правила аукциона…")
         self.editor.textChanged.connect(self._editor_changed)
         self.editor.cursorPositionChanged.connect(self._sync_format_controls)
+        self.editor.viewport().installEventFilter(self)
         text_layout.addWidget(self.editor, 1)
 
         bottom = QHBoxLayout()
@@ -500,7 +489,11 @@ class AuctionRulesEditorDialog(QDialog):
                 or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ).upper(),
             "background_opacity": self.rules_obs_opacity.value(),
-            "padding": self.rules_obs_padding.value(),
+            # Retain the legacy saved field for schema/backup compatibility,
+            # but no longer expose it or let it control display geometry.
+            "padding": int(self._loaded_obs_presentation.get(
+                "padding", RULES_OVERLAY_PADDING_DEFAULT
+            )),
         }
 
     def _apply_obs_presentation(self, values: dict[str, object]) -> None:
@@ -513,7 +506,6 @@ class AuctionRulesEditorDialog(QDialog):
             "Цвет фона",
         )
         self.rules_obs_opacity.setValue(int(values["background_opacity"]))
-        self.rules_obs_padding.setValue(int(values["padding"]))
         self._obs_background_changed()
 
     def _obs_background_changed(self, _checked: bool = False) -> None:
@@ -616,7 +608,7 @@ class AuctionRulesEditorDialog(QDialog):
         return current != self._loaded_html or presentation_dirty
 
     def _refresh_local_rules_preview(self) -> None:
-        """Mirror existing OBS background/opacity/padding in the editable area.
+        """Mirror OBS color/opacity and automatic inset in the editable area.
 
         This is a *view-only* treatment of the SAME QTextEdit/document. No HTML
         rewrite, second rendering backend or template write occurs on preview.
@@ -639,11 +631,28 @@ class AuctionRulesEditorDialog(QDialog):
         if viewport.styleSheet() != style:
             viewport.setStyleSheet(style)
 
-        # This is the same stored pixel inset used by rules_overlay.html; setting
-        # QTextDocument's layout margin does NOT write CSS into rule content.
-        margin = float(values["padding"])
-        if self.editor.document().documentMargin() != margin:
-            self.editor.document().setDocumentMargin(margin)
+        self._update_local_rules_padding()
+
+    @staticmethod
+    def _responsive_rules_padding(width: int, height: int) -> float:
+        """Same clamp(8px, 2.2vmin, 24px) used by the OBS Browser Source."""
+        dimension = min(max(1, int(width)), max(1, int(height)))
+        return float(max(8, min(24, int(dimension * 0.022 + 0.5))))
+
+    def _update_local_rules_padding(self) -> None:
+        viewport = self.editor.viewport()
+        margin = self._responsive_rules_padding(viewport.width(), viewport.height())
+        document = self.editor.document()
+        if document.documentMargin() != margin:
+            document.setDocumentMargin(margin)
+
+    def eventFilter(self, watched, event) -> bool:
+        # Moving the responsive splitter can resize the editor viewport
+        # without a QDialog resize event. The document itself is unchanged.
+        if (hasattr(self, "editor") and watched is self.editor.viewport()
+                and event.type() == QEvent.Resize):
+            self._update_local_rules_padding()
+        return super().eventFilter(watched, event)
 
     def _editor_changed(self) -> None:
         if not self._loading:
