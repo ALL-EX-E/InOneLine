@@ -130,6 +130,11 @@ jobs:
         run: |
           python tools/rules_presentation_access_smoke.py
 
+      - name: P11-K3 Rules editor appearance shared Save native Qt
+        shell: pwsh
+        run: |
+          python tools/rules_editor_appearance_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:
