@@ -173,6 +173,24 @@ def main() -> int:
             assert views[1].url().toString() == preview_url, "Preview URL changed after activation"
             assert db.get_active_rule_template()["id"] == inactive
             assert db.current_rules_payload()["content_html"].find("B CHOSEN") >= 0
+
+            # Repeat after auction closes: selection following must work
+            # independently of whether there is an open auction snapshot.
+            with db.connect() as conn:
+                conn.execute(
+                    "UPDATE auction_sessions SET status='cancelled' WHERE id=?",
+                    (auction_id,),
+                )
+            wait_js(live_page, expr, "B CHOSEN", "No-auction on-air active B")
+            wait_js(preview_page, expr, "A LIVE", "No-auction inactive A preview")
+            editor.template_combo.setCurrentIndex(editor.template_combo.findData(inactive))
+            app.processEvents()
+            wait_js(preview_page, expr, "B CHOSEN", "No-auction preview follows A -> B")
+            editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
+            app.processEvents()
+            wait_js(preview_page, expr, "A LIVE", "No-auction preview follows B -> A")
+            wait_js(live_page, expr, "B CHOSEN", "No-auction on-air still active B")
+            assert views[1].url().toString() == preview_url
             assert db.list_rule_templates()[0]["id"] == templates_before[0]["id"]
             assert db.get_settings() == settings_before
         finally:
