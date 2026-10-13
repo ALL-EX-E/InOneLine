@@ -23,7 +23,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTextEdit
 
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database, Game
@@ -64,8 +64,15 @@ def main() -> int:
     with TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         db = Database(Path(temp) / "rules_preview.db")
         active = int(db.get_active_rule_template()["id"])
-        inactive = db.create_rule_template("Browser secondary", content_html="<p>B CHOSEN</p>", make_active=False)
-        db.save_rule_template(active, "<p>A LIVE</p>")
+        # QTextEdit canonical HTML avoids a spurious unsaved-change prompt
+        # when the editor loads our test templates.
+        editor_text = QTextEdit()
+        editor_text.setPlainText("B CHOSEN")
+        html_b = editor_text.toHtml()
+        editor_text.setPlainText("A LIVE")
+        html_a = editor_text.toHtml()
+        inactive = db.create_rule_template("Browser secondary", content_html=html_b, make_active=False)
+        db.save_rule_template(active, html_a)
         db.save_rule_template_presentation(active, {
             "autoscroll": False, "background": "color",
             "background_color": "#883311", "background_opacity": 99, "padding": 18,
