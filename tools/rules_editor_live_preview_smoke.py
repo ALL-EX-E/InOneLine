@@ -39,9 +39,11 @@ def main() -> int:
         fixture_editor = QTextEdit()
         fixture_editor.setHtml("<p>Проверка <b>редактируемого</b> текста</p>")
         db.save_rule_template(active, fixture_editor.toHtml())
+        fixture_editor.setHtml("<p>Другие правила</p>")
+        inactive_html = fixture_editor.toHtml()
         fixture_editor.deleteLater()
         inactive = db.create_rule_template(
-            "Другой стиль", content_html="<p>Другие правила</p>", make_active=False
+            "Другой стиль", content_html=inactive_html, make_active=False
         )
         db.save_rule_template_presentation(inactive, {
             "autoscroll": False,
