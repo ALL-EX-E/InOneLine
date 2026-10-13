@@ -140,6 +140,11 @@ jobs:
         run: |
           python tools/rules_selected_template_preview_smoke.py
 
+      - name: P11-K5 live editable Rules local presentation native Qt
+        shell: pwsh
+        run: |
+          python tools/rules_editor_live_preview_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:
