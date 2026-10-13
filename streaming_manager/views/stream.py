@@ -40,16 +40,6 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
-    RULES_OVERLAY_AUTOSCROLL_DEFAULT,
-    RULES_OVERLAY_AUTOSCROLL_KEY,
-    RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT,
-    RULES_OVERLAY_BACKGROUND_COLOR_KEY,
-    RULES_OVERLAY_BACKGROUND_DEFAULT,
-    RULES_OVERLAY_BACKGROUND_KEY,
-    RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT,
-    RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
-    RULES_OVERLAY_PADDING_DEFAULT,
-    RULES_OVERLAY_PADDING_KEY,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
     TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT,
@@ -1018,66 +1008,11 @@ class StreamTab(QWidget):
         rules_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         rules_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         add_show_mode("rules", rules_form)
-        self.rules_overlay_autoscroll = QCheckBox("Автопрокрутка")
-        rules_form.addRow("Прокрутка:", self.rules_overlay_autoscroll)
-
-        background_row = QWidget()
-        background_layout = QHBoxLayout(background_row)
-        background_layout.setContentsMargins(0, 0, 0, 0)
-        background_layout.setSpacing(12)
-        self.rules_background_transparent = QRadioButton("Прозрачный")
-        self.rules_background_color_mode = QRadioButton("Цвет")
-        self.rules_background_transparent.toggled.connect(
-            self._update_rules_background_enabled_state
+        rules_form.addRow(
+            "",
+            QLabel("Текст и оформление этого виджета настраиваются "
+                   "в редакторе правил аукциона."),
         )
-        self.rules_background_color_mode.toggled.connect(
-            self._update_rules_background_enabled_state
-        )
-        background_layout.addWidget(self.rules_background_transparent)
-        background_layout.addWidget(self.rules_background_color_mode)
-        background_layout.addStretch()
-        rules_form.addRow("Фон:", background_row)
-
-        rules_color_row = QWidget()
-        rules_color_layout = QHBoxLayout(rules_color_row)
-        rules_color_layout.setContentsMargins(0, 0, 0, 0)
-        rules_color_layout.setSpacing(8)
-        self.rules_background_color_btn = QPushButton()
-        self.rules_background_color_btn.clicked.connect(self._choose_rules_background_color)
-        self.rules_background_color_pick_btn = make_screen_color_picker_button()
-        self.rules_background_color_pick_btn.setToolTip(
-            "Выбрать цвет фона непосредственно с экрана"
-        )
-        self.rules_background_color_pick_btn.clicked.connect(
-            lambda: self._pick_color_from_screen(self.rules_background_color_btn)
-        )
-        rules_color_layout.addWidget(self.rules_background_color_btn)
-        rules_color_layout.addWidget(self.rules_background_color_pick_btn)
-        rules_color_layout.addStretch()
-        self.rules_background_color_row = rules_color_row
-        rules_form.addRow("Цвет фона:", self.rules_background_color_row)
-
-        self.rules_background_opacity = ScrollSafeSpinBox()
-        self.rules_background_opacity.setRange(0, 100)
-        self.rules_background_opacity.setSuffix(" %")
-        self.rules_background_opacity.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.rules_background_opacity_control = make_wide_step_control(
-            self.rules_background_opacity,
-            up_tooltip="Увеличить непрозрачность",
-            down_tooltip="Уменьшить непрозрачность",
-        )
-        rules_form.addRow("Непрозрачность:", self.rules_background_opacity_control)
-
-        self.rules_overlay_padding = ScrollSafeSpinBox()
-        self.rules_overlay_padding.setRange(0, 200)
-        self.rules_overlay_padding.setSuffix(" px")
-        self.rules_overlay_padding.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.rules_overlay_padding_control = make_wide_step_control(
-            self.rules_overlay_padding,
-            up_tooltip="Увеличить внутренний отступ",
-            down_tooltip="Уменьшить внутренний отступ",
-        )
-        rules_form.addRow("Внутренний отступ:", self.rules_overlay_padding_control)
         layout.addLayout(rules_form)
 
         rules_actions = QHBoxLayout()
@@ -1110,7 +1045,7 @@ class StreamTab(QWidget):
             ("music_player", copy_music, open_music, self.music_player_overlay_font),
             ("wheel", self.copy_wheel_url_btn, self.preview_wheel_btn, save_wheel),
             ("auction_lots", copy_auction_lots, open_auction_lots, self.auction_lots_overlay_font),
-            ("rules", copy_rules, open_rules, self.rules_overlay_autoscroll),
+            ("rules", copy_rules, open_rules, save_rules),
         ):
             mode_control = self.obs_show_modes[widget]
             previous_control = mode_control.previousInFocusChain()
@@ -1417,41 +1352,15 @@ class StreamTab(QWidget):
             "Настройки списка лотов сохранены. Открытый Browser Source обновится автоматически.",
         )
 
-    def _update_rules_background_enabled_state(self) -> None:
-        enabled = self.rules_background_color_mode.isChecked()
-        self._set_form_row_visible(
-            self.rules_overlay_form,
-            self.rules_background_color_row,
-            enabled,
-        )
-        self._set_form_row_visible(
-            self.rules_overlay_form,
-            self.rules_background_opacity_control,
-            enabled,
-        )
-
-    def _choose_rules_background_color(self) -> None:
-        current = QColor(str(self.rules_background_color_btn.property("fontColor") or "#000000"))
-        selected = QColorDialog.getColor(current, self, "Выберите цвет фона правил")
-        if selected.isValid():
-            self._set_color_button(self.rules_background_color_btn, selected.name())
-
     def _save_rules_overlay_settings(self) -> None:
-        background = "color" if self.rules_background_color_mode.isChecked() else "transparent"
+        # Widget show-mode remains a global OBS policy. All five visual
+        # settings moved into the shared Rules template editor Save.
         self.db.set_settings_bulk({
             WIDGETS["rules"].key: str(self.obs_show_modes["rules"].currentData()),
-            RULES_OVERLAY_AUTOSCROLL_KEY: "1" if self.rules_overlay_autoscroll.isChecked() else "0",
-            RULES_OVERLAY_BACKGROUND_KEY: background,
-            RULES_OVERLAY_BACKGROUND_COLOR_KEY: str(
-                self.rules_background_color_btn.property("fontColor") or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
-            ),
-            RULES_OVERLAY_BACKGROUND_OPACITY_KEY: str(self.rules_background_opacity.value()),
-            RULES_OVERLAY_PADDING_KEY: str(self.rules_overlay_padding.value()),
         })
         QMessageBox.information(
-            self,
-            "OBS Rules",
-            "Настройки виджета правил сохранены. Открытый Browser Source обновится автоматически.",
+            self, "OBS Rules",
+            "Режим показа виджета правил сохранён.",
         )
 
     def _save_wheel_overlay_settings(self) -> None:
@@ -2454,30 +2363,7 @@ class StreamTab(QWidget):
             })
         self._update_auction_lots_background_enabled_state()
 
-        self.rules_overlay_autoscroll.setChecked(
-            setting(RULES_OVERLAY_AUTOSCROLL_KEY, "1" if RULES_OVERLAY_AUTOSCROLL_DEFAULT else "0") == "1"
-        )
-        rules_background = setting(RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT)
-        self.rules_background_color_mode.setChecked(rules_background == "color")
-        self.rules_background_transparent.setChecked(rules_background != "color")
-        self._set_color_button(
-            self.rules_background_color_btn,
-            setting(RULES_OVERLAY_BACKGROUND_COLOR_KEY, RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT),
-        )
-        try:
-            opacity = int(setting(
-                RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
-                str(RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT),
-            ))
-        except ValueError:
-            opacity = RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT
-        self.rules_background_opacity.setValue(max(0, min(100, opacity)))
-        try:
-            padding = int(setting(RULES_OVERLAY_PADDING_KEY, str(RULES_OVERLAY_PADDING_DEFAULT)))
-        except ValueError:
-            padding = RULES_OVERLAY_PADDING_DEFAULT
-        self.rules_overlay_padding.setValue(max(0, min(200, padding)))
-        self._update_rules_background_enabled_state()
+        # Rules appearance is template-owned and loaded by the Rules editor.
 
         state = "РАБОТАЕТ" if self.api.running else f"НЕ ЗАПУЩЕН: {self.api.last_error or 'неизвестная ошибка'}"
         self.api_label.setText(f"Состояние: {state}")

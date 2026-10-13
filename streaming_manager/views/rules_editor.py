@@ -16,12 +16,15 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
+    QCheckBox,
     QDialog,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSizePolicy,
     QTabWidget,
     QTextEdit,
@@ -29,6 +32,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..constants import (
+    RULES_OVERLAY_AUTOSCROLL_DEFAULT,
+    RULES_OVERLAY_AUTOSCROLL_KEY,
+    RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_COLOR_KEY,
+    RULES_OVERLAY_BACKGROUND_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_KEY,
+    RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT,
+    RULES_OVERLAY_BACKGROUND_OPACITY_KEY,
+    RULES_OVERLAY_PADDING_DEFAULT,
+    RULES_OVERLAY_PADDING_KEY,
+)
 from ..database import Database
 from .common import (
     ScrollSafeComboBox,
@@ -63,6 +78,8 @@ class AuctionRulesEditorDialog(QDialog):
         )
         self._loaded_template_id: int | None = None
         self._loaded_html = ""
+        self._loaded_obs_presentation: dict[str, object] = {}
+        self._loaded_obs_explicit = False
         self._loading = False
         # New templates created in this editor can be saved directly once.
         self._new_template_ids: set[int] = set()
@@ -156,6 +173,71 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
             obs_layout.addLayout(rules_access)
+
+        # P11-K3: the five existing Rules appearance settings now belong
+        # to the selected template, not to a second save in Stream / OBS.
+        obs_form = QFormLayout()
+        obs_form.setVerticalSpacing(10)
+        obs_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        obs_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        self.rules_obs_autoscroll = QCheckBox("Автопрокрутка")
+        self.rules_obs_autoscroll.toggled.connect(self._editor_changed)
+        obs_form.addRow("Прокрутка:", self.rules_obs_autoscroll)
+
+        background_row = QWidget()
+        background_row_layout = QHBoxLayout(background_row)
+        background_row_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_obs_transparent = QRadioButton("Прозрачный")
+        self.rules_obs_color_mode = QRadioButton("Цвет")
+        self.rules_obs_transparent.toggled.connect(self._obs_background_changed)
+        self.rules_obs_color_mode.toggled.connect(self._obs_background_changed)
+        background_row_layout.addWidget(self.rules_obs_transparent)
+        background_row_layout.addWidget(self.rules_obs_color_mode)
+        background_row_layout.addStretch()
+        obs_form.addRow("Фон:", background_row)
+
+        color_row = QWidget()
+        color_row_layout = QHBoxLayout(color_row)
+        color_row_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_obs_color_btn = QPushButton()
+        self.rules_obs_color_btn.clicked.connect(
+            lambda: self._choose_obs_color(False)
+        )
+        self.rules_obs_color_pick_btn = make_screen_color_picker_button(
+            "Выбрать цвет фона с экрана. Левый клик — принять, Escape — отмена."
+        )
+        self.rules_obs_color_pick_btn.clicked.connect(
+            lambda: self._choose_obs_color(True)
+        )
+        color_row_layout.addWidget(self.rules_obs_color_btn)
+        color_row_layout.addWidget(self.rules_obs_color_pick_btn)
+        color_row_layout.addStretch()
+        obs_form.addRow("Цвет фона:", color_row)
+
+        self.rules_obs_opacity = ScrollSafeSpinBox()
+        self.rules_obs_opacity.setRange(0, 100)
+        self.rules_obs_opacity.setSuffix(" %")
+        self.rules_obs_opacity.valueChanged.connect(self._editor_changed)
+        self.rules_obs_opacity_control = make_wide_step_control(
+            self.rules_obs_opacity,
+            up_tooltip="Увеличить непрозрачность",
+            down_tooltip="Уменьшить непрозрачность",
+        )
+        obs_form.addRow("Непрозрачность:", self.rules_obs_opacity_control)
+
+        self.rules_obs_padding = ScrollSafeSpinBox()
+        self.rules_obs_padding.setRange(0, 200)
+        self.rules_obs_padding.setSuffix(" px")
+        self.rules_obs_padding.valueChanged.connect(self._editor_changed)
+        obs_form.addRow(
+            "Внутренний отступ:",
+            make_wide_step_control(
+                self.rules_obs_padding,
+                up_tooltip="Увеличить внутренний отступ",
+                down_tooltip="Уменьшить внутренний отступ",
+            ),
+        )
+        obs_layout.addLayout(obs_form)
         obs_layout.addStretch(1)
 
         tools1 = QHBoxLayout()
@@ -292,6 +374,84 @@ class AuctionRulesEditorDialog(QDialog):
         if self.template_combo.count():
             self._load_template(int(self.template_combo.currentData()))
 
+    def _legacy_rules_presentation(self) -> dict[str, object]:
+        """Resolve the user's original global Rules values for legacy templates."""
+        settings = self.db.get_settings()
+        background = str(settings.get(
+            RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT
+        ) or RULES_OVERLAY_BACKGROUND_DEFAULT).strip().casefold()
+        if background not in ("color", "transparent"):
+            background = RULES_OVERLAY_BACKGROUND_DEFAULT
+        color = QColor(str(settings.get(
+            RULES_OVERLAY_BACKGROUND_COLOR_KEY, RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
+        ) or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT))
+        if not color.isValid():
+            color = QColor(RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT)
+        return {
+            "autoscroll": settings.get(
+                RULES_OVERLAY_AUTOSCROLL_KEY,
+                "1" if RULES_OVERLAY_AUTOSCROLL_DEFAULT else "0",
+            ) == "1",
+            "background": background,
+            "background_color": color.name().upper(),
+            "background_opacity": self.db._bounded_int_setting(
+                settings.get(RULES_OVERLAY_BACKGROUND_OPACITY_KEY),
+                RULES_OVERLAY_BACKGROUND_OPACITY_DEFAULT, 0, 100,
+            ),
+            "padding": self.db._bounded_int_setting(
+                settings.get(RULES_OVERLAY_PADDING_KEY),
+                RULES_OVERLAY_PADDING_DEFAULT, 0, 200,
+            ),
+        }
+
+    def _obs_presentation_values(self) -> dict[str, object]:
+        return {
+            "autoscroll": self.rules_obs_autoscroll.isChecked(),
+            "background": (
+                "color" if self.rules_obs_color_mode.isChecked() else "transparent"
+            ),
+            "background_color": str(
+                self.rules_obs_color_btn.property("selectedColor")
+                or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
+            ).upper(),
+            "background_opacity": self.rules_obs_opacity.value(),
+            "padding": self.rules_obs_padding.value(),
+        }
+
+    def _apply_obs_presentation(self, values: dict[str, object]) -> None:
+        self.rules_obs_autoscroll.setChecked(bool(values["autoscroll"]))
+        self.rules_obs_color_mode.setChecked(values["background"] == "color")
+        self.rules_obs_transparent.setChecked(values["background"] != "color")
+        self._set_color_button(
+            self.rules_obs_color_btn,
+            QColor(str(values["background_color"])),
+            "Цвет фона",
+        )
+        self.rules_obs_opacity.setValue(int(values["background_opacity"]))
+        self.rules_obs_padding.setValue(int(values["padding"]))
+        self._obs_background_changed()
+
+    def _obs_background_changed(self, _checked: bool = False) -> None:
+        color_mode = self.rules_obs_color_mode.isChecked()
+        self.rules_obs_color_btn.setEnabled(color_mode)
+        self.rules_obs_color_pick_btn.setEnabled(color_mode)
+        self.rules_obs_opacity_control.setEnabled(color_mode)
+        self._editor_changed()
+
+    def _choose_obs_color(self, pipette: bool) -> None:
+        current = QColor(str(
+            self.rules_obs_color_btn.property("selectedColor")
+            or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
+        ))
+        selected = (
+            pick_screen_color(self) if pipette
+            else QColorDialog.getColor(current, self, "Цвет фона правил")
+        )
+        if selected is None or not selected.isValid():
+            return
+        self._set_color_button(self.rules_obs_color_btn, selected, "Цвет фона")
+        self._editor_changed()
+
     def _template_index_changed(self, index: int) -> None:
         if self._loading or index < 0:
             return
@@ -315,6 +475,12 @@ class AuctionRulesEditorDialog(QDialog):
         try:
             self._loaded_template_id = int(template["id"])
             self._loaded_html = str(template["content_html"] or "")
+            explicit = self.db.get_rule_template_presentation(template_id)
+            self._loaded_obs_explicit = explicit is not None
+            self._loaded_obs_presentation = (
+                explicit if explicit is not None else self._legacy_rules_presentation()
+            )
+            self._apply_obs_presentation(self._loaded_obs_presentation)
             self.editor.setHtml(self._loaded_html) if self._loaded_html else self.editor.clear()
         finally:
             self._loading = False
@@ -352,9 +518,12 @@ class AuctionRulesEditorDialog(QDialog):
         if self._loaded_template_id is None:
             return False
         current = self.editor.toHtml() if self.editor.toPlainText() or self.editor.document().blockCount() else ""
+        presentation_dirty = (
+            self._obs_presentation_values() != self._loaded_obs_presentation
+        )
         if not self._loaded_html and not self.editor.toPlainText().strip():
-            return False
-        return current != self._loaded_html
+            return presentation_dirty
+        return current != self._loaded_html or presentation_dirty
 
     def _editor_changed(self) -> None:
         if not self._loading:
@@ -382,13 +551,22 @@ class AuctionRulesEditorDialog(QDialog):
         if self._loaded_template_id is None:
             return True
         html = self.editor.toHtml() if self.editor.toPlainText().strip() else ""
+        presentation = self._obs_presentation_values()
+        presentation_dirty = presentation != self._loaded_obs_presentation
         try:
+            if presentation_dirty:
+                self.db.save_rule_template_presentation(
+                    self._loaded_template_id, presentation
+                )
             self.db.save_rule_template(self._loaded_template_id, html)
         except Exception as exc:
             QMessageBox.critical(self, "Правила аукциона", str(exc))
             return False
         self._new_template_ids.discard(self._loaded_template_id)
         self._loaded_html = html
+        self._loaded_obs_presentation = presentation
+        if presentation_dirty:
+            self._loaded_obs_explicit = True
         self._update_status()
         return True
 
@@ -436,6 +614,13 @@ class AuctionRulesEditorDialog(QDialog):
             new_id = self.db.create_rule_template(
                 name, content_html=html, make_active=False
             )
+            if (
+                self._loaded_obs_explicit
+                or self._obs_presentation_values() != self._loaded_obs_presentation
+            ):
+                self.db.save_rule_template_presentation(
+                    new_id, self._obs_presentation_values()
+                )
         except Exception as exc:
             QMessageBox.warning(self, "Шаблоны правил", str(exc))
             return False

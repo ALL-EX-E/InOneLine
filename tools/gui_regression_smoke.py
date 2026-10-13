@@ -1073,9 +1073,11 @@ def assert_p09_obs_access(app, window, db) -> None:
          "music_player_overlay_font_size", 31),
         ("Сохранить виджет списка лотов", "auction_lots_overlay_form", stream.auction_lots_overlay_font_size,
          "auction_lots_overlay_font_size", 27),
-        ("Сохранить виджет правил", "rules_overlay_form", stream.rules_background_opacity,
-         "rules_overlay_background_opacity", 63),
     )
+    if hasattr(stream, "rules_background_opacity") or hasattr(
+        stream, "rules_overlay_autoscroll"
+    ):
+        raise AssertionError("P11-K3 duplicates Rules appearance outside template editor")
     originals = db.get_settings()
     first_fields = {
         "main_settings_form": stream.game_combo,
