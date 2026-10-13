@@ -148,7 +148,7 @@ class AuctionRulesEditorDialog(QDialog):
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
         if rules_overlay_url is not None:
-            obs_layout.addWidget(QLabel("URL виджета правил:"))
+            obs_layout.addWidget(QLabel("URL рабочего виджета правил (текущий аукцион):"))
             self.rules_overlay_url_label = QLabel(str(rules_overlay_url()))
             self.rules_overlay_url_label.setWordWrap(True)
             self.rules_overlay_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -166,7 +166,7 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.copy_rules_url_btn)
 
-            self.preview_rules_obs_btn = QPushButton("Открыть предпросмотр OBS")
+            self.preview_rules_obs_btn = QPushButton("Предпросмотр выбранного шаблона")
             self.preview_rules_obs_btn.setToolTip(
                 "Показать сохранённый вариант выбранного шаблона правил. "
                 "Несохранённые изменения появятся после нажатия «Сохранить»."
@@ -176,6 +176,9 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
             obs_layout.addLayout(rules_access)
+            self.rules_preview_target_label = QLabel()
+            self.rules_preview_target_label.setWordWrap(True)
+            obs_layout.addWidget(self.rules_preview_target_label)
 
         # P11-K3: the five existing Rules appearance settings now belong
         # to the selected template, not to a second save in Stream / OBS.
@@ -351,11 +354,27 @@ class AuctionRulesEditorDialog(QDialog):
         """Preview the selected saved template, never switch live OBS source."""
         if self._rules_overlay_url is None:
             return
-        url = str(self._rules_overlay_url())
-        suffix = "?preview=1"
-        if self._loaded_template_id is not None:
-            suffix += f"&template_id={int(self._loaded_template_id)}"
-        QDesktopServices.openUrl(QUrl(url + suffix))
+        selected = self.template_combo.currentData()
+        if selected is None or self._loaded_template_id is None:
+            return
+        selected_id = int(selected)
+        if selected_id != self._loaded_template_id:
+            QMessageBox.warning(
+                self, "Предпросмотр правил",
+                "Выбранный шаблон ещё не загружен в редактор. "
+                "Повторно выберите шаблон и откройте предпросмотр."
+            )
+            return
+        QDesktopServices.openUrl(
+            QUrl(self._selected_template_preview_url(selected_id))
+        )
+
+    def _selected_template_preview_url(self, template_id: int) -> str:
+        assert self._rules_overlay_url is not None
+        return (
+            str(self._rules_overlay_url())
+            + f"?preview=1&template_id={int(template_id)}"
+        )
 
     def _reload_templates(
         self,
@@ -555,6 +574,22 @@ class AuctionRulesEditorDialog(QDialog):
             self.template_combo.setStyleSheet(active_style)
         self.activate_template_btn.setHidden(is_active)
         self.delete_template_btn.setHidden(self.template_combo.count() <= 1)
+        if self._rules_overlay_url is not None:
+            name = str(current["name"]) if current is not None else ""
+            kind = "активный" if is_active else "неактивный"
+            self.rules_preview_target_label.setText(
+                f"Предпросмотр: «{name}» ({kind} шаблон). "
+                "Рабочий оверлей OBS останется без изменений."
+                if current is not None else ""
+            )
+            if current is not None and self._loaded_template_id is not None:
+                self.preview_rules_obs_btn.setToolTip(
+                    "Откроется сохранённый вариант выбранного шаблона. "
+                    "Несохранённые изменения видны после «Сохранить». "
+                    "Ссылка: " + self._selected_template_preview_url(
+                        self._loaded_template_id
+                    )
+                )
         self.dirty_label.setText(
             ("Есть несохранённые изменения" if self._is_dirty() else "Сохранено")
             if current is not None else ""
