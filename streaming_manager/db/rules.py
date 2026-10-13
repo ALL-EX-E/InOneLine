@@ -560,12 +560,14 @@ class RulesMixin:
                 auction_id: int | None = int(session["id"])
                 template_name = str(session.get("rules_template_name") or "")
                 raw_html = str(session.get("rules_html") or "")
+                raw_presentation = session.get("rules_presentation_json")
             else:
                 template = self._active_rule_snapshot_conn(conn)
                 source = "active_template"
                 auction_id = None
                 template_name = str(template["template_name"] or "")
                 raw_html = str(template["content_html"] or "")
+                raw_presentation = template["presentation_json"]
 
         background = str(settings.get(
             RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT
@@ -584,6 +586,10 @@ class RulesMixin:
             except ValueError:
                 color = RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
 
+        # The current session owns its frozen/live-synchronized appearance.
+        # Legacy NULL or corrupt values retain the exact original global
+        # presentation; widget visibility stays governed by global policy.
+        template_presentation = self._read_rule_presentation_json(raw_presentation)
         return {
             "visible": show_mode(settings, "rules") != "hidden",
             "visibility": visibility_payload(settings, "rules"),
@@ -591,7 +597,7 @@ class RulesMixin:
             "auction_id": auction_id,
             "template_name": template_name,
             "content_html": sanitize_rules_html(raw_html),
-            "presentation": {
+            "presentation": template_presentation if template_presentation is not None else {
                 "autoscroll": settings.get(
                     RULES_OVERLAY_AUTOSCROLL_KEY,
                     "1" if RULES_OVERLAY_AUTOSCROLL_DEFAULT else "0",
