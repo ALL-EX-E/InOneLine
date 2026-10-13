@@ -315,7 +315,7 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
             editor.preview_rules_obs_btn.click()
         if (opened.call_count != 1
                 or opened.call_args.args[0].toString()
-                != expected + f"?preview=1&template_id={int(editor._loaded_template_id)}"):
+                != editor._selected_template_preview_url(int(editor._loaded_template_id))):
             raise AssertionError("P11-B Rules editor preview lost exact OBS route")
         if hasattr(auction, "auction_rules_preview_btn"):
             raise AssertionError("P11-C obsolete Auction text-only preview button remains")
@@ -961,7 +961,7 @@ def assert_p11_rules_text_and_obs_sections(window) -> None:
             with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
                 dialog.preview_rules_obs_btn.click()
             if (opened.call_count != 1
-                    or opened.call_args.args[0].toString() != url + f"?preview=1&template_id={old_active}"):
+                    or opened.call_args.args[0].toString() != dialog._selected_template_preview_url(old_active)):
                 raise AssertionError("P11-J OBS preview route changed")
 
             tabs.setCurrentIndex(0)
