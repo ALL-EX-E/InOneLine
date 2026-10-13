@@ -105,6 +105,9 @@ def main() -> int:
             assert int(editor.template_combo.currentData()) == inactive, "Qt combobox did not select B"
             assert editor._loaded_template_id == inactive, "Qt editor still edits A"
             assert editor._is_dirty() is False, "Switching saved templates marked editor dirty"
+            assert "Browser secondary" in editor.rules_preview_target_label.text()
+            assert "неактивный шаблон" in editor.rules_preview_target_label.text()
+            assert f"template_id={inactive}" in editor.preview_rules_obs_btn.toolTip()
 
             urls = []
             with patch.object(QDesktopServices, "openUrl", side_effect=lambda url: urls.append(url.toString()) or True):
