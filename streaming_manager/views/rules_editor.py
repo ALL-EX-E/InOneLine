@@ -73,6 +73,7 @@ class AuctionRulesEditorDialog(QDialog):
     ):
         super().__init__(parent)
         self.db = db
+        self._rules_overlay_url = rules_overlay_url
         self._initial_template_id = (
             int(initial_template_id) if initial_template_id is not None else None
         )
@@ -166,10 +167,12 @@ class AuctionRulesEditorDialog(QDialog):
             rules_access.addWidget(self.copy_rules_url_btn)
 
             self.preview_rules_obs_btn = QPushButton("Открыть предпросмотр OBS")
+            self.preview_rules_obs_btn.setToolTip(
+                "Показать сохранённый вариант выбранного шаблона правил. "
+                "Несохранённые изменения появятся после нажатия «Сохранить»."
+            )
             self.preview_rules_obs_btn.clicked.connect(
-                lambda _checked=False: QDesktopServices.openUrl(
-                    QUrl(str(rules_overlay_url()) + "?preview=1")
-                )
+                self._open_selected_template_preview
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
             obs_layout.addLayout(rules_access)
@@ -343,6 +346,16 @@ class AuctionRulesEditorDialog(QDialog):
         )
         self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
 
+
+    def _open_selected_template_preview(self) -> None:
+        """Preview the selected saved template, never switch live OBS source."""
+        if self._rules_overlay_url is None:
+            return
+        url = str(self._rules_overlay_url())
+        suffix = "?preview=1"
+        if self._loaded_template_id is not None:
+            suffix += f"&template_id={int(self._loaded_template_id)}"
+        QDesktopServices.openUrl(QUrl(url + suffix))
 
     def _reload_templates(
         self,
