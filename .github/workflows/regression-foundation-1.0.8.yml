@@ -135,6 +135,11 @@ jobs:
         run: |
           python tools/rules_editor_appearance_smoke.py
 
+      - name: P11-K4 selected Rules template preview read-only HTTP regression
+        shell: pwsh
+        run: |
+          python tools/rules_selected_template_preview_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:
@@ -157,6 +162,13 @@ jobs:
         run: |
           python tools/timer_media_background_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "UI-045 Timer media regression failed" }
+
+      - name: P11-K4 real Chromium selected Rules preview vs on-air regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/rules_selected_template_browser_smoke.py
 
       - name: Build frozen application with accepted toolchain
         shell: pwsh

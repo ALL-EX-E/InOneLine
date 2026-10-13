@@ -315,7 +315,7 @@ def assert_p11_rules_obs_access_relocation(window) -> None:
             editor.preview_rules_obs_btn.click()
         if (opened.call_count != 1
                 or opened.call_args.args[0].toString()
-                != expected + "?preview=1"):
+                != editor._selected_template_preview_url(int(editor._loaded_template_id))):
             raise AssertionError("P11-B Rules editor preview lost exact OBS route")
         if hasattr(auction, "auction_rules_preview_btn"):
             raise AssertionError("P11-C obsolete Auction text-only preview button remains")
@@ -952,13 +952,16 @@ def assert_p11_rules_text_and_obs_sections(window) -> None:
                     or not dialog.rules_overlay_url_label.textInteractionFlags()
                     & Qt.TextSelectableByMouse):
                 raise AssertionError("P11-J reused Rules URL provider changed")
+            if ("Предпросмотр:" not in dialog.rules_preview_target_label.text()
+                    or "активный шаблон" not in dialog.rules_preview_target_label.text()):
+                raise AssertionError("P11-K4 selected-template preview target is not visible")
             dialog.copy_rules_url_btn.click()
             if QApplication.clipboard().text() != url:
                 raise AssertionError("P11-J copy URL disconnected")
             with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
                 dialog.preview_rules_obs_btn.click()
             if (opened.call_count != 1
-                    or opened.call_args.args[0].toString() != url + "?preview=1"):
+                    or opened.call_args.args[0].toString() != dialog._selected_template_preview_url(old_active)):
                 raise AssertionError("P11-J OBS preview route changed")
 
             tabs.setCurrentIndex(0)
@@ -1058,7 +1061,7 @@ def assert_p09_obs_access(app, window, db) -> None:
          "Копировать URL списка лотов", "Открыть предпросмотр списка лотов",
          "auction_lots_overlay_form", "?preview=1"),
         ("Виджет правил аукциона", "Правила OBS", "/rules-overlay", "Копировать URL правил",
-         "Открыть предпросмотр правил", "rules_overlay_form", "?preview=1"),
+         "Предпросмотр текущих правил", "rules_overlay_form", "?preview=1"),
     )
     clipboard_before = QApplication.clipboard().text()
     original_api = stream.api

@@ -638,10 +638,52 @@ class LocalApiServer:
                     return
 
                 if path in ("/api/rules", "/rules"):
-                    self._send_json(
-                        db.current_rules_payload(),
-                        pretty=pretty,
-                    )
+                    # Template selection is permitted only in explicit preview
+                    # requests, never in an OBS source's normal live polling.
+                    follow_token = query.get("follow_token", [None])[0]
+                    preview_id = query.get("template_id", [None])[0]
+                    if follow_token is not None and query.get("preview", ["0"])[0] == "1":
+                        if (
+                            not 16 <= len(follow_token) <= 128
+                            or any(
+                                c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+                                for c in follow_token
+                            )
+                        ):
+                            self._send_json({"error": "invalid_preview_token"}, 400)
+                            return
+                        template_id = db.get_rules_preview_selection(follow_token)
+                        if template_id is None:
+                            # Never silently return on-air Rules when an editor
+                            # preview has expired or its token was not found.
+                            self._send_json({"error": "preview_expired"}, 404)
+                            return
+                        try:
+                            payload = db.current_rules_payload(
+                                preview_template_id=template_id
+                            )
+                        except ValueError:
+                            self._send_json({"error": "template_not_found"}, 404)
+                            return
+                    elif preview_id is not None and query.get("preview", ["0"])[0] == "1":
+                        if (
+                            not preview_id.isascii()
+                            or not preview_id.isdecimal()
+                            or not 1 <= len(preview_id) <= 10
+                            or int(preview_id) < 1
+                        ):
+                            self._send_json({"error": "invalid_template_id"}, 400)
+                            return
+                        try:
+                            payload = db.current_rules_payload(
+                                preview_template_id=int(preview_id)
+                            )
+                        except ValueError:
+                            self._send_json({"error": "template_not_found"}, 404)
+                            return
+                    else:
+                        payload = db.current_rules_payload()
+                    self._send_json(payload, pretty=pretty)
                     return
                 self._send_json({"error": "not_found"}, 404)
 

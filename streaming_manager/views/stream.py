@@ -1024,7 +1024,12 @@ class StreamTab(QWidget):
         copy_rules.clicked.connect(
             lambda: QApplication.clipboard().setText(f"{self.api.base_url}/rules-overlay")
         )
-        open_rules = QPushButton("Открыть предпросмотр правил")
+        open_rules = QPushButton("Предпросмотр текущих правил")
+        open_rules.setToolTip(
+            "Открывает рабочие правила текущего аукциона или активного "
+            "шаблона. Для неактивного шаблона используйте предпросмотр "
+            "выбранного шаблона в редакторе правил."
+        )
         open_rules.clicked.connect(
             lambda: QDesktopServices.openUrl(
                 QUrl(f"{self.api.base_url}/rules-overlay?preview=1")
