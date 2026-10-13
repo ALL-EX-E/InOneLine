@@ -1,6 +1,6 @@
 """P11-K2: persisted per-template Rules appearance and auction source-sync tests.
 
-No user interface or OBS renderer appearance is switched in this increment.
+P11-K3 switches OBS presentation to the selected template with global fallback.
 """
 from __future__ import annotations
 
@@ -58,7 +58,9 @@ def main() -> int:
             **style_a, "background_color": "#1122AA"
         }
         assert db.get_rule_template_presentation(b) == style_b
-        assert db.current_rules_payload() == before, "saved style leaked to OBS"
+        assert db.current_rules_payload()["presentation"] == {
+            **style_a, "background_color": "#1122AA"
+        }, "active template style did not reach OBS"
 
         # Strict field/value checking and atomic failure.
         for invalid in (
@@ -82,7 +84,7 @@ def main() -> int:
             pass
         else:
             raise AssertionError("missing template accepted")
-        assert db.current_rules_payload() == before
+        assert db.current_rules_payload()["presentation"]["padding"] == 17
 
         db.add_game(Game(None, "K2 Lot A", "2026-01-01", 100, 0, STATUS_PLAYED, ""))
         db.add_game(Game(None, "K2 Lot B", "2026-01-01", 200, 0, STATUS_NOT_PLAYED, ""))
@@ -91,7 +93,7 @@ def main() -> int:
             **style_a, "background_color": "#1122AA"
         }, "new session did not capture active template appearance"
         assert db.current_rules_payload()["source"] == "auction_snapshot"
-        assert db.current_rules_payload()["presentation"] == before["presentation"]
+        assert db.current_rules_payload()["presentation"]["padding"] == 17
 
         # Inactive source cannot change on-air session appearance.
         db.save_rule_template_presentation(b, {**style_b, "padding": 81})
@@ -100,11 +102,12 @@ def main() -> int:
         db.save_rule_template_presentation(a, style_a2)
         db.save_rule_template_presentation(a, style_a2)  # idempotent Save: no extra audit
         assert db.get_auction_rules_presentation_snapshot(auction_id)["padding"] == 53
+        assert db.current_rules_payload()["presentation"]["padding"] == 53
         db.set_active_rule_template(b)
         assert db.get_auction_rules_presentation_snapshot(auction_id)["padding"] == 81
         assert db.get_auction_rules_snapshot(auction_id)["template_id"] == b
         assert "Other Rules" in db.current_rules_payload()["content_html"]
-        assert db.current_rules_payload()["presentation"] == before["presentation"]
+        assert db.current_rules_payload()["presentation"]["padding"] == 81
 
         # Resetting explicit style retains the same legacy global fallback.
         db.save_rule_template_presentation(b, None)
@@ -143,7 +146,7 @@ def main() -> int:
         Database(db.path)  # idempotent reopen preserves valid customization
         assert db.get_rule_template_presentation(a)["padding"] == 17
 
-    print("P11_K2_RULES_PRESENTATION_TEMPLATE_SESSION_SYNC_NO_OBS_SWITCH=PASS")
+    print("P11_K3_RULES_PRESENTATION_TEMPLATE_SESSION_OBS_CUTOVER=PASS")
     return 0
 
 
