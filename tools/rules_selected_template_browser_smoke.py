@@ -191,7 +191,7 @@ def main() -> int:
             wait_js(preview_page, expr, "A LIVE", "No-auction preview follows B -> A")
             wait_js(live_page, expr, "B CHOSEN", "No-auction on-air still active B")
             assert views[1].url().toString() == preview_url
-            assert db.list_rule_templates()[0]["id"] == templates_before[0]["id"]
+            assert {int(x["id"]) for x in db.list_rule_templates()} == {int(x["id"]) for x in templates_before}, "Unexpected template added or removed"
             assert db.get_settings() == settings_before
         finally:
             for view in views:
