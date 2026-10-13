@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QApplication, QInputDialog
+from PySide6.QtWidgets import QApplication, QInputDialog, QLabel
 from streaming_manager.database import Database
 from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
 from streaming_manager.constants import (
@@ -57,6 +57,9 @@ def main() -> int:
             assert dialog.rules_editor_splitter.widget(1) is dialog.rules_obs_scroll
             assert dialog.rules_obs_scroll.widget() is dialog.rules_obs_page
             assert dialog.rules_obs_color_btn is not None
+            assert not hasattr(dialog, "rules_obs_padding")
+            assert not any(label.text() == "Внутренний отступ:"
+                           for label in dialog.findChildren(QLabel))
             assert dialog._loaded_template_id == active
             assert db.get_rule_template_presentation(active) is None
             assert dialog._obs_presentation_values() == {
@@ -67,7 +70,6 @@ def main() -> int:
                 "padding": 37,
             }
             assert dialog._is_dirty() is False
-            dialog.rules_obs_padding.setValue(63)
             dialog.rules_obs_opacity.setValue(81)
             dialog.rules_obs_autoscroll.setChecked(True)
             dialog._set_color_button(
@@ -81,7 +83,7 @@ def main() -> int:
             assert not dialog._is_dirty()
             saved = db.get_rule_template_presentation(active)
             assert saved is not None
-            assert saved["padding"] == 63 and saved["background_opacity"] == 81
+            assert saved["padding"] == 37 and saved["background_opacity"] == 81
             assert saved["background_color"] == "#554433"
             assert saved["autoscroll"] is True
             assert db.get_settings() == original_settings
@@ -93,7 +95,7 @@ def main() -> int:
             assert dialog._obs_presentation_values()["padding"] == 37
             assert db.get_rule_template_presentation(inactive) is None
             assert dialog._is_dirty() is False
-            dialog.rules_obs_padding.setValue(47)
+            dialog.rules_obs_opacity.setValue(47)
             app.processEvents()
             assert dialog._is_dirty()
             with patch.object(dialog, "_confirm_discard_or_save", return_value=False):
@@ -106,23 +108,23 @@ def main() -> int:
 
             with patch.object(dialog, "_choose_save_action", return_value="replace"):
                 assert dialog._save_with_choice()
-            assert db.get_rule_template_presentation(inactive)["padding"] == 47
-            assert db.get_rule_template_presentation(active)["padding"] == 63
+            assert db.get_rule_template_presentation(inactive)["background_opacity"] == 47
+            assert db.get_rule_template_presentation(active)["background_opacity"] == 81
 
             # Saving a copy preserves appearance without making it active.
-            dialog.rules_obs_padding.setValue(69)
+            dialog.rules_obs_opacity.setValue(69)
             with patch.object(dialog, "_choose_save_action", return_value="new"), patch.object(
                 QInputDialog, "getText", return_value=("P11-K3 копия", True)
             ):
                 assert dialog._save_with_choice()
             copied = int(dialog._loaded_template_id)
             assert copied not in (active, inactive)
-            assert db.get_rule_template_presentation(copied)["padding"] == 69
+            assert db.get_rule_template_presentation(copied)["background_opacity"] == 69
             assert db.get_active_rule_template()["id"] == active
-            assert db.get_rule_template_presentation(inactive)["padding"] == 47
+            assert db.get_rule_template_presentation(inactive)["background_opacity"] == 47
 
             db.set_active_rule_template(copied)
-            assert db.current_rules_payload()["presentation"]["padding"] == 69
+            assert db.current_rules_payload()["presentation"]["background_opacity"] == 69
             assert db.get_settings() == original_settings
             db.save_rule_template_presentation(copied, None)
             assert db.current_rules_payload()["presentation"]["padding"] == 37

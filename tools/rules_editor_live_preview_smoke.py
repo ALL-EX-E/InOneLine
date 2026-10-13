@@ -71,27 +71,40 @@ def main() -> int:
             editor = dialog.editor
             initial_html = editor.toHtml()
             assert "rgba(18, 52, 86, 89)" in editor.viewport().styleSheet()
-            assert editor.document().documentMargin() == 37.0
+            assert not hasattr(dialog, "rules_obs_padding")
+            assert dialog._responsive_rules_padding(320, 180) == 8.0
+            assert dialog._responsive_rules_padding(1200, 1000) == 22.0
+            assert dialog._responsive_rules_padding(2000, 1500) == 24.0
+            assert editor.document().documentMargin() == dialog._responsive_rules_padding(
+                editor.viewport().width(), editor.viewport().height()
+            )
+            assert editor.document().documentMargin() < 37.0
             assert editor.isReadOnly() is False
             assert dialog._is_dirty() is False
             assert dialog.rules_editor_splitter.count() == 2
             assert dialog.rules_editor_splitter.orientation() == Qt.Horizontal
             assert editor.isVisible() and dialog.rules_obs_page.isVisible()
+            assert editor.document().documentMargin() == dialog._responsive_rules_padding(
+                editor.viewport().width(), editor.viewport().height()
+            )
             dialog.resize(800, 680)
             app.processEvents()
             assert dialog.rules_editor_splitter.orientation() == Qt.Vertical
             assert editor.isVisible() and dialog.rules_obs_page.isVisible()
+            assert editor.document().documentMargin() == dialog._responsive_rules_padding(
+                editor.viewport().width(), editor.viewport().height()
+            )
             dialog.resize(1100, 760)
             app.processEvents()
             assert dialog.rules_editor_splitter.orientation() == Qt.Horizontal
             assert editor.isVisible() and dialog.rules_obs_page.isVisible()
+            assert editor.document().documentMargin() == dialog._responsive_rules_padding(
+                editor.viewport().width(), editor.viewport().height()
+            )
 
             dialog.rules_obs_opacity.setValue(80)
             app.processEvents()
             assert "rgba(18, 52, 86, 204)" in editor.viewport().styleSheet()
-            dialog.rules_obs_padding.setValue(51)
-            app.processEvents()
-            assert editor.document().documentMargin() == 51.0
             dialog.rules_obs_transparent.setChecked(True)
             app.processEvents()
             assert "background-color: transparent" in editor.viewport().styleSheet()
@@ -115,7 +128,9 @@ def main() -> int:
             dialog._load_template(inactive)
             app.processEvents()
             assert "background-color: transparent" in editor.viewport().styleSheet()
-            assert editor.document().documentMargin() == 14.0
+            assert editor.document().documentMargin() == dialog._responsive_rules_padding(
+                editor.viewport().width(), editor.viewport().height()
+            )
             assert editor.toPlainText().strip() == "Другие правила"
             assert dialog._is_dirty() is False
             assert db.current_rules_payload()["source"] == "active_template"
@@ -126,7 +141,7 @@ def main() -> int:
             dialog.deleteLater()
             app.processEvents()
 
-    print("P11_K5_RULES_EDITABLE_BACKGROUND_OPACITY_INSET_LIVE_PREVIEW_QT=PASS")
+    print("P11_K6_RULES_EDITABLE_BACKGROUND_AND_RESPONSIVE_INSET_QT=PASS")
     return 0
 
 
