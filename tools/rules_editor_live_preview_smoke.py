@@ -16,7 +16,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QTextEdit
+from PySide6.QtGui import QTextCursor
 
 from streaming_manager.database import Database
 from streaming_manager.constants import (
@@ -33,7 +34,12 @@ def main() -> int:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         db = Database(Path(tmp) / "rules_k5_live_preview.db")
         active = int(db.get_active_rule_template()["id"])
-        db.save_rule_template(active, "<p>Проверка <b>редактируемого</b> текста</p>")
+        # The app stores QTextEdit.toHtml() on Save; use the same canonical Qt
+        # serialization rather than a manually typed <p> string as baseline.
+        fixture_editor = QTextEdit()
+        fixture_editor.setHtml("<p>Проверка <b>редактируемого</b> текста</p>")
+        db.save_rule_template(active, fixture_editor.toHtml())
+        fixture_editor.deleteLater()
         inactive = db.create_rule_template(
             "Другой стиль", content_html="<p>Другие правила</p>", make_active=False
         )
@@ -86,7 +92,7 @@ def main() -> int:
             assert db.get_settings() == original_settings
             assert db.get_active_rule_template()["id"] == active
 
-            editor.moveCursor(editor.textCursor().MoveOperation.End)
+            editor.moveCursor(QTextCursor.End)
             editor.insertPlainText(" ДОПОЛНЕНО")
             assert "ДОПОЛНЕНО" in editor.toPlainText()
             assert dialog._is_dirty()
