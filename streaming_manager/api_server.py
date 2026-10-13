@@ -638,10 +638,28 @@ class LocalApiServer:
                     return
 
                 if path in ("/api/rules", "/rules"):
-                    self._send_json(
-                        db.current_rules_payload(),
-                        pretty=pretty,
-                    )
+                    # Template selection is permitted only in explicit preview
+                    # requests, never in an OBS source's normal live polling.
+                    preview_id = query.get("template_id", [None])[0]
+                    if preview_id is not None and query.get("preview", ["0"])[0] == "1":
+                        if (
+                            not preview_id.isascii()
+                            or not preview_id.isdecimal()
+                            or not 1 <= len(preview_id) <= 10
+                            or int(preview_id) < 1
+                        ):
+                            self._send_json({"error": "invalid_template_id"}, 400)
+                            return
+                        try:
+                            payload = db.current_rules_payload(
+                                preview_template_id=int(preview_id)
+                            )
+                        except ValueError:
+                            self._send_json({"error": "template_not_found"}, 404)
+                            return
+                    else:
+                        payload = db.current_rules_payload()
+                    self._send_json(payload, pretty=pretty)
                     return
                 self._send_json({"error": "not_found"}, 404)
 
