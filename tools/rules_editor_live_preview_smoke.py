@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QTextEdit
 from PySide6.QtGui import QTextCursor
 
@@ -73,6 +74,17 @@ def main() -> int:
             assert editor.document().documentMargin() == 37.0
             assert editor.isReadOnly() is False
             assert dialog._is_dirty() is False
+            assert dialog.rules_editor_splitter.count() == 2
+            assert dialog.rules_editor_splitter.orientation() == Qt.Horizontal
+            assert editor.isVisible() and dialog.rules_obs_page.isVisible()
+            dialog.resize(800, 680)
+            app.processEvents()
+            assert dialog.rules_editor_splitter.orientation() == Qt.Vertical
+            assert editor.isVisible() and dialog.rules_obs_page.isVisible()
+            dialog.resize(1100, 760)
+            app.processEvents()
+            assert dialog.rules_editor_splitter.orientation() == Qt.Horizontal
+            assert editor.isVisible() and dialog.rules_obs_page.isVisible()
 
             dialog.rules_obs_opacity.setValue(80)
             app.processEvents()
