@@ -107,12 +107,12 @@ def main() -> int:
             assert editor._is_dirty() is False, "Switching saved templates marked editor dirty"
             assert "Browser secondary" in editor.rules_preview_target_label.text()
             assert "неактивный шаблон" in editor.rules_preview_target_label.text()
-            assert f"template_id={inactive}" in editor.preview_rules_obs_btn.toolTip()
+            assert f"follow_token={editor._rules_preview_token}" in editor.preview_rules_obs_btn.toolTip()
 
             urls = []
             with patch.object(QDesktopServices, "openUrl", side_effect=lambda url: urls.append(url.toString()) or True):
                 editor.preview_rules_obs_btn.click()
-            assert urls == [f"{base_url}?preview=1&template_id={inactive}"], urls
+            assert urls == [f"{base_url}?preview=1&follow_token={editor._rules_preview_token}"], urls
             preview_url = urls[0]
             assert db.current_rules_payload() == before_live, "Clicking preview changed live rules"
 
@@ -135,7 +135,7 @@ def main() -> int:
             expr = "document.getElementById('content')?.textContent.trim()"
             wait_js(live_page, expr, "A LIVE", "Real on-air browser rules")
             wait_js(preview_page, expr, "B CHOSEN", "Real browser inactive selected rules")
-            wait_js(preview_page, "new URLSearchParams(location.search).get('template_id')", str(inactive), "Preview URL id")
+            wait_js(preview_page, "new URLSearchParams(location.search).get('follow_token')", editor._rules_preview_token, "Stable preview token")
             wait_js(preview_page, "document.querySelector('#viewport').style.padding", "74px", "Preview B styling")
             wait_js(live_page, "document.querySelector('#viewport').style.padding", "18px", "On-air A styling")
             # Saving a new style for inactive B changes preview only.
@@ -145,8 +145,34 @@ def main() -> int:
             })
             wait_js(preview_page, "document.querySelector('#viewport').style.padding", "91px", "Preview update B")
             wait_js(live_page, expr, "A LIVE", "On-air remains A")
+
+            # The SAME already-open preview browser follows Qt selection.
+            editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
+            app.processEvents()
+            wait_js(preview_page, expr, "A LIVE", "Preview follows B -> A")
+            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "18px", "Preview A styling")
+            assert views[1].url().toString() == preview_url, "Preview should not navigate or spawn another tab"
+            editor.template_combo.setCurrentIndex(editor.template_combo.findData(inactive))
+            app.processEvents()
+            wait_js(preview_page, expr, "B CHOSEN", "Preview follows A -> B")
+            wait_js(preview_page, "document.querySelector('#viewport').style.padding", "91px", "Preview B styling after switch")
             assert db.get_auction_rules_snapshot(auction_id) == before_snapshot
             assert db.current_rules_payload() == before_live
+
+            # Activate B mid-auction: on-air becomes B. Preview must still
+            # follow editor selection when A is chosen without activation.
+            editor._make_active()
+            app.processEvents()
+            wait_js(live_page, expr, "B CHOSEN", "On-air B activated")
+            wait_js(preview_page, expr, "B CHOSEN", "Preview still on selected B")
+            editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
+            app.processEvents()
+            assert editor._loaded_template_id == active
+            wait_js(preview_page, expr, "A LIVE", "Preview follows inactive A after B activation")
+            wait_js(live_page, expr, "B CHOSEN", "On-air remains active B")
+            assert views[1].url().toString() == preview_url, "Preview URL changed after activation"
+            assert db.get_active_rule_template()["id"] == inactive
+            assert db.current_rules_payload()["content_html"].find("B CHOSEN") >= 0
             assert db.list_rule_templates()[0]["id"] == templates_before[0]["id"]
             assert db.get_settings() == settings_before
         finally:
