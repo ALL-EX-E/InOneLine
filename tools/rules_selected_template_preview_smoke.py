@@ -86,6 +86,23 @@ def main() -> int:
             assert "ON AIR PRIMARY" not in explicit["content_html"]
             assert explicit["presentation"]["background_color"] == "#ABCDEF"
             assert explicit["presentation"]["padding"] == 63
+            # A browser preview following an editor uses a process-only
+            # selector. Every poll resolves the current selection without
+            # changing the active template or persisted auction snapshots.
+            token = "A_valid_editor_preview_token_123456"
+            db.set_rules_preview_selection(token, b)
+            status, following = get(f"/api/rules?preview=1&follow_token={token}")
+            assert status == 200 and "SELECTED INACTIVE" in following["content_html"]
+            db.set_rules_preview_selection(token, a)
+            status, following = get(f"/api/rules?preview=1&follow_token={token}")
+            assert status == 200 and "ON AIR PRIMARY" in following["content_html"]
+            status, normal_token = get(f"/api/rules?follow_token={token}")
+            assert status == 200 and normal_token == live_before
+            db.clear_rules_preview_selection(token)
+            status, expired = get(f"/api/rules?preview=1&follow_token={token}")
+            assert status == 404 and expired["error"] == "preview_expired"
+            status, invalid = get("/api/rules?preview=1&follow_token=bad")
+            assert status == 400 and invalid["error"] == "invalid_preview_token"
             status, fallback = get(f"/api/rules?preview=1&template_id={a}")
             assert status == 200 and fallback["source"] == "template_preview"
             assert fallback["presentation"] == live_before["presentation"]
