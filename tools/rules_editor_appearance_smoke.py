@@ -52,8 +52,10 @@ def main() -> int:
         try:
             dialog.show()
             app.processEvents()
-            assert dialog.rules_editor_sections.count() == 2
-            assert dialog.rules_editor_sections.tabText(1) == "Оформление OBS"
+            assert dialog.rules_editor_splitter.count() == 2
+            assert dialog.rules_editor_splitter.widget(0) is dialog.rules_text_page
+            assert dialog.rules_editor_splitter.widget(1) is dialog.rules_obs_scroll
+            assert dialog.rules_obs_scroll.widget() is dialog.rules_obs_page
             assert dialog.rules_obs_color_btn is not None
             assert dialog._loaded_template_id == active
             assert db.get_rule_template_presentation(active) is None
@@ -65,7 +67,6 @@ def main() -> int:
                 "padding": 37,
             }
             assert dialog._is_dirty() is False
-            dialog.rules_editor_sections.setCurrentIndex(1)
             dialog.rules_obs_padding.setValue(63)
             dialog.rules_obs_opacity.setValue(81)
             dialog.rules_obs_autoscroll.setChecked(True)
