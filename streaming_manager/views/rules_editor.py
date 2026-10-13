@@ -523,6 +523,7 @@ class AuctionRulesEditorDialog(QDialog):
             self.editor.setHtml(self._loaded_html) if self._loaded_html else self.editor.clear()
         finally:
             self._loading = False
+        self._refresh_local_rules_preview()
         if self._rules_preview_token is not None:
             self.db.set_rules_preview_selection(
                 self._rules_preview_token, self._loaded_template_id
@@ -568,8 +569,39 @@ class AuctionRulesEditorDialog(QDialog):
             return presentation_dirty
         return current != self._loaded_html or presentation_dirty
 
+    def _refresh_local_rules_preview(self) -> None:
+        """Mirror existing OBS background/opacity/padding in the editable area.
+
+        This is a *view-only* treatment of the SAME QTextEdit/document. No HTML
+        rewrite, second rendering backend or template write occurs on preview.
+        Other OBS appearance features are separate future UI-060 increments.
+        """
+        values = self._obs_presentation_values()
+        if values["background"] == "color":
+            color = QColor(str(values["background_color"]))
+            alpha = round(int(values["background_opacity"]) * 255 / 100)
+            background = (
+                f"rgba({color.red()}, {color.green()}, {color.blue()}, {alpha})"
+            )
+        else:
+            background = "transparent"
+
+        # Style the viewport, not the QTextEdit frame: retain the application's
+        # focus border and keep all text editing, selection and shortcuts intact.
+        style = f"background-color: {background};"
+        viewport = self.editor.viewport()
+        if viewport.styleSheet() != style:
+            viewport.setStyleSheet(style)
+
+        # This is the same stored pixel inset used by rules_overlay.html; setting
+        # QTextDocument's layout margin does NOT write CSS into rule content.
+        margin = float(values["padding"])
+        if self.editor.document().documentMargin() != margin:
+            self.editor.document().setDocumentMargin(margin)
+
     def _editor_changed(self) -> None:
         if not self._loading:
+            self._refresh_local_rules_preview()
             self._update_status()
 
     def _update_status(self) -> None:
