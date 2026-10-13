@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Lock
 
 from .db.auction import AuctionMixin
 from .db.common import (
@@ -35,6 +36,9 @@ class Database(SchemaMixin, GamesMixin, AuctionMixin, MediaMixin, IntegrationsMi
 
     def __init__(self, path: str | Path, credential_store: CredentialStore | None = None):
         self.path = Path(path)
+        # Ephemeral browser-preview selection only, never persisted in SQLite.
+        self._rules_preview_selection_lock = Lock()
+        self._rules_preview_selections: dict[str, int] = {}
         self.credential_store = credential_store or create_credential_store(self.path.parent)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         ensure_managed_media_directories(self.path.parent)

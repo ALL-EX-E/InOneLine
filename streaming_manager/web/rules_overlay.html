@@ -70,7 +70,18 @@ body.preview #api-state.visible { display: block; }
 <div id="api-state">Нет связи с In one line</div>
 <script>
 (() => {
-  const API = "/api/rules";
+  const query = new URLSearchParams(window.location.search);
+  const chosenId = query.get("template_id");
+  const followToken = query.get("follow_token");
+  // The editor's ephemeral token makes this ONE browser tab follow its
+  // currently selected template, including changes after preview is opened.
+  // Normal OBS browser sources must keep polling the authoritative session.
+  const API = ObsVisibility.preview && followToken
+      && /^[A-Za-z0-9_-]{16,128}$/.test(followToken)
+    ? "/api/rules?preview=1&follow_token=" + followToken
+    : ObsVisibility.preview && chosenId && /^[1-9][0-9]{0,9}$/.test(chosenId)
+      ? "/api/rules?preview=1&template_id=" + chosenId
+      : "/api/rules";
   const POLL_MS = 500;
   const SPEED = 22; // px/s
   const PAUSE_TOP_MS = 1600;

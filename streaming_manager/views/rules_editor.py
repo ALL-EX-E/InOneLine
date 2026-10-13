@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Callable
+from secrets import token_urlsafe
 
 from PySide6.QtCore import QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
@@ -73,6 +74,10 @@ class AuctionRulesEditorDialog(QDialog):
     ):
         super().__init__(parent)
         self.db = db
+        self._rules_overlay_url = rules_overlay_url
+        # One ephemeral link per editor: changing the selected template updates
+        # its browser preview without altering active/on-air Rules.
+        self._rules_preview_token = token_urlsafe(24) if rules_overlay_url else None
         self._initial_template_id = (
             int(initial_template_id) if initial_template_id is not None else None
         )
@@ -147,7 +152,7 @@ class AuctionRulesEditorDialog(QDialog):
         # P11-B: reuse AuctionTab's existing URL provider; neither duplicate
         # its port resolution nor introduce another OBS route or preview mode.
         if rules_overlay_url is not None:
-            obs_layout.addWidget(QLabel("URL виджета правил:"))
+            obs_layout.addWidget(QLabel("URL рабочего виджета правил (текущий аукцион):"))
             self.rules_overlay_url_label = QLabel(str(rules_overlay_url()))
             self.rules_overlay_url_label.setWordWrap(True)
             self.rules_overlay_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -165,14 +170,19 @@ class AuctionRulesEditorDialog(QDialog):
             )
             rules_access.addWidget(self.copy_rules_url_btn)
 
-            self.preview_rules_obs_btn = QPushButton("Открыть предпросмотр OBS")
+            self.preview_rules_obs_btn = QPushButton("Предпросмотр выбранного шаблона")
+            self.preview_rules_obs_btn.setToolTip(
+                "Показать сохранённый вариант выбранного шаблона правил. "
+                "Несохранённые изменения появятся после нажатия «Сохранить»."
+            )
             self.preview_rules_obs_btn.clicked.connect(
-                lambda _checked=False: QDesktopServices.openUrl(
-                    QUrl(str(rules_overlay_url()) + "?preview=1")
-                )
+                self._open_selected_template_preview
             )
             rules_access.addWidget(self.preview_rules_obs_btn)
             obs_layout.addLayout(rules_access)
+            self.rules_preview_target_label = QLabel()
+            self.rules_preview_target_label.setWordWrap(True)
+            obs_layout.addWidget(self.rules_preview_target_label)
 
         # P11-K3: the five existing Rules appearance settings now belong
         # to the selected template, not to a second save in Stream / OBS.
@@ -344,6 +354,35 @@ class AuctionRulesEditorDialog(QDialog):
         self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
 
 
+    def _open_selected_template_preview(self) -> None:
+        """Preview the selected saved template, never switch live OBS source."""
+        if self._rules_overlay_url is None:
+            return
+        selected = self.template_combo.currentData()
+        if selected is None or self._loaded_template_id is None:
+            return
+        selected_id = int(selected)
+        if selected_id != self._loaded_template_id:
+            QMessageBox.warning(
+                self, "Предпросмотр правил",
+                "Выбранный шаблон ещё не загружен в редактор. "
+                "Повторно выберите шаблон и откройте предпросмотр."
+            )
+            return
+        QDesktopServices.openUrl(
+            QUrl(self._selected_template_preview_url(selected_id))
+        )
+
+    def _selected_template_preview_url(self, template_id: int) -> str:
+        assert self._rules_overlay_url is not None
+        assert self._rules_preview_token is not None
+        # URL stays the same while the editor changes its selected template.
+        # The selected ID is resolved from the process-only preview registry.
+        return (
+            str(self._rules_overlay_url())
+            + f"?preview=1&follow_token={self._rules_preview_token}"
+        )
+
     def _reload_templates(
         self,
         *,
@@ -484,6 +523,10 @@ class AuctionRulesEditorDialog(QDialog):
             self.editor.setHtml(self._loaded_html) if self._loaded_html else self.editor.clear()
         finally:
             self._loading = False
+        if self._rules_preview_token is not None:
+            self.db.set_rules_preview_selection(
+                self._rules_preview_token, self._loaded_template_id
+            )
         self._update_status()
         self._update_rules_session_notice()
         self._sync_format_controls()
@@ -542,6 +585,22 @@ class AuctionRulesEditorDialog(QDialog):
             self.template_combo.setStyleSheet(active_style)
         self.activate_template_btn.setHidden(is_active)
         self.delete_template_btn.setHidden(self.template_combo.count() <= 1)
+        if self._rules_overlay_url is not None:
+            name = str(current["name"]) if current is not None else ""
+            kind = "активный" if is_active else "неактивный"
+            self.rules_preview_target_label.setText(
+                f"Предпросмотр: «{name}» ({kind} шаблон). "
+                "Рабочий оверлей OBS останется без изменений."
+                if current is not None else ""
+            )
+            if current is not None and self._loaded_template_id is not None:
+                self.preview_rules_obs_btn.setToolTip(
+                    "Откроется сохранённый вариант выбранного шаблона. "
+                    "Несохранённые изменения видны после «Сохранить». "
+                    "Ссылка: " + self._selected_template_preview_url(
+                        self._loaded_template_id
+                    )
+                )
         self.dirty_label.setText(
             ("Есть несохранённые изменения" if self._is_dirty() else "Сохранено")
             if current is not None else ""
@@ -852,6 +911,8 @@ class AuctionRulesEditorDialog(QDialog):
 
     def closeEvent(self, event) -> None:
         if self._confirm_discard_or_save():
+            if self._rules_preview_token is not None:
+                self.db.clear_rules_preview_selection(self._rules_preview_token)
             event.accept()
         else:
             event.ignore()

@@ -538,8 +538,45 @@ class RulesMixin:
             return int(default)
         return max(int(minimum), min(int(maximum), parsed))
 
-    def current_rules_payload(self) -> dict[str, Any]:
-        """Read-only data contract for the standalone OBS Rules Browser Source."""
+    def set_rules_preview_selection(self, token: str, template_id: int) -> None:
+        """Set one editor's transient preview target; never activate a template.
+
+        Only an explicit preview token can read this value. The normal
+        on-air Rules route is entirely independent of this registry.
+        """
+        if not isinstance(token, str) or not token or len(token) > 128:
+            raise ValueError("Некорректная ссылка предпросмотра правил.")
+        template_id = int(template_id)
+        with self.connect() as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM auction_rule_templates WHERE id=?",
+                (template_id,),
+            ).fetchone()
+        if exists is None:
+            raise ValueError("Шаблон правил для предпросмотра не найден.")
+        with self._rules_preview_selection_lock:
+            self._rules_preview_selections[token] = template_id
+
+    def get_rules_preview_selection(self, token: str) -> int | None:
+        """Resolve a running editor preview, not a stored Rules preference."""
+        if not isinstance(token, str) or not token:
+            return None
+        with self._rules_preview_selection_lock:
+            return self._rules_preview_selections.get(token)
+
+    def clear_rules_preview_selection(self, token: str) -> None:
+        """Expire the editor's preview link on dialog close."""
+        with self._rules_preview_selection_lock:
+            self._rules_preview_selections.pop(token, None)
+
+    def current_rules_payload(
+        self, *, preview_template_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Read-only Rules API. Only preview callers may select another template.
+
+        Without a preview selector, open-session ownership and active-template
+        rendering are strictly unchanged. No read request writes template state.
+        """
         keys = (
             RULES_OVERLAY_VISIBLE_KEY,
             WIDGETS["rules"].key,
@@ -554,20 +591,34 @@ class RulesMixin:
         # connections per request.
         with self.connect() as conn:
             settings = self._get_settings_conn(conn, keys)
-            session = self._get_open_auction_session_conn(conn)
-            if session is not None:
-                source = "auction_snapshot"
-                auction_id: int | None = int(session["id"])
-                template_name = str(session.get("rules_template_name") or "")
-                raw_html = str(session.get("rules_html") or "")
-                raw_presentation = session.get("rules_presentation_json")
+            if preview_template_id is not None:
+                row = conn.execute(
+                    """SELECT name, content_html, presentation_json
+                       FROM auction_rule_templates WHERE id=?""",
+                    (int(preview_template_id),),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("Шаблон правил для предпросмотра не найден.")
+                source = "template_preview"
+                auction_id: int | None = None
+                template_name = str(row["name"] or "")
+                raw_html = str(row["content_html"] or "")
+                raw_presentation = row["presentation_json"]
             else:
-                template = self._active_rule_snapshot_conn(conn)
-                source = "active_template"
-                auction_id = None
-                template_name = str(template["template_name"] or "")
-                raw_html = str(template["content_html"] or "")
-                raw_presentation = template["presentation_json"]
+                session = self._get_open_auction_session_conn(conn)
+                if session is not None:
+                    source = "auction_snapshot"
+                    auction_id = int(session["id"])
+                    template_name = str(session.get("rules_template_name") or "")
+                    raw_html = str(session.get("rules_html") or "")
+                    raw_presentation = session.get("rules_presentation_json")
+                else:
+                    template = self._active_rule_snapshot_conn(conn)
+                    source = "active_template"
+                    auction_id = None
+                    template_name = str(template["template_name"] or "")
+                    raw_html = str(template["content_html"] or "")
+                    raw_presentation = template["presentation_json"]
 
         background = str(settings.get(
             RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT
