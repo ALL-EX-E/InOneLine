@@ -813,9 +813,12 @@ class AuctionRulesEditorDialog(QDialog):
         # A border-image stylesheet on QTextEdit.viewport is swallowed by
         # the native QTextEdit painting. Use a real QPalette.Base pixmap brush:
         # it paints *behind* editable text and never rewrites HTML.
-        media_ready = self._update_rules_media_brush(values)
+        media_selected = (
+            values["background"] == "media"
+            and values["background_media_id"] is not None
+        )
         color_css = (
-            "background: palette(base);" if media_ready
+            "background: palette(base);" if media_selected
             else f"background-color: {background};"
         )
         style = (
@@ -825,6 +828,9 @@ class AuctionRulesEditorDialog(QDialog):
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
             viewport.setStyleSheet(style)
+        # Qt's stylesheet engine can replace the active palette when a new
+        # style is installed. Always apply the image brush AFTER the style.
+        self._update_rules_media_brush(values)
         self._rules_glow_effect.setColor(QColor(
             edge.red(), edge.green(), edge.blue(), 148
         ))
