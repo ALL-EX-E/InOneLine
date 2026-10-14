@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Callable
 from secrets import token_urlsafe
-from pathlib import Path
 
 from PySide6.QtCore import QEvent, QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import (
@@ -612,11 +611,16 @@ class AuctionRulesEditorDialog(QDialog):
         if selected_id is _UNSET_MEDIA:
             selected_id = self.rules_obs_media_combo.currentData()
         self.db.sync_managed_media_category(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
-        existing = [
-            asset for asset in self.db.list_media_assets(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
-            if Path(asset.display_name).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
-            and media_asset_available(self.db.path.parent, asset)
-        ]
+        existing = []
+        for asset in self.db.list_media_assets(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS):
+            if not media_asset_available(self.db.path.parent, asset):
+                continue
+            try:
+                extension = resolve_media_asset_path(self.db.path.parent, asset).suffix.lower()
+            except (OSError, ValueError):
+                continue
+            if extension in {".png", ".jpg", ".jpeg", ".webp"}:
+                existing.append(asset)
         with QSignalBlocker(self.rules_obs_media_combo):
             self.rules_obs_media_combo.clear()
             self.rules_obs_media_combo.addItem("— выберите изображение —", None)
