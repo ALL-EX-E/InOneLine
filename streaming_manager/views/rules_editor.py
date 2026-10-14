@@ -78,10 +78,12 @@ class AuctionRulesEditorDialog(QDialog):
         *,
         initial_template_id: int | None = None,
         rules_overlay_url: Callable[[], str] | None = None,
+        import_background: Callable[[Callable[[int], None], QWidget], None] | None = None,
     ):
         super().__init__(parent)
         self.db = db
         self._rules_overlay_url = rules_overlay_url
+        self._import_background = import_background
         # One ephemeral link per editor: changing the selected template updates
         # its browser preview without altering active/on-air Rules.
         self._rules_preview_token = token_urlsafe(24) if rules_overlay_url else None
@@ -241,9 +243,18 @@ class AuctionRulesEditorDialog(QDialog):
         media_row_layout.addWidget(self.rules_obs_media_combo, 1)
         media_row_layout.addWidget(self.rules_obs_media_refresh)
         obs_form.addRow("Из библиотеки:", media_row)
+        self.rules_obs_media_add = QPushButton("Добавить фон…")
+        self.rules_obs_media_add.setEnabled(import_background is not None)
+        self.rules_obs_media_add.setToolTip(
+            "Добавить PNG, JPG или WEBP через общую библиотеку фонов."
+            if import_background is not None else
+            "Добавление фонов доступно из редактора в главном окне."
+        )
+        self.rules_obs_media_add.clicked.connect(self._import_rules_media_file)
+        obs_form.addRow("", self.rules_obs_media_add)
         self.rules_obs_media_hint = QLabel(
-            "Изображения PNG, JPG, WEBP из общей библиотеки. "
-            "Добавление файлов пока выполняется в «Стрим / OBS → Фон оверлея»."
+            "Общая библиотека фонов: копия в программу или ссылка на исходник. "
+            "GIF и видео будут доступны на следующем этапе."
         )
         self.rules_obs_media_hint.setWordWrap(True)
         obs_form.addRow(self.rules_obs_media_hint)
@@ -604,6 +615,10 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_opacity_control.setEnabled(color_mode)
         self.rules_obs_media_combo.setEnabled(self.rules_obs_media_mode.isChecked())
         self.rules_obs_media_refresh.setEnabled(self.rules_obs_media_mode.isChecked())
+        self.rules_obs_media_add.setEnabled(
+            self.rules_obs_media_mode.isChecked()
+            and self._import_background is not None
+        )
         self._editor_changed()
 
     def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
@@ -630,6 +645,23 @@ class AuctionRulesEditorDialog(QDialog):
             self.rules_obs_media_combo.setCurrentIndex(idx if idx >= 0 else 0)
         if not self._loading and hasattr(self, "editor"):
             self._editor_changed()
+
+    def _import_rules_media_file(self) -> None:
+        """Invoke the one pre-existing shared managed/external importer."""
+        if self._import_background is not None:
+            self._import_background(self._rules_media_imported, self)
+
+    def _rules_media_imported(self, asset_id: int) -> None:
+        """Select newly imported media in this template, not other widgets."""
+        self._refresh_rules_media_library(asset_id)
+        if self.rules_obs_media_combo.currentData() != asset_id:
+            QMessageBox.warning(
+                self, "Фон недоступен",
+                "Не удалось выбрать добавленный фон в общей библиотеке."
+            )
+            return
+        self.rules_obs_media_mode.setChecked(True)
+        self._editor_changed()
 
     def _obs_glow_changed(self, _checked: bool = False) -> None:
         enabled = self.rules_obs_glow.isChecked()
