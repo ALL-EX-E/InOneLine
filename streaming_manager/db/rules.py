@@ -606,6 +606,13 @@ class RulesMixin:
                 {"content_html": html, "presentation": validated},
             )
 
+    def clear_rules_preview_draft(self, token: str, template_id: int) -> None:
+        """Restore saved-template preview without changing the selected ID."""
+        with self._rules_preview_selection_lock:
+            entry = self._rules_preview_selections.get(token)
+            if entry is not None and entry[0] == int(template_id):
+                self._rules_preview_selections[token] = (int(template_id), None)
+
     def get_rules_preview_draft(
         self, token: str, template_id: int,
     ) -> dict[str, Any] | None:
