@@ -198,13 +198,32 @@ def main() -> int:
             media_asset = db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, image_path.name, image_path.name
             )
+            media_visible = "document.querySelector('#rules-background-image').style.display"
+            media_src = "document.querySelector('#rules-background-image').getAttribute('src')"
+            # FIX1: without Save, selecting the image and clicking Refresh
+            # must update the existing preview browser and local editable UI.
+            # The on-air source must still use the saved active template.
+            editor._refresh_rules_media_library(media_asset.id)
+            editor.rules_obs_media_mode.setChecked(True)
+            app.processEvents()
+            assert editor._is_dirty()
+            editor.rules_obs_media_refresh.click()
+            app.processEvents()
+            wait_js(preview_page, media_visible, "block", "Unsaved B media live preview")
+            wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Unsaved B preview safe asset")
+            assert db.get_rule_template_presentation(inactive).get("background") == "color"
+            assert db.current_rules_payload() == before_live
+            wait_js(live_page, media_visible, "none", "Unsaved B does not alter on-air A")
+            # Discard unsaved presentation; saved B can still change using the
+            # original DB mutation path, with no stale draft override.
+            editor._load_template(inactive)
+            app.processEvents()
+            wait_js(preview_page, media_visible, "none", "Discard restores saved B")
             db.save_rule_template_presentation(inactive, {
                 **db.get_rule_template_presentation(inactive),
                 "background": "media",
                 "background_media_id": media_asset.id,
             })
-            media_visible = "document.querySelector('#rules-background-image').style.display"
-            media_src = "document.querySelector('#rules-background-image').getAttribute('src')"
             wait_js(preview_page, media_visible, "block", "Shared B media shown in preview")
             wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Registered safe B image URL")
             wait_js(live_page, media_visible, "none", "On-air A retains no background media")

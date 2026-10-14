@@ -171,8 +171,26 @@ def main() -> int:
             dialog.rules_obs_media_mode.setChecked(True)
             app.processEvents()
             local_style = editor.viewport().styleSheet()
-            assert "border-image: url(" in local_style
-            assert "rules_k8a_preview.png" in local_style
+            assert "background-color: transparent" in local_style
+            assert dialog._rules_media_source_key is not None
+            assert dialog._rules_media_source_key[0] == str(image_file)
+            assert dialog._rules_media_label.isVisible()
+            assert not dialog._rules_media_label.pixmap().isNull()
+            assert dialog.rules_text_canvas.isVisible()
+            snapshot = dialog.rules_text_canvas.grab().toImage()
+            point = snapshot.pixelColor(
+                snapshot.width() // 2, snapshot.height() * 3 // 4,
+            )
+            assert (abs(point.red() - 51) < 6
+                    and abs(point.green() - 119) < 6
+                    and abs(point.blue() - 187) < 6), (
+                f"Qt text editor is not actually painting its image: {point.name()}"
+            )
+            # Refresh from the library must repaint instantly without Save.
+            dialog.rules_obs_media_refresh.click()
+            app.processEvents()
+            assert dialog._rules_media_source_key[0] == str(image_file)
+            assert editor.toHtml() == inactive_html
             assert editor.toPlainText().strip() == "Другие правила"
             assert dialog._is_dirty() is True
             assert db.get_rule_template_presentation(inactive)["background"] == "transparent"
@@ -180,7 +198,8 @@ def main() -> int:
             # Existing content and live template are unaffected before Save.
             dialog.rules_obs_transparent.setChecked(True)
             app.processEvents()
-            assert "border-image: url(" not in editor.viewport().styleSheet()
+            assert dialog._rules_media_label.isHidden()
+            assert dialog._rules_media_source_key is None
         finally:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
                 dialog.close()

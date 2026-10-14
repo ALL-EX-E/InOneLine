@@ -185,6 +185,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         open_integrations: Callable[[], None] | None = None,
         integration_runtime_health: Callable[[], dict[str, dict]] | None = None,
         audio_coordinator: AudioCoordinator | None = None,
+        import_rules_background: Callable[[Callable[[int], None], QWidget], None] | None = None,
     ):
         super().__init__()
         self.db = db
@@ -193,6 +194,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.open_integrations = open_integrations or (lambda: None)
         self.integration_runtime_health = integration_runtime_health or (lambda: {})
         self.audio_coordinator = audio_coordinator or AudioCoordinator(self)
+        self._import_rules_background = import_rules_background
         self._integration_status_dialog: QDialog | None = None
         self._active_auction_id: int | None = None
         self.thread_pool = QThreadPool.globalInstance()
@@ -2156,6 +2158,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self,
             initial_template_id=initial_template_id,
             rules_overlay_url=self._rules_overlay_url,
+            import_background=self._import_rules_background,
         )
         dialog.exec()
 

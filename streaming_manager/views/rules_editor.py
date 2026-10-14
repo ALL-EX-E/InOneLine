@@ -9,6 +9,8 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
+    QPalette,
+    QPixmap,
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
@@ -31,6 +33,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QScrollArea,
     QSplitter,
+    QStackedLayout,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -78,10 +81,12 @@ class AuctionRulesEditorDialog(QDialog):
         *,
         initial_template_id: int | None = None,
         rules_overlay_url: Callable[[], str] | None = None,
+        import_background: Callable[[Callable[[int], None], QWidget], None] | None = None,
     ):
         super().__init__(parent)
         self.db = db
         self._rules_overlay_url = rules_overlay_url
+        self._import_background = import_background
         # One ephemeral link per editor: changing the selected template updates
         # its browser preview without altering active/on-air Rules.
         self._rules_preview_token = token_urlsafe(24) if rules_overlay_url else None
@@ -241,9 +246,18 @@ class AuctionRulesEditorDialog(QDialog):
         media_row_layout.addWidget(self.rules_obs_media_combo, 1)
         media_row_layout.addWidget(self.rules_obs_media_refresh)
         obs_form.addRow("Из библиотеки:", media_row)
+        self.rules_obs_media_add = QPushButton("Добавить фон…")
+        self.rules_obs_media_add.setEnabled(import_background is not None)
+        self.rules_obs_media_add.setToolTip(
+            "Добавить PNG, JPG или WEBP через общую библиотеку фонов."
+            if import_background is not None else
+            "Добавление фонов доступно из редактора в главном окне."
+        )
+        self.rules_obs_media_add.clicked.connect(self._import_rules_media_file)
+        obs_form.addRow("", self.rules_obs_media_add)
         self.rules_obs_media_hint = QLabel(
-            "Изображения PNG, JPG, WEBP из общей библиотеки. "
-            "Добавление файлов пока выполняется в «Стрим / OBS → Фон оверлея»."
+            "Общая библиотека фонов: копия в программу или ссылка на исходник. "
+            "GIF и видео будут доступны на следующем этапе."
         )
         self.rules_obs_media_hint.setWordWrap(True)
         obs_form.addRow(self.rules_obs_media_hint)
@@ -384,6 +398,15 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
         self.editor.setPlaceholderText("Введите правила аукциона…")
+        self._rules_default_editor_palette = QPalette(self.editor.palette())
+        self._rules_default_viewport_palette = QPalette(self.editor.viewport().palette())
+        self._rules_media_source_key = None
+        self._rules_media_original = QPixmap()
+        self._rules_media_brush_key = None
+        self._rules_media_label = QLabel()
+        self._rules_media_label.setScaledContents(True)
+        self._rules_media_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._rules_media_label.hide()
         self._rules_glow_effect = QGraphicsDropShadowEffect(self.editor)
         self._rules_glow_effect.setOffset(0, 0)
         self._rules_glow_effect.setBlurRadius(20)
@@ -392,7 +415,14 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor.textChanged.connect(self._editor_changed)
         self.editor.cursorPositionChanged.connect(self._sync_format_controls)
         self.editor.viewport().installEventFilter(self)
-        text_layout.addWidget(self.editor, 1)
+        self.rules_text_canvas = QWidget()
+        self.rules_text_canvas_layout = QStackedLayout(self.rules_text_canvas)
+        self.rules_text_canvas_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_text_canvas_layout.setStackingMode(QStackedLayout.StackAll)
+        self.rules_text_canvas_layout.addWidget(self._rules_media_label)
+        self.rules_text_canvas_layout.addWidget(self.editor)
+        self.rules_text_canvas_layout.setCurrentWidget(self.editor)
+        text_layout.addWidget(self.rules_text_canvas, 1)
 
         bottom = QHBoxLayout()
         self.dirty_label = QLabel()
@@ -604,6 +634,10 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_opacity_control.setEnabled(color_mode)
         self.rules_obs_media_combo.setEnabled(self.rules_obs_media_mode.isChecked())
         self.rules_obs_media_refresh.setEnabled(self.rules_obs_media_mode.isChecked())
+        self.rules_obs_media_add.setEnabled(
+            self.rules_obs_media_mode.isChecked()
+            and self._import_background is not None
+        )
         self._editor_changed()
 
     def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
@@ -630,6 +664,23 @@ class AuctionRulesEditorDialog(QDialog):
             self.rules_obs_media_combo.setCurrentIndex(idx if idx >= 0 else 0)
         if not self._loading and hasattr(self, "editor"):
             self._editor_changed()
+
+    def _import_rules_media_file(self) -> None:
+        """Invoke the one pre-existing shared managed/external importer."""
+        if self._import_background is not None:
+            self._import_background(self._rules_media_imported, self)
+
+    def _rules_media_imported(self, asset_id: int) -> None:
+        """Select newly imported media in this template, not other widgets."""
+        self._refresh_rules_media_library(asset_id)
+        if self.rules_obs_media_combo.currentData() != asset_id:
+            QMessageBox.warning(
+                self, "Фон недоступен",
+                "Не удалось выбрать добавленный фон в общей библиотеке."
+            )
+            return
+        self.rules_obs_media_mode.setChecked(True)
+        self._editor_changed()
 
     def _obs_glow_changed(self, _checked: bool = False) -> None:
         enabled = self.rules_obs_glow.isChecked()
@@ -703,6 +754,7 @@ class AuctionRulesEditorDialog(QDialog):
             self.db.set_rules_preview_selection(
                 self._rules_preview_token, self._loaded_template_id
             )
+            self._publish_unsaved_preview()
         self._update_status()
         self._update_rules_session_notice()
         self._sync_format_controls()
@@ -770,28 +822,110 @@ class AuctionRulesEditorDialog(QDialog):
             f"rgba({edge.red()}, {edge.green()}, {edge.blue()}, {edge_alpha})"
             if glow else "rgba(255, 255, 255, 42)"
         )
-        media_style = ""
-        if values["background"] == "media" and values["background_media_id"] is not None:
-            asset = self.db.get_media_asset(int(values["background_media_id"]))
-            if (asset is not None and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
-                    and media_asset_available(self.db.path.parent, asset)):
-                path = resolve_media_asset_path(self.db.path.parent, asset)
-                media_url = QUrl.fromLocalFile(str(path)).toString()
-                media_style = f'border-image: url("{media_url}") 0 0 0 0 stretch stretch;'
+        # A border-image stylesheet on QTextEdit.viewport is swallowed by
+        # the native QTextEdit painting. Use a real QPalette.Base pixmap brush:
+        # it paints *behind* editable text and never rewrites HTML.
+        media_selected = (
+            values["background"] == "media"
+            and values["background_media_id"] is not None
+        )
+        color_css = (
+            "background-color: transparent;" if media_selected
+            else f"background-color: {background};"
+        )
         style = (
-            f"background-color: {background};"
+            f"{color_css}"
             f"border-radius: 8px; border: 1px solid {stroke};"
-            f"{media_style}"
         )
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
             viewport.setStyleSheet(style)
+        # The image is displayed under the one transparent editable surface.
+        self._update_rules_media_layer(values)
         self._rules_glow_effect.setColor(QColor(
             edge.red(), edge.green(), edge.blue(), 148
         ))
         self._rules_glow_effect.setEnabled(glow)
 
         self._update_local_rules_padding()
+
+    def _update_rules_media_layer(self, values: dict[str, object]) -> bool:
+        """Paint the cached image *under* one transparent native QTextEdit.
+
+        A QTextEdit viewport repaints its own base color, so a QSS border-image
+        or a QPalette texture on its viewport is not a reliable actual preview.
+        Using a QWidget stack leaves text, cursor, scrolling and QTextDocument
+        untouched and avoids duplicating the HTML renderer or editor model.
+        """
+        viewport = self.editor.viewport()
+        asset = None
+        if (values["background"] == "media"
+                and values.get("background_media_id") is not None):
+            asset = self.db.get_media_asset(int(values["background_media_id"]))
+        path = None
+        if (asset is not None
+                and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+                and media_asset_available(self.db.path.parent, asset)):
+            try:
+                path = resolve_media_asset_path(self.db.path.parent, asset)
+            except (ValueError, OSError):
+                path = None
+
+        valid = False
+        if path is not None and path.suffix.lower() in {
+            ".png", ".jpg", ".jpeg", ".webp",
+        }:
+            try:
+                source_key = (str(path), path.stat().st_mtime_ns)
+            except OSError:
+                source_key = None
+            if source_key is not None:
+                if self._rules_media_source_key != source_key:
+                    self._rules_media_source_key = source_key
+                    self._rules_media_original = QPixmap(str(path))
+                    self._rules_media_brush_key = None
+                if not self._rules_media_original.isNull():
+                    valid = True
+                    size = self.rules_text_canvas.size()
+                    width, height = max(1, size.width()), max(1, size.height())
+                    brush_key = (source_key, width, height)
+                    if self._rules_media_brush_key != brush_key:
+                        scaled = self._rules_media_original.scaled(
+                            width, height, Qt.KeepAspectRatioByExpanding,
+                            Qt.SmoothTransformation,
+                        )
+                        x = max(0, (scaled.width() - width) // 2)
+                        y = max(0, (scaled.height() - height) // 2)
+                        self._rules_media_label.setPixmap(
+                            scaled.copy(x, y, width, height)
+                        )
+                        self._rules_media_brush_key = brush_key
+
+        if valid:
+            # Make the actual QTextEdit surface see-through; the media
+            # is a non-interactive sibling painted beneath the text.
+            transparent = QPalette(self._rules_default_editor_palette)
+            transparent.setColor(QPalette.Base, QColor(0, 0, 0, 0))
+            self.editor.setPalette(transparent)
+            viewport.setPalette(transparent)
+            self.editor.setAttribute(Qt.WA_TranslucentBackground, True)
+            viewport.setAttribute(Qt.WA_TranslucentBackground, True)
+            viewport.setAutoFillBackground(False)
+            self.editor.setStyleSheet("QTextEdit { background: transparent; }")
+            self._rules_media_label.show()
+            self._rules_media_label.lower()
+        else:
+            self._rules_media_label.hide()
+            self._rules_media_source_key = None
+            self._rules_media_original = QPixmap()
+            self._rules_media_brush_key = None
+            self.editor.setStyleSheet("")
+            self.editor.setPalette(self._rules_default_editor_palette)
+            viewport.setPalette(self._rules_default_viewport_palette)
+            self.editor.setAttribute(Qt.WA_TranslucentBackground, False)
+            viewport.setAttribute(Qt.WA_TranslucentBackground, False)
+        viewport.update()
+        return valid
 
     @staticmethod
     def _responsive_rules_padding(width: int, height: int) -> float:
@@ -812,11 +946,41 @@ class AuctionRulesEditorDialog(QDialog):
         if (hasattr(self, "editor") and watched is self.editor.viewport()
                 and event.type() == QEvent.Resize):
             self._update_local_rules_padding()
+            if (hasattr(self, "rules_obs_media_mode")
+                    and self.rules_obs_media_mode.isChecked()):
+                self._refresh_local_rules_preview()
         return super().eventFilter(watched, event)
+
+    def _publish_unsaved_preview(self) -> None:
+        """Live browser draft for this editor token only, never normal OBS.
+
+        Reuses the existing read-only preview registry and the same validated
+        Rules media payload resolver as saved templates.
+        """
+        if self._rules_preview_token is None or self._loaded_template_id is None:
+            return
+        if not self._is_dirty():
+            self.db.clear_rules_preview_draft(
+                self._rules_preview_token, self._loaded_template_id,
+            )
+            return
+        presentation = self._obs_presentation_values()
+        if (presentation["background"] == "media"
+                and presentation.get("background_media_id") is None):
+            # Allow choosing "Свой" before choosing a library file.
+            presentation["background"] = "transparent"
+        html = (
+            self.editor.toHtml() if self.editor.toPlainText().strip() else ""
+        )
+        self.db.set_rules_preview_draft(
+            self._rules_preview_token, self._loaded_template_id,
+            html, presentation,
+        )
 
     def _editor_changed(self) -> None:
         if not self._loading:
             self._refresh_local_rules_preview()
+            self._publish_unsaved_preview()
             self._update_status()
 
     def _update_status(self) -> None:
@@ -873,6 +1037,7 @@ class AuctionRulesEditorDialog(QDialog):
         self._loaded_obs_presentation = presentation
         if presentation_dirty:
             self._loaded_obs_explicit = True
+        self._publish_unsaved_preview()
         self._update_status()
         return True
 

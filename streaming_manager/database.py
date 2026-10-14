@@ -36,9 +36,12 @@ class Database(SchemaMixin, GamesMixin, AuctionMixin, MediaMixin, IntegrationsMi
 
     def __init__(self, path: str | Path, credential_store: CredentialStore | None = None):
         self.path = Path(path)
-        # Ephemeral browser-preview selection only, never persisted in SQLite.
+        # Single process-only editor preview registry. Each token keeps
+        # selected template and optional unsaved draft; none is persisted.
         self._rules_preview_selection_lock = Lock()
-        self._rules_preview_selections: dict[str, int] = {}
+        self._rules_preview_selections: dict[
+            str, tuple[int, dict[str, object] | None]
+        ] = {}
         self.credential_store = credential_store or create_credential_store(self.path.parent)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         ensure_managed_media_directories(self.path.parent)
