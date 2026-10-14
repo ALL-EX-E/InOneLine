@@ -70,6 +70,7 @@ def main() -> int:
                 "padding": 37,
                 "glow": False,
                 "glow_color": "#FFFFFF",
+                "background_media_id": None,
             }
             assert not dialog._rules_glow_effect.isEnabled()
             assert "border-radius: 8px" in dialog.editor.viewport().styleSheet()
