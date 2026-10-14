@@ -1727,7 +1727,8 @@ class StreamTab(QWidget):
             return
         try:
             self._apply_background_import(
-                source, storage_mode, selection_target, on_imported=on_imported,
+                source, storage_mode, selection_target,
+                on_imported=on_imported, dialog_parent=owner,
             )
         except (OSError, ValueError) as exc:
             QMessageBox.critical(
@@ -1738,6 +1739,7 @@ class StreamTab(QWidget):
     def _apply_background_import(
         self, source: Path, storage_mode: str, selection_target: str,
         *, on_imported: Callable[[int], None] | None = None,
+        dialog_parent: QWidget | None = None,
     ) -> None:
         """Use shared D26 filename identity for both overlay background pickers."""
         if self._background_copy_worker is not None:
@@ -1761,7 +1763,7 @@ class StreamTab(QWidget):
         )
         if len(matches) > 1:
             QMessageBox.information(
-                self, "Фоны уже есть",
+                dialog_parent or self, "Фоны уже есть",
                 f"Для «{source.name}» найдено несколько записей в библиотеке. "
                 "Новая запись не создана. Выберите нужный фон вручную.",
             )
@@ -1782,7 +1784,7 @@ class StreamTab(QWidget):
                     # Readding a moved source reuses the original media ID.
                     asset = self.db.update_external_media_asset(asset.id, source)
                 QMessageBox.information(
-                    self, "Фон уже есть",
+                    dialog_parent or self, "Фон уже есть",
                     f"Файл «{source.name}» уже есть в библиотеке. "
                     "Будет выбран существующий фон.",
                 )
@@ -1791,7 +1793,7 @@ class StreamTab(QWidget):
 
         if existing is not None and existing.storage_mode == MEDIA_STORAGE_MANAGED:
             QMessageBox.information(
-                self, "Фон уже есть",
+                dialog_parent or self, "Фон уже есть",
                 f"Файл «{source.name}» уже есть в библиотеке. "
                 "Будет выбран существующий фон.",
             )
