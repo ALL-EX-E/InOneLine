@@ -925,6 +925,11 @@ class AuctionRulesEditorDialog(QDialog):
         """
         if self._rules_preview_token is None or self._loaded_template_id is None:
             return
+        if not self._is_dirty():
+            self.db.clear_rules_preview_draft(
+                self._rules_preview_token, self._loaded_template_id,
+            )
+            return
         presentation = self._obs_presentation_values()
         if (presentation["background"] == "media"
                 and presentation.get("background_media_id") is None):
@@ -998,6 +1003,7 @@ class AuctionRulesEditorDialog(QDialog):
         self._loaded_obs_presentation = presentation
         if presentation_dirty:
             self._loaded_obs_explicit = True
+        self._publish_unsaved_preview()
         self._update_status()
         return True
 
