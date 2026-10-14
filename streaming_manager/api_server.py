@@ -660,7 +660,10 @@ class LocalApiServer:
                             return
                         try:
                             payload = db.current_rules_payload(
-                                preview_template_id=template_id
+                                preview_template_id=template_id,
+                                preview_draft=db.get_rules_preview_draft(
+                                    follow_token, template_id
+                                ),
                             )
                         except ValueError:
                             self._send_json({"error": "template_not_found"}, 404)
