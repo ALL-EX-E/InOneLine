@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
             open_integrations=self.open_integrations_settings,
             integration_runtime_health=self._integration_runtime_health_snapshot,
             audio_coordinator=self.audio_coordinator,
+            import_rules_background=self.stream_tab.import_rules_background_media,
         )
         self.api.set_auction_lots_state_provider(
             self.auction_tab.auction_lots_overlay_state

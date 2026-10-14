@@ -145,6 +145,11 @@ jobs:
         run: |
           python tools/rules_editor_live_preview_smoke.py
 
+      - name: P11-K8B shared managed-external import in modal Rules editor
+        shell: pwsh
+        run: |
+          python tools/rules_editor_import_shared_media_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:

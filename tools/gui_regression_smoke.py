@@ -925,7 +925,9 @@ def assert_p11_rules_text_and_obs_sections(window) -> None:
                     or splitter.widget(1) is not dialog.rules_obs_scroll
                     or dialog.rules_obs_scroll.widget() is not dialog.rules_obs_page):
                 raise AssertionError("P11-K5 must have one shared editor and OBS panel")
-            if (dialog.editor.parentWidget() is not dialog.rules_text_page
+            if (dialog.editor.parentWidget() is not dialog.rules_text_canvas
+                    or dialog.rules_text_canvas.parentWidget() is not dialog.rules_text_page
+                    or dialog.rules_text_canvas_layout.count() != 2
                     or dialog.rules_overlay_url_label.parentWidget() is not dialog.rules_obs_page
                     or dialog.copy_rules_url_btn.parentWidget() is not dialog.rules_obs_page
                     or dialog.preview_rules_obs_btn.parentWidget() is not dialog.rules_obs_page):

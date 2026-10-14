@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Callable
 
 from PySide6.QtCore import Qt, QThreadPool, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QFont
@@ -1488,15 +1489,20 @@ class StreamTab(QWidget):
             self.timer_background_combo, selected_asset_id,
         )
 
-    def _select_imported_background(self, target: str, asset_id: int) -> None:
-        """Reuse the single importer and refresh all shared-background users."""
-        if target not in {"main", "auction_lots", "timer"}:
+    def _select_imported_background(
+        self, target: str, asset_id: int,
+        *, on_imported: Callable[[int], None] | None = None,
+    ) -> None:
+        """The one shared importer also serves the Rules editor without side effects."""
+        if target not in {"main", "auction_lots", "timer", "rules"}:
             raise ValueError(f"Неизвестный виджет фона: {target}")
         self._refresh_background_library(asset_id if target == "main" else None)
         self._refresh_auction_lots_background_library(
             asset_id if target == "auction_lots" else None
         )
         self._refresh_timer_background_library(asset_id if target == "timer" else None)
+        if target == "rules" and on_imported is not None:
+            on_imported(asset_id)
 
     def _selected_background_asset(self):
         raw = self.background_combo.currentData()
@@ -1629,8 +1635,10 @@ class StreamTab(QWidget):
         worker.signals.finished.connect(self._background_video_copy_finished)
         self.thread_pool.start(worker)
 
-    def _choose_background_storage_mode(self, source: Path) -> str | None:
-        dialog = QMessageBox(self)
+    def _choose_background_storage_mode(
+        self, source: Path, dialog_parent: QWidget | None = None,
+    ) -> str | None:
+        dialog = QMessageBox(dialog_parent or self)
         dialog.setWindowTitle("Как использовать фон?")
         dialog.setIcon(QMessageBox.Icon.Question)
         dialog.setText(f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?")
@@ -1663,44 +1671,75 @@ class StreamTab(QWidget):
     def _import_timer_background_media(self):
         self._import_background_media_for("timer")
 
-    def _import_background_media_for(self, selection_target: str):
+    def import_rules_background_media(
+        self, on_imported: Callable[[int], None], dialog_parent: QWidget,
+    ) -> None:
+        """Reuse the same managed/external importer, with modal Rules ownership.
+
+        Still images only in K8B; animated/video files are a separate increment.
+        """
+        self._import_background_media_for(
+            "rules", dialog_parent=dialog_parent, on_imported=on_imported,
+        )
+
+    def _import_background_media_for(
+        self, selection_target: str, *,
+        dialog_parent: QWidget | None = None,
+        on_imported: Callable[[int], None] | None = None,
+    ):
         if self._background_copy_worker is not None:
             return
-
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Выберите фон оверлея",
-            "",
+        owner = dialog_parent or self
+        rules_only = selection_target == "rules"
+        extensions = (
+            {".png", ".jpg", ".jpeg", ".webp"}
+            if rules_only else self._supported_background_extensions()
+        )
+        file_filter = (
+            "Изображения (*.png *.jpg *.jpeg *.webp);;Все файлы (*.*)"
+            if rules_only else
             "Поддерживаемые фоны (*.png *.jpg *.jpeg *.webp *.gif *.mp4 *.webm);;"
             "Изображения (*.png *.jpg *.jpeg *.webp);;"
-            "GIF (*.gif);;Видео (*.mp4 *.webm);;Все файлы (*.*)",
+            "GIF (*.gif);;Видео (*.mp4 *.webm);;Все файлы (*.*)"
+        )
+        path, _ = QFileDialog.getOpenFileName(
+            owner, "Выберите фон оверлея", "", file_filter,
         )
         if not path:
             return
         source = Path(path)
-        if source.suffix.lower() not in self._supported_background_extensions():
+        if source.suffix.lower() not in extensions:
             QMessageBox.warning(
-                self, "Неподдерживаемый формат",
+                owner, "Неподдерживаемый формат",
+                "Для правил пока поддерживаются PNG, JPG, JPEG и WEBP."
+                if rules_only else
                 "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
             )
             return
         if not source.is_file():
-            QMessageBox.critical(self, "Ошибка", "Выбранный файл не найден.")
+            QMessageBox.critical(owner, "Ошибка", "Выбранный файл не найден.")
             return
 
-        storage_mode = self._choose_background_storage_mode(source)
+        storage_mode = self._choose_background_storage_mode(
+            source, dialog_parent=owner,
+        )
         if storage_mode is None:
             return
         try:
-            self._apply_background_import(source, storage_mode, selection_target)
+            self._apply_background_import(
+                source, storage_mode, selection_target,
+                on_imported=on_imported, dialog_parent=owner,
+            )
         except (OSError, ValueError) as exc:
             QMessageBox.critical(
-                self, "Ошибка выбора фона",
+                owner, "Ошибка выбора фона",
                 f"Не удалось подготовить выбранный фон:\n{exc}",
             )
 
     def _apply_background_import(
         self, source: Path, storage_mode: str, selection_target: str,
+        *, on_imported: Callable[[int], None] | None = None,
+        dialog_parent: QWidget | None = None,
     ) -> None:
         """Use shared D26 filename identity for both overlay background pickers."""
         if self._background_copy_worker is not None:
@@ -1709,6 +1748,9 @@ class StreamTab(QWidget):
             raise ValueError("Выбранный файл не найден")
         if source.suffix.lower() not in self._supported_background_extensions():
             raise ValueError("Неподдерживаемый формат фона")
+        if (selection_target == "rules"
+                and source.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}):
+            raise ValueError("Для правил пока поддерживаются только изображения.")
         if storage_mode not in {MEDIA_STORAGE_MANAGED, MEDIA_STORAGE_EXTERNAL}:
             raise ValueError("Неизвестный режим хранения фона")
 
@@ -1721,7 +1763,7 @@ class StreamTab(QWidget):
         )
         if len(matches) > 1:
             QMessageBox.information(
-                self, "Фоны уже есть",
+                dialog_parent or self, "Фоны уже есть",
                 f"Для «{source.name}» найдено несколько записей в библиотеке. "
                 "Новая запись не создана. Выберите нужный фон вручную.",
             )
@@ -1742,20 +1784,20 @@ class StreamTab(QWidget):
                     # Readding a moved source reuses the original media ID.
                     asset = self.db.update_external_media_asset(asset.id, source)
                 QMessageBox.information(
-                    self, "Фон уже есть",
+                    dialog_parent or self, "Фон уже есть",
                     f"Файл «{source.name}» уже есть в библиотеке. "
                     "Будет выбран существующий фон.",
                 )
-            self._select_imported_background(selection_target, asset.id)
+            self._select_imported_background(selection_target, asset.id, on_imported=on_imported)
             return
 
         if existing is not None and existing.storage_mode == MEDIA_STORAGE_MANAGED:
             QMessageBox.information(
-                self, "Фон уже есть",
+                dialog_parent or self, "Фон уже есть",
                 f"Файл «{source.name}» уже есть в библиотеке. "
                 "Будет выбран существующий фон.",
             )
-            self._select_imported_background(selection_target, existing.id)
+            self._select_imported_background(selection_target, existing.id, on_imported=on_imported)
             return
 
         if source.resolve().parent == self.background_dir.resolve():
@@ -1763,7 +1805,7 @@ class StreamTab(QWidget):
             asset = self.db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, source.name, source.name,
             )
-            self._select_imported_background(selection_target, asset.id)
+            self._select_imported_background(selection_target, asset.id, on_imported=on_imported)
             return
 
         target = self._unique_background_target(source.name)
@@ -1783,7 +1825,7 @@ class StreamTab(QWidget):
             asset = self.db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, target.name, source.name,
             )
-        self._select_imported_background(selection_target, asset.id)
+        self._select_imported_background(selection_target, asset.id, on_imported=on_imported)
 
     def _add_typography_row(
         self,

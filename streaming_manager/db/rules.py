@@ -585,14 +585,51 @@ class RulesMixin:
         if exists is None:
             raise ValueError("Шаблон правил для предпросмотра не найден.")
         with self._rules_preview_selection_lock:
-            self._rules_preview_selections[token] = template_id
+            self._rules_preview_selections[token] = (template_id, None)
+
+    def set_rules_preview_draft(
+        self, token: str, template_id: int, html: str,
+        presentation: dict[str, Any],
+    ) -> None:
+        """Attach a draft to an existing editor token, without SQLite writes."""
+        validated = self._validated_rule_presentation(presentation)
+        if not isinstance(html, str):
+            raise ValueError("Некорректный текст предпросмотра правил.")
+        if len(html) > 1_000_000:
+            raise ValueError("Слишком длинный текст предпросмотра правил.")
+        with self._rules_preview_selection_lock:
+            entry = self._rules_preview_selections.get(token)
+            if entry is None or entry[0] != int(template_id):
+                return
+            self._rules_preview_selections[token] = (
+                int(template_id),
+                {"content_html": html, "presentation": validated},
+            )
+
+    def clear_rules_preview_draft(self, token: str, template_id: int) -> None:
+        """Restore saved-template preview without changing the selected ID."""
+        with self._rules_preview_selection_lock:
+            entry = self._rules_preview_selections.get(token)
+            if entry is not None and entry[0] == int(template_id):
+                self._rules_preview_selections[token] = (int(template_id), None)
+
+    def get_rules_preview_draft(
+        self, token: str, template_id: int,
+    ) -> dict[str, Any] | None:
+        """Read only a draft belonging to the selected editor template."""
+        with self._rules_preview_selection_lock:
+            entry = self._rules_preview_selections.get(token)
+            if entry is None or entry[0] != int(template_id) or entry[1] is None:
+                return None
+            return dict(entry[1])
 
     def get_rules_preview_selection(self, token: str) -> int | None:
         """Resolve a running editor preview, not a stored Rules preference."""
         if not isinstance(token, str) or not token:
             return None
         with self._rules_preview_selection_lock:
-            return self._rules_preview_selections.get(token)
+            entry = self._rules_preview_selections.get(token)
+            return entry[0] if entry is not None else None
 
     def clear_rules_preview_selection(self, token: str) -> None:
         """Expire the editor's preview link on dialog close."""
@@ -601,6 +638,7 @@ class RulesMixin:
 
     def current_rules_payload(
         self, *, preview_template_id: int | None = None,
+        preview_draft: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Read-only Rules API. Only preview callers may select another template.
 
@@ -649,6 +687,16 @@ class RulesMixin:
                     template_name = str(template["template_name"] or "")
                     raw_html = str(template["content_html"] or "")
                     raw_presentation = template["presentation_json"]
+
+        if preview_draft is not None:
+            if preview_template_id is None:
+                raise ValueError("Черновик недоступен для рабочего оверлея OBS.")
+            raw_html = str(preview_draft["content_html"])
+            raw_presentation = json.dumps(
+                self._validated_rule_presentation(preview_draft["presentation"]),
+                ensure_ascii=False,
+            )
+            source = "template_preview_draft"
 
         background = str(settings.get(
             RULES_OVERLAY_BACKGROUND_KEY, RULES_OVERLAY_BACKGROUND_DEFAULT
