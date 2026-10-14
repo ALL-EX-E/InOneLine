@@ -166,7 +166,7 @@ def main() -> int:
             asset = db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, image_file.name, image_file.name
             )
-            dialog._refresh_rules_media_library(asset.id)
+            dialog._rules_media_imported(asset.id)
             assert dialog.rules_obs_media_combo.currentData() == asset.id
             dialog.rules_obs_media_mode.setChecked(True)
             app.processEvents()
@@ -186,9 +186,9 @@ def main() -> int:
                     and abs(point.blue() - 187) < 6), (
                 f"Qt text editor is not actually painting its image: {point.name()}"
             )
-            # Refresh from the library must repaint instantly without Save.
-            dialog.rules_obs_media_refresh.click()
-            app.processEvents()
+            # The imported file appears automatically in the same editable
+            # canvas without a manual Refresh action or Save.
+            assert not hasattr(dialog, "rules_obs_media_refresh")
             assert dialog._rules_media_source_key[0] == str(image_file)
             assert editor.toHtml() == inactive_html
             assert editor.toPlainText().strip() == "Другие правила"
