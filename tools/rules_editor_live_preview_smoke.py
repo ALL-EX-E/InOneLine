@@ -200,6 +200,19 @@ def main() -> int:
             app.processEvents()
             assert dialog._rules_media_label.isHidden()
             assert dialog._rules_media_source_key is None
+
+            # A file that reaches the shared library while the dialog is open
+            # appears automatically on the next template switch, no button.
+            second = media_dir / "rules_auto_switch.png"
+            assert image.save(str(second))
+            second_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, second.name, second.name,
+            )
+            assert dialog.rules_obs_media_combo.findData(second_asset.id) == -1
+            dialog._load_template(active)
+            app.processEvents()
+            assert dialog.rules_obs_media_combo.findData(second_asset.id) >= 0
+            assert dialog._is_dirty() is False
         finally:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
                 dialog.close()
