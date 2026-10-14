@@ -5,6 +5,7 @@ that the browser actually renders a selected inactive template separately.
 """
 from __future__ import annotations
 import base64
+import faulthandler
 import os
 import socket
 import sys
@@ -51,17 +52,22 @@ def js(page, expression: str):
 
 
 def wait_js(page, expression: str, expected, label: str, timeout: float = 25):
+    print(f"RULES_BROWSER_CHECK_START: {label}", flush=True)
     end = time.monotonic() + timeout
     actual = None
     while time.monotonic() < end:
         actual = js(page, expression)
         if actual == expected:
+            print(f"RULES_BROWSER_CHECK_PASS: {label}", flush=True)
             return
         QTest.qWait(70)
     raise AssertionError(f"{label}: got {actual!r}, expected {expected!r}")
 
 
 def main() -> int:
+    faulthandler.enable()
+    faulthandler.dump_traceback_later(65, repeat=True)
+    print("RULES_BROWSER_DIAG_MAIN_START", flush=True)
     app = QApplication.instance() or QApplication([])
     with TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         db = Database(Path(temp) / "rules_preview.db")
