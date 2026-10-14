@@ -67,7 +67,10 @@ def main() -> int:
             assert isinstance(player, QMediaPlayer)
             assert player.audioOutput() is None, "The local Rules preview must be silent"
             assert player.loops() == QMediaPlayer.Infinite
-            assert player.source().toLocalFile() == str(video)
+            # An intentionally invalid MP4 header may be rejected immediately
+            # by FFmpeg/Windows Media Foundation in CI, clearing player.source().
+            # The shared registered path (not codec support) is the tested contract.
+            assert dialog._rules_media_source_key[0] == str(video)
             assert dialog._rules_video_sink is not None
 
             dialog._rules_media_imported(still_asset.id)
