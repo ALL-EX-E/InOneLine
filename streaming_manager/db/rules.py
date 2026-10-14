@@ -17,7 +17,8 @@ from ..constants import (
     RULES_OVERLAY_PADDING_KEY,
     RULES_OVERLAY_VISIBLE_KEY,
 )
-from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available, media_kind_for_name
+from ..media import (MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available,
+                     media_kind_for_name, resolve_media_asset_path)
 from ..obs_visibility import WIDGETS, show_mode, visibility_payload
 from ..rules_html import sanitize_rules_html
 from .common import normalize_text_key, utc_now
@@ -680,7 +681,14 @@ class RulesMixin:
                 and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
                 and media_asset_available(self.path.parent, asset)
             )
-            kind = media_kind_for_name(asset.display_name) if asset_ok else ""
+            kind = ""
+            if asset_ok:
+                try:
+                    kind = media_kind_for_name(
+                        resolve_media_asset_path(self.path.parent, asset).name
+                    )
+                except (OSError, ValueError):
+                    asset_ok = False
             if kind not in {"image", "video"}:
                 asset_ok = False
             template_presentation = {
