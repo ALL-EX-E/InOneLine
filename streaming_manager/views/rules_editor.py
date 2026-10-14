@@ -735,6 +735,7 @@ class AuctionRulesEditorDialog(QDialog):
             self.db.set_rules_preview_selection(
                 self._rules_preview_token, self._loaded_template_id
             )
+            self._publish_unsaved_preview()
         self._update_status()
         self._update_rules_session_notice()
         self._sync_format_controls()
@@ -846,9 +847,31 @@ class AuctionRulesEditorDialog(QDialog):
             self._update_local_rules_padding()
         return super().eventFilter(watched, event)
 
+    def _publish_unsaved_preview(self) -> None:
+        """Live browser draft for this editor token only, never normal OBS.
+
+        Reuses the existing read-only preview registry and the same validated
+        Rules media payload resolver as saved templates.
+        """
+        if self._rules_preview_token is None or self._loaded_template_id is None:
+            return
+        presentation = self._obs_presentation_values()
+        if (presentation["background"] == "media"
+                and presentation.get("background_media_id") is None):
+            # Allow choosing "Свой" before choosing a library file.
+            presentation["background"] = "transparent"
+        html = (
+            self.editor.toHtml() if self.editor.toPlainText().strip() else ""
+        )
+        self.db.set_rules_preview_draft(
+            self._rules_preview_token, self._loaded_template_id,
+            html, presentation,
+        )
+
     def _editor_changed(self) -> None:
         if not self._loading:
             self._refresh_local_rules_preview()
+            self._publish_unsaved_preview()
             self._update_status()
 
     def _update_status(self) -> None:
