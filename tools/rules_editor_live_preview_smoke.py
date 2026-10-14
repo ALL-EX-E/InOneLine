@@ -171,13 +171,13 @@ def main() -> int:
             dialog.rules_obs_media_mode.setChecked(True)
             app.processEvents()
             local_style = editor.viewport().styleSheet()
-            assert "background: palette(base)" in local_style
+            assert "background-color: transparent" in local_style
             assert dialog._rules_media_source_key is not None
             assert dialog._rules_media_source_key[0] == str(image_file)
-            assert not editor.viewport().palette().brush(
-                __import__("PySide6.QtGui", fromlist=["QPalette"]).QPalette.Base
-            ).texture().isNull(), "Missing native Qt background pixmap brush"
-            snapshot = editor.viewport().grab().toImage()
+            assert dialog._rules_media_label.isVisible()
+            assert not dialog._rules_media_label.pixmap().isNull()
+            assert dialog.rules_text_canvas.isVisible()
+            snapshot = dialog.rules_text_canvas.grab().toImage()
             point = snapshot.pixelColor(
                 snapshot.width() // 2, snapshot.height() * 3 // 4,
             )
@@ -198,7 +198,7 @@ def main() -> int:
             # Existing content and live template are unaffected before Save.
             dialog.rules_obs_transparent.setChecked(True)
             app.processEvents()
-            assert "background: palette(base)" not in editor.viewport().styleSheet()
+            assert dialog._rules_media_label.isHidden()
             assert dialog._rules_media_source_key is None
         finally:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
