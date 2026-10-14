@@ -218,7 +218,7 @@ def main() -> int:
             # No Save or active-template change is allowed from a preview pick.
             gif_path = media_dir / "rules_k8c_browser.gif"
             gif_path.write_bytes(base64.b64decode(
-                "R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw=="
+                "R0lGODlhEAAQAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAGQAAACwAAAAAEAAQAAAIHQABCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBACH5BAEZAAEALAAAAAAQABAAgQAA/wAAAAAAAAAAAAgdAAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAOw=="
             ))
             gif_asset = db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, gif_path.name, gif_path.name
