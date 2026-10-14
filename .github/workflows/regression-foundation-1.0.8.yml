@@ -179,6 +179,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "UI-045 Timer media regression failed" }
 
       - name: P11-K4 real Chromium selected Rules preview vs on-air regression
+        timeout-minutes: 5
         shell: pwsh
         env:
           QT_QPA_PLATFORM: windows
