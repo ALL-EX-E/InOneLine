@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QScrollArea,
     QSplitter,
+    QStackedLayout,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -402,6 +403,10 @@ class AuctionRulesEditorDialog(QDialog):
         self._rules_media_source_key = None
         self._rules_media_original = QPixmap()
         self._rules_media_brush_key = None
+        self._rules_media_label = QLabel()
+        self._rules_media_label.setScaledContents(True)
+        self._rules_media_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._rules_media_label.hide()
         self._rules_glow_effect = QGraphicsDropShadowEffect(self.editor)
         self._rules_glow_effect.setOffset(0, 0)
         self._rules_glow_effect.setBlurRadius(20)
@@ -410,7 +415,14 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor.textChanged.connect(self._editor_changed)
         self.editor.cursorPositionChanged.connect(self._sync_format_controls)
         self.editor.viewport().installEventFilter(self)
-        text_layout.addWidget(self.editor, 1)
+        self.rules_text_canvas = QWidget()
+        self.rules_text_canvas_layout = QStackedLayout(self.rules_text_canvas)
+        self.rules_text_canvas_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_text_canvas_layout.setStackingMode(QStackedLayout.StackAll)
+        self.rules_text_canvas_layout.addWidget(self._rules_media_label)
+        self.rules_text_canvas_layout.addWidget(self.editor)
+        self.rules_text_canvas_layout.setCurrentWidget(self.editor)
+        text_layout.addWidget(self.rules_text_canvas, 1)
 
         bottom = QHBoxLayout()
         self.dirty_label = QLabel()
@@ -818,7 +830,7 @@ class AuctionRulesEditorDialog(QDialog):
             and values["background_media_id"] is not None
         )
         color_css = (
-            "background: palette(base);" if media_selected
+            "background-color: transparent;" if media_selected
             else f"background-color: {background};"
         )
         style = (
@@ -828,9 +840,8 @@ class AuctionRulesEditorDialog(QDialog):
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
             viewport.setStyleSheet(style)
-        # Qt's stylesheet engine can replace the active palette when a new
-        # style is installed. Always apply the image brush AFTER the style.
-        self._update_rules_media_brush(values)
+        # The image is displayed under the one transparent editable surface.
+        self._update_rules_media_layer(values)
         self._rules_glow_effect.setColor(QColor(
             edge.red(), edge.green(), edge.blue(), 148
         ))
@@ -838,12 +849,13 @@ class AuctionRulesEditorDialog(QDialog):
 
         self._update_local_rules_padding()
 
-    def _update_rules_media_brush(self, values: dict[str, object]) -> bool:
-        """Render a cover-cropped registered static image under QTextEdit.
+    def _update_rules_media_layer(self, values: dict[str, object]) -> bool:
+        """Paint the cached image *under* one transparent native QTextEdit.
 
-        QPalette.Base is drawn by the native scroll-area viewport and keeps
-        selection/caret/rich-text editing untouched. Cache the original image
-        across keystrokes and rescale only when the viewport changes size.
+        A QTextEdit viewport repaints its own base color, so a QSS border-image
+        or a QPalette texture on its viewport is not a reliable actual preview.
+        Using a QWidget stack leaves text, cursor, scrolling and QTextDocument
+        untouched and avoids duplicating the HTML renderer or editor model.
         """
         viewport = self.editor.viewport()
         asset = None
@@ -858,46 +870,62 @@ class AuctionRulesEditorDialog(QDialog):
                 path = resolve_media_asset_path(self.db.path.parent, asset)
             except (ValueError, OSError):
                 path = None
-        if path is None or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+
+        valid = False
+        if path is not None and path.suffix.lower() in {
+            ".png", ".jpg", ".jpeg", ".webp",
+        }:
+            try:
+                source_key = (str(path), path.stat().st_mtime_ns)
+            except OSError:
+                source_key = None
+            if source_key is not None:
+                if self._rules_media_source_key != source_key:
+                    self._rules_media_source_key = source_key
+                    self._rules_media_original = QPixmap(str(path))
+                    self._rules_media_brush_key = None
+                if not self._rules_media_original.isNull():
+                    valid = True
+                    size = self.rules_text_canvas.size()
+                    width, height = max(1, size.width()), max(1, size.height())
+                    brush_key = (source_key, width, height)
+                    if self._rules_media_brush_key != brush_key:
+                        scaled = self._rules_media_original.scaled(
+                            width, height, Qt.KeepAspectRatioByExpanding,
+                            Qt.SmoothTransformation,
+                        )
+                        x = max(0, (scaled.width() - width) // 2)
+                        y = max(0, (scaled.height() - height) // 2)
+                        self._rules_media_label.setPixmap(
+                            scaled.copy(x, y, width, height)
+                        )
+                        self._rules_media_brush_key = brush_key
+
+        if valid:
+            # Make the actual QTextEdit surface see-through; the media
+            # is a non-interactive sibling painted beneath the text.
+            transparent = QPalette(self._rules_default_editor_palette)
+            transparent.setColor(QPalette.Base, QColor(0, 0, 0, 0))
+            self.editor.setPalette(transparent)
+            viewport.setPalette(transparent)
+            self.editor.setAttribute(Qt.WA_TranslucentBackground, True)
+            viewport.setAttribute(Qt.WA_TranslucentBackground, True)
+            viewport.setAutoFillBackground(False)
+            self.editor.setStyleSheet("QTextEdit { background: transparent; }")
+            self._rules_media_label.show()
+            self._rules_media_label.lower()
+        else:
+            self._rules_media_label.hide()
             self._rules_media_source_key = None
             self._rules_media_original = QPixmap()
             self._rules_media_brush_key = None
+            self.editor.setStyleSheet("")
             self.editor.setPalette(self._rules_default_editor_palette)
             viewport.setPalette(self._rules_default_viewport_palette)
-            viewport.update()
-            return False
-
-        try:
-            source_key = (str(path), path.stat().st_mtime_ns)
-        except OSError:
-            return False
-        if self._rules_media_source_key != source_key:
-            self._rules_media_source_key = source_key
-            self._rules_media_original = QPixmap(str(path))
-            self._rules_media_brush_key = None
-        if self._rules_media_original.isNull():
-            return False
-
-        width, height = max(1, viewport.width()), max(1, viewport.height())
-        brush_key = (source_key, width, height)
-        if self._rules_media_brush_key != brush_key:
-            scaled = self._rules_media_original.scaled(
-                width, height, Qt.KeepAspectRatioByExpanding,
-                Qt.SmoothTransformation,
-            )
-            x = max(0, (scaled.width() - width) // 2)
-            y = max(0, (scaled.height() - height) // 2)
-            fitted = scaled.copy(x, y, width, height)
-            brush = QBrush(fitted)
-            editor_palette = QPalette(self._rules_default_editor_palette)
-            viewport_palette = QPalette(self._rules_default_viewport_palette)
-            editor_palette.setBrush(QPalette.Base, brush)
-            viewport_palette.setBrush(QPalette.Base, brush)
-            self.editor.setPalette(editor_palette)
-            viewport.setPalette(viewport_palette)
-            self._rules_media_brush_key = brush_key
-            viewport.update()
-        return True
+            self.editor.setAttribute(Qt.WA_TranslucentBackground, False)
+            viewport.setAttribute(Qt.WA_TranslucentBackground, False)
+        viewport.update()
+        return valid
 
     @staticmethod
     def _responsive_rules_padding(width: int, height: int) -> float:
