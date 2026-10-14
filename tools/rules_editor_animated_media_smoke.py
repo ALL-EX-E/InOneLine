@@ -93,7 +93,6 @@ def main() -> int:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
                 dialog.close()
             dialog.deleteLater()
-        db.close()
     print("P11_K8C_QT_RULES_GIF_AND_SILENT_VIDEO=PASS")
     return 0
 
