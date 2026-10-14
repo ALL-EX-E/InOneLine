@@ -40,6 +40,15 @@ body.preview {
     0 0 16px var(--rules-glow-soft, rgba(255,255,255,.58)),
     inset 0 0 8px var(--rules-glow-inner, rgba(255,255,255,.22));
 }
+#rules-background-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+  pointer-events: none;
+}
 #viewport {
   position: absolute;
   inset: 0;
@@ -77,6 +86,7 @@ body.preview #api-state.visible { display: block; }
 </head>
 <body>
 <div id="root">
+  <img id="rules-background-image" alt="" aria-hidden="true">
   <div id="viewport"><div id="content"></div></div>
 </div>
 <div id="api-state">Нет связи с In one line</div>
@@ -101,6 +111,7 @@ body.preview #api-state.visible { display: block; }
   const RETURN_MS = 650;
 
   const root = document.getElementById("root");
+  const backgroundImage = document.getElementById("rules-background-image");
   const viewport = document.getElementById("viewport");
   const content = document.getElementById("content");
   const apiState = document.getElementById("api-state");
@@ -150,6 +161,22 @@ body.preview #api-state.visible { display: block; }
     root.style.background = presentation.background === "color"
       ? rgba(presentation.background_color, presentation.background_opacity)
       : "transparent";
+    // Only trusted registered image IDs are used. Missing media automatically
+    // falls back to transparent, without exposing external filesystem paths.
+    const asset = presentation.background_media || {};
+    const imageUrl = presentation.background === "media"
+      && asset.available === true && asset.type === "image"
+      && /^\/media\/\d+$/.test(String(asset.url || ""))
+      ? String(asset.url) : "";
+    if (imageUrl) {
+      if (backgroundImage.getAttribute("src") !== imageUrl) {
+        backgroundImage.src = imageUrl;
+      }
+      backgroundImage.style.display = "block";
+    } else {
+      backgroundImage.style.display = "none";
+      backgroundImage.removeAttribute("src");
+    }
     // The same fixed 8px radius/soft three-layer glow as shared overlays.
     // Legacy five-field Rules JSON has glow off by default.
     const glow = presentation.glow === true;

@@ -28,6 +28,9 @@ from streaming_manager.constants import (
     RULES_OVERLAY_PADDING_KEY,
 )
 from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
+from streaming_manager.media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, managed_media_directory
+from PySide6.QtGui import QImage
+
 
 
 def main() -> int:
@@ -151,6 +154,33 @@ def main() -> int:
             assert dialog._is_dirty() is False
             assert db.current_rules_payload()["source"] == "active_template"
             assert db.get_active_rule_template()["id"] == active
+
+            # K8A: existing shared-library image is selected without a second
+            # imported asset, saved model or modified underlying HTML.
+            media_dir = managed_media_directory(db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
+            media_dir.mkdir(parents=True, exist_ok=True)
+            image_file = media_dir / "rules_k8a_preview.png"
+            image = QImage(16, 16, QImage.Format_RGB32)
+            image.fill(QColor("#3377BB"))
+            assert image.save(str(image_file))
+            asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, image_file.name, image_file.name
+            )
+            dialog._refresh_rules_media_library(asset.id)
+            assert dialog.rules_obs_media_combo.currentData() == asset.id
+            dialog.rules_obs_media_mode.setChecked(True)
+            app.processEvents()
+            local_style = editor.viewport().styleSheet()
+            assert "border-image: url(" in local_style
+            assert "rules_k8a_preview.png" in local_style
+            assert editor.toPlainText().strip() == "Другие правила"
+            assert dialog._is_dirty() is True
+            assert db.get_rule_template_presentation(inactive)["background"] == "transparent"
+            assert db.get_active_rule_template()["id"] == active
+            # Existing content and live template are unaffected before Save.
+            dialog.rules_obs_transparent.setChecked(True)
+            app.processEvents()
+            assert "border-image: url(" not in editor.viewport().styleSheet()
         finally:
             with patch.object(dialog, "_confirm_discard_or_save", return_value=True):
                 dialog.close()

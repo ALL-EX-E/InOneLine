@@ -20,7 +20,7 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QImage, QColor
 from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QTextEdit
@@ -28,6 +28,7 @@ from PySide6.QtWidgets import QApplication, QTextEdit
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database, Game
 from streaming_manager.constants import STATUS_NOT_PLAYED, STATUS_PLAYED
+from streaming_manager.media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, managed_media_directory
 from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
 
 
@@ -186,6 +187,28 @@ def main() -> int:
             wait_js(preview_page, padding_is_responsive, True, "Preview B automatic inset after switch")
             wait_js(preview_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(51,204,119,0.65)", "Preview follows B glow color")
             assert db.get_auction_rules_snapshot(auction_id) == before_snapshot
+            # P11-K8A: registered shared image must render in selected B
+            # while live A remains without a media layer until activation.
+            media_dir = managed_media_directory(db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
+            media_dir.mkdir(parents=True, exist_ok=True)
+            image_path = media_dir / "rules_k8a_browser.png"
+            image = QImage(24, 24, QImage.Format_RGB32)
+            image.fill(QColor("#1166CC"))
+            assert image.save(str(image_path))
+            media_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, image_path.name, image_path.name
+            )
+            db.save_rule_template_presentation(inactive, {
+                **db.get_rule_template_presentation(inactive),
+                "background": "media",
+                "background_media_id": media_asset.id,
+            })
+            media_visible = "document.querySelector('#rules-background-image').style.display"
+            media_src = "document.querySelector('#rules-background-image').getAttribute('src')"
+            wait_js(preview_page, media_visible, "block", "Shared B media shown in preview")
+            wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Registered safe B image URL")
+            wait_js(live_page, media_visible, "none", "On-air A retains no background media")
+            assert db.current_rules_payload()["presentation"].get("background_media_id") is None
             assert db.current_rules_payload() == before_live
 
             # Activate B mid-auction: on-air becomes B. Preview must still
@@ -193,6 +216,7 @@ def main() -> int:
             editor._make_active()
             app.processEvents()
             wait_js(live_page, expr, "B CHOSEN", "On-air B activated")
+            wait_js(live_page, media_src, f"/media/{media_asset.id}", "On-air B uses shared registered image")
             wait_js(live_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(51,204,119,0.65)", "On-air activated B style")
             wait_js(preview_page, expr, "B CHOSEN", "Preview still on selected B")
             editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
@@ -221,6 +245,11 @@ def main() -> int:
             wait_js(preview_page, expr, "A LIVE", "No-auction preview follows B -> A")
             wait_js(live_page, expr, "B CHOSEN", "No-auction on-air still active B")
             assert views[1].url().toString() == preview_url
+            # Removing a linked managed file fails closed without leaking
+            # an arbitrary local path or writing template state.
+            image_path.unlink()
+            wait_js(live_page, media_visible, "none", "Missing media hides in live Browser")
+            wait_js(preview_page, media_visible, "none", "Missing media hides in preview")
             assert {int(x["id"]) for x in db.list_rule_templates()} == {int(x["id"]) for x in templates_before}, "Unexpected template added or removed"
             assert db.get_settings() == settings_before
         finally:
