@@ -61,6 +61,9 @@ from .common import (
 )
 
 
+_UNSET_MEDIA = object()
+
+
 class AuctionRulesEditorDialog(QDialog):
     """WYSIWYG editor for reusable auction-rule templates.
 
@@ -232,7 +235,7 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_media_combo.setMinimumWidth(175)
         self.rules_obs_media_combo.currentIndexChanged.connect(self._editor_changed)
         self.rules_obs_media_refresh = QPushButton("Обновить")
-        self.rules_obs_media_refresh.clicked.connect(self._refresh_rules_media_library)
+        self.rules_obs_media_refresh.clicked.connect(lambda: self._refresh_rules_media_library())
         media_row = QWidget()
         media_row_layout = QHBoxLayout(media_row)
         media_row_layout.setContentsMargins(0, 0, 0, 0)
@@ -604,9 +607,9 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_media_refresh.setEnabled(self.rules_obs_media_mode.isChecked())
         self._editor_changed()
 
-    def _refresh_rules_media_library(self, selected_id=None) -> None:
+    def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
         """Use registered shared overlay assets; never create a new library."""
-        if selected_id is None:
+        if selected_id is _UNSET_MEDIA:
             selected_id = self.rules_obs_media_combo.currentData()
         self.db.sync_managed_media_category(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
         existing = [
