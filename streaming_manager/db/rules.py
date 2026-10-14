@@ -17,6 +17,7 @@ from ..constants import (
     RULES_OVERLAY_PADDING_KEY,
     RULES_OVERLAY_VISIBLE_KEY,
 )
+from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available, media_kind_for_name
 from ..obs_visibility import WIDGETS, show_mode, visibility_payload
 from ..rules_html import sanitize_rules_html
 from .common import normalize_text_key, utc_now
@@ -183,15 +184,19 @@ class RulesMixin:
             "background_opacity", "padding",
         }
         glow_keys = {"glow", "glow_color"}
+        media_keys = {"background_media_id"}
         if not isinstance(value, dict) or set(value) not in (
-            legacy_keys, legacy_keys | glow_keys
+            legacy_keys, legacy_keys | glow_keys,
+            legacy_keys | glow_keys | media_keys,
         ):
             raise ValueError("Некорректный состав полей оформления правил.")
         if type(value["autoscroll"]) is not bool:
             raise ValueError("Автопрокрутка должна быть включена или выключена.")
         background = value["background"]
-        if background not in ("transparent", "color"):
+        if background not in ("transparent", "color", "media"):
             raise ValueError("Неизвестный тип фона правил.")
+        if background == "media" and "background_media_id" not in value:
+            raise ValueError("Свой фон требует идентификатор из общей библиотеки.")
         color = value["background_color"]
         if not (isinstance(color, str) and len(color) == 7 and color.startswith("#")):
             raise ValueError("Некорректный цвет фона правил.")
@@ -225,6 +230,13 @@ class RulesMixin:
                 raise ValueError("Некорректный цвет подсветки правил.") from exc
             cleaned["glow"] = value["glow"]
             cleaned["glow_color"] = glow_color.upper()
+        if "background_media_id" in value:
+            media_id = value["background_media_id"]
+            if media_id is not None and (type(media_id) is not int or media_id <= 0):
+                raise ValueError("Некорректный идентификатор фона правил.")
+            if background == "media" and media_id is None:
+                raise ValueError("Выберите фон из общей библиотеки.")
+            cleaned["background_media_id"] = media_id
         return cleaned
 
     @classmethod
@@ -658,6 +670,27 @@ class RulesMixin:
         # Legacy NULL or corrupt values retain the exact original global
         # presentation; widget visibility stays governed by global policy.
         template_presentation = self._read_rule_presentation_json(raw_presentation)
+        if template_presentation is not None and template_presentation.get("background") == "media":
+            # Only the registered overlay-background category is supported.
+            # Broken/moved files produce no media URL and never expose a raw path.
+            media_id = template_presentation.get("background_media_id")
+            asset = self.get_media_asset(media_id) if type(media_id) is int and media_id > 0 else None
+            asset_ok = bool(
+                asset is not None
+                and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+                and media_asset_available(self.path.parent, asset)
+            )
+            kind = media_kind_for_name(asset.display_name) if asset_ok else ""
+            if kind not in {"image", "video"}:
+                asset_ok = False
+            template_presentation = {
+                **template_presentation,
+                "background_media": {
+                    "available": asset_ok,
+                    "url": f"/media/{asset.id}" if asset_ok else "",
+                    "type": kind if asset_ok else "",
+                },
+            }
         return {
             "visible": show_mode(settings, "rules") != "hidden",
             "visibility": visibility_payload(settings, "rules"),
