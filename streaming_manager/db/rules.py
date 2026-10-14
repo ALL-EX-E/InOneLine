@@ -173,17 +173,20 @@ class RulesMixin:
 
     @staticmethod
     def _validated_rule_presentation(value: Any) -> dict[str, Any]:
-        """Accept only the five existing Rules widget appearance properties.
+        """Validate original 5-field or new 7-field composite Rules styling.
 
-        Show/visibility mode stays global and never enters a Rules template.
-        Invalid input fails without a partial database write.
+        Old templates and auction snapshots remain readable without migration.
+        Show/visibility mode remains global, not a per-template preference.
         """
-        keys = {
+        legacy_keys = {
             "autoscroll", "background", "background_color",
             "background_opacity", "padding",
         }
-        if not isinstance(value, dict) or set(value) != keys:
-            raise ValueError("Оформление правил должно содержать пять известных полей.")
+        glow_keys = {"glow", "glow_color"}
+        if not isinstance(value, dict) or set(value) not in (
+            legacy_keys, legacy_keys | glow_keys
+        ):
+            raise ValueError("Некорректный состав полей оформления правил.")
         if type(value["autoscroll"]) is not bool:
             raise ValueError("Автопрокрутка должна быть включена или выключена.")
         background = value["background"]
@@ -202,13 +205,27 @@ class RulesMixin:
             raise ValueError("Непрозрачность должна быть от 0 до 100.")
         if type(padding) is not int or not 0 <= padding <= 200:
             raise ValueError("Внутренний отступ должен быть от 0 до 200.")
-        return {
+        cleaned = {
             "autoscroll": value["autoscroll"],
             "background": background,
             "background_color": color.upper(),
             "background_opacity": opacity,
             "padding": padding,
         }
+        if "glow" in value:
+            if type(value["glow"]) is not bool:
+                raise ValueError("Светящийся контур должен быть включён или выключен.")
+            glow_color = value["glow_color"]
+            if (not isinstance(glow_color, str) or len(glow_color) != 7
+                    or not glow_color.startswith("#")):
+                raise ValueError("Некорректный цвет подсветки правил.")
+            try:
+                int(glow_color[1:], 16)
+            except ValueError as exc:
+                raise ValueError("Некорректный цвет подсветки правил.") from exc
+            cleaned["glow"] = value["glow"]
+            cleaned["glow_color"] = glow_color.upper()
+        return cleaned
 
     @classmethod
     def _read_rule_presentation_json(cls, raw: Any) -> dict[str, Any] | None:

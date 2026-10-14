@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFormLayout,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -249,6 +250,30 @@ class AuctionRulesEditorDialog(QDialog):
         )
         obs_form.addRow("Непрозрачность:", self.rules_obs_opacity_control)
 
+        # Reuse the common 8px rounded edge and standard soft/inner glow.
+        # Only glow on/off and its color are template settings: no extra
+        # blur, radius, thickness or second presentation model.
+        self.rules_obs_glow = QCheckBox("Светящийся контур")
+        self.rules_obs_glow.toggled.connect(self._obs_glow_changed)
+        obs_form.addRow("Контур:", self.rules_obs_glow)
+        glow_row = QWidget()
+        glow_layout = QHBoxLayout(glow_row)
+        glow_layout.setContentsMargins(0, 0, 0, 0)
+        self.rules_obs_glow_color_btn = QPushButton()
+        self.rules_obs_glow_color_btn.clicked.connect(
+            lambda: self._choose_obs_glow_color(False)
+        )
+        self.rules_obs_glow_color_pick_btn = make_screen_color_picker_button(
+            "Выбрать цвет подсветки с экрана. Левый клик — принять, Escape — отмена."
+        )
+        self.rules_obs_glow_color_pick_btn.clicked.connect(
+            lambda: self._choose_obs_glow_color(True)
+        )
+        glow_layout.addWidget(self.rules_obs_glow_color_btn)
+        glow_layout.addWidget(self.rules_obs_glow_color_pick_btn)
+        glow_layout.addStretch()
+        obs_form.addRow("Цвет контура:", glow_row)
+
         obs_layout.addLayout(obs_form)
         obs_layout.addStretch(1)
 
@@ -331,6 +356,11 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
         self.editor.setPlaceholderText("Введите правила аукциона…")
+        self._rules_glow_effect = QGraphicsDropShadowEffect(self.editor)
+        self._rules_glow_effect.setOffset(0, 0)
+        self._rules_glow_effect.setBlurRadius(20)
+        self._rules_glow_effect.setEnabled(False)
+        self.editor.setGraphicsEffect(self._rules_glow_effect)
         self.editor.textChanged.connect(self._editor_changed)
         self.editor.cursorPositionChanged.connect(self._sync_format_controls)
         self.editor.viewport().installEventFilter(self)
@@ -478,6 +508,15 @@ class AuctionRulesEditorDialog(QDialog):
             ),
         }
 
+    @staticmethod
+    def _with_glow_defaults(presentation: dict[str, object]) -> dict[str, object]:
+        # Old five-key template JSON remains valid and clean on first load.
+        return {
+            **presentation,
+            "glow": bool(presentation.get("glow", False)),
+            "glow_color": str(presentation.get("glow_color", "#FFFFFF")).upper(),
+        }
+
     def _obs_presentation_values(self) -> dict[str, object]:
         return {
             "autoscroll": self.rules_obs_autoscroll.isChecked(),
@@ -489,6 +528,11 @@ class AuctionRulesEditorDialog(QDialog):
                 or RULES_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ).upper(),
             "background_opacity": self.rules_obs_opacity.value(),
+            "glow": self.rules_obs_glow.isChecked(),
+            "glow_color": str(
+                self.rules_obs_glow_color_btn.property("selectedColor")
+                or "#FFFFFF"
+            ).upper(),
             # Retain the legacy saved field for schema/backup compatibility,
             # but no longer expose it or let it control display geometry.
             "padding": int(self._loaded_obs_presentation.get(
@@ -506,6 +550,13 @@ class AuctionRulesEditorDialog(QDialog):
             "Цвет фона",
         )
         self.rules_obs_opacity.setValue(int(values["background_opacity"]))
+        self.rules_obs_glow.setChecked(bool(values.get("glow", False)))
+        self._set_color_button(
+            self.rules_obs_glow_color_btn,
+            QColor(str(values.get("glow_color", "#FFFFFF"))),
+            "Цвет контура",
+        )
+        self._obs_glow_changed()
         self._obs_background_changed()
 
     def _obs_background_changed(self, _checked: bool = False) -> None:
@@ -513,6 +564,27 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_color_btn.setEnabled(color_mode)
         self.rules_obs_color_pick_btn.setEnabled(color_mode)
         self.rules_obs_opacity_control.setEnabled(color_mode)
+        self._editor_changed()
+
+    def _obs_glow_changed(self, _checked: bool = False) -> None:
+        enabled = self.rules_obs_glow.isChecked()
+        self.rules_obs_glow_color_btn.setEnabled(enabled)
+        self.rules_obs_glow_color_pick_btn.setEnabled(enabled)
+        self._editor_changed()
+
+    def _choose_obs_glow_color(self, pipette: bool) -> None:
+        current = QColor(str(
+            self.rules_obs_glow_color_btn.property("selectedColor") or "#FFFFFF"
+        ))
+        selected = (
+            pick_screen_color(self) if pipette
+            else QColorDialog.getColor(current, self, "Цвет подсветки правил")
+        )
+        if selected is None or not selected.isValid():
+            return
+        self._set_color_button(
+            self.rules_obs_glow_color_btn, selected, "Цвет контура"
+        )
         self._editor_changed()
 
     def _choose_obs_color(self, pipette: bool) -> None:
@@ -554,7 +626,7 @@ class AuctionRulesEditorDialog(QDialog):
             self._loaded_html = str(template["content_html"] or "")
             explicit = self.db.get_rule_template_presentation(template_id)
             self._loaded_obs_explicit = explicit is not None
-            self._loaded_obs_presentation = (
+            self._loaded_obs_presentation = self._with_glow_defaults(
                 explicit if explicit is not None else self._legacy_rules_presentation()
             )
             self._apply_obs_presentation(self._loaded_obs_presentation)
@@ -626,10 +698,24 @@ class AuctionRulesEditorDialog(QDialog):
 
         # Style the viewport, not the QTextEdit frame: retain the application's
         # focus border and keep all text editing, selection and shortcuts intact.
-        style = f"background-color: {background};"
+        glow = bool(values["glow"])
+        edge = QColor(str(values["glow_color"]))
+        edge_alpha = 160 if glow else 42
+        stroke = (
+            f"rgba({edge.red()}, {edge.green()}, {edge.blue()}, {edge_alpha})"
+            if glow else "rgba(255, 255, 255, 42)"
+        )
+        style = (
+            f"background-color: {background};"
+            f"border-radius: 8px; border: 1px solid {stroke};"
+        )
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
             viewport.setStyleSheet(style)
+        self._rules_glow_effect.setColor(QColor(
+            edge.red(), edge.green(), edge.blue(), 148
+        ))
+        self._rules_glow_effect.setEnabled(glow)
 
         self._update_local_rules_padding()
 

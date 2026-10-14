@@ -76,10 +76,12 @@ def main() -> int:
         db.save_rule_template_presentation(active, {
             "autoscroll": False, "background": "color",
             "background_color": "#883311", "background_opacity": 99, "padding": 18,
+            "glow": True, "glow_color": "#12AADD",
         })
         db.save_rule_template_presentation(inactive, {
             "autoscroll": False, "background": "color",
             "background_color": "#2277DD", "background_opacity": 91, "padding": 74,
+            "glow": False, "glow_color": "#33CC77",
         })
         db.add_game(Game(None, "Browser Preview A", "2026-01-01", 100, 0, STATUS_PLAYED, ""))
         db.add_game(Game(None, "Browser Preview B", "2026-01-01", 100, 0, STATUS_NOT_PLAYED, ""))
@@ -146,6 +148,11 @@ def main() -> int:
             )
             wait_js(preview_page, padding_is_responsive, True, "Preview B automatic inset")
             wait_js(live_page, padding_is_responsive, True, "On-air A automatic inset")
+            wait_js(live_page, "getComputedStyle(document.querySelector('#root')).borderRadius", "8px", "Rounded live Rules")
+            wait_js(preview_page, "getComputedStyle(document.querySelector('#root')).borderRadius", "8px", "Rounded preview Rules")
+            wait_js(live_page, "document.querySelector('#root').classList.contains('glow')", True, "Active A Rules glow")
+            wait_js(preview_page, "document.querySelector('#root').classList.contains('glow')", False, "Inactive B no glow")
+            wait_js(live_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(18,170,221,0.65)", "Active A glow color")
             # Changing the actual browser-source viewport must recalculate
             # the inset, independently from legacy template padding values.
             views[1].resize(380, 240)
@@ -158,8 +165,12 @@ def main() -> int:
             db.save_rule_template_presentation(inactive, {
                 "autoscroll": False, "background": "color",
                 "background_color": "#2277DD", "background_opacity": 91, "padding": 91,
+                "glow": True, "glow_color": "#33CC77",
             })
             wait_js(preview_page, padding_is_responsive, True, "Legacy B padding does not override responsive inset")
+            wait_js(preview_page, "document.querySelector('#root').classList.contains('glow')", True, "B selected glow refresh")
+            wait_js(preview_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(51,204,119,0.65)", "B selected glow color")
+            wait_js(live_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(18,170,221,0.65)", "On-air A glow unaffected")
             wait_js(live_page, expr, "A LIVE", "On-air remains A")
 
             # The SAME already-open preview browser follows Qt selection.
@@ -167,11 +178,13 @@ def main() -> int:
             app.processEvents()
             wait_js(preview_page, expr, "A LIVE", "Preview follows B -> A")
             wait_js(preview_page, padding_is_responsive, True, "Preview A automatic inset")
+            wait_js(preview_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(18,170,221,0.65)", "Preview follows A glow color")
             assert views[1].url().toString() == preview_url, "Preview should not navigate or spawn another tab"
             editor.template_combo.setCurrentIndex(editor.template_combo.findData(inactive))
             app.processEvents()
             wait_js(preview_page, expr, "B CHOSEN", "Preview follows A -> B")
             wait_js(preview_page, padding_is_responsive, True, "Preview B automatic inset after switch")
+            wait_js(preview_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(51,204,119,0.65)", "Preview follows B glow color")
             assert db.get_auction_rules_snapshot(auction_id) == before_snapshot
             assert db.current_rules_payload() == before_live
 
@@ -180,6 +193,7 @@ def main() -> int:
             editor._make_active()
             app.processEvents()
             wait_js(live_page, expr, "B CHOSEN", "On-air B activated")
+            wait_js(live_page, "document.querySelector('#root').style.getPropertyValue('--rules-glow-strong')", "rgba(51,204,119,0.65)", "On-air activated B style")
             wait_js(preview_page, expr, "B CHOSEN", "Preview still on selected B")
             editor.template_combo.setCurrentIndex(editor.template_combo.findData(active))
             app.processEvents()

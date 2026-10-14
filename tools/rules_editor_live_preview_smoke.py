@@ -18,7 +18,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QTextEdit
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QColor, QTextCursor
 
 from streaming_manager.database import Database
 from streaming_manager.constants import (
@@ -81,6 +81,22 @@ def main() -> int:
             assert editor.document().documentMargin() < 37.0
             assert editor.isReadOnly() is False
             assert dialog._is_dirty() is False
+            assert "border-radius: 8px" in editor.viewport().styleSheet()
+            assert dialog._rules_glow_effect.isEnabled() is False
+            dialog.rules_obs_glow.setChecked(True)
+            dialog._set_color_button(
+                dialog.rules_obs_glow_color_btn, QColor("#1188CC"), "Цвет контура"
+            )
+            dialog._editor_changed()
+            app.processEvents()
+            assert dialog._rules_glow_effect.isEnabled() is True
+            assert dialog._rules_glow_effect.color().blue() == 204
+            assert "border-radius: 8px" in editor.viewport().styleSheet()
+            assert editor.toHtml() == initial_html
+            assert db.get_rule_template_presentation(active) is None
+            dialog.rules_obs_glow.setChecked(False)
+            app.processEvents()
+            assert dialog._rules_glow_effect.isEnabled() is False
             assert dialog.rules_editor_splitter.count() == 2
             assert dialog.rules_editor_splitter.orientation() == Qt.Horizontal
             assert editor.isVisible() and dialog.rules_obs_page.isVisible()

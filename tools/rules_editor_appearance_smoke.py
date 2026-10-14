@@ -68,8 +68,22 @@ def main() -> int:
                 "background_color": "#123456",
                 "background_opacity": 35,
                 "padding": 37,
+                "glow": False,
+                "glow_color": "#FFFFFF",
             }
+            assert not dialog._rules_glow_effect.isEnabled()
+            assert "border-radius: 8px" in dialog.editor.viewport().styleSheet()
             assert dialog._is_dirty() is False
+            dialog.rules_obs_glow.setChecked(True)
+            dialog._set_color_button(
+                dialog.rules_obs_glow_color_btn, QColor("#33CC77"), "Цвет контура"
+            )
+            dialog._editor_changed()
+            app.processEvents()
+            assert dialog._rules_glow_effect.isEnabled()
+            assert dialog._rules_glow_effect.color().red() == 51
+            assert dialog._rules_glow_effect.color().green() == 204
+            assert dialog.rules_obs_glow_color_btn.isEnabled()
             dialog.rules_obs_opacity.setValue(81)
             dialog.rules_obs_autoscroll.setChecked(True)
             dialog._set_color_button(
@@ -86,6 +100,7 @@ def main() -> int:
             assert saved["padding"] == 37 and saved["background_opacity"] == 81
             assert saved["background_color"] == "#554433"
             assert saved["autoscroll"] is True
+            assert saved["glow"] is True and saved["glow_color"] == "#33CC77"
             assert db.get_settings() == original_settings
             assert db.current_rules_payload()["presentation"] == saved
 
@@ -93,6 +108,8 @@ def main() -> int:
             # settings until explicitly saved; no accidental style copy.
             dialog._reload_templates(selected_id=inactive)
             assert dialog._obs_presentation_values()["padding"] == 37
+            assert dialog._obs_presentation_values()["glow"] is False
+            assert dialog._rules_glow_effect.isEnabled() is False
             assert db.get_rule_template_presentation(inactive) is None
             assert dialog._is_dirty() is False
             dialog.rules_obs_opacity.setValue(47)
@@ -120,6 +137,7 @@ def main() -> int:
             copied = int(dialog._loaded_template_id)
             assert copied not in (active, inactive)
             assert db.get_rule_template_presentation(copied)["background_opacity"] == 69
+            assert db.get_rule_template_presentation(copied)["glow"] is False
             assert db.get_active_rule_template()["id"] == active
             assert db.get_rule_template_presentation(inactive)["background_opacity"] == 47
 
