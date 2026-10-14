@@ -9,6 +9,8 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
+    QPalette,
+    QPixmap,
     QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
@@ -395,6 +397,11 @@ class AuctionRulesEditorDialog(QDialog):
         self.editor = QTextEdit()
         self.editor.setAcceptRichText(True)
         self.editor.setPlaceholderText("Введите правила аукциона…")
+        self._rules_default_editor_palette = QPalette(self.editor.palette())
+        self._rules_default_viewport_palette = QPalette(self.editor.viewport().palette())
+        self._rules_media_source_key = None
+        self._rules_media_original = QPixmap()
+        self._rules_media_brush_key = None
         self._rules_glow_effect = QGraphicsDropShadowEffect(self.editor)
         self._rules_glow_effect.setOffset(0, 0)
         self._rules_glow_effect.setBlurRadius(20)
@@ -803,18 +810,17 @@ class AuctionRulesEditorDialog(QDialog):
             f"rgba({edge.red()}, {edge.green()}, {edge.blue()}, {edge_alpha})"
             if glow else "rgba(255, 255, 255, 42)"
         )
-        media_style = ""
-        if values["background"] == "media" and values["background_media_id"] is not None:
-            asset = self.db.get_media_asset(int(values["background_media_id"]))
-            if (asset is not None and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
-                    and media_asset_available(self.db.path.parent, asset)):
-                path = resolve_media_asset_path(self.db.path.parent, asset)
-                media_url = QUrl.fromLocalFile(str(path)).toString()
-                media_style = f'border-image: url("{media_url}") 0 0 0 0 stretch stretch;'
+        # A border-image stylesheet on QTextEdit.viewport is swallowed by
+        # the native QTextEdit painting. Use a real QPalette.Base pixmap brush:
+        # it paints *behind* editable text and never rewrites HTML.
+        media_ready = self._update_rules_media_brush(values)
+        color_css = (
+            "background: palette(base);" if media_ready
+            else f"background-color: {background};"
+        )
         style = (
-            f"background-color: {background};"
+            f"{color_css}"
             f"border-radius: 8px; border: 1px solid {stroke};"
-            f"{media_style}"
         )
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
@@ -825,6 +831,67 @@ class AuctionRulesEditorDialog(QDialog):
         self._rules_glow_effect.setEnabled(glow)
 
         self._update_local_rules_padding()
+
+    def _update_rules_media_brush(self, values: dict[str, object]) -> bool:
+        """Render a cover-cropped registered static image under QTextEdit.
+
+        QPalette.Base is drawn by the native scroll-area viewport and keeps
+        selection/caret/rich-text editing untouched. Cache the original image
+        across keystrokes and rescale only when the viewport changes size.
+        """
+        viewport = self.editor.viewport()
+        asset = None
+        if (values["background"] == "media"
+                and values.get("background_media_id") is not None):
+            asset = self.db.get_media_asset(int(values["background_media_id"]))
+        path = None
+        if (asset is not None
+                and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+                and media_asset_available(self.db.path.parent, asset)):
+            try:
+                path = resolve_media_asset_path(self.db.path.parent, asset)
+            except (ValueError, OSError):
+                path = None
+        if path is None or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+            self._rules_media_source_key = None
+            self._rules_media_original = QPixmap()
+            self._rules_media_brush_key = None
+            self.editor.setPalette(self._rules_default_editor_palette)
+            viewport.setPalette(self._rules_default_viewport_palette)
+            viewport.update()
+            return False
+
+        try:
+            source_key = (str(path), path.stat().st_mtime_ns)
+        except OSError:
+            return False
+        if self._rules_media_source_key != source_key:
+            self._rules_media_source_key = source_key
+            self._rules_media_original = QPixmap(str(path))
+            self._rules_media_brush_key = None
+        if self._rules_media_original.isNull():
+            return False
+
+        width, height = max(1, viewport.width()), max(1, viewport.height())
+        brush_key = (source_key, width, height)
+        if self._rules_media_brush_key != brush_key:
+            scaled = self._rules_media_original.scaled(
+                width, height, Qt.KeepAspectRatioByExpanding,
+                Qt.SmoothTransformation,
+            )
+            x = max(0, (scaled.width() - width) // 2)
+            y = max(0, (scaled.height() - height) // 2)
+            fitted = scaled.copy(x, y, width, height)
+            brush = QBrush(fitted)
+            editor_palette = QPalette(self._rules_default_editor_palette)
+            viewport_palette = QPalette(self._rules_default_viewport_palette)
+            editor_palette.setBrush(QPalette.Base, brush)
+            viewport_palette.setBrush(QPalette.Base, brush)
+            self.editor.setPalette(editor_palette)
+            viewport.setPalette(viewport_palette)
+            self._rules_media_brush_key = brush_key
+            viewport.update()
+        return True
 
     @staticmethod
     def _responsive_rules_padding(width: int, height: int) -> float:
@@ -845,6 +912,9 @@ class AuctionRulesEditorDialog(QDialog):
         if (hasattr(self, "editor") and watched is self.editor.viewport()
                 and event.type() == QEvent.Resize):
             self._update_local_rules_padding()
+            if (hasattr(self, "rules_obs_media_mode")
+                    and self.rules_obs_media_mode.isChecked()):
+                self._refresh_local_rules_preview()
         return super().eventFilter(watched, event)
 
     def _publish_unsaved_preview(self) -> None:
