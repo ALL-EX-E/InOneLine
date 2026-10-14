@@ -238,13 +238,10 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_media_combo = ScrollSafeComboBox()
         self.rules_obs_media_combo.setMinimumWidth(175)
         self.rules_obs_media_combo.currentIndexChanged.connect(self._editor_changed)
-        self.rules_obs_media_refresh = QPushButton("Обновить")
-        self.rules_obs_media_refresh.clicked.connect(lambda: self._refresh_rules_media_library())
         media_row = QWidget()
         media_row_layout = QHBoxLayout(media_row)
         media_row_layout.setContentsMargins(0, 0, 0, 0)
         media_row_layout.addWidget(self.rules_obs_media_combo, 1)
-        media_row_layout.addWidget(self.rules_obs_media_refresh)
         obs_form.addRow("Из библиотеки:", media_row)
         self.rules_obs_media_add = QPushButton("Добавить фон…")
         self.rules_obs_media_add.setEnabled(import_background is not None)
@@ -633,7 +630,6 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_color_pick_btn.setEnabled(color_mode)
         self.rules_obs_opacity_control.setEnabled(color_mode)
         self.rules_obs_media_combo.setEnabled(self.rules_obs_media_mode.isChecked())
-        self.rules_obs_media_refresh.setEnabled(self.rules_obs_media_mode.isChecked())
         self.rules_obs_media_add.setEnabled(
             self.rules_obs_media_mode.isChecked()
             and self._import_background is not None
@@ -641,7 +637,11 @@ class AuctionRulesEditorDialog(QDialog):
         self._editor_changed()
 
     def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
-        """Use registered shared overlay assets; never create a new library."""
+        """Sync shared assets automatically on open, template switch and import.
+
+        The library itself remains the only source of truth. There is no
+        separate "Refresh" UI control or duplicate local cache to maintain.
+        """
         if selected_id is _UNSET_MEDIA:
             selected_id = self.rules_obs_media_combo.currentData()
         self.db.sync_managed_media_category(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)

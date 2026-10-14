@@ -203,12 +203,11 @@ def main() -> int:
             # FIX1: without Save, selecting the image and clicking Refresh
             # must update the existing preview browser and local editable UI.
             # The on-air source must still use the saved active template.
-            editor._refresh_rules_media_library(media_asset.id)
-            editor.rules_obs_media_mode.setChecked(True)
+            editor._rules_media_imported(media_asset.id)
             app.processEvents()
+            assert not hasattr(editor, "rules_obs_media_refresh")
+            assert editor.rules_obs_media_mode.isChecked()
             assert editor._is_dirty()
-            editor.rules_obs_media_refresh.click()
-            app.processEvents()
             wait_js(preview_page, media_visible, "block", "Unsaved B media live preview")
             wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Unsaved B preview safe asset")
             assert db.get_rule_template_presentation(inactive).get("background") == "color"
