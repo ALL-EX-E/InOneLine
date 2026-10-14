@@ -32,7 +32,7 @@ def main() -> int:
         media_dir.mkdir(parents=True, exist_ok=True)
 
         gif = media_dir / "rules_animation.gif"
-        gif.write_bytes(base64.b64decode("R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw=="))
+        gif.write_bytes(base64.b64decode("R0lGODlhEAAQAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAGQAAACwAAAAAEAAQAAAIHQABCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBACH5BAEZAAEALAAAAAAQABAAgQAA/wAAAAAAAAAAAAgdAAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAOw=="))
         gif_asset = db.ensure_managed_media_asset(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, gif.name, gif.name)
         video = media_dir / "rules_silent.webm"
         video.write_bytes((Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm").read_bytes())
