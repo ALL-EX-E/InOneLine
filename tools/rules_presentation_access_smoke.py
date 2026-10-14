@@ -167,6 +167,29 @@ def main() -> int:
             else:
                 raise AssertionError(f"accepted invalid Rules glow: {invalid_glow!r}")
         assert db.get_rule_template_presentation(b)["glow_color"] == "#55FF99"
+        # K8A: media selection is registered-ID only; no filesystem paths.
+        media_style = {
+            **db.get_rule_template_presentation(b),
+            "background": "media",
+            "background_media_id": 999999,
+        }
+        db.save_rule_template_presentation(b, media_style)
+        assert db.get_rule_template_presentation(b)["background_media_id"] == 999999
+        assert "background_media" not in db.current_rules_payload()["presentation"]
+        for invalid_media in (
+            {**media_style, "background_media_id": "/etc/passwd"},
+            {**media_style, "background_media_id": True},
+            {**media_style, "background_media_id": -1},
+            {**media_style, "background_media_id": None},
+            {**media_style, "background_media_id": 1, "external_path": "C:/secret"},
+        ):
+            try:
+                db.save_rule_template_presentation(b, invalid_media)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"accepted invalid media: {invalid_media!r}")
+        assert db.get_rule_template_presentation(b)["background_media_id"] == 999999
 
 
     print("P11_K3_RULES_PRESENTATION_TEMPLATE_SESSION_OBS_CUTOVER=PASS")
