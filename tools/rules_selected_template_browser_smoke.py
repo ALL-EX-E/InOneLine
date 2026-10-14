@@ -267,7 +267,8 @@ def main() -> int:
                 app.processEvents()
                 wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Return to still image")
                 wait_js(preview_page, video_visible, "none", "Video stops on image change")
-                wait_js(preview_page, video_src, None, "Video source cleared")
+                # Chromium returns either null or an empty src attribute after pause/clear.
+                wait_js(preview_page, f"({video_src}) || ''", "", "Video source cleared")
                 assert db.get_rule_template_presentation(inactive).get("background") == "color"
             # Discard unsaved presentation; saved B can still change using the
             # original DB mutation path, with no stale draft override.
