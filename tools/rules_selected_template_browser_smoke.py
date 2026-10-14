@@ -330,7 +330,8 @@ def main() -> int:
             for view in views:
                 view.close()
                 view.deleteLater()
-            editor.close()
+            with patch.object(editor, "_confirm_discard_or_save", return_value=True):
+                editor.close()
             editor.deleteLater()
             QTest.qWait(100)
             server.stop()
