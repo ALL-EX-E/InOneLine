@@ -231,10 +231,10 @@ def main() -> int:
             assert db.current_rules_payload() == before_live
 
             # The browser's existing video pattern is muted/autoplay/loop.
-            # The lightweight fixture is not a playable clip: assertions
-            # verify safe source selection, never OS codec availability.
-            video_path = media_dir / "rules_k8c_browser.mp4"
-            video_path.write_bytes(b"\x00\x00\x00\x08ftypisom")
+            # The checked-in tiny VP8 WebM is valid and silent; platform decoding
+            # is covered by Qt media probes and real Windows manual QA.
+            video_path = media_dir / "rules_k8c_browser.webm"
+            video_path.write_bytes((Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm").read_bytes())
             video_asset = db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video_path.name, video_path.name
             )
@@ -242,8 +242,8 @@ def main() -> int:
             app.processEvents()
             video_visible = "document.querySelector('#rules-background-video').style.display"
             video_src = "document.querySelector('#rules-background-video').getAttribute('src')"
-            wait_js(preview_page, video_visible, "block", "Muted B video background")
-            wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared MP4 URL")
+            wait_js(preview_page, video_visible, "block", "Muted B WebM background")
+            wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared WebM URL")
             wait_js(preview_page, media_visible, "none", "Video hides previous GIF")
             wait_js(preview_page, "document.querySelector('#rules-background-video').muted", True, "Video always muted")
             wait_js(preview_page, "document.querySelector('#rules-background-video').loop", True, "Video loops")
