@@ -24,12 +24,22 @@ body.preview {
 }
 #root {
   position: absolute;
-  inset: 0;
+  /* Keep the common glow visible INSIDE the transparent OBS Browser Source. */
+  inset: 14px;
   overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.16);
   opacity: 0;
   transition: opacity .12s ease;
 }
 #root.visible { opacity: 1; }
+#root.glow {
+  border-color: var(--rules-glow-stroke, rgba(255,255,255,.62));
+  box-shadow:
+    0 0 6px var(--rules-glow-strong, rgba(255,255,255,.65)),
+    0 0 16px var(--rules-glow-soft, rgba(255,255,255,.58)),
+    inset 0 0 8px var(--rules-glow-inner, rgba(255,255,255,.22));
+}
 #viewport {
   position: absolute;
   inset: 0;
@@ -140,6 +150,15 @@ body.preview #api-state.visible { display: block; }
     root.style.background = presentation.background === "color"
       ? rgba(presentation.background_color, presentation.background_opacity)
       : "transparent";
+    // The same fixed 8px radius/soft three-layer glow as shared overlays.
+    // Legacy five-field Rules JSON has glow off by default.
+    const glow = presentation.glow === true;
+    const glowColor = normalizeHex(presentation.glow_color, "#FFFFFF");
+    root.classList.toggle("glow", glow);
+    root.style.setProperty("--rules-glow-stroke", rgba(glowColor, 62));
+    root.style.setProperty("--rules-glow-strong", rgba(glowColor, 65));
+    root.style.setProperty("--rules-glow-soft", rgba(glowColor, 58));
+    root.style.setProperty("--rules-glow-inner", rgba(glowColor, 22));
 
     content.innerHTML = html;
     resetScroll();

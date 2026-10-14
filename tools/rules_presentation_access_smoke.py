@@ -145,6 +145,29 @@ def main() -> int:
         assert db.get_rule_template_presentation(a)["padding"] == 17
         Database(db.path)  # idempotent reopen preserves valid customization
         assert db.get_rule_template_presentation(a)["padding"] == 17
+        # New seven-field glows coexist with untouched five-field snapshots.
+        old_style = db.get_rule_template_presentation(a)
+        glowing = {**style_b, "glow": True, "glow_color": "#55ff99"}
+        db.save_rule_template_presentation(b, glowing)
+        assert db.get_rule_template_presentation(b) == {
+            **glowing, "glow_color": "#55FF99"
+        }
+        assert db.get_rule_template_presentation(a) == old_style
+        for invalid_glow in (
+            {**glowing, "glow": "yes"},
+            {**glowing, "glow_color": "#XYZ123"},
+            {**glowing, "glow_color": None},
+            {**style_a, "glow": True},
+            {**glowing, "unexpected": 1},
+        ):
+            try:
+                db.save_rule_template_presentation(b, invalid_glow)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"accepted invalid Rules glow: {invalid_glow!r}")
+        assert db.get_rule_template_presentation(b)["glow_color"] == "#55FF99"
+
 
     print("P11_K3_RULES_PRESENTATION_TEMPLATE_SESSION_OBS_CUTOVER=PASS")
     return 0
