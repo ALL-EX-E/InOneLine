@@ -150,6 +150,11 @@ jobs:
         run: |
           python tools/rules_editor_import_shared_media_smoke.py
 
+      - name: P11-K8C animated Rules media in native Qt editor
+        shell: pwsh
+        run: |
+          python tools/rules_editor_animated_media_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:

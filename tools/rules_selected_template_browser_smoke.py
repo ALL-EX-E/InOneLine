@@ -4,6 +4,7 @@ This closes the coverage gap: checking only HTTP endpoints cannot demonstrate
 that the browser actually renders a selected inactive template separately.
 """
 from __future__ import annotations
+import base64
 import os
 import socket
 import sys
@@ -213,6 +214,50 @@ def main() -> int:
             assert db.get_rule_template_presentation(inactive).get("background") == "color"
             assert db.current_rules_payload() == before_live
             wait_js(live_page, media_visible, "none", "Unsaved B does not alter on-air A")
+            # P11-K8C: animated GIF reuses the same shared image element.
+            # No Save or active-template change is allowed from a preview pick.
+            gif_path = media_dir / "rules_k8c_browser.gif"
+            gif_path.write_bytes(base64.b64decode(
+                "R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw=="
+            ))
+            gif_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, gif_path.name, gif_path.name
+            )
+            editor._rules_media_imported(gif_asset.id)
+            app.processEvents()
+            wait_js(preview_page, media_visible, "block", "Animated GIF background in B")
+            wait_js(preview_page, media_src, f"/media/{gif_asset.id}", "Shared GIF URL")
+            wait_js(live_page, media_visible, "none", "GIF does not change live A")
+            assert db.current_rules_payload() == before_live
+
+            # The browser's existing video pattern is muted/autoplay/loop.
+            # The lightweight fixture is not a playable clip: assertions
+            # verify safe source selection, never OS codec availability.
+            video_path = media_dir / "rules_k8c_browser.mp4"
+            video_path.write_bytes(b"\x00\x00\x00\x08ftypisom")
+            video_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video_path.name, video_path.name
+            )
+            editor._rules_media_imported(video_asset.id)
+            app.processEvents()
+            video_visible = "document.querySelector('#rules-background-video').style.display"
+            video_src = "document.querySelector('#rules-background-video').getAttribute('src')"
+            wait_js(preview_page, video_visible, "block", "Muted B video background")
+            wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared MP4 URL")
+            wait_js(preview_page, media_visible, "none", "Video hides previous GIF")
+            wait_js(preview_page, "document.querySelector('#rules-background-video').muted", True, "Video always muted")
+            wait_js(preview_page, "document.querySelector('#rules-background-video').loop", True, "Video loops")
+            wait_js(preview_page, "document.querySelector('#rules-background-video').autoplay", True, "Video autoplays")
+            wait_js(live_page, video_visible, "none", "Video does not change on-air A")
+            assert db.current_rules_payload() == before_live
+
+            # Switching media has no stale frame/sound and does not save B.
+            editor._rules_media_imported(media_asset.id)
+            app.processEvents()
+            wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Return to still image")
+            wait_js(preview_page, video_visible, "none", "Video stops on image change")
+            wait_js(preview_page, video_src, None, "Video source cleared")
+            assert db.get_rule_template_presentation(inactive).get("background") == "color"
             # Discard unsaved presentation; saved B can still change using the
             # original DB mutation path, with no stale draft override.
             editor._load_template(inactive)
