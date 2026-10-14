@@ -49,6 +49,7 @@ from ..constants import (
     RULES_OVERLAY_PADDING_KEY,
 )
 from ..database import Database
+from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available, resolve_media_asset_path
 from .common import (
     ScrollSafeComboBox,
     ScrollSafeFontComboBox,
@@ -57,6 +58,9 @@ from .common import (
     make_screen_color_picker_button,
     pick_screen_color,
 )
+
+
+_UNSET_MEDIA = object()
 
 
 class AuctionRulesEditorDialog(QDialog):
@@ -214,12 +218,36 @@ class AuctionRulesEditorDialog(QDialog):
         background_row_layout.setContentsMargins(0, 0, 0, 0)
         self.rules_obs_transparent = QRadioButton("Прозрачный")
         self.rules_obs_color_mode = QRadioButton("Цвет")
+        self.rules_obs_media_mode = QRadioButton("Свой")
         self.rules_obs_transparent.toggled.connect(self._obs_background_changed)
         self.rules_obs_color_mode.toggled.connect(self._obs_background_changed)
+        self.rules_obs_media_mode.toggled.connect(self._obs_background_changed)
         background_row_layout.addWidget(self.rules_obs_transparent)
         background_row_layout.addWidget(self.rules_obs_color_mode)
+        background_row_layout.addWidget(self.rules_obs_media_mode)
         background_row_layout.addStretch()
         obs_form.addRow("Фон:", background_row)
+
+        # K8A reads the existing shared background category. File import stays
+        # with the original Stream/OBS importer until its separate UI step.
+        self.rules_obs_media_combo = ScrollSafeComboBox()
+        self.rules_obs_media_combo.setMinimumWidth(175)
+        self.rules_obs_media_combo.currentIndexChanged.connect(self._editor_changed)
+        self.rules_obs_media_refresh = QPushButton("Обновить")
+        self.rules_obs_media_refresh.clicked.connect(lambda: self._refresh_rules_media_library())
+        media_row = QWidget()
+        media_row_layout = QHBoxLayout(media_row)
+        media_row_layout.setContentsMargins(0, 0, 0, 0)
+        media_row_layout.addWidget(self.rules_obs_media_combo, 1)
+        media_row_layout.addWidget(self.rules_obs_media_refresh)
+        obs_form.addRow("Из библиотеки:", media_row)
+        self.rules_obs_media_hint = QLabel(
+            "Изображения PNG, JPG, WEBP из общей библиотеки. "
+            "Добавление файлов пока выполняется в «Стрим / OBS → Фон оверлея»."
+        )
+        self.rules_obs_media_hint.setWordWrap(True)
+        obs_form.addRow(self.rules_obs_media_hint)
+        self._refresh_rules_media_library()
 
         color_row = QWidget()
         color_row_layout = QHBoxLayout(color_row)
@@ -515,13 +543,21 @@ class AuctionRulesEditorDialog(QDialog):
             **presentation,
             "glow": bool(presentation.get("glow", False)),
             "glow_color": str(presentation.get("glow_color", "#FFFFFF")).upper(),
+            "background_media_id": presentation.get("background_media_id"),
         }
 
     def _obs_presentation_values(self) -> dict[str, object]:
         return {
             "autoscroll": self.rules_obs_autoscroll.isChecked(),
             "background": (
-                "color" if self.rules_obs_color_mode.isChecked() else "transparent"
+                "media" if self.rules_obs_media_mode.isChecked()
+                else "color" if self.rules_obs_color_mode.isChecked()
+                else "transparent"
+            ),
+            "background_media_id": (
+                int(self.rules_obs_media_combo.currentData())
+                if str(self.rules_obs_media_combo.currentData() or "").isdigit()
+                else None
             ),
             "background_color": str(
                 self.rules_obs_color_btn.property("selectedColor")
@@ -543,7 +579,9 @@ class AuctionRulesEditorDialog(QDialog):
     def _apply_obs_presentation(self, values: dict[str, object]) -> None:
         self.rules_obs_autoscroll.setChecked(bool(values["autoscroll"]))
         self.rules_obs_color_mode.setChecked(values["background"] == "color")
-        self.rules_obs_transparent.setChecked(values["background"] != "color")
+        self.rules_obs_media_mode.setChecked(values["background"] == "media")
+        self.rules_obs_transparent.setChecked(values["background"] == "transparent")
+        self._refresh_rules_media_library(values.get("background_media_id"))
         self._set_color_button(
             self.rules_obs_color_btn,
             QColor(str(values["background_color"])),
@@ -564,7 +602,34 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_color_btn.setEnabled(color_mode)
         self.rules_obs_color_pick_btn.setEnabled(color_mode)
         self.rules_obs_opacity_control.setEnabled(color_mode)
+        self.rules_obs_media_combo.setEnabled(self.rules_obs_media_mode.isChecked())
+        self.rules_obs_media_refresh.setEnabled(self.rules_obs_media_mode.isChecked())
         self._editor_changed()
+
+    def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
+        """Use registered shared overlay assets; never create a new library."""
+        if selected_id is _UNSET_MEDIA:
+            selected_id = self.rules_obs_media_combo.currentData()
+        self.db.sync_managed_media_category(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS)
+        existing = []
+        for asset in self.db.list_media_assets(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS):
+            if not media_asset_available(self.db.path.parent, asset):
+                continue
+            try:
+                extension = resolve_media_asset_path(self.db.path.parent, asset).suffix.lower()
+            except (OSError, ValueError):
+                continue
+            if extension in {".png", ".jpg", ".jpeg", ".webp"}:
+                existing.append(asset)
+        with QSignalBlocker(self.rules_obs_media_combo):
+            self.rules_obs_media_combo.clear()
+            self.rules_obs_media_combo.addItem("— выберите изображение —", None)
+            for asset in existing:
+                self.rules_obs_media_combo.addItem(asset.display_name, asset.id)
+            idx = self.rules_obs_media_combo.findData(selected_id)
+            self.rules_obs_media_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        if not self._loading and hasattr(self, "editor"):
+            self._editor_changed()
 
     def _obs_glow_changed(self, _checked: bool = False) -> None:
         enabled = self.rules_obs_glow.isChecked()
@@ -705,9 +770,18 @@ class AuctionRulesEditorDialog(QDialog):
             f"rgba({edge.red()}, {edge.green()}, {edge.blue()}, {edge_alpha})"
             if glow else "rgba(255, 255, 255, 42)"
         )
+        media_style = ""
+        if values["background"] == "media" and values["background_media_id"] is not None:
+            asset = self.db.get_media_asset(int(values["background_media_id"]))
+            if (asset is not None and asset.category == MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+                    and media_asset_available(self.db.path.parent, asset)):
+                path = resolve_media_asset_path(self.db.path.parent, asset)
+                media_url = QUrl.fromLocalFile(str(path)).toString()
+                media_style = f'border-image: url("{media_url}") 0 0 0 0 stretch stretch;'
         style = (
             f"background-color: {background};"
             f"border-radius: 8px; border: 1px solid {stroke};"
+            f"{media_style}"
         )
         viewport = self.editor.viewport()
         if viewport.styleSheet() != style:
