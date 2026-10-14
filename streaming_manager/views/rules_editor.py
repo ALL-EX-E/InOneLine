@@ -621,7 +621,7 @@ class AuctionRulesEditorDialog(QDialog):
                 self.rules_obs_media_combo.addItem(asset.display_name, asset.id)
             idx = self.rules_obs_media_combo.findData(selected_id)
             self.rules_obs_media_combo.setCurrentIndex(idx if idx >= 0 else 0)
-        if not self._loading:
+        if not self._loading and hasattr(self, "editor"):
             self._editor_changed()
 
     def _obs_glow_changed(self, _checked: bool = False) -> None:
