@@ -34,8 +34,8 @@ def main() -> int:
         gif = media_dir / "rules_animation.gif"
         gif.write_bytes(base64.b64decode("R0lGODlhAQABAAD/ACwAAAAAAQABAAACAUwAOw=="))
         gif_asset = db.ensure_managed_media_asset(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, gif.name, gif.name)
-        video = media_dir / "rules_silent.mp4"
-        video.write_bytes(b"\x00\x00\x00\x08ftypisom")
+        video = media_dir / "rules_silent.webm"
+        video.write_bytes((Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm").read_bytes())
         video_asset = db.ensure_managed_media_asset(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video.name, video.name)
         still = media_dir / "rules_still.png"
         image = QImage(16, 16, QImage.Format_RGB32)
