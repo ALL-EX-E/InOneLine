@@ -238,26 +238,31 @@ def main() -> int:
             video_asset = db.ensure_managed_media_asset(
                 MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video_path.name, video_path.name
             )
-            editor._rules_media_imported(video_asset.id)
-            app.processEvents()
-            video_visible = "document.querySelector('#rules-background-video').style.display"
-            video_src = "document.querySelector('#rules-background-video').getAttribute('src')"
-            wait_js(preview_page, video_visible, "block", "Muted B WebM background")
-            wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared WebM URL")
-            wait_js(preview_page, media_visible, "none", "Video hides previous GIF")
-            wait_js(preview_page, "document.querySelector('#rules-background-video').muted", True, "Video always muted")
-            wait_js(preview_page, "document.querySelector('#rules-background-video').loop", True, "Video loops")
-            wait_js(preview_page, "document.querySelector('#rules-background-video').autoplay", True, "Video autoplays")
-            wait_js(live_page, video_visible, "none", "Video does not change on-air A")
-            assert db.current_rules_payload() == before_live
+            # Qt QMediaPlayer is covered by the isolated native K8C smoke.
+            # Keep Chromium video checks independent of a second decoder in
+            # the same Qt process; this prevents cross-backend test interference.
+            editor._stop_rules_animated_media()
+            with patch.object(editor, "_update_rules_media_layer", return_value=False):
+                editor._rules_media_imported(video_asset.id)
+                app.processEvents()
+                video_visible = "document.querySelector('#rules-background-video').style.display"
+                video_src = "document.querySelector('#rules-background-video').getAttribute('src')"
+                wait_js(preview_page, video_visible, "block", "Muted B WebM background")
+                wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared WebM URL")
+                wait_js(preview_page, media_visible, "none", "Video hides previous GIF")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').muted", True, "Video always muted")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').loop", True, "Video loops")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').autoplay", True, "Video autoplays")
+                wait_js(live_page, video_visible, "none", "Video does not change on-air A")
+                assert db.current_rules_payload() == before_live
 
-            # Switching media has no stale frame/sound and does not save B.
-            editor._rules_media_imported(media_asset.id)
-            app.processEvents()
-            wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Return to still image")
-            wait_js(preview_page, video_visible, "none", "Video stops on image change")
-            wait_js(preview_page, video_src, None, "Video source cleared")
-            assert db.get_rule_template_presentation(inactive).get("background") == "color"
+                # Switching media has no stale frame/sound and does not save B.
+                editor._rules_media_imported(media_asset.id)
+                app.processEvents()
+                wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Return to still image")
+                wait_js(preview_page, video_visible, "none", "Video stops on image change")
+                wait_js(preview_page, video_src, None, "Video source cleared")
+                assert db.get_rule_template_presentation(inactive).get("background") == "color"
             # Discard unsaved presentation; saved B can still change using the
             # original DB mutation path, with no stale draft override.
             editor._load_template(inactive)
