@@ -522,8 +522,18 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 f"{self.window().api.base_url}/timer-overlay"
             )
         )
+        self.preview_timer_overlay_btn = QPushButton("Открыть предпросмотр таймера")
+        self.preview_timer_overlay_btn.setToolTip(
+            "Открыть тот же виджет таймера с режимом предпросмотра"
+        )
+        self.preview_timer_overlay_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.window().api.base_url}/timer-overlay?preview=1")
+            )
+        )
         timer_obs_row.addStretch()
         timer_obs_row.addWidget(self.copy_timer_overlay_btn)
+        timer_obs_row.addWidget(self.preview_timer_overlay_btn)
         timer_obs_row.addStretch()
         timer_layout.addLayout(timer_obs_row)
 
