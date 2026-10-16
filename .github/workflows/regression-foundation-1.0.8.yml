@@ -63,6 +63,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "compileall failed" }
           Write-Host "COMPILEALL=PASS"
 
+      - name: P11-K4 real Chromium selected Rules preview vs on-air regression
+        timeout-minutes: 5
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/rules_selected_template_browser_smoke.py
+
       - name: GitHub Actions version regression
         shell: pwsh
         run: |
@@ -150,6 +158,11 @@ jobs:
         run: |
           python tools/rules_editor_import_shared_media_smoke.py
 
+      - name: P11-K8C animated Rules media in native Qt editor
+        shell: pwsh
+        run: |
+          python tools/rules_editor_animated_media_smoke.py
+
       - name: Native GUI regression core
         shell: pwsh
         env:
@@ -172,13 +185,6 @@ jobs:
         run: |
           python tools/timer_media_background_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "UI-045 Timer media regression failed" }
-
-      - name: P11-K4 real Chromium selected Rules preview vs on-air regression
-        shell: pwsh
-        env:
-          QT_QPA_PLATFORM: windows
-        run: |
-          python tools/rules_selected_template_browser_smoke.py
 
       - name: Build frozen application with accepted toolchain
         shell: pwsh

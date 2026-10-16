@@ -4,6 +4,8 @@ This closes the coverage gap: checking only HTTP endpoints cannot demonstrate
 that the browser actually renders a selected inactive template separately.
 """
 from __future__ import annotations
+import base64
+import faulthandler
 import os
 import socket
 import sys
@@ -50,17 +52,22 @@ def js(page, expression: str):
 
 
 def wait_js(page, expression: str, expected, label: str, timeout: float = 25):
+    print(f"RULES_BROWSER_CHECK_START: {label}", flush=True)
     end = time.monotonic() + timeout
     actual = None
     while time.monotonic() < end:
         actual = js(page, expression)
         if actual == expected:
+            print(f"RULES_BROWSER_CHECK_PASS: {label}", flush=True)
             return
         QTest.qWait(70)
     raise AssertionError(f"{label}: got {actual!r}, expected {expected!r}")
 
 
 def main() -> int:
+    faulthandler.enable()
+    faulthandler.dump_traceback_later(65, repeat=True)
+    print("RULES_BROWSER_DIAG_MAIN_START", flush=True)
     app = QApplication.instance() or QApplication([])
     with TemporaryDirectory(ignore_cleanup_errors=True) as temp:
         db = Database(Path(temp) / "rules_preview.db")
@@ -213,6 +220,56 @@ def main() -> int:
             assert db.get_rule_template_presentation(inactive).get("background") == "color"
             assert db.current_rules_payload() == before_live
             wait_js(live_page, media_visible, "none", "Unsaved B does not alter on-air A")
+            # P11-K8C: animated GIF reuses the same shared image element.
+            # No Save or active-template change is allowed from a preview pick.
+            gif_path = media_dir / "rules_k8c_browser.gif"
+            gif_path.write_bytes(base64.b64decode(
+                "R0lGODlhEAAQAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAGQAAACwAAAAAEAAQAAAIHQABCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBACH5BAEZAAEALAAAAAAQABAAgQAA/wAAAAAAAAAAAAgdAAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAOw=="
+            ))
+            gif_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, gif_path.name, gif_path.name
+            )
+            editor._rules_media_imported(gif_asset.id)
+            app.processEvents()
+            wait_js(preview_page, media_visible, "block", "Animated GIF background in B")
+            wait_js(preview_page, media_src, f"/media/{gif_asset.id}", "Shared GIF URL")
+            wait_js(live_page, media_visible, "none", "GIF does not change live A")
+            assert db.current_rules_payload() == before_live
+
+            # The browser's existing video pattern is muted/autoplay/loop.
+            # The checked-in tiny VP8 WebM is valid and silent; platform decoding
+            # is covered by Qt media probes and real Windows manual QA.
+            video_path = media_dir / "rules_k8c_browser.webm"
+            video_path.write_bytes((Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm").read_bytes())
+            video_asset = db.ensure_managed_media_asset(
+                MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, video_path.name, video_path.name
+            )
+            # Qt QMediaPlayer is covered by the isolated native K8C smoke.
+            # Keep Chromium video checks independent of a second decoder in
+            # the same Qt process; this prevents cross-backend test interference.
+            editor._stop_rules_animated_media()
+            with patch.object(editor, "_update_rules_media_layer", return_value=False):
+                editor._rules_media_imported(video_asset.id)
+                app.processEvents()
+                video_visible = "document.querySelector('#rules-background-video').style.display"
+                video_src = "document.querySelector('#rules-background-video').getAttribute('src')"
+                wait_js(preview_page, video_visible, "block", "Muted B WebM background")
+                wait_js(preview_page, video_src, f"/media/{video_asset.id}", "Shared WebM URL")
+                wait_js(preview_page, media_visible, "none", "Video hides previous GIF")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').muted", True, "Video always muted")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').loop", True, "Video loops")
+                wait_js(preview_page, "document.querySelector('#rules-background-video').autoplay", True, "Video autoplays")
+                wait_js(live_page, video_visible, "none", "Video does not change on-air A")
+                assert db.current_rules_payload() == before_live
+
+                # Switching media has no stale frame/sound and does not save B.
+                editor._rules_media_imported(media_asset.id)
+                app.processEvents()
+                wait_js(preview_page, media_src, f"/media/{media_asset.id}", "Return to still image")
+                wait_js(preview_page, video_visible, "none", "Video stops on image change")
+                # Chromium returns either null or an empty src attribute after pause/clear.
+                wait_js(preview_page, f"({video_src}) || ''", "", "Video source cleared")
+                assert db.get_rule_template_presentation(inactive).get("background") == "color"
             # Discard unsaved presentation; saved B can still change using the
             # original DB mutation path, with no stale draft override.
             editor._load_template(inactive)
@@ -274,7 +331,8 @@ def main() -> int:
             for view in views:
                 view.close()
                 view.deleteLater()
-            editor.close()
+            with patch.object(editor, "_confirm_discard_or_save", return_value=True):
+                editor.close()
             editor.deleteLater()
             QTest.qWait(100)
             server.stop()

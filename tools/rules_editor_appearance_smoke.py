@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QInputDialog, QLabel
 from streaming_manager.database import Database
@@ -51,6 +52,23 @@ def main() -> int:
         )
         try:
             dialog.show()
+            app.processEvents()
+            # P11-K8C UI FIX1: the final "Цвет текста: #FFFFFF" label must
+            # already be included in the non-resizable scroll host's geometry.
+            # A late setText previously cropped the left edge in Windows.
+            color_button = dialog.text_color_btn
+            assert color_button.text() == "Цвет текста: #FFFFFF"
+            assert color_button.minimumWidth() >= color_button.sizeHint().width()
+            assert color_button.width() >= color_button.sizeHint().width()
+            toolbar = dialog.rules_format_toolbars[1]
+            assert toolbar.widget().width() >= color_button.width()
+            assert toolbar.horizontalScrollBar().value() == 0
+            dialog.resize(760, 560)
+            app.processEvents()
+            assert dialog.rules_editor_splitter.orientation() == Qt.Vertical
+            assert color_button.width() >= color_button.sizeHint().width()
+            assert toolbar.widget().width() >= color_button.width()
+            dialog.resize(1050, 760)
             app.processEvents()
             assert dialog.rules_editor_splitter.count() == 2
             assert dialog.rules_editor_splitter.widget(0) is dialog.rules_text_page

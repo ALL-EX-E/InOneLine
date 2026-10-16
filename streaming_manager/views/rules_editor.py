@@ -9,6 +9,7 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
+    QMovie,
     QPalette,
     QPixmap,
     QTextBlockFormat,
@@ -16,6 +17,7 @@ from PySide6.QtGui import (
     QTextCursor,
     QTextListFormat,
 )
+from PySide6.QtMultimedia import QMediaPlayer, QVideoSink
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
@@ -246,7 +248,7 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_media_add = QPushButton("Добавить фон…")
         self.rules_obs_media_add.setEnabled(import_background is not None)
         self.rules_obs_media_add.setToolTip(
-            "Добавить PNG, JPG или WEBP через общую библиотеку фонов."
+            "Добавить PNG, JPG, WEBP, GIF, MP4 или WEBM через общую библиотеку фонов."
             if import_background is not None else
             "Добавление фонов доступно из редактора в главном окне."
         )
@@ -254,7 +256,7 @@ class AuctionRulesEditorDialog(QDialog):
         obs_form.addRow("", self.rules_obs_media_add)
         self.rules_obs_media_hint = QLabel(
             "Общая библиотека фонов: копия в программу или ссылка на исходник. "
-            "GIF и видео будут доступны на следующем этапе."
+            "Поддерживаются изображения, анимированные GIF и видео MP4/WEBM без звука."
         )
         self.rules_obs_media_hint.setWordWrap(True)
         obs_form.addRow(self.rules_obs_media_hint)
@@ -362,6 +364,11 @@ class AuctionRulesEditorDialog(QDialog):
 
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
+        # Set the final localized label BEFORE _add_scrollable_toolbar()
+        # snapshots the toolbar widget's preferred size. Doing it after
+        # wrapper.adjustSize() clips "Цвет текста: #FFFFFF".
+        self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
+        self.text_color_btn.setMinimumWidth(self.text_color_btn.sizeHint().width())
         self.text_color_btn.clicked.connect(lambda: self._choose_color(False))
         self.text_color_pick_btn = make_screen_color_picker_button(
             "Выбрать цвет текста с экрана. Левый клик — принять, Escape — отмена."
@@ -400,6 +407,10 @@ class AuctionRulesEditorDialog(QDialog):
         self._rules_media_source_key = None
         self._rules_media_original = QPixmap()
         self._rules_media_brush_key = None
+        self._rules_media_kind = ""
+        self._rules_media_movie: QMovie | None = None
+        self._rules_media_player: QMediaPlayer | None = None
+        self._rules_video_sink: QVideoSink | None = None
         self._rules_media_label = QLabel()
         self._rules_media_label.setScaledContents(True)
         self._rules_media_label.setAttribute(Qt.WA_TransparentForMouseEvents)
@@ -440,8 +451,6 @@ class AuctionRulesEditorDialog(QDialog):
             selected_id=self._initial_template_id,
             select_active=self._initial_template_id is None,
         )
-        self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
-
 
 
     def _add_scrollable_toolbar(self, layout: QVBoxLayout, buttons: QHBoxLayout) -> None:
@@ -653,11 +662,11 @@ class AuctionRulesEditorDialog(QDialog):
                 extension = resolve_media_asset_path(self.db.path.parent, asset).suffix.lower()
             except (OSError, ValueError):
                 continue
-            if extension in {".png", ".jpg", ".jpeg", ".webp"}:
+            if extension in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm"}:
                 existing.append(asset)
         with QSignalBlocker(self.rules_obs_media_combo):
             self.rules_obs_media_combo.clear()
-            self.rules_obs_media_combo.addItem("— выберите изображение —", None)
+            self.rules_obs_media_combo.addItem("— выберите фон —", None)
             for asset in existing:
                 self.rules_obs_media_combo.addItem(asset.display_name, asset.id)
             idx = self.rules_obs_media_combo.findData(selected_id)
@@ -849,13 +858,102 @@ class AuctionRulesEditorDialog(QDialog):
 
         self._update_local_rules_padding()
 
-    def _update_rules_media_layer(self, values: dict[str, object]) -> bool:
-        """Paint the cached image *under* one transparent native QTextEdit.
+    def _stop_rules_animated_media(self) -> None:
+        """Release Qt playback when the template, source or editor changes."""
+        self._rules_media_kind = ""
+        movie, self._rules_media_movie = self._rules_media_movie, None
+        if movie is not None:
+            movie.stop()
+            movie.deleteLater()
+        player, self._rules_media_player = self._rules_media_player, None
+        if player is not None:
+            player.stop()
+            player.setVideoOutput(None)
+            player.deleteLater()
+        sink, self._rules_video_sink = self._rules_video_sink, None
+        if sink is not None:
+            sink.deleteLater()
 
-        A QTextEdit viewport repaints its own base color, so a QSS border-image
-        or a QPalette texture on its viewport is not a reliable actual preview.
-        Using a QWidget stack leaves text, cursor, scrolling and QTextDocument
-        untouched and avoids duplicating the HTML renderer or editor model.
+    def _paint_rules_media_frame(self) -> None:
+        """Scale the latest image/GIF/video frame beneath the editable text."""
+        pixmap = self._rules_media_original
+        if pixmap.isNull() or self._rules_media_source_key is None:
+            return
+        size = self.rules_text_canvas.size()
+        width, height = max(1, size.width()), max(1, size.height())
+        brush_key = (self._rules_media_source_key, pixmap.cacheKey(), width, height)
+        if self._rules_media_brush_key == brush_key:
+            return
+        scaled = pixmap.scaled(
+            width, height, Qt.KeepAspectRatioByExpanding,
+            Qt.SmoothTransformation,
+        )
+        x = max(0, (scaled.width() - width) // 2)
+        y = max(0, (scaled.height() - height) // 2)
+        self._rules_media_label.setPixmap(scaled.copy(x, y, width, height))
+        self._rules_media_brush_key = brush_key
+
+    def _on_rules_gif_frame(self, movie: QMovie) -> None:
+        if self._rules_media_movie is not movie:
+            return
+        frame = movie.currentPixmap()
+        if not frame.isNull():
+            self._rules_media_original = frame
+            self._paint_rules_media_frame()
+
+    def _on_rules_video_frame(self, frame) -> None:
+        if self._rules_media_player is None or self._rules_media_kind != "video":
+            return
+        if not frame.isValid():
+            return
+        image = frame.toImage()
+        if not image.isNull():
+            self._rules_media_original = QPixmap.fromImage(image)
+            self._paint_rules_media_frame()
+
+    def _load_rules_media_source(self, path, source_key: tuple) -> bool:
+        """Reuse the shared asset path; never create a second media importer."""
+        self._stop_rules_animated_media()
+        self._rules_media_source_key = source_key
+        self._rules_media_original = QPixmap()
+        self._rules_media_brush_key = None
+        extension = path.suffix.lower()
+        if extension == ".gif":
+            movie = QMovie(str(path), parent=self)
+            if not movie.isValid():
+                movie.deleteLater()
+                return False
+            self._rules_media_kind = "gif"
+            self._rules_media_movie = movie
+            movie.frameChanged.connect(
+                lambda _index, selected=movie: self._on_rules_gif_frame(selected)
+            )
+            movie.start()
+            return True
+        if extension in {".mp4", ".webm"}:
+            # A QVideoSink provides frames for the existing non-interactive
+            # QLabel beneath QTextEdit; QVideoWidget could obscure the cursor.
+            # No QAudioOutput is attached, so editor video is always silent.
+            sink = QVideoSink(self)
+            self._rules_video_sink = sink
+            sink.videoFrameChanged.connect(self._on_rules_video_frame)
+            player = QMediaPlayer(self)
+            self._rules_media_player = player
+            self._rules_media_kind = "video"
+            player.setVideoOutput(sink)
+            player.setLoops(QMediaPlayer.Infinite)
+            player.setSource(QUrl.fromLocalFile(str(path)))
+            player.play()
+            return True
+        self._rules_media_kind = "image"
+        self._rules_media_original = QPixmap(str(path))
+        return not self._rules_media_original.isNull()
+
+    def _update_rules_media_layer(self, values: dict[str, object]) -> bool:
+        """Render shared media behind the SAME editable QTextEdit document.
+
+        Still images, GIF frames and muted looping video all feed one QLabel
+        layer. Selection, save, live OBS and preview tokens remain independent.
         """
         viewport = self.editor.viewport()
         asset = None
@@ -873,7 +971,7 @@ class AuctionRulesEditorDialog(QDialog):
 
         valid = False
         if path is not None and path.suffix.lower() in {
-            ".png", ".jpg", ".jpeg", ".webp",
+            ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm",
         }:
             try:
                 source_key = (str(path), path.stat().st_mtime_ns)
@@ -881,29 +979,15 @@ class AuctionRulesEditorDialog(QDialog):
                 source_key = None
             if source_key is not None:
                 if self._rules_media_source_key != source_key:
-                    self._rules_media_source_key = source_key
-                    self._rules_media_original = QPixmap(str(path))
-                    self._rules_media_brush_key = None
-                if not self._rules_media_original.isNull():
-                    valid = True
-                    size = self.rules_text_canvas.size()
-                    width, height = max(1, size.width()), max(1, size.height())
-                    brush_key = (source_key, width, height)
-                    if self._rules_media_brush_key != brush_key:
-                        scaled = self._rules_media_original.scaled(
-                            width, height, Qt.KeepAspectRatioByExpanding,
-                            Qt.SmoothTransformation,
-                        )
-                        x = max(0, (scaled.width() - width) // 2)
-                        y = max(0, (scaled.height() - height) // 2)
-                        self._rules_media_label.setPixmap(
-                            scaled.copy(x, y, width, height)
-                        )
-                        self._rules_media_brush_key = brush_key
+                    valid = self._load_rules_media_source(path, source_key)
+                else:
+                    valid = self._rules_media_kind in {"gif", "video"} or (
+                        not self._rules_media_original.isNull()
+                    )
+                if valid:
+                    self._paint_rules_media_frame()
 
         if valid:
-            # Make the actual QTextEdit surface see-through; the media
-            # is a non-interactive sibling painted beneath the text.
             transparent = QPalette(self._rules_default_editor_palette)
             transparent.setColor(QPalette.Base, QColor(0, 0, 0, 0))
             self.editor.setPalette(transparent)
@@ -915,7 +999,9 @@ class AuctionRulesEditorDialog(QDialog):
             self._rules_media_label.show()
             self._rules_media_label.lower()
         else:
+            self._stop_rules_animated_media()
             self._rules_media_label.hide()
+            self._rules_media_label.clear()
             self._rules_media_source_key = None
             self._rules_media_original = QPixmap()
             self._rules_media_brush_key = None
@@ -1323,6 +1409,7 @@ class AuctionRulesEditorDialog(QDialog):
 
     def closeEvent(self, event) -> None:
         if self._confirm_discard_or_save():
+            self._stop_rules_animated_media()
             if self._rules_preview_token is not None:
                 self.db.clear_rules_preview_selection(self._rules_preview_token)
             event.accept()
