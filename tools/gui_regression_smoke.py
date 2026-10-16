@@ -4020,15 +4020,36 @@ def main() -> int:
         if help_button.text() != "Как работает аукцион?":
             raise AssertionError("P12 unified Auction help label mismatch")
         required_help = (
-            "Список лотов", "ИГРАЛ", "НЕ ИГРАЛ", "Максимальная сумма",
-            "Взвешенное колесо", "Ставки", "История", "Выбывание",
-            "В архив", "ПРОХОДИТСЯ", "Общий таймер", "Правила аукциона",
+            "Список лотов", "ИГРАЛ", "НЕ ИГРАЛ", "ПРОХОДИТСЯ",
+            "ПРОЙДЕНО", "ЗАБРОШЕНО", "ДЛЯ АУКА",
+            "счётчик подходящих записей, а не отдельный список",
+            "Поиск до запуска синхронизируется",
+            "во время аукциона ищет только среди его лотов",
+            "Приём ставок и баллы", "не во время паузы",
+            "Добавить", "Уменьшить", "временный лот",
+            "История", "Ставки", "Максимальная сумма",
+            "Завершить приём ставок", "Дополнительное время",
+            "Подтвердить победителя", "Взвешенное колесо",
+            "Отдельного периода приёма ставок в этом режиме нет",
+            "Выбывание", "В архив", "Шанс в колесе",
+            "Общий таймер и музыка", "Сбросить",
+            "Предпросмотр и OBS", "активный сохранённый шаблон",
+            "Автопрокрутка",
         )
         help_text = help_label.text()
         if any(value not in help_text for value in required_help):
-            raise AssertionError("P12 Auction help lost approved user-facing coverage")
-        if "wheel_duration_ms" in help_text or "игра получает статус" in help_text:
-            raise AssertionError("P12 Auction help retained implementation terminology")
+            missing = [value for value in required_help if value not in help_text]
+            raise AssertionError(f"P12-B help FIX1 missing live UX coverage: {missing!r}")
+        forbidden_help = (
+            "wheel_duration_ms", "игра получает статус",
+            "из списка ДЛЯ АУКА", "До запуска участвуют записи из списка",
+        )
+        if any(value in help_text for value in forbidden_help):
+            raise AssertionError("P12-B help FIX1 still describes a nonexistent auction list")
+        if "\\n" in help_text:
+            raise AssertionError("P12-B help FIX1 renders literal backslash-n escapes")
+        if not help_text.startswith("Список лотов\n"):
+            raise AssertionError("P12-B help FIX1 lost plain-text headings and line breaks")
         if hasattr(auction_page, "lots_rules_btn") or hasattr(auction_page, "lots_rules_label"):
             raise AssertionError("P12 left duplicate Lots instructions")
         old_auction_help_page = window.tabs.currentWidget()
