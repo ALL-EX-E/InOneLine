@@ -66,7 +66,6 @@ class AuctionStateMixin:
     def _refresh_visible_state(self):
         started = time.perf_counter()
         self._refresh_pending = False
-        selected_id = self.selected_game_id()
         conduct_selected_id = self.selected_conduct_game_id()
         session = self._current_session()
         self._sync_auction_timer_activity(session)
@@ -104,39 +103,18 @@ class AuctionStateMixin:
         )
         db_seconds = time.perf_counter() - started
 
-        # Основной поиск вкладки «Лоты» синхронизирован с первыми двумя
-        # основными вкладками программы.
-        query = normalize_text_key(self.search.text())
-        rows = all_rows
-        if query:
-            rows = [
-                row for row in all_rows
-                if query in normalize_text_key(row["title"])
-            ]
-
-        self.count_label.setText(f"Лотов: {len(rows)}")
-        lots_started = time.perf_counter()
-        lots_timing = self._populate_lot_table(
-            self.table,
-            rows,
-            selected_id,
-            position_mode=position_mode,
+        # P12-A: one prestart/session lot search and exactly one table fill.
+        # No separate hidden Lots query or second table model.
+        query = normalize_text_key(self.conduct_search.text())
+        filtered_rows = (
+            [row for row in all_rows if query in normalize_text_key(row["title"])]
+            if query else all_rows
         )
-        lots_seconds = time.perf_counter() - lots_started
-
-        # На «Проведение» — отдельный локальный поиск по текущим лотам.
-        conduct_query = normalize_text_key(self.conduct_search.text())
-        conduct_rows = all_rows
-        if conduct_query:
-            conduct_rows = [
-                row for row in all_rows
-                if conduct_query in normalize_text_key(row["title"])
-            ]
-
+        self.count_label.setText(f"Лотов: {len(filtered_rows)}")
         conduct_started = time.perf_counter()
         conduct_timing = self._populate_lot_table(
             self.conduct_table,
-            conduct_rows,
+            filtered_rows,
             conduct_selected_id,
             wheel_probabilities=wheel_probabilities,
             position_mode=position_mode,
@@ -157,10 +135,6 @@ class AuctionStateMixin:
                 AppPaths.from_database_path(self.db.path).logs_dir,
                 "AUCTION_REFRESH "
                 f"rows={len(all_rows)} db={db_seconds:.3f}s "
-                f"lots={lots_seconds:.3f}s "
-                f"lots_fill={lots_timing['fill']:.3f}s "
-                f"lots_autosize={lots_timing['autosize']:.3f}s "
-                f"lots_reactivate={lots_timing['reactivate']:.3f}s "
                 f"conduct={conduct_seconds:.3f}s "
                 f"conduct_fill={conduct_timing['fill']:.3f}s "
                 f"conduct_autosize={conduct_timing['autosize']:.3f}s "

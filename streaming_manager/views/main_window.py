@@ -297,11 +297,7 @@ class MainWindow(QMainWindow):
         targets = (
             (self.games_tab.table, self.games_tab._COMPACT_COLUMNS),
             (self.public_tab.table, self.public_tab._COMPACT_COLUMNS),
-            (self.auction_tab.table, self.auction_tab._lot_compact_columns),
-            (
-                self.auction_tab.conduct_table,
-                self.auction_tab._conduct_compact_columns,
-            ),
+            (self.auction_tab.conduct_table, self.auction_tab._conduct_compact_columns),
         )
         for table, columns in targets:
             autosize_compact_columns_once(table, columns)
@@ -311,12 +307,12 @@ class MainWindow(QMainWindow):
         controls = {
             "games": (self.games_tab.search, self.games_tab),
             "public": (self.public_tab.search, self.public_tab),
-            "auction": (self.auction_tab.search, self.auction_tab),
-            "auction_conduct": (
-                self.auction_tab.conduct_search,
-                self.auction_tab,
-            ),
+            "auction": (self.auction_tab.conduct_search, self.auction_tab),
         }
+        # P12: a running auction's frozen/session-only composition must not
+        # inherit text from the permanent List or Public searches.
+        if self.auction_tab._current_session() is not None:
+            controls.pop("auction")
         source_pair = controls.get(source)
         if source_pair is None:
             return
@@ -368,10 +364,11 @@ class MainWindow(QMainWindow):
             self._refresh_dirty_search_target(self.public_tab)
             self.public_tab.select_synced_search_result(game_id)
 
-        # Auction's A8 hidden guard is intentionally bypassed only for this
-        # explicit Find/Enter catch-up so selection sees the synchronized query.
-        self._refresh_dirty_search_target(self.auction_tab, force=True)
-        self.auction_tab.select_synced_search_result(game_id)
+        # Explicit cross-list Enter only selects Auction lots before the
+        # session starts; a running session uses its own local lot search.
+        if self.auction_tab._current_session() is None:
+            self._refresh_dirty_search_target(self.auction_tab, force=True)
+            self.auction_tab.select_synced_search_result(game_id)
 
     def _add_main_tab(
         self, page: QWidget, title: str, icon_pixmap: QStyle.StandardPixmap

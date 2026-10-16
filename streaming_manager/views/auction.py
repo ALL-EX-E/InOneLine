@@ -249,96 +249,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(9)
 
-        # Внутренние вкладки разделяют подготовку лотов, управление сессией
-        # и совместимость с внешними форматами. Так на одном экране больше нет ряда
-        # неактуальных кнопок.
-        self.auction_tabs = QTabWidget()
-        self.auction_tabs.setMinimumWidth(0)
-        self.auction_tabs.setSizePolicy(
-            QSizePolicy.Ignored, QSizePolicy.Expanding
-        )
-        layout.addWidget(self.auction_tabs, 1)
-
-        # ==========================================================
-        # ЛОТЫ
-        # ==========================================================
-        self.lots_page = QWidget()
-        lots_layout = QVBoxLayout(self.lots_page)
-        lots_layout.setContentsMargins(10, 10, 10, 10)
-        lots_layout.setSpacing(9)
-
-        lots_rules_row = QHBoxLayout()
-        self.lots_rules_btn = QPushButton("Правила вкладки")
-        self.lots_rules_btn.clicked.connect(
-            lambda: self._toggle_rules(
-                self.lots_rules_label,
-                self.lots_rules_btn,
-            )
-        )
-        lots_rules_row.addWidget(self.lots_rules_btn)
-        lots_rules_row.addStretch()
-        lots_layout.addLayout(lots_rules_row)
-
-        self.lots_rules_label = QLabel(
-            "Список лотов формируется из активных игр со статусами ИГРАЛ + НЕ ИГРАЛ. "
-            "ПРОХОДИТСЯ, ПРОЙДЕНО, ЗАБРОШЕНО и архив в список не попадают. "
-            "До запуска отображается текущий список ДЛЯ АУКА. После запуска состав "
-            "лотов фиксируется для этой сессии; ставки изменяют баллы выбранного лота."
-        )
-        self.lots_rules_label.setWordWrap(True)
-        self.lots_rules_label.setProperty("muted", True)
-        self.lots_rules_label.setVisible(False)
-        lots_layout.addWidget(self.lots_rules_label)
-
-        top = QHBoxLayout()
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Поиск")
-        self.search.setClearButtonEnabled(True)
-        self.search.textChanged.connect(
-            lambda text: self._search_text_changed("auction", text)
-        )
-        self.search.returnPressed.connect(self.activate_search)
-
-        self.search_btn = QPushButton("Найти")
-        self.search_btn.setToolTip(
-            "Перейти к первому найденному лоту"
-        )
-        self.search_btn.clicked.connect(self.activate_search)
-
+        # P12-A: one real Auction page and one operator-side lot table.
+        # Keep the existing Conduct widgets and their business-state handlers,
+        # not a hidden second Lots page/table or another data model.
         self.count_label = QLabel()
         self.count_label.setProperty("badge", True)
-        self.lots_scroll_btn = QPushButton("Включить прокрутку")
-        self.lots_scroll_btn.setToolTip(
-            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов "
-            "и OBS-оверлея списка лотов."
-        )
-        self.lots_scroll_btn.clicked.connect(self._toggle_desktop_lot_auto_scroll)
-
-        top.addWidget(self.search, 1)
-        top.addWidget(self.search_btn)
-        top.addWidget(self.lots_scroll_btn)
-        top.addWidget(self.count_label)
-        lots_layout.addLayout(top)
-
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ"])
-        self._lot_title_column = 1
-        self._lot_compact_columns = (0, 2)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.table.setAlternatingRowColors(True)
-        self.table.setShowGrid(False)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
-        self.table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self.table.verticalHeader().setVisible(False)
-        self.table.verticalHeader().setDefaultSectionSize(32)
-        self.table.horizontalHeader().setResizeContentsPrecision(0)
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        lots_layout.addWidget(self.table, 1)
-
-        self.auction_tabs.addTab(self.lots_page, "Лоты")
 
         # ==========================================================
         # ПРОВЕДЕНИЕ
@@ -351,6 +266,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.conduct_page.setSizePolicy(
             QSizePolicy.Ignored, QSizePolicy.Minimum
         )
+        layout.addWidget(self.conduct_page, 1)
         conduct_layout = QVBoxLayout(self.conduct_page)
         conduct_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
         conduct_layout.setContentsMargins(10, 10, 10, 10)
@@ -699,25 +615,21 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # синхронизируется с ними через MainWindow.
         conduct_search_row = QHBoxLayout()
         self.conduct_search = QLineEdit()
-        self.conduct_search.setPlaceholderText("Поиск")
+        self.conduct_search.setPlaceholderText("Поиск по лотам…")
         self.conduct_search.setClearButtonEnabled(True)
         self.conduct_search.textChanged.connect(
-            lambda text: self._search_text_changed("auction_conduct", text)
+            lambda text: self._search_text_changed("auction", text)
         )
         self.conduct_search.returnPressed.connect(
             self.activate_conduct_search
         )
 
-        self.conduct_search_btn = QPushButton("Найти")
-        self.conduct_search_btn.setToolTip(
-            "Перейти к первому найденному лоту"
-        )
-        self.conduct_search_btn.clicked.connect(
-            self.activate_conduct_search
-        )
-
+        # MainWindow's existing synchronized prestart search uses .search.
+        # Both names point to ONE visible QLineEdit; session-only search is
+        # handled by AuctionSearchMixin without writing other list queries.
+        self.search = self.conduct_search
         conduct_search_row.addWidget(self.conduct_search, 1)
-        conduct_search_row.addWidget(self.conduct_search_btn)
+        conduct_search_row.addWidget(self.count_label)
         conduct_layout.addLayout(conduct_search_row)
 
         # Ручная ставка теперь находится непосредственно на вкладке
@@ -914,6 +826,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._update_delete_lot_action_state
         )
         conduct_content_layout.addWidget(self.conduct_table, 3)
+        # Keep compatibility for callers reading .table, but do NOT construct
+        # a second table. The authoritative operator lot widget is Conduct.
+        self.table = self.conduct_table
+        self._lot_title_column = self._conduct_title_column
+        self._lot_compact_columns = self._conduct_compact_columns
 
         # A7/B5: one compact operator-side area.  История keeps the full
         # current-session audit feed; Ставки is a filtered read-only feed of
@@ -1022,7 +939,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.conduct_content_scroll.setWidget(self.conduct_content)
         conduct_layout.addWidget(self.conduct_content_scroll, 1)
 
-        self.auction_tabs.addTab(self.conduct_page, "Проведение")
         self.refresh_integration_status()
 
         # Main-list XLSX controls are re-parented to GamesTab by MainWindow.
@@ -1056,13 +972,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
 
         self._init_shared_xlsx_sync()
-
-        # Подключаем currentChanged только после создания всех внутренних страниц.
-        # QTabWidget испускает currentChanged уже при добавлении первой вкладки;
-        # раннее подключение обращалось к ещё не созданному conduct_page.
-        self.auction_tabs.currentChanged.connect(
-            self._handle_inner_tab_changed
-        )
 
         # Полная синхронизация состояния остаётся редкой и не пишет время в БД:
         # остаток вычисляется из deadline_at. Отдельный точный UI-таймер лишь
@@ -1114,11 +1023,9 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.refresh()
         self._handle_prestart_mode_changed()
 
-        # Если программа была закрыта во время аукциона, база сохраняет сессию.
-        # При следующем запуске сразу возвращаем пользователя на «Проведение»
-        # для running / paused / tie-break / wheel / winner_selected состояний.
+        # P12-A: the one Auction page is always the Conduct page, including
+        # an open session restored after restarting the application.
         if self._current_session() is not None:
-            self.auction_tabs.setCurrentWidget(self.conduct_page)
             QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
 
@@ -2108,33 +2015,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         self._set_timer_running(
             self.auction_history_timer,
-            self.auction_tabs.currentWidget() is self.conduct_page,
+            True,
         )
         self._set_timer_running(self.integration_status_timer, True)
         self.refresh_integration_status()
         return refreshed
-
-    def _handle_inner_tab_changed(self, _index: int):
-        # Не отдаём фокус первому QLineEdit новой страницы автоматически.
-        # Это важно для «Проведение»: автопрокрутка должна останавливаться
-        # только после реального действия пользователя.
-        QTimer.singleShot(
-            0,
-            lambda: self.auction_tabs.setFocus(Qt.OtherFocusReason),
-        )
-        conduct_page = getattr(self, "conduct_page", None)
-        conduct_visible = bool(
-            conduct_page is not None
-            and self.auction_tabs.currentWidget() is conduct_page
-            and getattr(self, "_main_tab_visible", True)
-        )
-        timer = getattr(self, "auction_history_timer", None)
-        if timer is not None:
-            self._set_timer_running(timer, conduct_visible)
-        if conduct_visible:
-            QTimer.singleShot(0, self._poll_auction_history)
-        else:
-            self._clear_history_hover_highlight()
 
     def _rules_overlay_url(self) -> str:
         raw_port = self.db.get_setting("api_port", "8765")
@@ -2312,6 +2197,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._conduct_title_column = name_column
             self._conduct_chance_column = int(chance_column)
             self._conduct_compact_columns = compact_columns
+            self._lot_title_column = name_column
+            self._lot_compact_columns = compact_columns
         else:
             self._lot_title_column = name_column
             self._lot_compact_columns = compact_columns
@@ -2566,8 +2453,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def _poll_auction_history(self) -> None:
         if not getattr(self, "_main_tab_visible", True):
-            return
-        if self.auction_tabs.currentWidget() is not self.conduct_page:
             return
         session = self._current_session()
         self._sync_auction_bets(session)
