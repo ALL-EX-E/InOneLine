@@ -364,6 +364,11 @@ class AuctionRulesEditorDialog(QDialog):
 
         tools2 = QHBoxLayout()
         self.text_color_btn = QPushButton("Цвет текста")
+        # Set the final localized label BEFORE _add_scrollable_toolbar()
+        # snapshots the toolbar widget's preferred size. Doing it after
+        # wrapper.adjustSize() clips "Цвет текста: #FFFFFF".
+        self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
+        self.text_color_btn.setMinimumWidth(self.text_color_btn.sizeHint().width())
         self.text_color_btn.clicked.connect(lambda: self._choose_color(False))
         self.text_color_pick_btn = make_screen_color_picker_button(
             "Выбрать цвет текста с экрана. Левый клик — принять, Escape — отмена."
@@ -446,8 +451,6 @@ class AuctionRulesEditorDialog(QDialog):
             selected_id=self._initial_template_id,
             select_active=self._initial_template_id is None,
         )
-        self._set_color_button(self.text_color_btn, QColor("#FFFFFF"), "Цвет текста")
-
 
 
     def _add_scrollable_toolbar(self, layout: QVBoxLayout, buttons: QHBoxLayout) -> None:
