@@ -596,7 +596,7 @@ class AuctionActionMixin:
             QMessageBox.information(
                 self,
                 "Аукцион",
-                "Выберите лот на вкладке «Проведение».",
+                "Выберите лот в списке лотов.",
             )
             return
 
@@ -639,7 +639,7 @@ class AuctionActionMixin:
             QMessageBox.information(
                 self,
                 "Аукцион",
-                "Выберите лот на вкладке «Проведение».",
+                "Выберите лот в списке лотов.",
             )
             return
 
