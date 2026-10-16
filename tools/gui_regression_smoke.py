@@ -4021,8 +4021,8 @@ def main() -> int:
             raise AssertionError("P12 unified Auction help label mismatch")
         required_help = (
             "Список лотов", "ИГРАЛ", "НЕ ИГРАЛ", "ПРОХОДИТСЯ",
-            "ПРОЙДЕНО", "ЗАБРОШЕНО", "ДЛЯ АУКА",
-            "счётчик подходящих записей, а не отдельный список",
+            "ПРОЙДЕНО", "ЗАБРОШЕНО",
+            "показаны записи из «Списка» со статусами ИГРАЛ и НЕ ИГРАЛ",
             "Поиск до запуска синхронизируется",
             "во время аукциона ищет только среди его лотов",
             "Приём ставок и баллы", "не во время паузы",
@@ -4042,7 +4042,9 @@ def main() -> int:
             raise AssertionError(f"P12-B help FIX1 missing live UX coverage: {missing!r}")
         forbidden_help = (
             "wheel_duration_ms", "игра получает статус",
-            "из списка ДЛЯ АУКА", "До запуска участвуют записи из списка",
+            "из списка ДЛЯ АУКА", "ДЛЯ АУКА",
+            "счётчик подходящих записей, а не отдельный список",
+            "До запуска участвуют записи из списка",
         )
         if any(value in help_text for value in forbidden_help):
             raise AssertionError("P12-B help FIX1 still describes a nonexistent auction list")
