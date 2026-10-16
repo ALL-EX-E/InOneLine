@@ -7,6 +7,11 @@ from PySide6.QtWidgets import QMessageBox
 class AuctionSearchMixin:
     def _search_text_changed(self, source: str, text: str):
         """Route synchronized search through MainWindow; standalone fallback stays eager."""
+        if self._current_session() is not None:
+            # The active auction may contain temporary auction_only lots.
+            # Its query never overwrites the permanent List/Public searches.
+            self.refresh()
+            return
         window = self.window()
         if hasattr(window, "sync_search_text"):
             window.sync_search_text(source, text)
@@ -77,11 +82,9 @@ class AuctionSearchMixin:
 
         game_id = self.selected_conduct_game_id()
         window = self.window()
-        if game_id is not None and hasattr(window, "sync_search_result"):
-            window.sync_search_result(
-                game_id,
-                source="auction_conduct",
-            )
+        if (self._current_session() is None and game_id is not None
+                and hasattr(window, "sync_search_result")):
+            window.sync_search_result(game_id, source="auction")
 
     def _sync_lot_scroll_buttons(self):
         text = (
@@ -89,7 +92,7 @@ class AuctionSearchMixin:
             if self._desktop_lot_auto_scroll_enabled
             else "Автопрокрутка: ВЫКЛ"
         )
-        for button_name in ("lots_scroll_btn", "conduct_scroll_btn"):
+        for button_name in ("conduct_scroll_btn",):
             button = getattr(self, button_name, None)
             if button is not None:
                 button.setText(text)
@@ -122,9 +125,8 @@ class AuctionSearchMixin:
             return
         self._lots_scroll_direction = 1
         self._conduct_scroll_direction = 1
-        for table in (self.table, self.conduct_table):
-            bar = table.verticalScrollBar()
-            bar.setValue(bar.minimum())
+        bar = self.conduct_table.verticalScrollBar()
+        bar.setValue(bar.minimum())
 
     @staticmethod
     def _advance_auto_scroll_table(table, direction: int) -> int:
@@ -163,9 +165,7 @@ class AuctionSearchMixin:
         # contract, search/manual focus turns the shared switch OFF instead of
         # silently resuming later. A7 history hover is only a temporary pause.
         operator_interaction = bool(
-            self.search.text().strip()
-            or self.table.hasFocus()
-            or self.conduct_search.text().strip()
+            self.conduct_search.text().strip()
             or self.conduct_table.hasFocus()
             or self.bid_amount.hasFocus()
             or self.add_bid_btn.hasFocus()
@@ -178,55 +178,15 @@ class AuctionSearchMixin:
             self._set_desktop_lot_auto_scroll(False)
             return
 
-        self._lots_scroll_direction = self._advance_auto_scroll_table(
-            self.table, self._lots_scroll_direction
-        )
         if not getattr(self, "_history_hover_pauses_auto_scroll", False):
             self._conduct_scroll_direction = self._advance_auto_scroll_table(
                 self.conduct_table, self._conduct_scroll_direction
             )
 
     def select_synced_search_result(self, game_id: int) -> bool:
-        found = False
-        for row in range(self.table.rowCount()):
-            item = self.table.item(row, 0)
-            if item is None:
-                continue
-            try:
-                row_id = int(item.data(Qt.UserRole))
-            except (TypeError, ValueError):
-                continue
-            if row_id != game_id:
-                continue
-
-            self.table.selectRow(row)
-            self.table.scrollToItem(item)
-            found = True
-            break
-
-        conduct_found = self.select_conduct_game_id(game_id)
-        return found or conduct_found
+        """Select in the one visible Auction table (prestart sync only)."""
+        return self.select_conduct_game_id(game_id)
 
     def activate_search(self):
-        query = self.search.text().strip()
-        self.refresh()
-
-        if self.table.rowCount() == 0:
-            if query:
-                QMessageBox.information(
-                    self,
-                    "Поиск",
-                    f"По запросу «{query}» ничего не найдено.",
-                )
-            return
-
-        self.table.selectRow(0)
-        target = self.table.item(0, 0)
-        if target is not None:
-            self.table.scrollToItem(target)
-        self.table.setFocus()
-
-        game_id = self.selected_game_id()
-        window = self.window()
-        if game_id is not None and hasattr(window, "sync_search_result"):
-            window.sync_search_result(game_id, source="auction")
+        """Compatibility entry point for existing List/Public sync callers."""
+        self.activate_conduct_search()
