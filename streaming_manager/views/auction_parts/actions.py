@@ -168,7 +168,6 @@ class AuctionActionMixin:
         self._pending_tie_overtime = False
         # D26 ownership is acquired by the soundtrack engine only when a
         # configured soundtrack is actually audible.
-        self.auction_tabs.setCurrentWidget(self.conduct_page)
         # Session creation changes the authoritative position projection for
         # every connected list and XLSX mirror.
         self.changed()
@@ -399,7 +398,6 @@ class AuctionActionMixin:
         self._pending_tie_overtime = True
         self._timer_context = "auction"
         self._set_prestart_timer_ms(self._saved_wheel_default_duration_ms())
-        self.auction_tabs.setCurrentWidget(self.conduct_page)
         self.refresh()
         self.timer_edit.setFocus()
 
@@ -438,7 +436,6 @@ class AuctionActionMixin:
         )
         self.conduct_search.clear()
         self.changed()
-        self.auction_tabs.setCurrentWidget(self.conduct_page)
         QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
     def use_wheel_for_tie(self):
@@ -467,7 +464,6 @@ class AuctionActionMixin:
         self._timer_context = "wheel"
         self._set_wheel_timer_ms(default_ms)
         self.changed()
-        self.auction_tabs.setCurrentWidget(self.conduct_page)
         self.refresh()
         self.timer_edit.setFocus()
 

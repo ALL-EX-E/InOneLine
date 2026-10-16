@@ -198,7 +198,6 @@ class AuctionRngMixin:
         # раскрывают победителя/выбывающий лот только после завершения
         # синхронной анимации.
         self.refresh()
-        self.auction_tabs.setCurrentWidget(self.conduct_page)
 
     def _wheel_rng_failed(self, exc):
         self._release_auction_audio_owner()

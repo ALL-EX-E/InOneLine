@@ -843,7 +843,6 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
     """UI-MINWIDTH-001: method text and actions never overlap in Conduct."""
     auction = window.auction_tab
     old_outer_tab = window.tabs.currentWidget()
-    old_inner_tab = auction.auction_tabs.currentWidget()
     old_size = window.size()
     previous_mode = auction.mode_combo.currentData()
     previous_rng = auction.rng_combo.currentData()
@@ -851,7 +850,6 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
     try:
         # MainWindow tabs host scroll areas, not the raw AuctionTab itself.
         window.tabs.setCurrentWidget(window._main_tab_scroll_by_page[auction])
-        auction.auction_tabs.setCurrentWidget(auction.conduct_page)
         QApplication.processEvents()
 
         method = auction.method_selector_label
@@ -903,7 +901,6 @@ def assert_auction_conduct_compact_method_layout(window) -> None:
                 raise AssertionError("Conduct method auxiliary label/control visibility diverged")
     finally:
         window.resize(old_size)
-        auction.auction_tabs.setCurrentWidget(old_inner_tab)
         window.tabs.setCurrentWidget(old_outer_tab)
         QApplication.processEvents()
     print("AUCTION_CONDUCT_MINWIDTH_METHOD_LABEL_BUTTONS_NO_OVERLAP=PASS")
@@ -2978,7 +2975,6 @@ def main() -> int:
         # The Conduct page collapses the combined operator panes vertically;
         # the table keeps its own columns while the nested page never pans.
         auction = window.auction_tab
-        auction.auction_tabs.setCurrentWidget(auction.conduct_page)
         app.processEvents()
         window._update_responsive_layout()
         app.processEvents()
@@ -2986,7 +2982,6 @@ def main() -> int:
             raise AssertionError("P06 narrow Auction Conduct panes did not stack")
         if auction.conduct_content_scroll.horizontalScrollBar().maximum() != 0:
             raise AssertionError("P06 Auction Conduct content still scrolls horizontally")
-        auction.auction_tabs.setCurrentWidget(auction.lots_page)
         app.processEvents()
 
         # Compact tabs retain readable short captions and distinct accent colors.
@@ -4003,12 +3998,21 @@ def main() -> int:
                 f"Games refresh count={f5_refresh_calls}"
             )
 
-        auction_tabs = [
-            window.auction_tab.auction_tabs.tabText(i)
-            for i in range(window.auction_tab.auction_tabs.count())
-        ]
-        if auction_tabs != ["Лоты", "Проведение"]:
-            raise AssertionError(f"auction tabs mismatch: {auction_tabs}")
+        # P12-A: Auction has one actual table on its top-level page, no
+        # inner QTabWidget with a hidden duplicate Lots page.
+        auction_page = window.auction_tab
+        if hasattr(auction_page, "auction_tabs") or hasattr(auction_page, "lots_page"):
+            raise AssertionError("P12 left obsolete Lots/Conduct inner tabs")
+        if auction_page.table is not auction_page.conduct_table:
+            raise AssertionError("P12 created two different operator lot tables")
+        if auction_page.search is not auction_page.conduct_search:
+            raise AssertionError("P12 created two different search inputs")
+        if hasattr(auction_page, "conduct_search_btn"):
+            raise AssertionError("P12 left redundant Find button")
+        if auction_page.count_label is None or not auction_page.count_label.text().startswith("Лотов:"):
+            raise AssertionError("P12 lost the live lot counter")
+        if auction_page.auction_activity_tabs.count() != 2:
+            raise AssertionError("P12 lost Bets/History activity tabs")
 
         settings_tabs = [
             window.settings_tab.settings_tabs.tabText(i)
@@ -4177,22 +4181,8 @@ def main() -> int:
             "auction_only": False,
             "review": "",
         }]
-        auction._populate_lot_table(
-            auction.table,
-            position_fixture,
-            None,
-            position_mode=POSITION_COLUMNS_SINGLE,
-        )
-        if auction.table.columnCount() != 3 or [
-            auction.table.horizontalHeaderItem(column).text()
-            for column in range(auction.table.columnCount())
-        ] != ["ПОЗИЦИЯ", "НАЗВАНИЕ", "БАЛЛЫ"]:
-            raise AssertionError("Auction single-position table schema is wrong")
-        if auction.table.item(0, 0).text() != "3":
-            raise AssertionError("Auction current position value is wrong")
-        if auction._lot_compact_columns != (0, 2):
-            raise AssertionError("Auction single-position compact columns are wrong")
-
+        # P12-A: a single table retains Conduct's optional chance column
+        # and global one/two-position policy across all Auction modes.
         auction._populate_lot_table(
             auction.conduct_table,
             position_fixture,
@@ -4202,33 +4192,15 @@ def main() -> int:
         auction._sync_wheel_chance_visibility(None)
         if (
             auction.conduct_table.columnCount() != 4
-            or getattr(auction, "_conduct_chance_column", None) != 2
+            or [auction.conduct_table.horizontalHeaderItem(column).text()
+                for column in range(4)]
+            != ["ПОЗИЦИЯ", "НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
+            or auction.conduct_table.item(0, 0).text() != "3"
             or not auction.conduct_table.isColumnHidden(2)
         ):
-            raise AssertionError("Auction compact chance-column layout is wrong")
-
-        auction._populate_lot_table(
-            auction.table,
-            position_fixture,
-            None,
-            position_mode=POSITION_COLUMNS_START_CURRENT,
-        )
-        if (
-            auction.table.columnCount() != 4
-            or [
-                auction.table.horizontalHeaderItem(column).text()
-                for column in range(auction.table.columnCount())
-            ]
-            != ["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "БАЛЛЫ"]
-        ):
-            raise AssertionError("Auction start/current table schema is wrong")
-        if [
-            auction.table.item(0, column).text()
-            for column in (0, 1)
-        ] != ["2", "3"]:
-            raise AssertionError("Auction start/current position values are wrong")
-        if auction._lot_compact_columns != (0, 1, 3):
-            raise AssertionError("Auction start/current compact columns are wrong")
+            raise AssertionError("P12 single-table current position/chance policy changed")
+        if auction._conduct_compact_columns != (0, 2, 3):
+            raise AssertionError("P12 single-position compact columns are wrong")
 
         auction._populate_lot_table(
             auction.conduct_table,
@@ -4239,12 +4211,15 @@ def main() -> int:
         auction._sync_wheel_chance_visibility(None)
         if (
             auction.conduct_table.columnCount() != 5
-            or getattr(auction, "_conduct_chance_column", None) != 3
+            or [auction.conduct_table.horizontalHeaderItem(column).text()
+                for column in range(5)]
+            != ["СТАРТ", "ТЕКУЩАЯ", "НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
+            or [auction.conduct_table.item(0, col).text() for col in (0, 1)] != ["2", "3"]
             or not auction.conduct_table.isColumnHidden(3)
         ):
-            raise AssertionError("Auction start/current chance-column layout is wrong")
+            raise AssertionError("P12 start/current and hidden chance policy changed")
         if auction._conduct_compact_columns != (0, 1, 3, 4):
-            raise AssertionError("Auction start/current conduct compact columns are wrong")
+            raise AssertionError("P12 start/current compact columns are wrong")
         window._finalize_compact_headers_after_polish()
         auction.refresh()
 
@@ -4314,7 +4289,7 @@ def main() -> int:
                 if expected == POSITION_COLUMNS_START_CURRENT
                 else ["ПОЗИЦИЯ", "НАЗВАНИЕ"]
             )
-            for table in (auction.table, auction.conduct_table):
+            for table in (auction.conduct_table,):
                 actual_headers = [
                     table.horizontalHeaderItem(column).text()
                     for column in range(2)
