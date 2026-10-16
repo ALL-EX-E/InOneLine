@@ -4014,6 +4014,27 @@ def main() -> int:
         if auction_page.auction_activity_tabs.count() != 2:
             raise AssertionError("P12 lost Bets/History activity tabs")
 
+        # P13-A/UI-053: same authoritative /timer-overlay route; preview is
+        # ?preview=1 on this existing widget, not a parallel OBS endpoint.
+        preview_timer = auction_page.preview_timer_overlay_btn
+        copy_timer = auction_page.copy_timer_overlay_btn
+        if (copy_timer.text() != "Копировать URL таймера"
+                or preview_timer.text() != "Открыть предпросмотр таймера"):
+            raise AssertionError("P13-A Auction timer quick actions mismatch")
+        with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+            preview_timer.click()
+        if (opened.call_count != 1
+                or opened.call_args.args[0].toString()
+                != f"{window.api.base_url}/timer-overlay?preview=1"):
+            raise AssertionError("P13-A Auction preview did not use existing timer OBS route")
+        clipboard_before_timer = QApplication.clipboard().text()
+        try:
+            copy_timer.click()
+            if QApplication.clipboard().text() != f"{window.api.base_url}/timer-overlay":
+                raise AssertionError("P13-A existing timer Copy URL changed")
+        finally:
+            QApplication.clipboard().setText(clipboard_before_timer)
+
         # P12-B UI-052: exactly one inline help, no obsolete Lots help.
         help_button = auction_page.conduct_rules_btn
         help_label = auction_page.conduct_rules_label
