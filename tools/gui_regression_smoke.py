@@ -4014,6 +4014,45 @@ def main() -> int:
         if auction_page.auction_activity_tabs.count() != 2:
             raise AssertionError("P12 lost Bets/History activity tabs")
 
+        # P12-B UI-052: exactly one inline help, no obsolete Lots help.
+        help_button = auction_page.conduct_rules_btn
+        help_label = auction_page.conduct_rules_label
+        if help_button.text() != "Как работает аукцион?":
+            raise AssertionError("P12 unified Auction help label mismatch")
+        required_help = (
+            "Список лотов", "ИГРАЛ", "НЕ ИГРАЛ", "Максимальная сумма",
+            "Взвешенное колесо", "Ставки", "История", "Выбывание",
+            "В архив", "ПРОХОДИТСЯ", "Общий таймер", "Правила аукциона",
+        )
+        help_text = help_label.text()
+        if any(value not in help_text for value in required_help):
+            raise AssertionError("P12 Auction help lost approved user-facing coverage")
+        if "wheel_duration_ms" in help_text or "игра получает статус" in help_text:
+            raise AssertionError("P12 Auction help retained implementation terminology")
+        if hasattr(auction_page, "lots_rules_btn") or hasattr(auction_page, "lots_rules_label"):
+            raise AssertionError("P12 left duplicate Lots instructions")
+        old_auction_help_page = window.tabs.currentWidget()
+        try:
+            window._set_current_main_page(auction_page)
+            app.processEvents()
+            if not help_label.isHidden():
+                raise AssertionError("P12 Auction inline help should initially be collapsed")
+            help_button.click()
+            app.processEvents()
+            if help_label.isHidden() or help_button.text() != "Скрыть справку":
+                raise AssertionError("P12 inline help did not expand")
+            help_button.click()
+            app.processEvents()
+            if not help_label.isHidden() or help_button.text() != "Как работает аукцион?":
+                raise AssertionError("P12 inline help did not collapse")
+            if auction_page.auction_rules_editor_btn.text() != "Правила аукциона":
+                raise AssertionError("P12 removed the existing Rules editor entry")
+        finally:
+            if not help_label.isHidden():
+                help_button.click()
+            window.tabs.setCurrentWidget(old_auction_help_page)
+            app.processEvents()
+
         settings_tabs = [
             window.settings_tab.settings_tabs.tabText(i)
             for i in range(window.settings_tab.settings_tabs.count())
