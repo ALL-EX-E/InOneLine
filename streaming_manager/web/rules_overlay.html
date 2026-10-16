@@ -40,7 +40,7 @@ body.preview {
     0 0 16px var(--rules-glow-soft, rgba(255,255,255,.58)),
     inset 0 0 8px var(--rules-glow-inner, rgba(255,255,255,.22));
 }
-#rules-background-image {
+#rules-background-image, #rules-background-video {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -87,6 +87,7 @@ body.preview #api-state.visible { display: block; }
 <body>
 <div id="root">
   <img id="rules-background-image" alt="" aria-hidden="true">
+  <video id="rules-background-video" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
   <div id="viewport"><div id="content"></div></div>
 </div>
 <div id="api-state">Нет связи с In one line</div>
@@ -112,6 +113,7 @@ body.preview #api-state.visible { display: block; }
 
   const root = document.getElementById("root");
   const backgroundImage = document.getElementById("rules-background-image");
+  const backgroundVideo = document.getElementById("rules-background-video");
   const viewport = document.getElementById("viewport");
   const content = document.getElementById("content");
   const apiState = document.getElementById("api-state");
@@ -161,13 +163,16 @@ body.preview #api-state.visible { display: block; }
     root.style.background = presentation.background === "color"
       ? rgba(presentation.background_color, presentation.background_opacity)
       : "transparent";
-    // Only trusted registered image IDs are used. Missing media automatically
+    // Only trusted registered media IDs are used. Missing media automatically
     // falls back to transparent, without exposing external filesystem paths.
     const asset = presentation.background_media || {};
-    const imageUrl = presentation.background === "media"
-      && asset.available === true && asset.type === "image"
+    const mediaUrl = presentation.background === "media"
+      && asset.available === true
+      && ["image", "video"].includes(String(asset.type || ""))
       && /^\/media\/\d+$/.test(String(asset.url || ""))
       ? String(asset.url) : "";
+    const imageUrl = asset.type === "image" ? mediaUrl : "";
+    const videoUrl = asset.type === "video" ? mediaUrl : "";
     if (imageUrl) {
       if (backgroundImage.getAttribute("src") !== imageUrl) {
         backgroundImage.src = imageUrl;
@@ -176,6 +181,22 @@ body.preview #api-state.visible { display: block; }
     } else {
       backgroundImage.style.display = "none";
       backgroundImage.removeAttribute("src");
+    }
+    if (videoUrl) {
+      if (backgroundVideo.getAttribute("src") !== videoUrl) {
+        backgroundVideo.setAttribute("src", videoUrl);
+        backgroundVideo.load();
+      }
+      backgroundVideo.style.display = "block";
+      const started = backgroundVideo.play();
+      if (started && typeof started.catch === "function") started.catch(() => {});
+    } else {
+      backgroundVideo.style.display = "none";
+      backgroundVideo.pause();
+      if (backgroundVideo.hasAttribute("src")) {
+        backgroundVideo.removeAttribute("src");
+        backgroundVideo.load();
+      }
     }
     // The same fixed 8px radius/soft three-layer glow as shared overlays.
     // Legacy five-field Rules JSON has glow off by default.
