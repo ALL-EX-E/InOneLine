@@ -397,7 +397,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         setup.addWidget(self.wheel_format_combo, 2, 1)
 
-        conduct_layout.addWidget(self.setup_widget)
+        # P13-B/UI-062: wheel preview shares the upper operator region
+        # with winner-method controls rather than widening the lot/history row.
+        # Its existing soundtrack stays with the panel until UI-071 moves
+        # existing controls to the common contextual timer (no duplicate).
+        self.method_wheel_row = QHBoxLayout()
+        self.method_wheel_row.setSpacing(12)
+        self.method_wheel_row.addWidget(self.setup_widget, 3)
+        conduct_layout.addLayout(self.method_wheel_row)
 
         self.wheel_obs_widget = QWidget()
         wheel_obs_row = QHBoxLayout(self.wheel_obs_widget)
@@ -928,12 +935,13 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.wheel_panel.setMinimumWidth(300)
         self.wheel_panel.setVisible(False)
-        conduct_content_layout.addWidget(self.wheel_panel, 2)
+        # Same one wheel widget, now in the upper method region. Keep the
+        # lower workspace as exactly the table and Bets/History.
+        self.method_wheel_row.addWidget(self.wheel_panel, 2)
 
-        # R1.0.7 geometry stability: dynamic operator panes may need more
-        # horizontal space than the current restored window provides. Put this
-        # row behind its own horizontal scroll boundary so showing the Wheel
-        # cannot squeeze critical fields/columns or resize MainWindow.
+        # P13-B: the lower workspace contains only lots plus Bets/History;
+        # the local wheel no longer adds a third competing wide column.
+        # Retain the existing scroll host to preserve operator-table behavior.
         self.conduct_content_scroll = QScrollArea()
         self.conduct_content_scroll.setFrameShape(QFrame.NoFrame)
         self.conduct_content_scroll.setWidgetResizable(True)

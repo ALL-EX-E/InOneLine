@@ -4014,6 +4014,24 @@ def main() -> int:
         if auction_page.auction_activity_tabs.count() != 2:
             raise AssertionError("P12 lost Bets/History activity tabs")
 
+        # P13-B/UI-062 first isolated layout step: physically relocate the
+        # one existing local wheel; no duplicate renderer or third lower pane.
+        if auction_page.method_wheel_row.indexOf(auction_page.setup_widget) < 0:
+            raise AssertionError("P13-B method selector left its upper layout")
+        if auction_page.method_wheel_row.indexOf(auction_page.wheel_panel) < 0:
+            raise AssertionError("P13-B wheel panel was not moved beside method setup")
+        if auction_page.conduct_content_layout.indexOf(auction_page.wheel_panel) >= 0:
+            raise AssertionError("P13-B wheel still occupies the lower lots/history row")
+        if (auction_page.conduct_content_layout.count() != 2
+                or auction_page.conduct_content_layout.indexOf(auction_page.conduct_table) < 0
+                or auction_page.conduct_content_layout.indexOf(auction_page.auction_activity_tabs) < 0):
+            raise AssertionError("P13-B broke two-pane lots and activity layout")
+        if auction_page.wheel_panel.findChildren(type(auction_page.wheel_widget)).count(
+                auction_page.wheel_widget) != 1:
+            raise AssertionError("P13-B duplicated the local wheel renderer")
+        if auction_page.wheel_soundtrack_widget.parent() is not auction_page.wheel_panel:
+            raise AssertionError("P13-B altered wheel soundtrack ownership prematurely")
+
         # P13-A/UI-053: same authoritative /timer-overlay route; preview is
         # ?preview=1 on this existing widget, not a parallel OBS endpoint.
         preview_timer = auction_page.preview_timer_overlay_btn
