@@ -3,12 +3,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from .constants import (
     MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
     RULES_OVERLAY_VISIBLE_DEFAULT,
     RULES_OVERLAY_VISIBLE_KEY,
+    WHEEL_GLOW_ENABLED_KEY,
+    WHEEL_GLOW_ENABLED_DEFAULT,
+    WHEEL_GLOW_COLOR_KEY,
+    WHEEL_GLOW_COLOR_DEFAULT,
 )
 
 
@@ -62,6 +67,17 @@ def show_mode(settings: Mapping[str, Any], widget: str) -> str:
         return "always" if legacy == "1" else "hidden"
     mode = str(settings.get(spec.key) or "").strip().casefold()
     return mode if any(mode == value for value, _label in spec.options) else spec.default
+
+
+def wheel_glow_appearance(settings: Mapping[str, Any]) -> dict[str, Any]:
+    """One validated, read-only local+OBS wheel appearance contract."""
+    raw_color = str(settings.get(WHEEL_GLOW_COLOR_KEY) or WHEEL_GLOW_COLOR_DEFAULT).strip()
+    color = raw_color.upper() if re.fullmatch(r"#[0-9a-fA-F]{6}", raw_color) else WHEEL_GLOW_COLOR_DEFAULT
+    return {
+        "glow_enabled": str(settings.get(WHEEL_GLOW_ENABLED_KEY,
+                                      "1" if WHEEL_GLOW_ENABLED_DEFAULT else "0")) == "1",
+        "glow_color": color,
+    }
 
 
 def visibility_payload(

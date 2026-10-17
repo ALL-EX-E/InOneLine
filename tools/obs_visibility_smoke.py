@@ -38,7 +38,19 @@ def policy_smoke() -> None:
         assert "visibility" in db.current_stream_payload(), "Missing common OBS visibility contract"
         from streaming_manager.obs_visibility import (
             WIDGETS, show_mode, visibility_payload, wheel_context_relevant,
+            wheel_glow_appearance,
         )
+        from streaming_manager.constants import WHEEL_GLOW_ENABLED_KEY, WHEEL_GLOW_COLOR_KEY
+        assert wheel_glow_appearance({}) == {
+            "glow_enabled": False, "glow_color": "#FFFFFF",
+        }
+        assert wheel_glow_appearance({
+            WHEEL_GLOW_ENABLED_KEY: "1", WHEEL_GLOW_COLOR_KEY: "#12ab34",
+        }) == {"glow_enabled": True, "glow_color": "#12AB34"}
+        assert wheel_glow_appearance({
+            WHEEL_GLOW_ENABLED_KEY: "bogus", WHEEL_GLOW_COLOR_KEY: "<script>",
+        }) == {"glow_enabled": False, "glow_color": "#FFFFFF"}
+        assert db.current_wheel_payload()["appearance"] == wheel_glow_appearance({})
         expected = {"overlay", "list", "timer", "music_player", "auction_lots", "rules", "wheel"}
         assert set(WIDGETS) == expected
         for widget, spec in WIDGETS.items():
@@ -261,6 +273,11 @@ def ui_smoke() -> None:
                 assert combo.currentData() == show_mode(saved_before, widget)
                 assert forms[widget].getWidgetPosition(combo)[0] == (2 if widget == "list" else 0)
             assert db.get_settings() == saved_before, "Refresh wrote visibility defaults"
+            assert not stream.wheel_glow_enabled.isChecked()
+            assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_enabled).text() == "Светящийся контур:"
+            assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_color_row).text() == "Цвет контура:"
+            stream.wheel_glow_enabled.setChecked(True)
+            stream._set_color_button(stream.wheel_glow_color_btn, "#12AB34")
             auction = window.auction_tab
             auction.mode_combo.setCurrentIndex(auction.mode_combo.findData("max_amount"))
             stream.obs_show_modes["wheel"].setCurrentIndex(stream.obs_show_modes["wheel"].findData("always"))
@@ -268,6 +285,10 @@ def ui_smoke() -> None:
                 stream._save_wheel_overlay_settings()
             assert auction._wheel_context_relevant(None) is False, "OBS Always changed local wheel visibility"
             assert read_json(window.api, "/api/wheel")["visibility"]["show_mode"] == "always"
+            assert read_json(window.api, "/api/wheel")["appearance"] == {
+                "glow_enabled": True, "glow_color": "#12AB34",
+            }
+            assert db.get_setting("wheel_glow_enabled") == "1"
             auction.mode_combo.setCurrentIndex(auction.mode_combo.findData("weighted_wheel"))
             assert auction._wheel_context_relevant(None) is True
             assert read_json(window.api, "/api/wheel")["visibility"]["context_visible"] is True
@@ -328,6 +349,11 @@ def ui_smoke() -> None:
             QTest.qWait(600)
             assert window.db.get_settings() == saved
             assert all(combo.currentData() == "hidden" for combo in window.stream_tab.obs_show_modes.values())
+            assert window.stream_tab.wheel_glow_enabled.isChecked()
+            assert window.stream_tab.wheel_glow_color_btn.property("fontColor") == "#12AB34"
+            assert read_json(window.api, "/api/wheel")["appearance"] == {
+                "glow_enabled": True, "glow_color": "#12AB34",
+            }
             assert read_json(window.api, "/api/data")["visibility"]["overlay"]["show_mode"] == "always"
         finally:
             window.api.stop()
@@ -651,6 +677,19 @@ def browser_smoke() -> None:
                             "(positionCenterImage(200,200,100), parseFloat(centerImageEl.style.width))",
                         )
                         assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
+                        stream.wheel_glow_enabled.setChecked(True)
+                        stream._set_color_button(stream.wheel_glow_color_btn, "#34A1F2")
+                        with patch.object(QMessageBox, "information"):
+                            stream._save_wheel_overlay_settings()
+                        wait_js(normal, "state?.appearance?.glow_enabled", True,
+                                "P15-C live glow enabled")
+                        wait_js(preview, "state?.appearance?.glow_color", "#34A1F2",
+                                "P15-C live glow color")
+                        stream.wheel_glow_enabled.setChecked(False)
+                        with patch.object(QMessageBox, "information"):
+                            stream._save_wheel_overlay_settings()
+                        wait_js(normal, "state?.appearance?.glow_enabled", False,
+                                "P15-C live glow disabled without navigating")
                         palette_ok = js(preview, """(()=> {
                            return sectorColor({game_id:10},0)===sectorColor({game_id:10},9)
                              && sectorColor({game_id:10},0)!==sectorColor({game_id:11},0);

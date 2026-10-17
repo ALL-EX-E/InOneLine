@@ -12,9 +12,11 @@ from ..constants import (
     STATUS_NOT_PLAYED,
     STATUS_PLAYED,
     WHEEL_CENTER_IMAGE_MEDIA_ID_KEY,
+    WHEEL_GLOW_ENABLED_KEY,
+    WHEEL_GLOW_COLOR_KEY,
 )
 from ..media import MEDIA_CATEGORY_WHEEL_CENTER_ICONS, media_asset_available
-from ..obs_visibility import WIDGETS, visibility_payload, wheel_context_relevant
+from ..obs_visibility import WIDGETS, visibility_payload, wheel_context_relevant, wheel_glow_appearance
 from .common import utc_now
 
 
@@ -1165,7 +1167,12 @@ class WheelMixin:
             session = self._get_auction_session_conn(conn, auction_id)
             if session is None:
                 raise KeyError(auction_id)
-            return self._wheel_payload_from_conn(conn, session)
+            payload = self._wheel_payload_from_conn(conn, session)
+            settings = self._get_settings_conn(
+                conn, (WHEEL_GLOW_ENABLED_KEY, WHEEL_GLOW_COLOR_KEY),
+            )
+            payload["appearance"] = wheel_glow_appearance(settings)
+            return payload
 
     def _preview_wheel_payload_from_conn(self, conn) -> dict[str, Any]:
         """Build the existing pre-start wheel preview without a nested DB connection."""
@@ -1250,7 +1257,9 @@ class WheelMixin:
         """Состояние колеса для OBS даже до запуска сессии."""
         with self.connect() as conn:
             session = self._get_open_auction_session_conn(conn)
-            settings = self._get_settings_conn(conn, (WIDGETS["wheel"].key,))
+            settings = self._get_settings_conn(
+                conn, (WIDGETS["wheel"].key, WHEEL_GLOW_ENABLED_KEY, WHEEL_GLOW_COLOR_KEY),
+            )
             payload = (
                 self._wheel_payload_from_conn(conn, session)
                 if session is not None else self._preview_wheel_payload_from_conn(conn)
@@ -1258,4 +1267,5 @@ class WheelMixin:
             payload["visibility"] = visibility_payload(
                 settings, "wheel", wheel_context_relevant(session, selected_mode),
             )
+            payload["appearance"] = wheel_glow_appearance(settings)
             return payload

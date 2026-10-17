@@ -200,6 +200,12 @@ class MainWindow(QMainWindow):
         self.stream_tab.preview_wheel_btn.clicked.connect(
             self.auction_tab.open_wheel_preview
         )
+        # Reuse the existing Auction wheel presenter; no second preview state.
+        self.stream_tab.wheelAppearanceSaved.connect(
+            lambda: self.auction_tab._update_wheel_panel(
+                self.auction_tab._current_session()
+            )
+        )
         # Duplicate navigation controls call the exact same Stream/OBS actions.
         # No second URL or preview logic is maintained in Games/Auction.
         self.games_tab.copy_list_overlay_url_btn.clicked.connect(
