@@ -240,8 +240,19 @@ function draw(){
  });
  ctx.restore();
 
- // outer ring
- ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;ctx.stroke();
+ // The wheel ring stays drawn when glow is disabled. Its optional halo is
+ // stationary outside the sector-rotation transform, same as the Qt wheel.
+ const appearance=s.appearance||{};
+ ctx.save();
+ ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);
+ ctx.strokeStyle="#E8EDF2";ctx.lineWidth=3;
+ if(appearance.glow_enabled){
+   ctx.shadowColor=/^#[0-9A-Fa-f]{6}$/.test(String(appearance.glow_color||""))
+     ? appearance.glow_color:"#FFFFFF";
+   ctx.shadowBlur=14;
+ }
+ ctx.stroke();
+ ctx.restore();
  // D19 center is stationary; native <img> above the canvas preserves GIF/WebP animation.
  drawCenterBase(cx,cy,r);
  // pointer
