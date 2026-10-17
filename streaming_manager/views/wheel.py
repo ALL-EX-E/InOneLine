@@ -25,6 +25,9 @@ class AuctionWheelWidget(QOpenGLWidget):
     spinFinished = Signal()
     centerClicked = Signal()
 
+    # UI-079: one geometry factor for both visual center and click target.
+    CENTER_RADIUS_RATIO = 0.24
+
     PALETTE = (
         "#4FC3F7",
         "#FF8A65",
@@ -74,7 +77,7 @@ class AuctionWheelWidget(QOpenGLWidget):
         rect = self.rect().adjusted(10, 10, -10, -68)
         side = max(2, min(rect.width(), rect.height()))
         center = rect.center()
-        center_radius = (side / 2.0) * 0.12
+        center_radius = (side / 2.0) * self.CENTER_RADIUS_RATIO
         pos = event.position()
         dx = float(pos.x()) - float(center.x())
         dy = float(pos.y()) - float(center.y())
@@ -433,7 +436,7 @@ class AuctionWheelWidget(QOpenGLWidget):
 
         # D19: center is painted after the rotating sector layer, so it remains
         # physically stationary while the wheel spins.
-        center_radius = radius * 0.12
+        center_radius = radius * self.CENTER_RADIUS_RATIO
         center_rect = QRectF(
             center.x() - center_radius,
             center.y() - center_radius,

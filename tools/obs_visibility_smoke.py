@@ -184,6 +184,33 @@ def ui_smoke() -> None:
     )
 
     app = QApplication.instance() or QApplication([])
+    # UI-079: verify the actual local hit target, not only the ratio constant.
+    # A point at 20% of wheel radius was outside the former 12% center.
+    from PySide6.QtCore import QPointF
+    from streaming_manager.views.wheel import AuctionWheelWidget
+
+    wheel_probe = AuctionWheelWidget()
+    wheel_probe.resize(420, 420)
+    wheel_rect = wheel_probe.rect().adjusted(10, 10, -10, -68)
+    wheel_radius = min(wheel_rect.width(), wheel_rect.height()) / 2.0
+    wheel_center = wheel_rect.center()
+    clicked = []
+    wheel_probe.centerClicked.connect(lambda: clicked.append(True))
+
+    class CenterHitProbe:
+        accepted = False
+
+        def position(self):
+            return QPointF(wheel_center.x() + wheel_radius * 0.20, wheel_center.y())
+
+        def accept(self):
+            self.accepted = True
+
+    hit_probe = CenterHitProbe()
+    wheel_probe.mousePressEvent(hit_probe)
+    assert clicked == [True] and hit_probe.accepted, "P15-A center hitbox did not double"
+    assert wheel_probe.CENTER_RADIUS_RATIO == 0.24
+    wheel_probe.deleteLater()
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         paths = AppPaths.from_root(Path(tmp))
         paths.ensure_runtime_dirs()
@@ -601,6 +628,12 @@ def browser_smoke() -> None:
                         wait_js(preview, "document.querySelector('#card').classList.contains('visible')", True, "Music preview ignores event expiry")
                         music["event_serial"] = 17
                     if widget == "wheel":
+                        # Chromium runs the shared OBS center-size geometry too.
+                        obs_center_width = js(
+                            preview.page(),
+                            "(positionCenterImage(200,200,100), parseFloat(centerImageEl.style.width))",
+                        )
+                        assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
                         save(widget, "context")
                         wait_js(normal, visible, "false", "Wheel Max prestart")
                         runtime["mode"] = "weighted_wheel"
