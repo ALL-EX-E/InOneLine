@@ -450,6 +450,53 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "Math.round(window.innerWidth-document.querySelector('#root').getBoundingClientRect().right)",
                                 16, "P14-C inset card from right OBS edge")
+                        # P14-D: the OBS source's outside 16px margin is
+                        # transparent in every background mode. The image,
+                        # video, or chosen color lives strictly INSIDE #root
+                        # and its rounded overflow clip; the outer glow stays.
+                        wait_js(normal,
+                                "document.querySelector('#background').parentElement.id",
+                                "root", "P14-D chosen background is inside card")
+                        wait_js(normal,
+                                "document.querySelector('#background-video').parentElement.id",
+                                "root", "P14-D video is inside card")
+                        wait_js(normal,
+                                "getComputedStyle(document.body).backgroundColor",
+                                "rgba(0, 0, 0, 0)", "P14-D outside browser card stays transparent")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#root')).overflow",
+                                "hidden", "P14-D round-card background remains clipped")
+                        db.set_settings_bulk({
+                            "auction_lots_overlay_background": "color",
+                            "auction_lots_overlay_background_color": "#4F2C11",
+                        })
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#background')).backgroundColor",
+                                "rgb(79, 44, 17)", "P14-D chosen color applied inside card")
+                        wait_js(normal,
+                                "getComputedStyle(document.body).backgroundColor",
+                                "rgba(0, 0, 0, 0)", "P14-D chosen color does not flood source gutter")
+                        db.set_setting("auction_lots_overlay_background", "transparent")
+                        # P14-D: the footer comes from the authoritative
+                        # payload total, never the visible scrolling rows.
+                        total_payload = read_json(server, "/api/auction-lots")
+                        assert total_payload["total_sm_points"] >= 100
+                        assert total_payload["show_total_footer"] is False
+                        db.set_setting("auction_lots_show_total_footer", "1")
+                        expected_footer = "Всего баллов в аукционе: " + (
+                            f"{total_payload['total_sm_points']:,}".replace(",", " ")
+                        )
+                        wait_js(normal, "document.querySelector('#total-footer').textContent",
+                                expected_footer, "P14-D footer gets canonical auction total")
+                        wait_js(normal, "document.querySelector('#total-footer').style.display",
+                                "block", "P14-D footer visible when opted in")
+                        wait_js(normal,
+                                "document.querySelector('#total-footer').getBoundingClientRect().top >= "
+                                "document.querySelector('#viewport').getBoundingClientRect().bottom",
+                                True, "P14-D footer sits below scroll viewport")
+                        db.set_setting("auction_lots_show_total_footer", "0")
+                        wait_js(normal, "document.querySelector('#total-footer').style.display",
+                                "none", "P14-D hidden footer restores full list viewport")
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .col-title')).whiteSpace",
                                 "normal", "Auction Lots title wraps to browser width")
