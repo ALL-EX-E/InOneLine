@@ -55,6 +55,9 @@ defaultCenterImageEl.onload=()=>{
  if(centerImageEl.style.display!=="block")defaultCenterImageEl.style.display="block";
 };
 defaultCenterImageEl.onerror=()=>{defaultCenterImageEl.style.display="none"};
+if(defaultCenterImageEl.complete && defaultCenterImageEl.naturalWidth>0){
+ defaultCenterImageEl.style.display="block";
+}
 const pointerLotEl=document.getElementById("pointer-lot");
 const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
 const preview=ObsVisibility.preview;
