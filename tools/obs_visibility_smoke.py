@@ -550,8 +550,8 @@ def browser_smoke() -> None:
                             "auction_lots_card_header_font_size": "31",
                         })
                         wait_js(normal,
-                                "getComputedStyle(document.querySelector('#root')).backgroundColor",
-                                "rgba(18, 52, 86, 0)", "Auction Lots zero-opacity panel")
+                                "getComputedStyle(document.querySelector('#root'), '::before').backgroundColor",
+                                "rgba(18, 52, 86, 0)", "Auction Lots zero-opacity inner tint")
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .lot-cell')).backgroundColor",
                                 "rgba(51, 102, 153, 0.6)", "Auction Lots saved row tint/opacity")
