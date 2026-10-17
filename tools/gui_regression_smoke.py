@@ -4354,7 +4354,15 @@ def main() -> int:
             or auction.conduct_table.item(0, 0).text() != "3"
             or not auction.conduct_table.isColumnHidden(2)
         ):
-            raise AssertionError("P12 single-table current position/chance policy changed")
+            raise AssertionError(
+                "P12 single-table current position/chance policy changed: "
+                f"mode={auction.mode_combo.currentData()!r} "
+                f"chance_checked={auction._wheel_chance_visible!r} "
+                f"columns={auction.conduct_table.columnCount()} "
+                f"headers={[auction.conduct_table.horizontalHeaderItem(c).text() for c in range(auction.conduct_table.columnCount())]!r} "
+                f"position={auction.conduct_table.item(0, 0).text() if auction.conduct_table.item(0, 0) else None!r} "
+                f"chance_hidden={auction.conduct_table.isColumnHidden(2)!r}"
+            )
         if auction._conduct_compact_columns != (0, 2, 3):
             raise AssertionError("P12 single-position compact columns are wrong")
 
