@@ -447,6 +447,28 @@ class AuctionWheelWidget(QOpenGLWidget):
         )
         painter.restore()
 
+        # UI-079: shared static outer glow is anchored on the wheel center,
+        # not the rotating sector pixmap. Three lightweight strokes match the
+        # existing OBS glow principle without changing spin geometry or RNG.
+        appearance = self._payload.get("appearance") or {}
+        if appearance.get("glow_enabled"):
+            glow = QColor(str(appearance.get("glow_color") or "#FFFFFF"))
+            if not glow.isValid():
+                glow = QColor("#FFFFFF")
+            glow_radius = max(1.0, radius - 3.0)
+            glow_rect = QRectF(
+                center.x() - glow_radius, center.y() - glow_radius,
+                glow_radius * 2.0, glow_radius * 2.0,
+            )
+            painter.save()
+            painter.setBrush(Qt.NoBrush)
+            for width, alpha in ((15.0, 36), (9.0, 72), (4.0, 130)):
+                stroke = QColor(glow)
+                stroke.setAlpha(alpha)
+                painter.setPen(QPen(stroke, width))
+                painter.drawEllipse(glow_rect)
+            painter.restore()
+
         # D19: center is painted after the rotating sector layer, so it remains
         # physically stationary while the wheel spins.
         center_radius = radius * self.CENTER_RADIUS_RATIO
