@@ -177,6 +177,8 @@ jobs:
         run: |
           python tools/wheel_center_connection_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P15-G wheel center connection regression failed" }
+          python tools/wheel_center_hover_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P15-H wheel center hover regression failed" }
           python tools/obs_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Common OBS visibility regression failed" }
 
