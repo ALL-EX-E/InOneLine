@@ -247,6 +247,26 @@ class AuctionWheelWidget(QOpenGLWidget):
         return target * visual_progress, complete
 
     @staticmethod
+    def sector_under_pointer(sectors: list[dict], rotation_deg: float) -> dict | None:
+        """Read-only visual hit test of the pointer, using rendered sector weights."""
+        if not sectors:
+            return None
+        weights = [max(0, int(sec.get("weight") or 0)) for sec in sectors]
+        if sum(weights) <= 0:
+            weights = [1] * len(sectors)
+        total = sum(weights)
+        # Wheel is drawn clockwise from 12 o'clock and rotates positively.
+        # The stationary pointer sees the inverse of its current rotation.
+        position = ((-float(rotation_deg)) % 360.0) / 360.0 * total
+        accumulated = 0
+        for sector, weight in zip(sectors, weights):
+            accumulated += weight
+            if weight > 0 and position < accumulated:
+                return sector
+        return next((sec for sec, weight in reversed(list(zip(sectors, weights)))
+                     if weight > 0), None)
+
+    @staticmethod
     def _fit_sector_font(
         painter: QPainter,
         title: str,
@@ -524,7 +544,15 @@ class AuctionWheelWidget(QOpenGLWidget):
         animation = self._payload.get("animation") or {}
         winner = self._payload.get("winner")
         if animation.get("spin_id") and not complete:
-            caption = "Колесо вращается…"
+            pointer = (
+                self.sector_under_pointer(sectors, rotation)
+                if (self._payload.get("appearance") or {}).get("pointer_label_enabled")
+                else None
+            )
+            caption = (
+                "Под стрелкой: " + str(pointer.get("title") or "")
+                if pointer else "Колесо вращается…"
+            )
         elif winner:
             prefix = (
                 "Выбывает"
