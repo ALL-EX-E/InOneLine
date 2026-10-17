@@ -521,6 +521,10 @@ body.preview #api-state.visible { display: block; }
       direction = scrollY >= maximum - 1 && maximum > 0 ? -1 : 1;
       lastFrame = performance.now();
     }
+    // Single observed browser state for native Chromium regression checks.
+    // Avoid treating an HTTP resource-start event as a completed API poll.
+    document.documentElement.dataset.auctionLotsAutoScroll =
+      autoScroll ? "true" : "false";
   }
 
   function renderFooter(payload) {
