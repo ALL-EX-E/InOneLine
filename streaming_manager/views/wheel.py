@@ -382,17 +382,20 @@ class AuctionWheelWidget(QOpenGLWidget):
                     preferred,
                 )
                 painter.setFont(font)
-                painter.setPen(QColor("#111315"))
-                painter.drawText(
-                    QRectF(
-                        -text_width / 2.0,
-                        -text_height / 2.0,
-                        text_width,
-                        text_height,
-                    ),
-                    flags,
-                    title,
+                text_rect = QRectF(
+                    -text_width / 2.0,
+                    -text_height / 2.0,
+                    text_width,
+                    text_height,
                 )
+                # UI-079: a light label with dark four-way outline is legible
+                # against every sector. Labels are cached, never re-laid out
+                # per frame while the wheel rotates.
+                painter.setPen(QColor("#0B0D10"))
+                for dx, dy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+                    painter.drawText(text_rect.translated(dx, dy), flags, title)
+                painter.setPen(QColor("#FFFFFF"))
+                painter.drawText(text_rect, flags, title)
                 painter.restore()
 
             start_deg -= span
