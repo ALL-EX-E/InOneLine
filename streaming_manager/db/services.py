@@ -18,6 +18,7 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
     AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+    AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY, AUCTION_LOTS_SHOW_TOTAL_FOOTER_DEFAULT,
     AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT, AUCTION_LOTS_CARD_PANEL_COLOR_KEY,
     AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT, AUCTION_LOTS_CARD_PANEL_OPACITY_KEY,
     AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT, AUCTION_LOTS_CARD_FRAME_COLOR_KEY,
@@ -1633,6 +1634,7 @@ class ServicesMixin:
             AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
             AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
             AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+            AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY,
             AUCTION_LOTS_CARD_PANEL_COLOR_KEY,
             AUCTION_LOTS_CARD_PANEL_OPACITY_KEY,
             AUCTION_LOTS_CARD_FRAME_COLOR_KEY,
@@ -1713,6 +1715,15 @@ class ServicesMixin:
             if sector.get("game_id") is not None
         }
 
+        # Reuse the same authoritative A6 session total as the local label.
+        # The session total includes inactive history and excludes 'removed'.
+        if session is None:
+            total_sm_points = sum(
+                max(0, int(game.sm_points or 0)) for game in game_rows
+            )
+        else:
+            total_sm_points = self.auction_total_sm_points(int(auction_id))
+
         payload_rows = []
         for row in rows:
             game_id = int(row["game_id"])
@@ -1776,6 +1787,11 @@ class ServicesMixin:
             "show_wheel_chance": show_wheel_chance,
             "position_columns": position_columns,
             "auto_scroll": auto_scroll,
+            "show_total_footer": str(settings.get(
+                AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY,
+                "1" if AUCTION_LOTS_SHOW_TOTAL_FOOTER_DEFAULT else "0",
+            )).strip().casefold() in {"1", "true", "yes", "on"},
+            "total_sm_points": int(total_sm_points),
             "rows": payload_rows,
             "visibility": visibility_payload(settings, "auction_lots"),
             "presentation": {

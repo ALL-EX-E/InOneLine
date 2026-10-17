@@ -450,6 +450,53 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "Math.round(window.innerWidth-document.querySelector('#root').getBoundingClientRect().right)",
                                 16, "P14-C inset card from right OBS edge")
+                        # P14-D: the OBS source's outside 16px margin is
+                        # transparent in every background mode. The image,
+                        # video, or chosen color lives strictly INSIDE #root
+                        # and its rounded overflow clip; the outer glow stays.
+                        wait_js(normal,
+                                "document.querySelector('#background').parentElement.id",
+                                "root", "P14-D chosen background is inside card")
+                        wait_js(normal,
+                                "document.querySelector('#background-video').parentElement.id",
+                                "root", "P14-D video is inside card")
+                        wait_js(normal,
+                                "getComputedStyle(document.body).backgroundColor",
+                                "rgba(0, 0, 0, 0)", "P14-D outside browser card stays transparent")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#root')).overflow",
+                                "hidden", "P14-D round-card background remains clipped")
+                        db.set_settings_bulk({
+                            "auction_lots_overlay_background": "color",
+                            "auction_lots_overlay_background_color": "#4F2C11",
+                        })
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#background')).backgroundColor",
+                                "rgb(79, 44, 17)", "P14-D chosen color applied inside card")
+                        wait_js(normal,
+                                "getComputedStyle(document.body).backgroundColor",
+                                "rgba(0, 0, 0, 0)", "P14-D chosen color does not flood source gutter")
+                        db.set_setting("auction_lots_overlay_background", "transparent")
+                        # P14-D: the footer comes from the authoritative
+                        # payload total, never the visible scrolling rows.
+                        total_payload = read_json(server, "/api/auction-lots")
+                        assert total_payload["total_sm_points"] >= 100
+                        assert total_payload["show_total_footer"] is False
+                        db.set_setting("auction_lots_show_total_footer", "1")
+                        expected_footer = "Всего баллов в аукционе: " + (
+                            f"{total_payload['total_sm_points']:,}".replace(",", " ")
+                        )
+                        wait_js(normal, "document.querySelector('#total-footer').textContent",
+                                expected_footer, "P14-D footer gets canonical auction total")
+                        wait_js(normal, "document.querySelector('#total-footer').style.display",
+                                "block", "P14-D footer visible when opted in")
+                        wait_js(normal,
+                                "document.querySelector('#total-footer').getBoundingClientRect().top >= "
+                                "document.querySelector('#viewport').getBoundingClientRect().bottom",
+                                True, "P14-D footer sits below scroll viewport")
+                        db.set_setting("auction_lots_show_total_footer", "0")
+                        wait_js(normal, "document.querySelector('#total-footer').style.display",
+                                "none", "P14-D hidden footer restores full list viewport")
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .col-title')).whiteSpace",
                                 "normal", "Auction Lots title wraps to browser width")
@@ -473,16 +520,14 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "document.querySelector('#lots-rows').style.transform !== 'translateY(0px)'",
                                 True, "P14-C OBS-only autoscroll starts", timeout=25)
-                        polls_lots = (
-                            "performance.getEntriesByType('resource')"
-                            ".filter(e => e.name.includes('/api/auction-lots')).length"
-                        )
-                        count_before_disable = js(normal, polls_lots)
                         runtime["auto_scroll"] = False
-                        # The browser polls every 200 ms: wait for at least two
-                        # new responses before judging that animation stopped.
-                        wait_js(normal, f"({polls_lots}) >= {count_before_disable + 3}",
-                                True, "P14-C OBS consumed disable toggle")
+                        # A resource-timing entry is recorded when a fetch
+                        # starts, which can predate the actual response and
+                        # applyPayload. Wait for the browser's consumed state
+                        # instead of assuming three fetch-starts imply OFF.
+                        wait_js(normal,
+                                "document.documentElement.dataset.auctionLotsAutoScroll",
+                                "false", "P14-D OBS consumed disable state")
                         stopped_at = js(normal,
                                         "document.querySelector('#lots-rows').style.transform")
                         QTest.qWait(300)
@@ -505,8 +550,8 @@ def browser_smoke() -> None:
                             "auction_lots_card_header_font_size": "31",
                         })
                         wait_js(normal,
-                                "getComputedStyle(document.querySelector('#root')).backgroundColor",
-                                "rgba(18, 52, 86, 0)", "Auction Lots zero-opacity panel")
+                                "getComputedStyle(document.querySelector('#root'), '::before').backgroundColor",
+                                "rgba(18, 52, 86, 0)", "Auction Lots zero-opacity inner tint")
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .lot-cell')).backgroundColor",
                                 "rgba(51, 102, 153, 0.6)", "Auction Lots saved row tint/opacity")

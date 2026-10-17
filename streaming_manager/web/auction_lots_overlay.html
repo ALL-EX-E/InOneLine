@@ -41,7 +41,8 @@ body {
   padding: 16px;
 }
 #background, #background-video {
-  position: fixed;
+  /* These elements are children of the rounded card, never of the viewport. */
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -67,13 +68,26 @@ body {
   flex-direction: column;
   overflow: hidden;
   padding: 10px 9px;
-  background: var(--lot-panel-bg);
+  background: transparent;
+  isolation: isolate;
   border: 1px solid var(--lot-panel-border);
   box-shadow: 0 0 6px var(--lot-panel-glow), 0 0 14px var(--lot-panel-glow),
     inset 0 0 8px rgba(255, 255, 255, .12);
   border-radius: 8px;
 }
+/* Tint the chosen image/video/color inside the card, not over its glow.
+   Outer 16px source inset remains truly transparent in every background mode. */
+#root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--lot-panel-bg);
+}
 #header-shell {
+  position: relative;
+  z-index: 2;
   flex: 0 0 auto;
   width: 100%;
   overflow: hidden;
@@ -81,10 +95,25 @@ body {
 }
 #viewport {
   position: relative;
+  z-index: 2;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
   overflow: hidden;
+}
+#total-footer {
+  position: relative;
+  z-index: 2;
+  display: none;
+  flex: 0 0 auto;
+  margin-top: 9px;
+  padding: .45em .58em;
+  border: 1px solid var(--lot-row-border);
+  border-radius: 6px;
+  background: var(--lot-cell-bg);
+  box-shadow: 0 0 5px var(--lot-row-glow), inset 0 0 4px rgba(255,255,255,.06);
+  font-weight: 700;
+  text-align: center;
 }
 #lots-rows {
   width: 100%;
@@ -166,9 +195,9 @@ body.preview #api-state.visible { display: block; }
 <script src="/obs-visibility.js"></script>
 </head>
 <body>
-<div id="background"></div>
-<video id="background-video" autoplay muted loop playsinline></video>
 <div id="root">
+  <div id="background"></div>
+  <video id="background-video" autoplay muted loop playsinline></video>
   <div id="header-shell">
     <div id="header-row" class="lot-row" role="row"></div>
   </div>
@@ -176,6 +205,7 @@ body.preview #api-state.visible { display: block; }
     <div id="lots-rows" role="rowgroup"></div>
     <div id="empty">Список лотов пуст</div>
   </div>
+  <div id="total-footer" role="status" aria-live="polite"></div>
 </div>
 <span id="measure-cell" aria-hidden="true"></span>
 <div id="api-state">Нет связи с In one line</div>
@@ -198,6 +228,7 @@ body.preview #api-state.visible { display: block; }
   const apiState = document.getElementById("api-state");
   const background = document.getElementById("background");
   const backgroundVideo = document.getElementById("background-video");
+  const totalFooter = document.getElementById("total-footer");
 
   let lastRowsSignature = "";
   let lastPresentationSignature = "";
@@ -380,6 +411,7 @@ body.preview #api-state.visible { display: block; }
   function clearMediaBackground() {
     background.style.display = "none";
     background.style.backgroundImage = "";
+    background.style.backgroundColor = "transparent";
     if (!backgroundVideo.paused) backgroundVideo.pause();
     backgroundVideo.removeAttribute("src");
     backgroundVideo.load();
@@ -437,9 +469,14 @@ body.preview #api-state.visible { display: block; }
     measureCache.clear();
 
     const mode = String(p.background || "transparent");
-    document.body.style.backgroundColor =
-      mode === "color" ? String(p.background_color || "#000000") : "transparent";
+    // Never paint the body itself: the entire 16px source gutter must
+    // remain alpha=0 for both chosen color and image/video backgrounds.
+    document.body.style.backgroundColor = "transparent";
     clearMediaBackground();
+    if (mode === "color") {
+      background.style.backgroundColor = String(p.background_color || "#000000");
+      background.style.display = "block";
+    }
 
     const media = p.background_media || {};
     if (mode === "media" && media.available && media.url) {
@@ -476,6 +513,7 @@ body.preview #api-state.visible { display: block; }
     ObsVisibility.apply(payload?.visibility);
     renderRows(payload || {});
     applyPresentation((payload || {}).presentation || {});
+    renderFooter(payload);
     const nextAutoScroll = Boolean((payload || {}).auto_scroll);
     if (nextAutoScroll !== autoScroll) {
       autoScroll = nextAutoScroll;
@@ -483,6 +521,23 @@ body.preview #api-state.visible { display: block; }
       direction = scrollY >= maximum - 1 && maximum > 0 ? -1 : 1;
       lastFrame = performance.now();
     }
+    // Single observed browser state for native Chromium regression checks.
+    // Avoid treating an HTTP resource-start event as a completed API poll.
+    document.documentElement.dataset.auctionLotsAutoScroll =
+      autoScroll ? "true" : "false";
+  }
+
+  function renderFooter(payload) {
+    const visible = Boolean((payload || {}).show_total_footer);
+    // Value comes from the same A6 total backend as the always-visible
+    // desktop label; never sum the currently visible/filtered list rows.
+    const value = Math.max(0, Number((payload || {}).total_sm_points) || 0);
+    const formatted = String(Math.floor(value)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    const text = "Всего баллов в аукционе: " + formatted;
+    if (totalFooter.textContent !== text) totalFooter.textContent = text;
+    totalFooter.style.display = visible ? "block" : "none";
+    // Footer is outside #viewport, so all scrolling geometry excludes it.
+    clampScroll();
   }
 
   function scrollFrame(now) {
