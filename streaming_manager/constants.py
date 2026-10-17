@@ -114,6 +114,13 @@ WHEEL_SOUNDTRACK_VOLUME_DEFAULT = 100
 WHEEL_SOUNDTRACK_MUTE_KEY = "wheel_soundtrack_mute"
 WHEEL_SOUNDTRACK_MUTE_DEFAULT = False
 
+# UI-079 — shared OBS/local wheel glow, presentation only.
+# Default OFF preserves the accepted wheel outline until explicitly enabled.
+WHEEL_GLOW_ENABLED_KEY = "wheel_glow_enabled"
+WHEEL_GLOW_ENABLED_DEFAULT = False
+WHEEL_GLOW_COLOR_KEY = "wheel_glow_color"
+WHEEL_GLOW_COLOR_DEFAULT = "#FFFFFF"
+
 # D19 — one application-owned center image shared by the local and OBS wheel.
 # Empty value preserves the historical standard center.
 WHEEL_CENTER_IMAGE_MEDIA_ID_KEY = "wheel_center_image_media_id"
