@@ -520,16 +520,14 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "document.querySelector('#lots-rows').style.transform !== 'translateY(0px)'",
                                 True, "P14-C OBS-only autoscroll starts", timeout=25)
-                        polls_lots = (
-                            "performance.getEntriesByType('resource')"
-                            ".filter(e => e.name.includes('/api/auction-lots')).length"
-                        )
-                        count_before_disable = js(normal, polls_lots)
                         runtime["auto_scroll"] = False
-                        # The browser polls every 200 ms: wait for at least two
-                        # new responses before judging that animation stopped.
-                        wait_js(normal, f"({polls_lots}) >= {count_before_disable + 3}",
-                                True, "P14-C OBS consumed disable toggle")
+                        # A resource-timing entry is recorded when a fetch
+                        # starts, which can predate the actual response and
+                        # applyPayload. Wait for the browser's consumed state
+                        # instead of assuming three fetch-starts imply OFF.
+                        wait_js(normal,
+                                "document.documentElement.dataset.auctionLotsAutoScroll",
+                                "false", "P14-D OBS consumed disable state")
                         stopped_at = js(normal,
                                         "document.querySelector('#lots-rows').style.transform")
                         QTest.qWait(300)
