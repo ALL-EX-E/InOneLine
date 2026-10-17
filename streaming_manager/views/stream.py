@@ -35,6 +35,28 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT,
     AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
     AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+    AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_PANEL_COLOR_KEY,
+    AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT,
+    AUCTION_LOTS_CARD_PANEL_OPACITY_KEY,
+    AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_FRAME_COLOR_KEY,
+    AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_ROW_COLOR_KEY,
+    AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT,
+    AUCTION_LOTS_CARD_ROW_OPACITY_KEY,
+    AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY,
+    AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_HEADER_COLOR_KEY,
+    AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT,
+    AUCTION_LOTS_CARD_HEADER_OPACITY_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_DEFAULT,
+    AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_SIZE_DEFAULT,
+    AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT,
+    AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT,
     AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT,
@@ -974,6 +996,76 @@ class StreamTab(QWidget):
         media_layout.addWidget(self.auction_lots_choose_background_btn)
         self.auction_lots_background_media_row = media_row
         auction_lots_form.addRow("Свой фон:", self.auction_lots_background_media_row)
+
+        # P14-B UI-047: settings of one original rounded OBS card renderer.
+        # Reuse the existing Save and shared color picker; no second renderer.
+        self.auction_lots_card_colors = {}
+        self.auction_lots_card_opacities = {}
+        def lots_color(label, key, default):
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            button = QPushButton()
+            self._set_color_button(button, default)
+            button.clicked.connect(
+                lambda checked=False, btn=button, text=label:
+                    self._choose_auction_lots_card_color(btn, text)
+            )
+            pipette = make_screen_color_picker_button()
+            pipette.clicked.connect(
+                lambda checked=False, btn=button: self._pick_color_from_screen(btn)
+            )
+            row_layout.addWidget(button)
+            row_layout.addWidget(pipette)
+            row_layout.addStretch()
+            self.auction_lots_card_colors[key] = button
+            auction_lots_form.addRow(label + ":", row)
+
+        def lots_opacity(label, key, default):
+            spin = ScrollSafeSpinBox()
+            spin.setRange(0, 100)
+            spin.setSuffix(" %")
+            spin.setValue(default)
+            self.auction_lots_card_opacities[key] = spin
+            auction_lots_form.addRow(label + ":", make_wide_step_control(
+                spin,
+                up_tooltip="Увеличить непрозрачность",
+                down_tooltip="Уменьшить непрозрачность",
+            ))
+
+        card_title = QLabel("Оформление контейнера списка")
+        card_title.setStyleSheet("font-weight: 650;")
+        auction_lots_form.addRow(card_title)
+        lots_color("Цвет контейнера", "panel", AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT)
+        lots_opacity("Непрозрачность контейнера", "panel", AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT)
+        lots_color("Цвет светящегося контура", "frame", AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT)
+
+        row_title = QLabel("Оформление плашек")
+        row_title.setStyleSheet("font-weight: 650;")
+        auction_lots_form.addRow(row_title)
+        lots_color("Цвет плашек", "row", AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT)
+        lots_opacity("Непрозрачность плашек", "row", AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT)
+        lots_color("Контур плашек", "row_frame", AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT)
+        lots_color("Цвет плашек заголовков", "header", AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT)
+        lots_opacity("Непрозрачность заголовков", "header", AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT)
+
+        header_title = QLabel("Шрифт заголовков столбцов")
+        header_title.setStyleSheet("font-weight: 650;")
+        auction_lots_form.addRow(header_title)
+        self.auction_lots_header_font = ScrollSafeFontComboBox()
+        self.auction_lots_header_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        auction_lots_form.addRow("Шрифт заголовков:", self.auction_lots_header_font)
+        self.auction_lots_header_font_size = ScrollSafeSpinBox()
+        self.auction_lots_header_font_size.setRange(8, 160)
+        self.auction_lots_header_font_size.setSuffix(" px")
+        auction_lots_form.addRow("Размер заголовков:", make_wide_step_control(
+            self.auction_lots_header_font_size,
+            up_tooltip="Увеличить размер заголовков",
+            down_tooltip="Уменьшить размер заголовков",
+        ))
+        lots_color("Цвет шрифта заголовков", "header_font",
+                   AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT)
         layout.addLayout(auction_lots_form)
 
         auction_lots_actions = QHBoxLayout()
@@ -1321,6 +1413,12 @@ class StreamTab(QWidget):
                 color.name().upper(),
             )
 
+    def _choose_auction_lots_card_color(self, button: QPushButton, title: str) -> None:
+        current = QColor(str(button.property("fontColor") or "#FFFFFF"))
+        selected = QColorDialog.getColor(current, self, title)
+        if selected.isValid():
+            self._set_color_button(button, selected.name())
+
     def _save_auction_lots_overlay_settings(self) -> None:
         if self.auction_lots_background_media_mode.isChecked():
             background = "media"
@@ -1351,6 +1449,37 @@ class StreamTab(QWidget):
                 or AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ),
             AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: media_id,
+            AUCTION_LOTS_CARD_PANEL_COLOR_KEY: str(
+                self.auction_lots_card_colors["panel"].property("fontColor")
+                or AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_FRAME_COLOR_KEY: str(
+                self.auction_lots_card_colors["frame"].property("fontColor")
+                or AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_ROW_COLOR_KEY: str(
+                self.auction_lots_card_colors["row"].property("fontColor")
+                or AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY: str(
+                self.auction_lots_card_colors["row_frame"].property("fontColor")
+                or AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_HEADER_COLOR_KEY: str(
+                self.auction_lots_card_colors["header"].property("fontColor")
+                or AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY: str(
+                self.auction_lots_card_colors["header_font"].property("fontColor")
+                or AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT
+            ),
+            AUCTION_LOTS_CARD_PANEL_OPACITY_KEY: str(self.auction_lots_card_opacities["panel"].value()),
+            AUCTION_LOTS_CARD_ROW_OPACITY_KEY: str(self.auction_lots_card_opacities["row"].value()),
+            AUCTION_LOTS_CARD_HEADER_OPACITY_KEY: str(self.auction_lots_card_opacities["header"].value()),
+            AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY:
+                self.auction_lots_header_font.currentFont().family(),
+            AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY:
+                str(self.auction_lots_header_font_size.value()),
         })
         QMessageBox.information(
             self,
@@ -2409,6 +2538,63 @@ class StreamTab(QWidget):
                 AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY: "",
             })
         self._update_auction_lots_background_enabled_state()
+        self._set_color_button(
+            self.auction_lots_card_colors["panel"],
+            setting(AUCTION_LOTS_CARD_PANEL_COLOR_KEY, AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT),
+        )
+        self._set_color_button(
+            self.auction_lots_card_colors["frame"],
+            setting(AUCTION_LOTS_CARD_FRAME_COLOR_KEY, AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT),
+        )
+        self._set_color_button(
+            self.auction_lots_card_colors["row"],
+            setting(AUCTION_LOTS_CARD_ROW_COLOR_KEY, AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT),
+        )
+        self._set_color_button(
+            self.auction_lots_card_colors["row_frame"],
+            setting(AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY, AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT),
+        )
+        self._set_color_button(
+            self.auction_lots_card_colors["header"],
+            setting(AUCTION_LOTS_CARD_HEADER_COLOR_KEY, AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT),
+        )
+        self._set_color_button(
+            self.auction_lots_card_colors["header_font"],
+            setting(AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY, AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT),
+        )
+        try:
+            value = int(setting(
+                AUCTION_LOTS_CARD_PANEL_OPACITY_KEY, str(AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT)
+            ))
+        except (ValueError, TypeError):
+            value = AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT
+        self.auction_lots_card_opacities["panel"].setValue(max(0, min(100, value)))
+        try:
+            value = int(setting(
+                AUCTION_LOTS_CARD_ROW_OPACITY_KEY, str(AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT)
+            ))
+        except (ValueError, TypeError):
+            value = AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT
+        self.auction_lots_card_opacities["row"].setValue(max(0, min(100, value)))
+        try:
+            value = int(setting(
+                AUCTION_LOTS_CARD_HEADER_OPACITY_KEY, str(AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT)
+            ))
+        except (ValueError, TypeError):
+            value = AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT
+        self.auction_lots_card_opacities["header"].setValue(max(0, min(100, value)))
+        self.auction_lots_header_font.setCurrentFont(QFont(
+            setting(AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY,
+                    AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_DEFAULT)
+        ))
+        try:
+            header_size = int(setting(
+                AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY,
+                str(AUCTION_LOTS_CARD_HEADER_FONT_SIZE_DEFAULT),
+            ))
+        except (TypeError, ValueError):
+            header_size = AUCTION_LOTS_CARD_HEADER_FONT_SIZE_DEFAULT
+        self.auction_lots_header_font_size.setValue(max(8, min(160, header_size)))
 
         # Rules appearance is template-owned and loaded by the Rules editor.
 
