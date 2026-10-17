@@ -969,10 +969,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.wheel_widget.centerClicked.connect(
             self._open_wheel_center_picker
         )
-        self.wheel_widget.setToolTip(
-            "Нажмите на центр колеса, чтобы быстро выбрать изображение или смайлик."
-        )
         wheel_panel_layout.addWidget(self.wheel_widget, 1)
+        self.wheel_center_hint = QLabel(
+            "Нажмите на центр колеса, чтобы изменить изображение"
+        )
+        self.wheel_center_hint.setProperty("muted", True)
+        self.wheel_center_hint.setWordWrap(True)
+        self.wheel_center_hint.setAlignment(Qt.AlignCenter)
+        wheel_panel_layout.addWidget(self.wheel_center_hint)
 
         self.wheel_panel.setMinimumWidth(300)
         self.wheel_panel.setMaximumWidth(700)
