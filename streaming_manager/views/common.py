@@ -67,6 +67,9 @@ QLabel[badge="true"] {
     background: #2b2f33; border: 1px solid #3d444a; border-radius: 5px;
     padding: 5px 9px;
 }
+QFrame[sectionCard="true"] {
+    background: #24272a; border: 1px solid #3d444a; border-radius: 5px;
+}
 QPushButton[statFilter="true"] {
     background: #2b2f33;
     color: #eeeeee;
