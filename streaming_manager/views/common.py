@@ -72,7 +72,9 @@ QFrame[sectionCard="true"] {
 }
 /* P13-D follow-up: text and existing inner soundtrack hosts must expose the
    card surface, not paint base QWidget strips over it. Scoped to this card. */
-QFrame[sectionCard="true"] QLabel {
+QFrame[sectionCard="true"] QLabel,
+QFrame[sectionCard="true"] QCheckBox {
+    /* Last dark band under the "Без звука" checkbox. Scoped to timer card. */
     background: transparent;
 }
 QWidget[cardContent="true"] {

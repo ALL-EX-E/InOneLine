@@ -444,6 +444,29 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .col-title')).whiteSpace",
                                 "normal", "Auction Lots title wraps to browser width")
+                        # P14-B:UI-047: changes saved to existing settings
+                        # must update the already opened Chromium source live,
+                        # including explicit zero-opacity (not fallback).
+                        db.set_settings_bulk({
+                            "auction_lots_card_panel_color": "#123456",
+                            "auction_lots_card_panel_opacity": "0",
+                            "auction_lots_card_row_color": "#336699",
+                            "auction_lots_card_row_opacity": "60",
+                            "auction_lots_card_header_font_color": "#FFCC33",
+                            "auction_lots_card_header_font_size": "31",
+                        })
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#root')).backgroundColor",
+                                "rgba(18, 52, 86, 0)", "Auction Lots zero-opacity panel")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#lots-rows .lot-cell')).backgroundColor",
+                                "rgba(51, 102, 153, 0.6)", "Auction Lots saved row tint/opacity")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#header-row .lot-header')).color",
+                                "rgb(255, 204, 51)", "Auction Lots header color")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#header-row .lot-header')).fontSize",
+                                "31px", "Auction Lots independent heading size")
                     if widget == "timer":
                         runtime["mode"] = "weighted_wheel"
                         wait_js(normal, "document.querySelector('#timer').getAttribute('aria-label')",

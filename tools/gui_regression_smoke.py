@@ -4168,6 +4168,31 @@ def main() -> int:
             "<table", "<tbody", "<thead", "border-collapse:", "buildColumnGroup("
         )):
             raise AssertionError("P14-A Auction Lots still contains legacy table grid")
+        # P14-B: controller stays on original StreamTab/OBS save path; both
+        # soundtrack checkboxes must inherit the card surface without bands.
+        if 'QFrame[sectionCard="true"] QCheckBox' not in APP_STYLE:
+            raise AssertionError("P14-B muted checkbox dark band is not scoped transparent")
+        lots = window.stream_tab
+        for key in ("panel", "frame", "row", "row_frame", "header", "header_font"):
+            if key not in lots.auction_lots_card_colors:
+                raise AssertionError(f"P14-B color control missing: {key}")
+            if not lots.auction_lots_card_colors[key].property("fontColor"):
+                raise AssertionError(f"P14-B default color control not initialized: {key}")
+        for key in ("panel", "row", "header"):
+            if key not in lots.auction_lots_card_opacities:
+                raise AssertionError(f"P14-B opacity control missing: {key}")
+            if not 0 <= lots.auction_lots_card_opacities[key].value() <= 100:
+                raise AssertionError(f"P14-B invalid opacity value: {key}")
+        if not lots.auction_lots_header_font.currentFont().family():
+            raise AssertionError("P14-B independent header font selector uninitialized")
+        for token in (
+            '--lot-header-font-size', '--lot-header-font-color',
+            'css.setProperty("--lot-panel-bg"',
+            'css.setProperty("--lot-cell-bg"',
+            'css.setProperty("--lot-header-bg"',
+        ):
+            if token not in lots_html:
+                raise AssertionError(f"P14-B dynamic OBS card appearance missing: {token}")
 
         # P13-A/UI-053: same authoritative /timer-overlay route; preview is
         # ?preview=1 on this existing widget, not a parallel OBS endpoint.

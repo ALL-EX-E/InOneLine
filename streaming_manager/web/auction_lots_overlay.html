@@ -16,6 +16,13 @@
   --lot-header-bg: rgba(36, 64, 84, .94);
   --lot-border: rgba(255, 255, 255, .8);
   --lot-glow: rgba(175, 219, 248, .45);
+  --lot-panel-border: rgba(255,255,255,.8);
+  --lot-row-border: rgba(255,255,255,.8);
+  --lot-panel-glow: rgba(255,255,255,.45);
+  --lot-row-glow: rgba(255,255,255,.45);
+  --lot-header-font-family: "Segoe UI", Arial, sans-serif;
+  --lot-header-font-size: 24px;
+  --lot-header-font-color: #FFFFFF;
   --lot-columns: minmax(0, 1fr);
 }
 * { box-sizing: border-box; }
@@ -59,8 +66,8 @@ body {
   overflow: hidden;
   padding: 10px 9px;
   background: var(--lot-panel-bg);
-  border: 1px solid var(--lot-border);
-  box-shadow: 0 0 6px var(--lot-glow), 0 0 14px var(--lot-glow),
+  border: 1px solid var(--lot-panel-border);
+  box-shadow: 0 0 6px var(--lot-panel-glow), 0 0 14px var(--lot-panel-glow),
     inset 0 0 8px rgba(255, 255, 255, .12);
   border-radius: 8px;
 }
@@ -96,16 +103,19 @@ body {
   min-width: 0;
   padding: .45em .58em;
   text-align: center;
-  border: 1px solid var(--lot-border);
+  border: 1px solid var(--lot-row-border);
   border-radius: 6px;
   background: var(--lot-cell-bg);
-  box-shadow: 0 0 5px var(--lot-glow), inset 0 0 4px rgba(255,255,255,.06);
+  box-shadow: 0 0 5px var(--lot-row-glow), inset 0 0 4px rgba(255,255,255,.06);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .lot-header {
   background: var(--lot-header-bg);
+  font-family: var(--lot-header-font-family);
+  font-size: var(--lot-header-font-size);
+  color: var(--lot-header-font-color);
   font-weight: 700;
 }
 .col-pos, .col-chance, .col-points {
@@ -226,8 +236,8 @@ body.preview #api-state.visible { display: block; }
 
   function measureText(text, className, bold) {
     const key = [
-      getComputedStyle(document.body).fontFamily,
-      getComputedStyle(document.body).fontSize,
+      bold ? getComputedStyle(document.documentElement).getPropertyValue("--lot-header-font-family") : getComputedStyle(document.body).fontFamily,
+      bold ? getComputedStyle(document.documentElement).getPropertyValue("--lot-header-font-size") : getComputedStyle(document.body).fontSize,
       className,
       bold ? "700" : "400",
       String(text ?? ""),
@@ -237,6 +247,12 @@ body.preview #api-state.visible { display: block; }
 
     measureCell.className = className;
     measureCell.style.fontWeight = bold ? "700" : "400";
+    measureCell.style.fontFamily = bold
+      ? getComputedStyle(document.documentElement).getPropertyValue("--lot-header-font-family").trim()
+      : "var(--font-family)";
+    measureCell.style.fontSize = bold
+      ? getComputedStyle(document.documentElement).getPropertyValue("--lot-header-font-size").trim()
+      : "var(--font-size)";
     measureCell.textContent = String(text ?? "");
     // Reserve cell padding, border and glow spacing for each auto column.
     const width = Math.ceil(measureCell.getBoundingClientRect().width)
@@ -386,6 +402,36 @@ body.preview #api-state.visible { display: block; }
       "--font-color",
       String(p.font_color || "#FFFFFF")
     );
+    // The original browser renderer reads the same saved settings; 0 percent
+    // remains a valid fully transparent surface. No alternative backend.
+    const opacity = (value, fallback) => {
+      const numeric = value === undefined || value === null || value === ""
+        ? fallback : Number(value);
+      return Math.max(0, Math.min(100, Number.isFinite(numeric) ? numeric : fallback)) / 100;
+    };
+    const toRgba = (value, alpha) => {
+      const matched = /^#([0-9a-f]{6})$/i.exec(String(value || ""));
+      if (!matched) return `rgba(255,255,255,${alpha})`;
+      const code = matched[1];
+      return `rgba(${parseInt(code.slice(0,2),16)},${parseInt(code.slice(2,4),16)},${parseInt(code.slice(4,6),16)},${alpha})`;
+    };
+    const css = document.documentElement.style;
+    const panelAlpha = opacity(p.card_panel_opacity, 74);
+    const rowAlpha = opacity(p.card_row_opacity, 76);
+    const headerAlpha = opacity(p.card_header_opacity, 94);
+    css.setProperty("--lot-panel-bg", toRgba(p.card_panel_color || "#0A0D10", panelAlpha));
+    css.setProperty("--lot-cell-bg", toRgba(p.card_row_color || "#182834", rowAlpha));
+    css.setProperty("--lot-header-bg", toRgba(p.card_header_color || "#244054", headerAlpha));
+    css.setProperty("--lot-panel-border", String(p.card_frame_color || "#FFFFFF"));
+    css.setProperty("--lot-row-border", String(p.card_row_frame_color || "#FFFFFF"));
+    css.setProperty("--lot-panel-glow", toRgba(p.card_frame_color || "#FFFFFF", .45));
+    css.setProperty("--lot-row-glow", toRgba(p.card_row_frame_color || "#FFFFFF", .45));
+    css.setProperty("--lot-header-font-family",
+      JSON.stringify(String(p.card_header_font_family || "Segoe UI")));
+    css.setProperty("--lot-header-font-size",
+      Math.max(8, Math.min(160, Number(p.card_header_font_size) || 24)) + "px");
+    css.setProperty("--lot-header-font-color",
+      String(p.card_header_font_color || "#FFFFFF"));
     measureCache.clear();
 
     const mode = String(p.background || "transparent");
