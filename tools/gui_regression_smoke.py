@@ -1836,7 +1836,11 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
     games_tab.apply_stat_filter("all")
 
     # P13-B FIX1 wide/narrow placement uses the same one wheel/timer.
+    # Return the fixture to its original prestart mode so later P12 tests
+    # still exercise the expected max-amount/table visibility contract.
     auction = window.auction_tab
+    original_main_page = window._current_main_page()
+    original_winner_mode = auction.mode_combo.currentIndex()
     window._set_current_main_page(auction)
     wheel_index = auction.mode_combo.findData("weighted_wheel")
     auction.mode_combo.setCurrentIndex(wheel_index)
@@ -1867,6 +1871,10 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
     ):
         if control.layout().direction() != QBoxLayout.LeftToRight:
             raise AssertionError("P13-B FIX1 compact volume steppers became vertical")
+    auction.mode_combo.setCurrentIndex(original_winner_mode)
+    if original_main_page is not None:
+        window._set_current_main_page(original_main_page)
+    app.processEvents()
 
 
 def main() -> int:
@@ -4354,15 +4362,7 @@ def main() -> int:
             or auction.conduct_table.item(0, 0).text() != "3"
             or not auction.conduct_table.isColumnHidden(2)
         ):
-            raise AssertionError(
-                "P12 single-table current position/chance policy changed: "
-                f"mode={auction.mode_combo.currentData()!r} "
-                f"chance_checked={auction._wheel_chance_visible!r} "
-                f"columns={auction.conduct_table.columnCount()} "
-                f"headers={[auction.conduct_table.horizontalHeaderItem(c).text() for c in range(auction.conduct_table.columnCount())]!r} "
-                f"position={auction.conduct_table.item(0, 0).text() if auction.conduct_table.item(0, 0) else None!r} "
-                f"chance_hidden={auction.conduct_table.isColumnHidden(2)!r}"
-            )
+            raise AssertionError("P12 single-table current position/chance policy changed")
         if auction._conduct_compact_columns != (0, 2, 3):
             raise AssertionError("P12 single-position compact columns are wrong")
 
