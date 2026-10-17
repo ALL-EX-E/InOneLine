@@ -47,6 +47,8 @@ from ..audio import AudioCoordinator
 from ..constants import (
     AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT,
     AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
+    AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY,
+    AUCTION_LOTS_SHOW_TOTAL_FOOTER_DEFAULT,
     AUCTION_MANUAL_BID_POINTS_MAX,
     AUCTION_MANUAL_BID_POINTS_MIN,
     AUCTION_MIN_DURATION_MS,
@@ -242,6 +244,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             str(self.db.get_setting(
                 AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
                 "1" if AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT else "0",
+            )).strip().casefold() in {"1", "true", "yes", "on"}
+        )
+        self._auction_lots_show_total_footer = (
+            str(self.db.get_setting(
+                AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY,
+                "1" if AUCTION_LOTS_SHOW_TOTAL_FOOTER_DEFAULT else "0",
             )).strip().casefold() in {"1", "true", "yes", "on"}
         )
         self._init_wheel_audio()
@@ -799,6 +807,19 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             "font-size: 10.5pt; font-weight: 600;"
         )
         conduct_heading_row.addWidget(self.auction_total_label)
+        # UI-075: local auction total stays permanently visible.
+        self.auction_overlay_total_checkbox = QCheckBox("Показать сумму в оверлее")
+        self.auction_overlay_total_checkbox.setChecked(
+            self._auction_lots_show_total_footer
+        )
+        self.auction_overlay_total_checkbox.setToolTip(
+            "Показывать общую сумму в закреплённой нижней плашке "
+            "OBS-списка лотов. Настройка сохраняется после перезапуска."
+        )
+        self.auction_overlay_total_checkbox.toggled.connect(
+            self._set_auction_overlay_total_visible
+        )
+        conduct_heading_row.addWidget(self.auction_overlay_total_checkbox)
 
         conduct_layout.addLayout(conduct_heading_row)
 
@@ -1989,6 +2010,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._prestart_wheel_format = wheel_format
         self.db.set_setting(AUCTION_WHEEL_FORMAT_KEY, wheel_format)
         self.refresh()
+
+    def _set_auction_overlay_total_visible(self, enabled: bool) -> None:
+        self._auction_lots_show_total_footer = bool(enabled)
+        self.db.set_setting(
+            AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY, "1" if enabled else "0"
+        )
 
     def auction_lots_overlay_state(self) -> dict[str, object]:
         """Expose existing Auction-owned transient state without duplicating it."""
