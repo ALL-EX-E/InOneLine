@@ -70,6 +70,14 @@ QLabel[badge="true"] {
 QFrame[sectionCard="true"] {
     background: #24272a; border: 1px solid #3d444a; border-radius: 5px;
 }
+/* P13-D follow-up: text and existing inner soundtrack hosts must expose the
+   card surface, not paint base QWidget strips over it. Scoped to this card. */
+QFrame[sectionCard="true"] QLabel {
+    background: transparent;
+}
+QWidget[cardContent="true"] {
+    background: transparent;
+}
 QPushButton[statFilter="true"] {
     background: #2b2f33;
     color: #eeeeee;
