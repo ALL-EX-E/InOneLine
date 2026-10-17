@@ -255,8 +255,15 @@ def reflow_narrow_rows(
             )
             if parent_width <= 0:
                 parent_width = available_width
+            # Atomic spin+step-button controls must never be broken into
+            # vertical pieces: their fixed minimum fits the narrow workspace.
+            keep_horizontal = bool(
+                parent is not None
+                and parent.property("responsiveKeepHorizontal")
+            )
             needs_stack = bool(
                 compact
+                and not keep_horizontal
                 and parent_width > 0
                 and preferred_width(layout) > max(0, parent_width - 2)
             )
@@ -729,6 +736,15 @@ def make_wide_step_control(
     layout.addWidget(spin)
     layout.addWidget(up_btn)
     layout.addWidget(down_btn)
+    # This three-part widget is one inseparable horizontal input. A global
+    # reflow may run before Qt assigns its final geometry, so the minimum width
+    # alone is not enough to prevent an accidental vertical ▲ / ▼ stack.
+    wrapper.setProperty("responsiveKeepHorizontal", True)
+    wrapper.setMinimumWidth(
+        max(spin.minimumWidth(), spin.sizeHint().width())
+        + 2 * button_size
+        + 2 * layout.spacing()
+    )
     return wrapper
 
 def _selected_id(table: QTableWidget) -> int | None:
