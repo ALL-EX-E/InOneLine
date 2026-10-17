@@ -762,32 +762,8 @@ def browser_smoke() -> None:
                         assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
                         # A missing custom center falls back to the packaged icon,
                         # while a successful custom image takes priority in OBS.
-                        try:
-                            wait_js(preview, "defaultCenterImageEl.complete && defaultCenterImageEl.naturalWidth > 0",
-                                    True, "P15-E wheel bundled icon loads")
-                        except AssertionError as exc:
-                            image_diagnostics = js(preview, """(()=> JSON.stringify({
-                              src:defaultCenterImageEl.src,
-                              complete:defaultCenterImageEl.complete,
-                              width:defaultCenterImageEl.naturalWidth,
-                              height:defaultCenterImageEl.naturalHeight,
-                              ready:document.readyState,
-                              href:location.href,
-                              resources:performance.getEntriesByType("resource")
-                                .filter(e=>e.name.includes("wheel-default-icon"))
-                                .map(e=>({name:e.name,decoded:e.decodedBodySize,
-                                          encoded:e.encodedBodySize,duration:e.duration}))
-                            }))()""")
-                            with urlopen(server.base_url + "/wheel-default-icon", timeout=5) as res:
-                                raw_png = res.read()
-                                http_diag = (
-                                    f"status={res.status}, mime={res.headers.get_content_type()}, "
-                                    f"size={len(raw_png)}, prefix={raw_png[:8].hex()}"
-                                )
-                            raise AssertionError(
-                                f"P15-F wheel icon browser failed: {image_diagnostics}; "
-                                f"HTTP same server: {http_diag}"
-                            ) from exc
+                        wait_js(preview, "defaultCenterImageEl.complete && defaultCenterImageEl.naturalWidth > 0",
+                                True, "P15-E wheel bundled icon loads")
                         assert js(preview, """(()=> {
                           syncCenterImage({center_image:{enabled:false}});
                           positionCenterImage(200,200,100);
