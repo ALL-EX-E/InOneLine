@@ -167,6 +167,10 @@ class LocalApiServer:
         wheel_overlay_html = _inject_overlay_version_handshake(
             wheel_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
+        # Compute the built-in fallback icon once BEFORE HTTP worker threads
+        # and OBS Chromium begin requesting resources. It is a high-resolution
+        # QImage and its color normalization must never block an image GET.
+        wheel_default_icon_bytes = default_wheel_icon_png()
         rules_overlay_html = _inject_overlay_version_handshake(
             rules_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
@@ -446,7 +450,7 @@ class LocalApiServer:
                 if path == "/wheel-default-icon":
                     # Fixed, cached presentation-only PNG. The original bundled
                     # square icon is untouched and never user-controlled.
-                    content = default_wheel_icon_png()
+                    content = wheel_default_icon_bytes
                     if not content:
                         self._send_json({"error": "wheel_default_icon_not_found"}, 404)
                         return
