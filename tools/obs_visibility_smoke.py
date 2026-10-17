@@ -234,6 +234,14 @@ def ui_smoke() -> None:
     wheel_probe.mousePressEvent(hit_probe)
     assert clicked == [True] and hit_probe.accepted, "P15-A center hitbox did not double"
     assert wheel_probe.CENTER_RADIUS_RATIO == 0.24
+    # UI-079: already-bundled app logo is the local fallback if no custom asset.
+    assert wheel_probe._default_center_icon_path.is_file()
+    assert not wheel_probe._default_center_pixmap.isNull()
+    wheel_probe.set_center_image_path(str(wheel_probe._default_center_icon_path))
+    assert wheel_probe._center_image_pixmap is not None
+    wheel_probe.set_center_image_path(None)
+    assert wheel_probe._center_image_pixmap is None
+    assert not wheel_probe._default_center_pixmap.isNull()
     assert wheel_probe.sector_color({"game_id": 10}, 0) == wheel_probe.sector_color(
         {"game_id": 10}, 7
     ), "P15-B game changed sector color after reordering"
@@ -262,6 +270,12 @@ def ui_smoke() -> None:
             window._set_current_main_page(window.stream_tab)
             app.processEvents()
             QTest.qWait(600)  # Let scheduled startup work start before fixture teardown.
+            # Fixed read-only endpoint, available in source and frozen bundles.
+            with urlopen(window.api.base_url + "/wheel-default-icon", timeout=5) as res:
+                assert res.status == 200
+                assert res.headers.get_content_type() == "image/png"
+                assert int(res.headers.get("Content-Length", "0")) > 100
+                assert res.read(4) == bytes([137, 80, 78, 71])
             stream = window.stream_tab
             assert hasattr(stream, "obs_show_modes"), "Missing common OBS mode controls"
             assert set(stream.obs_show_modes) == set(WIDGETS) - {"overlay"}
@@ -693,6 +707,34 @@ def browser_smoke() -> None:
                             "(positionCenterImage(200,200,100), parseFloat(centerImageEl.style.width))",
                         )
                         assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
+                        # A missing custom center falls back to the packaged icon,
+                        # while a successful custom image takes priority in OBS.
+                        wait_js(preview, "defaultCenterImageEl.complete && defaultCenterImageEl.naturalWidth > 0",
+                                True, "P15-E wheel bundled icon loads")
+                        assert js(preview, """(()=> {
+                          syncCenterImage({center_image:{enabled:false}});
+                          positionCenterImage(200,200,100);
+                          return defaultCenterImageEl.style.display==="block"
+                            && defaultCenterImageEl.style.width===centerImageEl.style.width;
+                        })()"""), "P15-E fallback icon not centered"
+                        # Test async image-success behavior synchronously,
+                        # so background API polls cannot restore the prestart
+                        # empty selection before the simulated custom load.
+                        # Actual image bytes and content type were checked via
+                        # the real read-only HTTP endpoint in ui_smoke.
+                        assert js(preview, """(()=> {
+                          syncCenterImage({center_image:{enabled:true,
+                            url:"/wheel-default-icon",asset_id:"default"}});
+                          const correctUrl=centerImageEl.src.includes("/wheel-default-icon");
+                          const hasOnload=typeof centerImageEl.onload==="function";
+                          if(hasOnload)centerImageEl.onload();
+                          const overridden=centerImageEl.style.display==="block"
+                            && defaultCenterImageEl.style.display==="none";
+                          syncCenterImage({center_image:{enabled:false}});
+                          const restored=defaultCenterImageEl.style.display==="block"
+                            && centerImageEl.style.display==="none";
+                          return correctUrl&&hasOnload&&overridden&&restored;
+                        })()"""), "P15-E custom-overrides-default and reset restore failed"
                         stream.wheel_glow_enabled.setChecked(True)
                         stream._set_color_button(stream.wheel_glow_color_btn, "#34A1F2")
                         with patch.object(QMessageBox, "information"):
@@ -727,11 +769,15 @@ def browser_smoke() -> None:
                               {game_id:2,title:"Second",weight:3}],
                               appearance:{pointer_label_enabled:true},
                               animation:{spin_id:"P15D-TITLE",started_at:"2026-10-17T00:00:00Z",
-                                duration_ms:8000,target_rotation:720,complete:false}};
+                                duration_ms:8000,target_rotation:0,complete:false}};
                             spinClock={id:"P15D-TITLE",startMono:performance.now()-150};
                             draw();
+                            // Static-angle synthetic spin validates caption copy
+                            // independently from phase-boundary timing. Weighted
+                            // angular hit tests are asserted separately above.
                             return pointerLotEl.classList.contains("visible")
-                              && pointerLotEl.textContent.includes("Под стрелкой:");
+                              && pointerLotEl.textContent==="First"
+                              && !pointerLotEl.textContent.includes("Под стрелкой:");
                           } finally {state=old;spinClock=oldClock;draw()}
                         })()"""), "P15-D pointer caption not visible during active spin"
 

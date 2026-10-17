@@ -442,6 +442,16 @@ class LocalApiServer:
             def do_GET(self):
                 parsed = urlparse(self.path)
                 path = parsed.path.rstrip("/") or "/"
+                if path == "/wheel-default-icon":
+                    # Fixed bundled asset; no file path or user input is used.
+                    self._send_local_media_path(
+                        Path(__file__).resolve().parent.parent
+                        / "assets" / "InOneLine_icon_master.png",
+                        allowed_extensions=frozenset({".png"}),
+                        not_found_error="wheel_default_icon_not_found",
+                        unsupported_error="wheel_default_icon_unsupported",
+                    )
+                    return
                 if path == "/obs-visibility.js":
                     self._send_text(
                         obs_visibility_js,
