@@ -664,6 +664,27 @@ def browser_smoke() -> None:
                           return stayed;
                         })()""")
                         assert monotonic_ok, "P15-B OBS clock reanchors on each poll"
+                        axis_ok = js(preview, """(()=> {
+                          const priorState=state,priorClock=spinClock;
+                          try {
+                            if(!priorState?.sectors?.length)return false;
+                            const simulated={...priorState,animation:{
+                              spin_id:"P15-B-AXIS",started_at:"2026-10-17T00:00:00.000Z",
+                              duration_ms:8000,target_rotation:1440
+                            },server_time:"2026-10-17T00:00:01.000Z"};
+                            state=simulated;
+                            syncSpinClock(simulated);
+                            draw();
+                            const first=[centerImageEl.style.left,centerImageEl.style.top,
+                              centerImageEl.style.width,centerImageEl.style.height];
+                            spinClock.startMono-=4000;
+                            draw();
+                            const second=[centerImageEl.style.left,centerImageEl.style.top,
+                              centerImageEl.style.width,centerImageEl.style.height];
+                            return JSON.stringify(first)===JSON.stringify(second);
+                          } finally {state=priorState;spinClock=priorClock;draw()}
+                        })()""")
+                        assert axis_ok, "P15-B center image moved during wheel spin"
                         save(widget, "context")
                         wait_js(normal, visible, "false", "Wheel Max prestart")
                         runtime["mode"] = "weighted_wheel"
