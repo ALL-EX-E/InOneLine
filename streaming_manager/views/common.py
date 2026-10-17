@@ -77,7 +77,9 @@ QFrame[sectionCard="true"] QCheckBox {
     /* Last dark band under the "Без звука" checkbox. Scoped to timer card. */
     background: transparent;
 }
-QWidget[cardContent="true"] {
+QWidget[cardContent="true"],
+QFrame[sectionCard="true"] QWidget[responsiveKeepHorizontal="true"] {
+    /* Original spinbox/arrow wrapper must not paint a dark volume stripe. */
     background: transparent;
 }
 QPushButton[statFilter="true"] {
