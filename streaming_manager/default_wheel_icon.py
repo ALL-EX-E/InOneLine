@@ -24,43 +24,54 @@ def _is_panel_green(color: QColor) -> bool:
 
 
 def fill_default_icon_corners(source: QImage) -> QImage:
-    """Keep native dimensions, protect all inner black logo strokes."""
+    """Recolor only exterior padding; avoid per-pixel Qt/Python QColor calls.
+
+    RGBA8888 permits two short byte-level edge scans per row. This is
+    considerably faster for the bundled high-resolution icon than repeated
+    QImage.pixelColor/setPixelColor and leaves the interior logo untouched.
+    """
     if source.isNull():
         return QImage()
-    result = source.convertToFormat(QImage.Format.Format_ARGB32)
+    result = source.convertToFormat(QImage.Format.Format_RGBA8888)
     width, height = result.width(), result.height()
+    stride = result.bytesPerLine()
+    pixels = result.bits()
 
-    # Sample the existing vivid green rather than adding a configurable color.
-    # A central band avoids the dark border and the arrow-shaft drawing.
+    def green(row: memoryview, x: int) -> bool:
+        p = x * 4
+        r, g, b, a = row[p], row[p + 1], row[p + 2], row[p + 3]
+        return g >= 110 and g * 20 > r * 33 and g * 20 > b * 33 and a >= 200
+
     swatches: list[tuple[int, int, int]] = []
     for y in range(height // 5, (height * 4) // 5, max(1, height // 40)):
+        row = pixels[y * stride: y * stride + width * 4]
         for x in range(width // 5, (width * 4) // 5, max(1, width // 40)):
-            color = result.pixelColor(x, y)
-            if _is_panel_green(color):
-                swatches.append((color.red(), color.green(), color.blue()))
+            if green(row, x):
+                p = x * 4
+                swatches.append((row[p], row[p + 1], row[p + 2]))
     if not swatches:
         return result
-    swatches.sort()
-    # Median by each channel resists edge anti-aliasing.
-    fill = QColor(
-        sorted(c[0] for c in swatches)[len(swatches) // 2],
-        sorted(c[1] for c in swatches)[len(swatches) // 2],
-        sorted(c[2] for c in swatches)[len(swatches) // 2],
-    )
 
-    # One scan per row. The dark arrows are INSIDE the green panel and are
-    # never visited. If no green is present, the entire row is outer padding.
+    middle = len(swatches) // 2
+    fill_pixel = bytes((
+        sorted(c[0] for c in swatches)[middle],
+        sorted(c[1] for c in swatches)[middle],
+        sorted(c[2] for c in swatches)[middle],
+        255,
+    ))
     for y in range(height):
-        left = width
-        right = -1
-        for x in range(width):
-            if _is_panel_green(result.pixelColor(x, y)):
-                left = min(left, x)
-                right = x
-        for x in range(left):
-            result.setPixelColor(x, y, fill)
-        for x in range(right + 1, width):
-            result.setPixelColor(x, y, fill)
+        row = pixels[y * stride: y * stride + width * 4]
+        left = 0
+        while left < width and not green(row, left):
+            left += 1
+        right = width - 1
+        while right >= left and not green(row, right):
+            right -= 1
+        # Only exterior bands, never the dark logo inside the green panel.
+        if left:
+            row[:left * 4] = fill_pixel * left
+        if right + 1 < width:
+            row[(right + 1) * 4:] = fill_pixel * (width - right - 1)
     return result
 
 
