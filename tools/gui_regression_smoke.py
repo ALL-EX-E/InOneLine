@@ -4203,6 +4203,40 @@ def main() -> int:
             auction_page._set_lot_overlay_auto_scroll(previous_scroll)
         if auction_page.db.get_setting("auction_lots_obs_auto_scroll", "") != ("1" if previous_scroll else "0"):
             raise AssertionError("P14-C scroll fixture was not restored")
+        # P14-D/UI-075: only the new OBS footer toggles. The operator total
+        # remains permanently visible and the setting survives DB reads.
+        if auction_page.auction_overlay_total_checkbox.text() != "Показать сумму в оверлее":
+            raise AssertionError("P14-D optional OBS total footer toggle missing")
+        if not auction_page.auction_total_label.isVisible():
+            raise AssertionError("P14-D unexpectedly hid the local total label")
+        prior_footer = auction_page.auction_overlay_total_checkbox.isChecked()
+        try:
+            auction_page.auction_overlay_total_checkbox.setChecked(not prior_footer)
+            if auction_page.db.get_setting("auction_lots_show_total_footer", "") != (
+                "0" if prior_footer else "1"
+            ):
+                raise AssertionError("P14-D footer option did not persist to settings")
+            payload = auction_page.db.current_auction_lots_payload(
+                auction_page.auction_lots_overlay_state()
+            )
+            if payload["show_total_footer"] != (not prior_footer):
+                raise AssertionError("P14-D OBS payload did not reflect toggle")
+            if auction_page.auction_total_label.isHidden():
+                raise AssertionError("P14-D hid the desktop total when toggling OBS footer")
+        finally:
+            auction_page.auction_overlay_total_checkbox.setChecked(prior_footer)
+        if auction_page.db.get_setting("auction_lots_show_total_footer", "") != (
+            "1" if prior_footer else "0"
+        ):
+            raise AssertionError("P14-D footer setting not restored after QA")
+        for snippet in (
+            'id="total-footer"',
+            '"Всего баллов в аукционе: "',
+            'background.parentElement === root',
+            'document.body.style.backgroundColor = "transparent"',
+        ):
+            if snippet not in lots_html:
+                raise AssertionError(f"P14-D rounded transparent card/total contract: {snippet}")
         lots = window.stream_tab
         for key in ("panel", "frame", "row", "row_frame", "header", "header_font"):
             if key not in lots.auction_lots_card_colors:
