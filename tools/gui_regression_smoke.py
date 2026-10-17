@@ -4172,6 +4172,37 @@ def main() -> int:
         # soundtrack checkboxes must inherit the card surface without bands.
         if 'QFrame[sectionCard="true"] QCheckBox' not in APP_STYLE:
             raise AssertionError("P14-B muted checkbox dark band is not scoped transparent")
+        # P14-C UI-074: the sole Auction Lots scroll flag belongs to OBS,
+        # is saved in existing settings, and never starts a local QTimer.
+        if hasattr(auction_page, "conduct_scroll_timer"):
+            raise AssertionError("P14-C left obsolete desktop Auction auto-scroll timer")
+        if "responsiveKeepHorizontal" not in APP_STYLE:
+            raise AssertionError("P14-C timer volume wrapper still paints dark stripe")
+        if not auction_page.conduct_scroll_btn.text().startswith("Автопрокрутка оверлея:"):
+            raise AssertionError("P14-C OBS-only scroll button has stale label")
+        previous_scroll = bool(auction_page._obs_lot_auto_scroll_enabled)
+        previous_local_position = auction_page.conduct_table.verticalScrollBar().value()
+        try:
+            auction_page.conduct_scroll_btn.click()
+            target_scroll = not previous_scroll
+            if bool(auction_page._obs_lot_auto_scroll_enabled) != target_scroll:
+                raise AssertionError("P14-C OBS-only scroll button did not toggle")
+            if auction_page.auction_lots_overlay_state()["auto_scroll"] != target_scroll:
+                raise AssertionError("P14-C OBS API is not sourced from persisted toggle")
+            saved_value = auction_page.db.get_setting("auction_lots_obs_auto_scroll", "")
+            if saved_value != ("1" if target_scroll else "0"):
+                raise AssertionError("P14-C autoscroll was not saved in shared settings")
+            # Focus/selection and search must never turn the OBS flag off.
+            auction_page.conduct_table.setFocus()
+            app.processEvents()
+            if bool(auction_page._obs_lot_auto_scroll_enabled) != target_scroll:
+                raise AssertionError("P14-C focus changed OBS-autoscroll")
+            if auction_page.conduct_table.verticalScrollBar().value() != previous_local_position:
+                raise AssertionError("P14-C toggling OBS-scroll moved the local table")
+        finally:
+            auction_page._set_lot_overlay_auto_scroll(previous_scroll)
+        if auction_page.db.get_setting("auction_lots_obs_auto_scroll", "") != ("1" if previous_scroll else "0"):
+            raise AssertionError("P14-C scroll fixture was not restored")
         lots = window.stream_tab
         for key in ("panel", "frame", "row", "row_frame", "header", "header_font"):
             if key not in lots.auction_lots_card_colors:
