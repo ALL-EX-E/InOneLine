@@ -120,7 +120,16 @@ function drawSectorTitle(title,deg,r){
    lines=wrapAllLines(title,textWidth);
  }
  const total=(lines.length-1)*lineHeight;
- lines.forEach((line,i)=>ctx.fillText(line,0,i*lineHeight-total/2,textWidth));
+ // UI-079: readable light lettering with dark outline on all sector colors.
+ ctx.lineJoin="round";
+ ctx.strokeStyle="#0B0D10";
+ ctx.lineWidth=Math.max(2,Math.min(3.5,size*.25));
+ ctx.fillStyle="#FFFFFF";
+ lines.forEach((line,i)=>{
+   const y=i*lineHeight-total/2;
+   ctx.strokeText(line,0,y,textWidth);
+   ctx.fillText(line,0,y,textWidth);
+ });
 }
 function sampleState(){
  return {visible:true,ready:true,sectors:[
