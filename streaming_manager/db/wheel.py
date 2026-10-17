@@ -1176,12 +1176,9 @@ class WheelMixin:
             WHERE auction_only=0
               AND archived=0
               AND status IN (?, ?)
-            ORDER BY
-                sm_points DESC,
-                CASE WHEN release_date IS NULL THEN 1 ELSE 0 END ASC,
-                release_date DESC,
-                updated_at DESC,
-                id ASC
+            -- Match the immutable active-session/draw-info sector order.
+            -- Otherwise creating a wheel session visually reorders the wheel.
+            ORDER BY id ASC
             """,
             (STATUS_PLAYED, STATUS_NOT_PLAYED),
         ).fetchall()
