@@ -16,6 +16,7 @@ from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.wheel import AuctionWheelWidget
+from streaming_manager.views.common import APP_STYLE
 
 
 class CenterHoverTests(unittest.TestCase):
@@ -27,7 +28,13 @@ class CenterHoverTests(unittest.TestCase):
         self.wheel = AuctionWheelWidget()
         self.wheel.resize(420, 420)
         self.wheel.show()
-        QTest.qWait(70)
+        self.wheel.raise_()
+        self.wheel.activateWindow()
+        self.assertTrue(QTest.qWaitForWindowActive(self.wheel, 2000))
+        # Always enter from outside the hub: native mouseMove at the current
+        # screen position may not generate an event after a previous Qt test.
+        QTest.mouseMove(self.wheel, QPoint(12, 12))
+        QTest.qWait(40)
 
     def tearDown(self):
         self.wheel.close()
@@ -90,6 +97,25 @@ class CenterHoverTests(unittest.TestCase):
         QTest.qWait(40)
         self.assertFalse(label.isVisible(), "Resize left an edit badge far from stationary pointer")
         self.assertEqual(self.wheel.cursor().shape(), Qt.ArrowCursor)
+
+    def test_badge_fits_circle_with_real_application_font_style(self):
+        self.wheel.setStyleSheet(APP_STYLE)
+        for width, height in ((300, 300), (650, 420)):
+            self.wheel.resize(width, height)
+            QTest.mouseMove(self.wheel, QPoint(12, 12))
+            QTest.qWait(40)
+            QTest.mouseMove(self.wheel, self.center())
+            QTest.qWait(40)
+            label = self.wheel.findChild(QLabel, "wheel-center-edit")
+            self.assertIsNotNone(label)
+            self.assertTrue(label.isVisible())
+            self.assertLessEqual(label.fontMetrics().horizontalAdvance(label.text()), label.contentsRect().width(), "Application QSS overrides fitted badge font")
+            self.assertLessEqual(label.fontMetrics().height(), label.contentsRect().height(), "Badge text is vertically clipped")
+            region = self.wheel.rect().adjusted(10, 10, -10, -68)
+            radius = min(region.width(), region.height()) * 0.5 * 0.24
+            for corner in (label.geometry().topLeft(), label.geometry().topRight(), label.geometry().bottomLeft(), label.geometry().bottomRight()):
+                delta = corner - self.center()
+                self.assertLessEqual(delta.x()**2 + delta.y()**2, (radius - 2)**2, "Badge extends into center outline")
 
     def test_operator_hint_is_present_at_narrow_width_without_global_tooltip(self):
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
