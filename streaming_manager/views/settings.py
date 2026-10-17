@@ -1976,6 +1976,8 @@ class SettingsTab(QWidget):
         if self._integration_worker is not None:
             return
         operation = getattr(self.integration_manager, action)
+        before = self.db.get_integration_connection(service_key) or {}
+        expected_center = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
 
         def perform_operation():
             twitch_service = self.twitch_channel_points_service if service_key == "twitch" else None
@@ -1995,17 +1997,35 @@ class SettingsTab(QWidget):
                 result = operation(service_key)
             if twitch_service is not None and action == "remove_connection":
                 twitch_service.on_connection_removed()
-            return result
+            center_update = None
+            if service_key == "twitch" and action in {"connect", "reconnect"} and result:
+                config = result.get("provider_config") or {}
+                old_config = before.get("provider_config") or {}
+                user_id = str(config.get("twitch_user_id") or "")
+                was_connected = before.get("enabled") and before.get("status") == "connected"
+                if result.get("status") == "connected" and user_id and (
+                    not was_connected or user_id != str(old_config.get("twitch_user_id") or "")
+                ):
+                    center_update = {"expected": expected_center, "user_id": user_id}
+                    try:
+                        source = str(config.get("profile_image_url") or "").strip()
+                        if not source:
+                            raise ValueError("Twitch не вернул изображение профиля.")
+                        center_update["prepared"] = self._prepare_wheel_center_remote(source)
+                    except Exception as exc:
+                        # Avatar presentation never turns a successful login into failure.
+                        center_update["notice"] = sanitize_diagnostic_text(str(exc))
+            return center_update
 
         self._set_integration_actions_enabled(False)
         worker = FunctionWorker(perform_operation)
         self._integration_worker = worker
-        worker.signals.result.connect(lambda _result: self._integration_action_done())
+        worker.signals.result.connect(self._integration_action_done)
         worker.signals.error.connect(self._integration_action_failed)
         worker.signals.finished.connect(self._integration_action_finished)
         self.thread_pool.start(worker)
 
-    def _integration_action_done(self) -> None:
+    def _integration_action_done(self, center_update=None) -> None:
         self._close_twitch_auth_dialog(success=True)
         self._close_donationalerts_auth_dialog(success=True)
         self.twitch_runtime_wake()
@@ -2013,6 +2033,29 @@ class SettingsTab(QWidget):
         self._refresh_integrations()
         self._refresh_conversion_rate_rows()
         self.integration_status_changed()
+        if not isinstance(center_update, dict):
+            return
+        connection = self.db.get_integration_connection("twitch") or {}
+        if (
+            not connection.get("enabled") or connection.get("status") != "connected"
+            or str((connection.get("provider_config") or {}).get("twitch_user_id") or "") != center_update["user_id"]
+            or self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "") != center_update["expected"]
+        ):
+            return  # A newer manual choice/connection always wins over a slow download.
+        notice = center_update.get("notice", "")
+        if not notice:
+            try:
+                asset = store_prepared_center_image(self.db, center_update["prepared"])
+                self._refresh_wheel_center_image_library(asset.id)
+                self._save_wheel_center_selection_immediately()
+            except Exception as exc:
+                notice = sanitize_diagnostic_text(str(exc))
+        if notice:
+            QMessageBox.information(
+                self, "Изображение центра",
+                "Twitch подключён, но загрузить аватар для центра колеса не удалось. "
+                "Прежнее изображение сохранено. Его можно изменить вручную.\n\n" + notice,
+            )
 
     def _integration_action_failed(self, exc) -> None:
         self._close_twitch_auth_dialog(success=True)
