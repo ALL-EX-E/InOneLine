@@ -768,8 +768,11 @@ def browser_smoke() -> None:
                                 duration_ms:8000,target_rotation:720,complete:false}};
                             spinClock={id:"P15D-TITLE",startMono:performance.now()-150};
                             draw();
+                            const rotation=rotationFor(state).rotation;
+                            const current=sectorUnderPointer(state.sectors,rotation);
                             return pointerLotEl.classList.contains("visible")
-                              && pointerLotEl.textContent==="First";
+                              && pointerLotEl.textContent===String(current?.title||"")
+                              && !pointerLotEl.textContent.includes("Под стрелкой:");
                           } finally {state=old;spinClock=oldClock;draw()}
                         })()"""), "P15-D pointer caption not visible during active spin"
 
