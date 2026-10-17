@@ -630,7 +630,7 @@ def browser_smoke() -> None:
                     if widget == "wheel":
                         # Chromium runs the shared OBS center-size geometry too.
                         obs_center_width = js(
-                            preview.page(),
+                            preview,
                             "(positionCenterImage(200,200,100), parseFloat(centerImageEl.style.width))",
                         )
                         assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
