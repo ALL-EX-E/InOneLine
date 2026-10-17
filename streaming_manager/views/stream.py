@@ -107,6 +107,8 @@ from ..constants import (
     WHEEL_GLOW_ENABLED_DEFAULT,
     WHEEL_GLOW_COLOR_KEY,
     WHEEL_GLOW_COLOR_DEFAULT,
+    WHEEL_POINTER_LABEL_ENABLED_KEY,
+    WHEEL_POINTER_LABEL_ENABLED_DEFAULT,
 )
 from ..database import Database
 from ..media import (
@@ -931,6 +933,11 @@ class StreamTab(QWidget):
             self.wheel_glow_color_row.setEnabled
         )
         self.wheel_glow_color_row.setEnabled(WHEEL_GLOW_ENABLED_DEFAULT)
+        self.wheel_pointer_label_enabled = QCheckBox("Показывать при вращении")
+        self.wheel_pointer_label_enabled.setToolTip(
+            "Отображать название лота, находящегося под стрелкой, в программе и OBS"
+        )
+        self.wheel_overlay_form.addRow("Текущий лот под стрелкой:", self.wheel_pointer_label_enabled)
         layout.addLayout(self.wheel_overlay_form)
         save_wheel = QPushButton("Сохранить виджет колеса")
         save_wheel.setProperty("primary", True)
@@ -1535,6 +1542,9 @@ class StreamTab(QWidget):
         self.db.set_settings_bulk({
             WIDGETS["wheel"].key: str(self.obs_show_modes["wheel"].currentData()),
             WHEEL_GLOW_ENABLED_KEY: "1" if self.wheel_glow_enabled.isChecked() else "0",
+            WHEEL_POINTER_LABEL_ENABLED_KEY: (
+                "1" if self.wheel_pointer_label_enabled.isChecked() else "0"
+            ),
             WHEEL_GLOW_COLOR_KEY: str(
                 self.wheel_glow_color_btn.property("fontColor")
                 or WHEEL_GLOW_COLOR_DEFAULT
@@ -2331,6 +2341,12 @@ class StreamTab(QWidget):
         self.wheel_glow_enabled.setChecked(
             setting(WHEEL_GLOW_ENABLED_KEY,
                     "1" if WHEEL_GLOW_ENABLED_DEFAULT else "0") == "1"
+        )
+        self.wheel_pointer_label_enabled.setChecked(
+            setting(
+                WHEEL_POINTER_LABEL_ENABLED_KEY,
+                "1" if WHEEL_POINTER_LABEL_ENABLED_DEFAULT else "0",
+            ) == "1"
         )
         self._set_color_button(
             self.wheel_glow_color_btn,

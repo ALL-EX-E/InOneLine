@@ -14,6 +14,8 @@ from .constants import (
     WHEEL_GLOW_ENABLED_DEFAULT,
     WHEEL_GLOW_COLOR_KEY,
     WHEEL_GLOW_COLOR_DEFAULT,
+    WHEEL_POINTER_LABEL_ENABLED_KEY,
+    WHEEL_POINTER_LABEL_ENABLED_DEFAULT,
 )
 
 
@@ -77,6 +79,10 @@ def wheel_glow_appearance(settings: Mapping[str, Any]) -> dict[str, Any]:
         "glow_enabled": str(settings.get(WHEEL_GLOW_ENABLED_KEY,
                                       "1" if WHEEL_GLOW_ENABLED_DEFAULT else "0")) == "1",
         "glow_color": color,
+        "pointer_label_enabled": str(settings.get(
+            WHEEL_POINTER_LABEL_ENABLED_KEY,
+            "1" if WHEEL_POINTER_LABEL_ENABLED_DEFAULT else "0",
+        )) == "1",
     }
 
 

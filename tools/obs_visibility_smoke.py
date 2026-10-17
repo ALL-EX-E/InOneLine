@@ -40,16 +40,17 @@ def policy_smoke() -> None:
             WIDGETS, show_mode, visibility_payload, wheel_context_relevant,
             wheel_glow_appearance,
         )
-        from streaming_manager.constants import WHEEL_GLOW_ENABLED_KEY, WHEEL_GLOW_COLOR_KEY
+        from streaming_manager.constants import WHEEL_GLOW_ENABLED_KEY, WHEEL_GLOW_COLOR_KEY, WHEEL_POINTER_LABEL_ENABLED_KEY
         assert wheel_glow_appearance({}) == {
-            "glow_enabled": False, "glow_color": "#FFFFFF",
+            "glow_enabled": False, "glow_color": "#FFFFFF", "pointer_label_enabled": False,
         }
         assert wheel_glow_appearance({
             WHEEL_GLOW_ENABLED_KEY: "1", WHEEL_GLOW_COLOR_KEY: "#12ab34",
-        }) == {"glow_enabled": True, "glow_color": "#12AB34"}
+            WHEEL_POINTER_LABEL_ENABLED_KEY: "1",
+        }) == {"glow_enabled": True, "glow_color": "#12AB34", "pointer_label_enabled": True}
         assert wheel_glow_appearance({
             WHEEL_GLOW_ENABLED_KEY: "bogus", WHEEL_GLOW_COLOR_KEY: "<script>",
-        }) == {"glow_enabled": False, "glow_color": "#FFFFFF"}
+        }) == {"glow_enabled": False, "glow_color": "#FFFFFF", "pointer_label_enabled": False}
         assert db.current_wheel_payload()["appearance"] == wheel_glow_appearance({})
         expected = {"overlay", "list", "timer", "music_player", "auction_lots", "rules", "wheel"}
         assert set(WIDGETS) == expected
@@ -239,6 +240,16 @@ def ui_smoke() -> None:
     assert wheel_probe.sector_color({"game_id": 10}, 0) != wheel_probe.sector_color(
         {"game_id": 11}, 0
     )
+    # P15-D: inverse rotation hits the fixed 12-o'clock pointer, not RNG.
+    sectors = [
+        {"game_id": 1, "title": "First", "weight": 1},
+        {"game_id": 2, "title": "Second", "weight": 3},
+    ]
+    assert wheel_probe.sector_under_pointer(sectors, 0)["game_id"] == 1
+    assert wheel_probe.sector_under_pointer(sectors, 90)["game_id"] == 2
+    assert wheel_probe.sector_under_pointer(sectors, 315)["game_id"] == 1
+    assert wheel_probe.sector_under_pointer(sectors, 360)["game_id"] == 1
+    assert wheel_probe.sector_under_pointer([], 45) is None
     wheel_probe.deleteLater()
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         paths = AppPaths.from_root(Path(tmp))
@@ -274,9 +285,11 @@ def ui_smoke() -> None:
                 assert forms[widget].getWidgetPosition(combo)[0] == (2 if widget == "list" else 0)
             assert db.get_settings() == saved_before, "Refresh wrote visibility defaults"
             assert not stream.wheel_glow_enabled.isChecked()
+            assert not stream.wheel_pointer_label_enabled.isChecked()
             assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_enabled).text() == "Светящийся контур:"
             assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_color_row).text() == "Цвет контура:"
             stream.wheel_glow_enabled.setChecked(True)
+            stream.wheel_pointer_label_enabled.setChecked(True)
             stream._set_color_button(stream.wheel_glow_color_btn, "#12AB34")
             auction = window.auction_tab
             auction.mode_combo.setCurrentIndex(auction.mode_combo.findData("max_amount"))
@@ -287,6 +300,7 @@ def ui_smoke() -> None:
             assert read_json(window.api, "/api/wheel")["visibility"]["show_mode"] == "always"
             assert read_json(window.api, "/api/wheel")["appearance"] == {
                 "glow_enabled": True, "glow_color": "#12AB34",
+                "pointer_label_enabled": True,
             }
             assert db.get_setting("wheel_glow_enabled") == "1"
             auction.mode_combo.setCurrentIndex(auction.mode_combo.findData("weighted_wheel"))
@@ -350,9 +364,11 @@ def ui_smoke() -> None:
             assert window.db.get_settings() == saved
             assert all(combo.currentData() == "hidden" for combo in window.stream_tab.obs_show_modes.values())
             assert window.stream_tab.wheel_glow_enabled.isChecked()
+            assert window.stream_tab.wheel_pointer_label_enabled.isChecked()
             assert window.stream_tab.wheel_glow_color_btn.property("fontColor") == "#12AB34"
             assert read_json(window.api, "/api/wheel")["appearance"] == {
                 "glow_enabled": True, "glow_color": "#12AB34",
+                "pointer_label_enabled": True,
             }
             assert read_json(window.api, "/api/data")["visibility"]["overlay"]["show_mode"] == "always"
         finally:
@@ -685,6 +701,40 @@ def browser_smoke() -> None:
                                 "P15-C live glow enabled")
                         wait_js(preview, "state?.appearance?.glow_color", "#34A1F2",
                                 "P15-C live glow color")
+                        assert js(preview, """(()=> {
+                          const dark=wheelGlowPasses("#000000"),light=wheelGlowPasses("#FFFFFF");
+                          return dark.some(p=>p.contrast&&p.width>=20)
+                            && light.length>=4 && light.every(p=>!p.contrast);
+                        })()"""), "P15-D very dark glow lacks contrasting outer foundation"
+                        stream.wheel_pointer_label_enabled.setChecked(True)
+                        with patch.object(QMessageBox, "information"):
+                            stream._save_wheel_overlay_settings()
+                        wait_js(normal, "state?.appearance?.pointer_label_enabled", True,
+                                "P15-D live pointer label toggle")
+                        assert js(preview, """(()=> {
+                          const a=[{game_id:1,title:"First",weight:1},
+                                   {game_id:2,title:"Second",weight:3}];
+                          return sectorUnderPointer(a,0)?.game_id===1
+                            && sectorUnderPointer(a,90)?.game_id===2
+                            && sectorUnderPointer(a,315)?.game_id===1
+                            && sectorUnderPointer([],45)===null;
+                        })()"""), "P15-D browser sector hit geometry differs from Qt"
+                        assert js(preview, """(()=> {
+                          const old=state,oldClock=spinClock;
+                          try {
+                            state={visible:true,ready:true,sectors:[
+                              {game_id:1,title:"First",weight:1},
+                              {game_id:2,title:"Second",weight:3}],
+                              appearance:{pointer_label_enabled:true},
+                              animation:{spin_id:"P15D-TITLE",started_at:"2026-10-17T00:00:00Z",
+                                duration_ms:8000,target_rotation:720,complete:false}};
+                            spinClock={id:"P15D-TITLE",startMono:performance.now()-150};
+                            draw();
+                            return pointerLotEl.classList.contains("visible")
+                              && pointerLotEl.textContent.includes("Под стрелкой:");
+                          } finally {state=old;spinClock=oldClock;draw()}
+                        })()"""), "P15-D pointer caption not visible during active spin"
+
                         stream.wheel_glow_enabled.setChecked(False)
                         with patch.object(QMessageBox, "information"):
                             stream._save_wheel_overlay_settings()
