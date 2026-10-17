@@ -4221,6 +4221,18 @@ def main() -> int:
             )
             if payload["show_total_footer"] != (not prior_footer):
                 raise AssertionError("P14-D OBS payload did not reflect toggle")
+            session_total = auction_page._current_session()
+            if session_total is None:
+                expected_total = sum(
+                    max(0, int(game.sm_points or 0))
+                    for game in auction_page.db.auction_eligible_games()
+                )
+            else:
+                expected_total = auction_page.db.auction_total_sm_points(
+                    int(session_total["id"])
+                )
+            if payload["total_sm_points"] != expected_total:
+                raise AssertionError("P14-D footer differs from canonical A6 local total")
             if auction_page.auction_total_label.isHidden():
                 raise AssertionError("P14-D hid the desktop total when toggling OBS footer")
         finally:
