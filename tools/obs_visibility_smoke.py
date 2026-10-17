@@ -82,16 +82,19 @@ def policy_smoke() -> None:
         for session, selected, expected_context in cases:
             assert wheel_context_relevant(session, selected) is expected_context, (session, selected)
 
-        db.add_game(Game(None, "Visibility contract lot", None, 100, 0, STATUS_NOT_PLAYED, ""))
-        db.add_game(Game(None, "Visibility contract second lot", None, 300, 0, STATUS_NOT_PLAYED, ""))
-        # Descending weights are deliberate: a prestart preview must already
-        # use the same id-ordered sectors as the live wheel RNG/draw payload.
-        initial_sectors = db.current_wheel_payload()["sectors"]
+        # The preview-order regression uses its own fixture. The main
+        # visibility lifecycle below deliberately requires a two-lot tie.
+        sort_db = Database(Path(tmp) / "prestart_order_probe.db")
+        sort_db.add_game(Game(None, "Lower first ID", None, 100, 0, STATUS_NOT_PLAYED, ""))
+        sort_db.add_game(Game(None, "Higher second ID", None, 300, 0, STATUS_NOT_PLAYED, ""))
+        initial_sectors = sort_db.current_wheel_payload()["sectors"]
         assert len(initial_sectors) == 2
         assert [sec["game_id"] for sec in initial_sectors] == sorted(
             sec["game_id"] for sec in initial_sectors
         ), "P15-B prestart wheel order changes at session start"
         assert [sec["weight"] for sec in initial_sectors] == [100, 300]
+        db.add_game(Game(None, "Visibility contract lot", None, 100, 0, STATUS_NOT_PLAYED, ""))
+        db.add_game(Game(None, "Visibility contract second lot", None, 100, 0, STATUS_NOT_PLAYED, ""))
         stream_before = db.current_stream_payload()
         timer_runtime = {"mode": "max_amount", "audio": {
             "enabled": True, "owner": "auction", "active": True, "kind": "auction",
