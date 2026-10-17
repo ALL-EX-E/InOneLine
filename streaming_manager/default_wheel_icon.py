@@ -1,9 +1,9 @@
 """Presentation-only correction for the built-in InOneLine wheel-center icon.
 
 The original square asset has dark corner padding around a green panel.  Fill
-only the exterior bands of that *bundled* asset with its own dominant green;
-leave every pixel between the first and last green pixel of a row untouched,
-including the black symbol. This never transforms user-selected media/GIFs.
+only the exterior bands of that *bundled* asset with its own dominant green.
+Scan both axes and cover the narrow antialiased panel fringe; the interior
+black symbol stays untouched. This never transforms user-selected media/GIFs.
 """
 from __future__ import annotations
 
@@ -36,15 +36,16 @@ def fill_default_icon_corners(source: QImage) -> QImage:
     width, height = result.width(), result.height()
     stride = result.bytesPerLine()
     pixels = result.bits()
+    original = bytes(pixels)
 
-    def green(row: memoryview, x: int) -> bool:
-        p = x * 4
+    def green(row: bytes, x: int, offset: int = 0) -> bool:
+        p = offset + x * 4
         r, g, b, a = row[p], row[p + 1], row[p + 2], row[p + 3]
         return g >= 110 and g * 20 > r * 33 and g * 20 > b * 33 and a >= 200
 
     swatches: list[tuple[int, int, int]] = []
     for y in range(height // 5, (height * 4) // 5, max(1, height // 40)):
-        row = pixels[y * stride: y * stride + width * 4]
+        row = original[y * stride: y * stride + width * 4]
         for x in range(width // 5, (width * 4) // 5, max(1, width // 40)):
             if green(row, x):
                 p = x * 4
@@ -59,19 +60,37 @@ def fill_default_icon_corners(source: QImage) -> QImage:
         sorted(c[2] for c in swatches)[middle],
         255,
     ))
+    # The old panel has a thin dark/bright antialiased border, including
+    # horizontal fragments that a row-only exterior scan cannot see.
+    fringe = max(1, min(width, height) // 200)
     for y in range(height):
+        source_row = original[y * stride: y * stride + width * 4]
         row = pixels[y * stride: y * stride + width * 4]
         left = 0
-        while left < width and not green(row, left):
+        while left < width and not green(source_row, left):
             left += 1
         right = width - 1
-        while right >= left and not green(row, right):
+        while right >= left and not green(source_row, right):
             right -= 1
-        # Only exterior bands, never the dark logo inside the green panel.
+        left = min(width, left + fringe)
+        right = max(-1, right - fringe)
         if left:
             row[:left * 4] = fill_pixel * left
         if right + 1 < width:
             row[(right + 1) * 4:] = fill_pixel * (width - right - 1)
+    for x in range(width):
+        top = 0
+        while top < height and not green(original, x, top * stride):
+            top += 1
+        bottom = height - 1
+        while bottom >= top and not green(original, x, bottom * stride):
+            bottom -= 1
+        for y in range(min(height, top + fringe)):
+            offset = y * stride + x * 4
+            pixels[offset:offset + 4] = fill_pixel
+        for y in range(max(0, bottom + 1 - fringe), height):
+            offset = y * stride + x * 4
+            pixels[offset:offset + 4] = fill_pixel
     return result
 
 

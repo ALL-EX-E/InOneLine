@@ -559,6 +559,7 @@ class TwitchAdapter(IntegrationAdapter):
                 "twitch_user_id": user_id,
                 "login": login,
                 "display_name": display_name,
+                "profile_image_url": str(user.get("profile_image_url") or "").strip(),
                 "broadcaster_type": broadcaster_type,
                 "granted_scopes": list(validation.get("scopes") or []),
                 "channel_points_custom_rewards_available": rewards_available,
