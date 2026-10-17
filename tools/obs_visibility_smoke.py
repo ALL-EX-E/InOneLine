@@ -83,7 +83,15 @@ def policy_smoke() -> None:
             assert wheel_context_relevant(session, selected) is expected_context, (session, selected)
 
         db.add_game(Game(None, "Visibility contract lot", None, 100, 0, STATUS_NOT_PLAYED, ""))
-        db.add_game(Game(None, "Visibility contract second lot", None, 100, 0, STATUS_NOT_PLAYED, ""))
+        db.add_game(Game(None, "Visibility contract second lot", None, 300, 0, STATUS_NOT_PLAYED, ""))
+        # Descending weights are deliberate: a prestart preview must already
+        # use the same id-ordered sectors as the live wheel RNG/draw payload.
+        initial_sectors = db.current_wheel_payload()["sectors"]
+        assert len(initial_sectors) == 2
+        assert [sec["game_id"] for sec in initial_sectors] == sorted(
+            sec["game_id"] for sec in initial_sectors
+        ), "P15-B prestart wheel order changes at session start"
+        assert [sec["weight"] for sec in initial_sectors] == [100, 300]
         stream_before = db.current_stream_payload()
         timer_runtime = {"mode": "max_amount", "audio": {
             "enabled": True, "owner": "auction", "active": True, "kind": "auction",
@@ -210,6 +218,12 @@ def ui_smoke() -> None:
     wheel_probe.mousePressEvent(hit_probe)
     assert clicked == [True] and hit_probe.accepted, "P15-A center hitbox did not double"
     assert wheel_probe.CENTER_RADIUS_RATIO == 0.24
+    assert wheel_probe.sector_color({"game_id": 10}, 0) == wheel_probe.sector_color(
+        {"game_id": 10}, 7
+    ), "P15-B game changed sector color after reordering"
+    assert wheel_probe.sector_color({"game_id": 10}, 0) != wheel_probe.sector_color(
+        {"game_id": 11}, 0
+    )
     wheel_probe.deleteLater()
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         paths = AppPaths.from_root(Path(tmp))
@@ -634,6 +648,43 @@ def browser_smoke() -> None:
                             "(positionCenterImage(200,200,100), parseFloat(centerImageEl.style.width))",
                         )
                         assert obs_center_width == 44, f"P15-A OBS center width: {obs_center_width}"
+                        palette_ok = js(preview, """(()=> {
+                           return sectorColor({game_id:10},0)===sectorColor({game_id:10},9)
+                             && sectorColor({game_id:10},0)!==sectorColor({game_id:11},0);
+                        })()""")
+                        assert palette_ok, "P15-B OBS palette changes after sector reorder"
+                        monotonic_ok = js(preview, """(()=> {
+                          const p={animation:{spin_id:"P15-B-CLOCK",started_at:"2026-10-17T00:00:00.000Z"},
+                            server_time:"2026-10-17T00:00:01.000Z"};
+                          syncSpinClock(p);
+                          const first=spinClock.startMono;
+                          syncSpinClock({...p,server_time:"2026-10-17T00:00:09.000Z"});
+                          const stayed=first===spinClock.startMono;
+                          spinClock={id:"",startMono:null};
+                          return stayed;
+                        })()""")
+                        assert monotonic_ok, "P15-B OBS clock reanchors on each poll"
+                        axis_ok = js(preview, """(()=> {
+                          const priorState=state,priorClock=spinClock;
+                          try {
+                            if(!priorState?.sectors?.length)return false;
+                            const simulated={...priorState,animation:{
+                              spin_id:"P15-B-AXIS",started_at:"2026-10-17T00:00:00.000Z",
+                              duration_ms:8000,target_rotation:1440
+                            },server_time:"2026-10-17T00:00:01.000Z"};
+                            state=simulated;
+                            syncSpinClock(simulated);
+                            draw();
+                            const first=[centerImageEl.style.left,centerImageEl.style.top,
+                              centerImageEl.style.width,centerImageEl.style.height];
+                            spinClock.startMono-=4000;
+                            draw();
+                            const second=[centerImageEl.style.left,centerImageEl.style.top,
+                              centerImageEl.style.width,centerImageEl.style.height];
+                            return JSON.stringify(first)===JSON.stringify(second);
+                          } finally {state=priorState;spinClock=priorClock;draw()}
+                        })()""")
+                        assert axis_ok, "P15-B center image moved during wheel spin"
                         save(widget, "context")
                         wait_js(normal, visible, "false", "Wheel Max prestart")
                         runtime["mode"] = "weighted_wheel"

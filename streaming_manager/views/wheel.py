@@ -43,6 +43,16 @@ class AuctionWheelWidget(QOpenGLWidget):
         "#DCE775",
     )
 
+    @classmethod
+    def sector_color(cls, sector: dict, index: int) -> str:
+        """Stable per-game wheel color, unaffected by session sector order."""
+        try:
+            game_id = int(sector.get("game_id") or 0)
+        except (TypeError, ValueError):
+            game_id = 0
+        slot = game_id - 1 if game_id > 0 else int(index)
+        return cls.PALETTE[slot % len(cls.PALETTE)]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._payload: dict = {}
@@ -334,7 +344,7 @@ class AuctionWheelWidget(QOpenGLWidget):
                 if effective_total
                 else 0.0
             )
-            color = QColor(self.PALETTE[index % len(self.PALETTE)])
+            color = QColor(self.sector_color(sector, index))
 
             path = QPainterPath()
             path.moveTo(center)
@@ -372,17 +382,20 @@ class AuctionWheelWidget(QOpenGLWidget):
                     preferred,
                 )
                 painter.setFont(font)
-                painter.setPen(QColor("#111315"))
-                painter.drawText(
-                    QRectF(
-                        -text_width / 2.0,
-                        -text_height / 2.0,
-                        text_width,
-                        text_height,
-                    ),
-                    flags,
-                    title,
+                text_rect = QRectF(
+                    -text_width / 2.0,
+                    -text_height / 2.0,
+                    text_width,
+                    text_height,
                 )
+                # UI-079: a light label with dark four-way outline is legible
+                # against every sector. Labels are cached, never re-laid out
+                # per frame while the wheel rotates.
+                painter.setPen(QColor("#0B0D10"))
+                for dx, dy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+                    painter.drawText(text_rect.translated(dx, dy), flags, title)
+                painter.setPen(QColor("#FFFFFF"))
+                painter.drawText(text_rect, flags, title)
                 painter.restore()
 
             start_deg -= span
