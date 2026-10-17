@@ -1223,6 +1223,14 @@ class AuctionAudioMixin:
             show = mode == "max_amount" and not wheel_context
             editable = status not in ("running", "paused")
 
+        # P13-C/UI-071: both existing soundtrack panels now live inside
+        # the same timer. The wheel panel follows the existing wheel context
+        # (including Max Amount -> Wheel transition and weighted prestart),
+        # without changing either soundtrack's own saved settings or routing.
+        self._set_visible_state(
+            self.wheel_soundtrack_widget,
+            self._wheel_context_relevant(session),
+        )
         self._set_visible_state(self.auction_soundtrack_widget, show)
         if show:
             self._refresh_auction_soundtrack_availability()
