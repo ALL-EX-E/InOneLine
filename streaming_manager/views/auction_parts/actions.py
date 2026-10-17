@@ -171,7 +171,6 @@ class AuctionActionMixin:
         # Session creation changes the authoritative position projection for
         # every connected list and XLSX mirror.
         self.changed()
-        QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
         if direct_wheel:
             # Нажатие «Крутить» уже является явным подтверждением запуска,
@@ -436,7 +435,6 @@ class AuctionActionMixin:
         )
         self.conduct_search.clear()
         self.changed()
-        QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
     def use_wheel_for_tie(self):
         session = self._current_session()
