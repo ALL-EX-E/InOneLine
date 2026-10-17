@@ -4207,7 +4207,7 @@ def main() -> int:
         # remains permanently visible and the setting survives DB reads.
         if auction_page.auction_overlay_total_checkbox.text() != "Показать сумму в оверлее":
             raise AssertionError("P14-D optional OBS total footer toggle missing")
-        if not auction_page.auction_total_label.isVisible():
+        if auction_page.auction_total_label.isHidden():
             raise AssertionError("P14-D unexpectedly hid the local total label")
         prior_footer = auction_page.auction_overlay_total_checkbox.isChecked()
         try:
@@ -4232,7 +4232,7 @@ def main() -> int:
         for snippet in (
             'id="total-footer"',
             '"Всего баллов в аукционе: "',
-            'background.parentElement === root',
+            '#root::before {',
             'document.body.style.backgroundColor = "transparent"',
         ):
             if snippet not in lots_html:
