@@ -279,6 +279,9 @@ class AuctionAudioMixin:
 
     def _build_wheel_soundtrack_controls(self) -> QWidget:
         panel = QWidget()
+        # Both original soundtrack widgets are now hosted by the timer card.
+        # Their base QWidget paint otherwise covers the card with dark strips.
+        panel.setProperty("cardContent", True)
         root = QVBoxLayout(panel)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(5)
@@ -757,6 +760,9 @@ class AuctionAudioMixin:
 
     def _build_auction_soundtrack_controls(self) -> QWidget:
         panel = QWidget()
+        # Both original soundtrack widgets are now hosted by the timer card.
+        # Their base QWidget paint otherwise covers the card with dark strips.
+        panel.setProperty("cardContent", True)
         root = QVBoxLayout(panel)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(5)
