@@ -563,7 +563,12 @@ body.preview #api-state.visible { display: block; }
     requestAnimationFrame(scrollFrame);
   }
 
+  // One in-flight Browser Source poll: stale overlapping responses must not
+  // re-enable autoscroll after the operator has already switched it OFF.
+  let updateInFlight = false;
   async function update() {
+    if (updateInFlight) return;
+    updateInFlight = true;
     try {
       const response = await fetch(API, { cache: "no-store" });
       if (!response.ok) throw new Error("HTTP " + response.status);
@@ -571,6 +576,8 @@ body.preview #api-state.visible { display: block; }
       apiState.classList.remove("visible");
     } catch (_error) {
       apiState.classList.add("visible");
+    } finally {
+      updateInFlight = false;
     }
   }
 

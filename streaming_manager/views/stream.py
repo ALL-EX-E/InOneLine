@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt, QThreadPool, QUrl
+from PySide6.QtCore import Qt, QThreadPool, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QApplication,
@@ -103,6 +103,10 @@ from ..constants import (
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
     STREAM_FORMATS,
+    WHEEL_GLOW_ENABLED_KEY,
+    WHEEL_GLOW_ENABLED_DEFAULT,
+    WHEEL_GLOW_COLOR_KEY,
+    WHEEL_GLOW_COLOR_DEFAULT,
 )
 from ..database import Database
 from ..media import (
@@ -126,6 +130,8 @@ from .common import (
 )
 
 class StreamTab(QWidget):
+    wheelAppearanceSaved = Signal()
+
     def __init__(self, db: Database, api: LocalApiServer):
         super().__init__()
         self.db = db
@@ -898,6 +904,33 @@ class StreamTab(QWidget):
         self.wheel_overlay_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         self.wheel_overlay_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         add_show_mode("wheel", self.wheel_overlay_form)
+        self.wheel_glow_enabled = QCheckBox("Включить")
+        self.wheel_overlay_form.addRow("Светящийся контур:", self.wheel_glow_enabled)
+        self.wheel_glow_color_row = QWidget()
+        glow_row = QHBoxLayout(self.wheel_glow_color_row)
+        glow_row.setContentsMargins(0, 0, 0, 0)
+        glow_row.setSpacing(8)
+        self.wheel_glow_color_btn = QPushButton()
+        self._set_color_button(self.wheel_glow_color_btn, WHEEL_GLOW_COLOR_DEFAULT)
+        self.wheel_glow_color_btn.clicked.connect(
+            lambda: self._choose_music_overlay_color(
+                self.wheel_glow_color_btn, "Цвет светящегося контура колеса",
+                WHEEL_GLOW_COLOR_DEFAULT,
+            )
+        )
+        self.wheel_glow_color_pick_btn = make_screen_color_picker_button()
+        self.wheel_glow_color_pick_btn.setToolTip("Выбрать цвет контура колеса с экрана")
+        self.wheel_glow_color_pick_btn.clicked.connect(
+            lambda: self._pick_color_from_screen(self.wheel_glow_color_btn)
+        )
+        glow_row.addWidget(self.wheel_glow_color_btn)
+        glow_row.addWidget(self.wheel_glow_color_pick_btn)
+        glow_row.addStretch()
+        self.wheel_overlay_form.addRow("Цвет контура:", self.wheel_glow_color_row)
+        self.wheel_glow_enabled.toggled.connect(
+            self.wheel_glow_color_row.setEnabled
+        )
+        self.wheel_glow_color_row.setEnabled(WHEEL_GLOW_ENABLED_DEFAULT)
         layout.addLayout(self.wheel_overlay_form)
         save_wheel = QPushButton("Сохранить виджет колеса")
         save_wheel.setProperty("primary", True)
@@ -1501,7 +1534,13 @@ class StreamTab(QWidget):
     def _save_wheel_overlay_settings(self) -> None:
         self.db.set_settings_bulk({
             WIDGETS["wheel"].key: str(self.obs_show_modes["wheel"].currentData()),
+            WHEEL_GLOW_ENABLED_KEY: "1" if self.wheel_glow_enabled.isChecked() else "0",
+            WHEEL_GLOW_COLOR_KEY: str(
+                self.wheel_glow_color_btn.property("fontColor")
+                or WHEEL_GLOW_COLOR_DEFAULT
+            ),
         })
+        self.wheelAppearanceSaved.emit()
         QMessageBox.information(
             self, "OBS Wheel",
             "Настройки виджета колеса сохранены. Открытый Browser Source обновится автоматически.",
@@ -2289,6 +2328,14 @@ class StreamTab(QWidget):
             combo.blockSignals(True)
             self._set_combo_by_data(combo, show_mode(settings, widget))
             combo.blockSignals(False)
+        self.wheel_glow_enabled.setChecked(
+            setting(WHEEL_GLOW_ENABLED_KEY,
+                    "1" if WHEEL_GLOW_ENABLED_DEFAULT else "0") == "1"
+        )
+        self._set_color_button(
+            self.wheel_glow_color_btn,
+            setting(WHEEL_GLOW_COLOR_KEY, WHEEL_GLOW_COLOR_DEFAULT),
+        )
 
         current = setting("stream_current_game_id", "")
         self.game_combo.blockSignals(True)
