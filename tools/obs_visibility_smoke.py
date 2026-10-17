@@ -441,9 +441,58 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#root')).borderRadius",
                                 "8px", "Auction Lots outer panel style")
+                        # User's P14-B feedback: 16px inset lets the outer
+                        # glow show at all four viewport edges, without
+                        # affecting the background media under the card.
+                        wait_js(normal,
+                                "Math.round(document.querySelector('#root').getBoundingClientRect().left)",
+                                16, "P14-C inset card from left OBS edge")
+                        wait_js(normal,
+                                "Math.round(window.innerWidth-document.querySelector('#root').getBoundingClientRect().right)",
+                                16, "P14-C inset card from right OBS edge")
                         wait_js(normal,
                                 "getComputedStyle(document.querySelector('#lots-rows .col-title')).whiteSpace",
                                 "normal", "Auction Lots title wraps to browser width")
+                        # P14-C/UI-074: this is only an overlay animation.
+                        # The production provider reads the persisted toggle;
+                        # this isolated API fixture supplies the same runtime
+                        # primitive to the very same existing renderer.
+                        for index in range(18):
+                            db.add_game(Game(
+                                None, f"OBS-only scroll row {index:02d}", None,
+                                10, 0, STATUS_NOT_PLAYED, "",
+                            ))
+                        wait_js(normal,
+                                "document.querySelector('#lots-rows').scrollHeight > document.querySelector('#viewport').clientHeight",
+                                True, "P14-C OBS list has scrollable rows")
+                        runtime["auto_scroll"] = False
+                        wait_js(normal,
+                                "document.querySelector('#lots-rows').style.transform",
+                                "translateY(0px)", "P14-C OBS list starts stopped")
+                        runtime["auto_scroll"] = True
+                        wait_js(normal,
+                                "document.querySelector('#lots-rows').style.transform !== 'translateY(0px)'",
+                                True, "P14-C OBS-only autoscroll starts", timeout=25)
+                        polls_lots = (
+                            "performance.getEntriesByType('resource')"
+                            ".filter(e => e.name.includes('/api/auction-lots')).length"
+                        )
+                        count_before_disable = js(normal, polls_lots)
+                        runtime["auto_scroll"] = False
+                        # The browser polls every 200 ms: wait for at least two
+                        # new responses before judging that animation stopped.
+                        wait_js(normal, f"({polls_lots}) >= {count_before_disable + 3}",
+                                True, "P14-C OBS consumed disable toggle")
+                        stopped_at = js(normal,
+                                        "document.querySelector('#lots-rows').style.transform")
+                        QTest.qWait(300)
+                        stopped_after = js(normal,
+                                           "document.querySelector('#lots-rows').style.transform")
+                        if stopped_after != stopped_at:
+                            raise AssertionError(
+                                f"P14-C OBS still scrolls after toggle: "
+                                f"{stopped_at!r} → {stopped_after!r}"
+                            )
                         # P14-B:UI-047: changes saved to existing settings
                         # must update the already opened Chromium source live,
                         # including explicit zero-opacity (not fallback).
