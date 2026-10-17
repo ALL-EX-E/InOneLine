@@ -1,6 +1,7 @@
 from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
+from ...constants import AUCTION_LOTS_OBS_AUTO_SCROLL_KEY
 
 
 
@@ -87,101 +88,28 @@ class AuctionSearchMixin:
             window.sync_search_result(game_id, source="auction")
 
     def _sync_lot_scroll_buttons(self):
-        text = (
-            "Автопрокрутка: ВКЛ"
-            if self._desktop_lot_auto_scroll_enabled
-            else "Автопрокрутка: ВЫКЛ"
-        )
-        for button_name in ("conduct_scroll_btn",):
-            button = getattr(self, button_name, None)
-            if button is not None:
-                button.setText(text)
-
-    def _set_desktop_lot_auto_scroll(self, enabled: bool):
-        self._desktop_lot_auto_scroll_enabled = bool(enabled)
-        if self._desktop_lot_auto_scroll_enabled:
-            self._lots_scroll_direction = 1
-            self._conduct_scroll_direction = 1
-        timer = getattr(self, "conduct_scroll_timer", None)
-        if timer is not None:
-            should_run = bool(
-                self._desktop_lot_auto_scroll_enabled
-                and getattr(self, "_main_tab_visible", True)
+        # UI-074: local operator table is manual-only, while the persisted
+        # control affects the dedicated OBS overlay regardless of tab focus.
+        button = getattr(self, "conduct_scroll_btn", None)
+        if button is not None:
+            button.setText(
+                "Автопрокрутка оверлея: ВКЛ"
+                if self._obs_lot_auto_scroll_enabled
+                else "Автопрокрутка оверлея: ВЫКЛ"
             )
-            if should_run and not timer.isActive():
-                timer.start()
-            elif not should_run and timer.isActive():
-                timer.stop()
+
+    def _set_lot_overlay_auto_scroll(self, enabled: bool):
+        self._obs_lot_auto_scroll_enabled = bool(enabled)
+        self.db.set_setting(
+            AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
+            "1" if enabled else "0",
+        )
         self._sync_lot_scroll_buttons()
-    def _toggle_desktop_lot_auto_scroll(self):
-        self._set_desktop_lot_auto_scroll(
-            not bool(self._desktop_lot_auto_scroll_enabled)
+
+    def _toggle_overlay_lot_auto_scroll(self):
+        self._set_lot_overlay_auto_scroll(
+            not bool(self._obs_lot_auto_scroll_enabled)
         )
-
-    def _reset_conduct_auto_scroll(self):
-        # Historical callers use this name when opening/restarting an auction.
-        # Reset both local lists only while their shared switch is enabled.
-        if not self._desktop_lot_auto_scroll_enabled:
-            return
-        self._lots_scroll_direction = 1
-        self._conduct_scroll_direction = 1
-        bar = self.conduct_table.verticalScrollBar()
-        bar.setValue(bar.minimum())
-
-    @staticmethod
-    def _advance_auto_scroll_table(table, direction: int) -> int:
-        bar = table.verticalScrollBar()
-        minimum = bar.minimum()
-        maximum = bar.maximum()
-        if maximum <= minimum:
-            return direction
-
-        value = bar.value()
-        if direction > 0:
-            next_value = value + 1
-            if next_value >= maximum:
-                next_value = maximum
-                direction = -1
-        else:
-            next_value = value - 1
-            if next_value <= minimum:
-                next_value = minimum
-                direction = 1
-        bar.setValue(next_value)
-        return direction
-
-    def _auto_scroll_conduct_lots(self):
-        # One shared operator switch controls both local auction tables and the
-        # dedicated auction-lots OBS overlay.
-        if not self._desktop_lot_auto_scroll_enabled:
-            return
-
-        # During wheel animation keep both tables still to preserve smooth GUI
-        # rendering in the single Qt thread.
-        if self.wheel_widget.is_spinning():
-            return
-
-        # Explicit operator work takes priority. Per the approved desktop
-        # contract, search/manual focus turns the shared switch OFF instead of
-        # silently resuming later. A7 history hover is only a temporary pause.
-        operator_interaction = bool(
-            self.conduct_search.text().strip()
-            or self.conduct_table.hasFocus()
-            or self.bid_amount.hasFocus()
-            or self.add_bid_btn.hasFocus()
-            or self.decrease_bid_btn.hasFocus()
-            or self.new_lot_title.hasFocus()
-            or self.new_lot_points.hasFocus()
-            or self.new_lot_btn.hasFocus()
-        )
-        if operator_interaction:
-            self._set_desktop_lot_auto_scroll(False)
-            return
-
-        if not getattr(self, "_history_hover_pauses_auto_scroll", False):
-            self._conduct_scroll_direction = self._advance_auto_scroll_table(
-                self.conduct_table, self._conduct_scroll_direction
-            )
 
     def select_synced_search_result(self, game_id: int) -> bool:
         """Select in the one visible Auction table (prestart sync only)."""
