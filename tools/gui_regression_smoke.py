@@ -1835,6 +1835,39 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
             games_table.setColumnWidth(2, original_title_width)
     games_tab.apply_stat_filter("all")
 
+    # P13-B FIX1 wide/narrow placement uses the same one wheel/timer.
+    auction = window.auction_tab
+    window._set_current_main_page(auction)
+    wheel_index = auction.mode_combo.findData("weighted_wheel")
+    auction.mode_combo.setCurrentIndex(wheel_index)
+    window.resize(1600, 900)
+    app.processEvents()
+    window._update_responsive_layout()
+    app.processEvents()
+    if auction.operator_columns.direction() != QBoxLayout.LeftToRight:
+        raise AssertionError("P13-B FIX1 wide operator columns are not side by side")
+    if auction.wheel_panel.isHidden():
+        raise AssertionError("P13-B FIX1 local wheel is hidden in prestart weighted mode")
+    wheel_position = auction.wheel_panel.mapTo(auction.conduct_page, QPoint(0, 0))
+    setup_position = auction.setup_widget.mapTo(auction.conduct_page, QPoint(0, 0))
+    timer_position = auction.timer_widget.mapTo(auction.conduct_page, QPoint(0, 0))
+    if (abs(wheel_position.x() - setup_position.x()) > 12
+            or wheel_position.y() <= setup_position.y()
+            or timer_position.x() <= wheel_position.x() + auction.wheel_panel.width() - 20):
+        raise AssertionError("P13-B FIX1 wide wheel is not beneath method with timer to the right")
+    window.resize(520, 640)
+    app.processEvents()
+    window._update_responsive_layout()
+    app.processEvents()
+    if auction.operator_columns.direction() != QBoxLayout.TopToBottom:
+        raise AssertionError("P13-B FIX1 compact operator columns did not stack")
+    for control in (
+        auction.wheel_soundtrack_volume_control,
+        auction.auction_soundtrack_volume_control,
+    ):
+        if control.layout().direction() != QBoxLayout.LeftToRight:
+            raise AssertionError("P13-B FIX1 compact volume steppers became vertical")
+
 
 def main() -> int:
     assert_position_policy()
@@ -2982,6 +3015,18 @@ def main() -> int:
             raise AssertionError("P06 narrow Auction Conduct panes did not stack")
         if auction.conduct_content_scroll.horizontalScrollBar().maximum() != 0:
             raise AssertionError("P06 Auction Conduct content still scrolls horizontally")
+        if auction.operator_columns.direction() != QBoxLayout.TopToBottom:
+            raise AssertionError("P13-B FIX1 upper wheel/timer columns did not stack at minimum width")
+        for control in (
+            auction.wheel_soundtrack_volume_control,
+            auction.auction_soundtrack_volume_control,
+        ):
+            if not control.property("responsiveKeepHorizontal"):
+                raise AssertionError("P13-B FIX1 volume stepper lacks atomic layout protection")
+            if control.layout().direction() != QBoxLayout.LeftToRight:
+                raise AssertionError("P13-B FIX1 volume buttons stacked vertically")
+            if control.minimumWidth() < control.layout().sizeHint().width():
+                raise AssertionError("P13-B FIX1 volume control minimum width is too narrow")
         app.processEvents()
 
         # Compact tabs retain readable short captions and distinct accent colors.
@@ -4014,12 +4059,22 @@ def main() -> int:
         if auction_page.auction_activity_tabs.count() != 2:
             raise AssertionError("P12 lost Bets/History activity tabs")
 
-        # P13-B/UI-062 first isolated layout step: physically relocate the
-        # one existing local wheel; no duplicate renderer or third lower pane.
-        if auction_page.method_wheel_row.indexOf(auction_page.setup_widget) < 0:
-            raise AssertionError("P13-B method selector left its upper layout")
-        if auction_page.method_wheel_row.indexOf(auction_page.wheel_panel) < 0:
-            raise AssertionError("P13-B wheel panel was not moved beside method setup")
+        # P13-B FIX1: two top-level operator columns. Method -> wheel ->
+        # wheel OBS actions vertically on the left; one timer on the right.
+        # The bottom workspace must remain just lots + Bets/History.
+        if auction_page.operator_columns.itemAt(0).layout() is not auction_page.operator_left:
+            raise AssertionError("P13-B FIX1 left operator column was lost")
+        if auction_page.operator_columns.itemAt(1).layout() is not auction_page.operator_right:
+            raise AssertionError("P13-B FIX1 right timer column was lost")
+        left_order = (
+            auction_page.operator_left.indexOf(auction_page.setup_widget),
+            auction_page.operator_left.indexOf(auction_page.wheel_panel),
+            auction_page.operator_left.indexOf(auction_page.wheel_obs_widget),
+        )
+        if left_order != (0, 1, 2):
+            raise AssertionError(f"P13-B FIX1 method/wheel/OBS order is wrong: {left_order}")
+        if auction_page.operator_right.indexOf(auction_page.timer_widget) != 0:
+            raise AssertionError("P13-B FIX1 timer is not in the right column")
         if auction_page.conduct_content_layout.indexOf(auction_page.wheel_panel) >= 0:
             raise AssertionError("P13-B wheel still occupies the lower lots/history row")
         if (auction_page.conduct_content_layout.count() != 2
