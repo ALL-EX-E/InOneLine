@@ -5,6 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Event
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -74,6 +75,9 @@ class CenterConnectionTests(unittest.TestCase):
 
     def action(self, name):
         self.tab._run_integration_action("twitch", name)
+        self.finish_action()
+
+    def finish_action(self):
         for _ in range(500):
             self.app.processEvents()
             if self.tab._integration_worker is None:
@@ -112,6 +116,45 @@ class CenterConnectionTests(unittest.TestCase):
         self.assertEqual(self.db.get_setting(CENTER_KEY, ""), manual)
         self.assertTrue(self.db.get_media_asset(int(manual)))
         self.assertEqual(Database(self.db.path).get_setting(CENTER_KEY, ""), manual)
+
+    def test_same_account_recovery_does_not_overwrite_manual_image(self):
+        self.manager.connect("twitch")
+        manual = self.select_manual()
+        for status in ("error", "requires_login"):
+            self.db.upsert_integration_connection("twitch", status=status)
+            with patch("streaming_manager.wheel_center_media.download_external_image", side_effect=self.download):
+                self.action("reconnect")
+            self.assertEqual(self.db.get_setting(CENTER_KEY, ""), manual, status)
+
+    def test_manual_choice_returning_to_original_value_wins_slow_download(self):
+        manual = self.select_manual()
+        self.db.set_setting(CENTER_KEY, "")
+        self.tab._refresh_wheel_center_image_library()
+        entered, release = Event(), Event()
+
+        def download(source, **kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError("fixture did not release avatar download")
+            return self.download(source, **kwargs)
+
+        with patch("streaming_manager.wheel_center_media.download_external_image", side_effect=download):
+            self.tab._run_integration_action("twitch", "connect")
+            try:
+                for _ in range(100):
+                    if entered.is_set():
+                        break
+                    QTest.qWait(10)
+                self.assertTrue(entered.is_set())
+                self.tab.wheel_center_image_combo.setCurrentIndex(
+                    self.tab.wheel_center_image_combo.findData(int(manual))
+                )
+                self.tab.wheel_center_image_combo.setCurrentIndex(0)
+                self.assertEqual(self.db.get_setting(CENTER_KEY, ""), "")
+            finally:
+                release.set()
+            self.finish_action()
+        self.assertEqual(self.db.get_setting(CENTER_KEY, ""), "", "Slow avatar replaced explicit return to default")
 
     def test_account_change_and_reenable_select_avatar(self):
         self.manager.connect("twitch")

@@ -155,6 +155,7 @@ class SettingsTab(QWidget):
         self._full_restore_worker = None
         self._integration_worker = None
         self._wheel_center_image_worker = None
+        self._wheel_center_selection_revision = 0
         self.wheel_center_icons_dir = managed_media_directory(
             self.db.path.parent, MEDIA_CATEGORY_WHEEL_CENTER_ICONS
         )
@@ -977,6 +978,9 @@ class SettingsTab(QWidget):
         return asset
 
     def _refresh_wheel_center_image_library(self, selected_asset_id=None) -> None:
+        # Existing Auction picker signals and manual imports arrive here too.
+        # Count explicit choices even if the saved ID returns to its old value.
+        self._wheel_center_selection_revision += 1
         if selected_asset_id is None:
             selected_asset_id = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
         try:
@@ -998,6 +1002,7 @@ class SettingsTab(QWidget):
 
     def _save_wheel_center_selection_immediately(self, _index: int = -1) -> None:
         """Same instant persistent choice as the Auction wheel quick picker."""
+        self._wheel_center_selection_revision += 1
         asset = self._selected_wheel_center_image_asset()
         selected = str(asset.id) if asset is not None else ""
         if asset is not None and not media_asset_available(self.db.path.parent, asset):
@@ -1978,6 +1983,7 @@ class SettingsTab(QWidget):
         operation = getattr(self.integration_manager, action)
         before = self.db.get_integration_connection(service_key) or {}
         expected_center = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
+        expected_revision = self._wheel_center_selection_revision
 
         def perform_operation():
             twitch_service = self.twitch_channel_points_service if service_key == "twitch" else None
@@ -2002,11 +2008,15 @@ class SettingsTab(QWidget):
                 config = result.get("provider_config") or {}
                 old_config = before.get("provider_config") or {}
                 user_id = str(config.get("twitch_user_id") or "")
-                was_connected = before.get("enabled") and before.get("status") == "connected"
-                if result.get("status") == "connected" and user_id and (
-                    not was_connected or user_id != str(old_config.get("twitch_user_id") or "")
-                ):
-                    center_update = {"expected": expected_center, "user_id": user_id}
+                old_user_id = str(old_config.get("twitch_user_id") or "")
+                # Error/login-required are transient states of an existing
+                # enabled identity, not a new connection to that same account.
+                same_enabled_account = before.get("enabled") and old_user_id == user_id
+                if result.get("status") == "connected" and user_id and not same_enabled_account:
+                    center_update = {
+                        "expected": expected_center, "user_id": user_id,
+                        "revision": expected_revision,
+                    }
                     try:
                         source = str(config.get("profile_image_url") or "").strip()
                         if not source:
@@ -2040,6 +2050,7 @@ class SettingsTab(QWidget):
             not connection.get("enabled") or connection.get("status") != "connected"
             or str((connection.get("provider_config") or {}).get("twitch_user_id") or "") != center_update["user_id"]
             or self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "") != center_update["expected"]
+            or self._wheel_center_selection_revision != center_update["revision"]
         ):
             return  # A newer manual choice/connection always wins over a slow download.
         notice = center_update.get("notice", "")
