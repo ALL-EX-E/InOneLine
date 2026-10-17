@@ -912,7 +912,7 @@ class StreamTab(QWidget):
             up_tooltip="Увеличить размер текста списка лотов",
             down_tooltip="Уменьшить размер текста списка лотов",
         )
-        auction_lots_form.addRow("Размер:", self.auction_lots_overlay_font_size_control)
+        auction_lots_form.addRow("Размер шрифта:", self.auction_lots_overlay_font_size_control)
 
         color_row = QWidget()
         color_layout = QHBoxLayout(color_row)
@@ -927,7 +927,7 @@ class StreamTab(QWidget):
         color_layout.addWidget(self.auction_lots_overlay_font_color_btn)
         color_layout.addWidget(self.auction_lots_overlay_font_color_pick_btn)
         color_layout.addStretch()
-        auction_lots_form.addRow("Цвет текста:", color_row)
+        auction_lots_form.addRow("Цвет шрифта:", color_row)
 
         bg_mode_row = QWidget()
         bg_mode_layout = QHBoxLayout(bg_mode_row)
