@@ -4115,6 +4115,24 @@ def main() -> int:
         if (timer_layout.indexOf(auction_page.auction_soundtrack_widget) < 0
                 or timer_layout.indexOf(auction_page.wheel_soundtrack_widget) < 0):
             raise AssertionError("P13-C timer does not own both existing soundtrack editors")
+        # P13-D/UI-073 is presentation only: exactly one reusable Stream/OBS
+        # style card/title, above the original time field, while both original
+        # soundtrack groups and timer controls retain their identity/order.
+        if auction_page.timer_widget.property("sectionCard") is not True:
+            raise AssertionError("P13-D timer did not use shared section card palette")
+        if (auction_page.timer_section_heading.text() != "Таймер"
+                or timer_layout.itemAt(0).widget() is not auction_page.timer_section_heading):
+            raise AssertionError("P13-D shared timer heading is missing")
+        if ("font-size: 13pt" not in auction_page.timer_section_heading.styleSheet()
+                or "font-weight: 650" not in auction_page.timer_section_heading.styleSheet()):
+            raise AssertionError("P13-D timer section does not match Stream/OBS headings")
+        if timer_layout.indexOf(auction_page.timer_edit) != 1:
+            raise AssertionError("P13-D time field was moved below other controls")
+        if not (
+            timer_layout.indexOf(auction_page.auction_soundtrack_widget) > 1
+            and timer_layout.indexOf(auction_page.wheel_soundtrack_widget) > 1
+        ):
+            raise AssertionError("P13-D reordered contextual soundtrack above time field")
         if auction_page.wheel_panel.findChildren(type(auction_page.wheel_soundtrack_widget)).count(
                 auction_page.wheel_soundtrack_widget) != 0:
             raise AssertionError("P13-C left a wheel soundtrack duplicate in wheel panel")
