@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
-    QBrush, QColor, QFontMetricsF, QMovie, QPainter, QPainterPath, QPen, QPixmap,
+    QBrush, QColor, QCursor, QFontMetricsF, QMovie, QPainter, QPainterPath, QPen, QPixmap,
     QPolygonF,
 )
-from PySide6.QtWidgets import QSizePolicy, QWidget
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from ..wheel_motion import wheel_motion_progress
 from ..default_wheel_icon import default_wheel_icon_image
@@ -72,6 +72,16 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._spin_id = None
         self._spin_start_monotonic: float | None = None
         self._finished_emitted_for_spin = None
+        self._center_hovered = False
+        self._center_edit_label = QLabel("Изменить", self)
+        self._center_edit_label.setObjectName("wheel-center-edit")
+        self._center_edit_label.setAlignment(Qt.AlignCenter)
+        self._center_edit_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._center_edit_label.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 155); color: white; border-radius: 4px;"
+        )
+        self._center_edit_label.hide()
+        self.setMouseTracking(True)
 
         self.setMinimumSize(300, 300)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -91,15 +101,69 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._timer.setInterval(8)
         self._timer.timeout.connect(self._advance_frame)
 
-    def mousePressEvent(self, event):
+    def _center_rect(self) -> QRectF:
+        """One hub geometry for drawing, clicking and local hover affordance."""
         rect = self.rect().adjusted(10, 10, -10, -68)
         side = max(2, min(rect.width(), rect.height()))
         center = rect.center()
-        center_radius = (side / 2.0) * self.CENTER_RADIUS_RATIO
-        pos = event.position()
-        dx = float(pos.x()) - float(center.x())
-        dy = float(pos.y()) - float(center.y())
-        if dx * dx + dy * dy <= center_radius * center_radius:
+        radius = side * 0.5 * self.CENTER_RADIUS_RATIO
+        return QRectF(center.x() - radius, center.y() - radius, radius * 2, radius * 2)
+
+    def _center_contains(self, pos) -> bool:
+        rect = self._center_rect()
+        delta = QPointF(pos) - rect.center()
+        return delta.x() ** 2 + delta.y() ** 2 <= (rect.width() * 0.5) ** 2
+
+    def _position_center_edit_label(self) -> None:
+        rect = self._center_rect()
+        available_width = max(1, int(rect.width() * 0.9))
+        font = self.font()
+        font.setPixelSize(11)
+        while font.pixelSize() > 7 and QFontMetricsF(font).horizontalAdvance("Изменить") + 8 > available_width:
+            font.setPixelSize(font.pixelSize() - 1)
+        metrics = QFontMetricsF(font)
+        self._center_edit_label.setFont(font)
+        width = min(available_width, math.ceil(metrics.horizontalAdvance("Изменить")) + 8)
+        height = math.ceil(metrics.height()) + 4
+        self._center_edit_label.setGeometry(
+            round(rect.center().x() - width * 0.5),
+            round(rect.center().y() - height * 0.5), width, height,
+        )
+
+    def _set_center_hovered(self, hovered: bool) -> None:
+        self._center_hovered = bool(hovered)
+        if hovered:
+            self._position_center_edit_label()
+            self.setCursor(Qt.PointingHandCursor)
+            self._center_edit_label.show()
+            self._center_edit_label.raise_()
+        else:
+            self.unsetCursor()
+            self._center_edit_label.hide()
+
+    def enterEvent(self, event):
+        self._set_center_hovered(self._center_contains(event.position()))
+        super().enterEvent(event)
+
+    def mouseMoveEvent(self, event):
+        hovered = self._center_contains(event.position())
+        if hovered != self._center_hovered:
+            self._set_center_hovered(hovered)
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self._set_center_hovered(False)
+        super().leaveEvent(event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_center_edit_label()
+        self._set_center_hovered(
+            self.underMouse() and self._center_contains(self.mapFromGlobal(QCursor.pos()))
+        )
+
+    def mousePressEvent(self, event):
+        if self._center_contains(event.position()):
             self.centerClicked.emit()
             event.accept()
             return
@@ -499,13 +563,7 @@ class AuctionWheelWidget(QOpenGLWidget):
 
         # D19: center is painted after the rotating sector layer, so it remains
         # physically stationary while the wheel spins.
-        center_radius = radius * self.CENTER_RADIUS_RATIO
-        center_rect = QRectF(
-            center.x() - center_radius,
-            center.y() - center_radius,
-            center_radius * 2.0,
-            center_radius * 2.0,
-        )
+        center_rect = self._center_rect()
         painter.setPen(QPen(QColor("#E8EDF2"), 2))
         painter.setBrush(QColor("#25292D"))
         painter.drawEllipse(center_rect)
