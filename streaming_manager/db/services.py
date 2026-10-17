@@ -18,6 +18,17 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_BACKGROUND_DEFAULT, AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
     AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+    AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT, AUCTION_LOTS_CARD_PANEL_COLOR_KEY,
+    AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT, AUCTION_LOTS_CARD_PANEL_OPACITY_KEY,
+    AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT, AUCTION_LOTS_CARD_FRAME_COLOR_KEY,
+    AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT, AUCTION_LOTS_CARD_ROW_COLOR_KEY,
+    AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT, AUCTION_LOTS_CARD_ROW_OPACITY_KEY,
+    AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT, AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY,
+    AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT, AUCTION_LOTS_CARD_HEADER_COLOR_KEY,
+    AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT, AUCTION_LOTS_CARD_HEADER_OPACITY_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_DEFAULT, AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_SIZE_DEFAULT, AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY,
+    AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT, AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
@@ -1622,6 +1633,17 @@ class ServicesMixin:
             AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
             AUCTION_LOTS_OVERLAY_BACKGROUND_COLOR_KEY,
             AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
+            AUCTION_LOTS_CARD_PANEL_COLOR_KEY,
+            AUCTION_LOTS_CARD_PANEL_OPACITY_KEY,
+            AUCTION_LOTS_CARD_FRAME_COLOR_KEY,
+            AUCTION_LOTS_CARD_ROW_COLOR_KEY,
+            AUCTION_LOTS_CARD_ROW_OPACITY_KEY,
+            AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY,
+            AUCTION_LOTS_CARD_HEADER_COLOR_KEY,
+            AUCTION_LOTS_CARD_HEADER_OPACITY_KEY,
+            AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY,
+            AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY,
+            AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY,
         )
         with self.connect() as conn:
             settings = self._get_settings_conn(conn, keys)
@@ -1778,6 +1800,50 @@ class ServicesMixin:
                     "available": bool(background_available),
                     "url": background_url,
                 },
+                "card_panel_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_PANEL_COLOR_KEY),
+                    AUCTION_LOTS_CARD_PANEL_COLOR_DEFAULT,
+                ),
+                "card_panel_opacity": self._timer_overlay_bounded_int(
+                    settings.get(AUCTION_LOTS_CARD_PANEL_OPACITY_KEY),
+                    AUCTION_LOTS_CARD_PANEL_OPACITY_DEFAULT, 0, 100,
+                ),
+                "card_frame_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_FRAME_COLOR_KEY),
+                    AUCTION_LOTS_CARD_FRAME_COLOR_DEFAULT,
+                ),
+                "card_row_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_ROW_COLOR_KEY),
+                    AUCTION_LOTS_CARD_ROW_COLOR_DEFAULT,
+                ),
+                "card_row_opacity": self._timer_overlay_bounded_int(
+                    settings.get(AUCTION_LOTS_CARD_ROW_OPACITY_KEY),
+                    AUCTION_LOTS_CARD_ROW_OPACITY_DEFAULT, 0, 100,
+                ),
+                "card_row_frame_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_ROW_FRAME_COLOR_KEY),
+                    AUCTION_LOTS_CARD_ROW_FRAME_COLOR_DEFAULT,
+                ),
+                "card_header_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_HEADER_COLOR_KEY),
+                    AUCTION_LOTS_CARD_HEADER_COLOR_DEFAULT,
+                ),
+                "card_header_opacity": self._timer_overlay_bounded_int(
+                    settings.get(AUCTION_LOTS_CARD_HEADER_OPACITY_KEY),
+                    AUCTION_LOTS_CARD_HEADER_OPACITY_DEFAULT, 0, 100,
+                ),
+                "card_header_font_family": (str(
+                    settings.get(AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_KEY)
+                    or AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_DEFAULT
+                ).strip()[:160] or AUCTION_LOTS_CARD_HEADER_FONT_FAMILY_DEFAULT),
+                "card_header_font_size": self._timer_overlay_bounded_int(
+                    settings.get(AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY),
+                    AUCTION_LOTS_CARD_HEADER_FONT_SIZE_DEFAULT, 8, 160,
+                ),
+                "card_header_font_color": self._timer_overlay_color(
+                    settings.get(AUCTION_LOTS_CARD_HEADER_FONT_COLOR_KEY),
+                    AUCTION_LOTS_CARD_HEADER_FONT_COLOR_DEFAULT,
+                ),
             },
         }
 
