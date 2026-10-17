@@ -457,9 +457,18 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # изменяют именно минуты.
         self.timer_widget = QFrame()
         self.timer_widget.setFrameShape(QFrame.StyledPanel)
+        # P13-D/UI-073: match the existing Stream/OBS section typography and
+        # reusable app-wide card palette, without moving or replacing any
+        # timer, music, button, or OBS control.
+        self.timer_widget.setProperty("sectionCard", True)
         timer_layout = QVBoxLayout(self.timer_widget)
         timer_layout.setContentsMargins(10, 8, 10, 8)
-        timer_layout.setSpacing(6)
+        timer_layout.setSpacing(8)
+        self.timer_section_heading = QLabel("Таймер")
+        self.timer_section_heading.setStyleSheet(
+            "font-size: 13pt; font-weight: 650;"
+        )
+        timer_layout.addWidget(self.timer_section_heading)
 
         self.timer_edit = QLineEdit(
             self._format_milliseconds(self._prestart_auction_duration_ms)
