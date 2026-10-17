@@ -61,6 +61,8 @@ AUCTION_LOTS_OVERLAY_BACKGROUND_MEDIA_ID_KEY = "auction_lots_overlay_background_
 # UI-074: one authoritative persisted OBS-only Auction Lots scroll flag.
 AUCTION_LOTS_OBS_AUTO_SCROLL_KEY = "auction_lots_obs_auto_scroll"
 AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT = False
+AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY = "auction_lots_show_total_footer"
+AUCTION_LOTS_SHOW_TOTAL_FOOTER_DEFAULT = False
 
 # UI-047: persistent card appearance; same legacy settings table, no migration.
 AUCTION_LOTS_CARD_PANEL_COLOR_KEY = "auction_lots_card_panel_color"
