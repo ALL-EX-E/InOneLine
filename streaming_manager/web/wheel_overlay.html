@@ -43,7 +43,23 @@ const centerImageEl=document.getElementById("center-image");
 const winnerTitleEl=document.getElementById("winner-title"),winnerChanceEl=document.getElementById("winner-chance");
 const preview=ObsVisibility.preview;
 if(preview)document.body.classList.add("preview");
-let state=null,clockOffset=0,rafId=null;
+let state=null,rafId=null,spinClock={id:"",startMono:null};
+let pollActive=false;
+// A spin's monotonic timeline is anchored once. Poll latency/clock jitter must
+// never move a running wheel backwards every 200 ms.
+function syncSpinClock(payload){
+ const a=payload?.animation||{},id=String(a.spin_id||"");
+ if(id===spinClock.id)return;
+ const start=Date.parse(a.started_at||""),serverNow=Date.parse(payload?.server_time||"");
+ const elapsed=Number.isFinite(start)?
+   (Number.isFinite(serverNow)?serverNow:Date.now())-start:0;
+ spinClock={id,startMono:id?performance.now()-elapsed:null};
+}
+function sectorColor(sec,index){
+ const id=Number(sec?.game_id);
+ const slot=Number.isSafeInteger(id)&&id>0?id-1:index;
+ return PALETTE[((slot%PALETTE.length)+PALETTE.length)%PALETTE.length];
+}
 let centerImageUrl="";
 
 function motionProgress(progress,durationMs){
@@ -104,7 +120,16 @@ function drawSectorTitle(title,deg,r){
    lines=wrapAllLines(title,textWidth);
  }
  const total=(lines.length-1)*lineHeight;
- lines.forEach((line,i)=>ctx.fillText(line,0,i*lineHeight-total/2,textWidth));
+ // UI-079: readable light lettering with dark outline on all sector colors.
+ ctx.lineJoin="round";
+ ctx.strokeStyle="#0B0D10";
+ ctx.lineWidth=Math.max(2,Math.min(3.5,size*.25));
+ ctx.fillStyle="#FFFFFF";
+ lines.forEach((line,i)=>{
+   const y=i*lineHeight-total/2;
+   ctx.strokeText(line,0,y,textWidth);
+   ctx.fillText(line,0,y,textWidth);
+ });
 }
 function sampleState(){
  return {visible:true,ready:true,sectors:[
@@ -124,8 +149,9 @@ new ResizeObserver(resize).observe(stage);
 function rotationFor(s){
  const a=s?.animation||{},target=Number(a.target_rotation||0);
  if(!a.spin_id||!a.started_at)return {rotation:0,complete:true};
- const start=Date.parse(a.started_at)-clockOffset,duration=Math.max(1,Number(a.duration_ms||8000));
- const p=Math.max(0,Math.min(1,(Date.now()-start)/duration));
+ if(String(a.spin_id)!==spinClock.id)syncSpinClock(s);
+ const duration=Math.max(1,Number(a.duration_ms||8000));
+ const p=Math.max(0,Math.min(1,(performance.now()-spinClock.startMono)/duration));
  const visualProgress=motionProgress(p,duration);
  return {rotation:target*visualProgress,complete:p>=1};
 }
@@ -196,7 +222,7 @@ function draw(){
  sectors.forEach((sec,i)=>{
    const span=sec.weight/total*Math.PI*2,end=start+span;
    ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,start,end);ctx.closePath();
-   ctx.fillStyle=PALETTE[i%PALETTE.length];ctx.fill();
+   ctx.fillStyle=sectorColor(sec,i);ctx.fill();
    ctx.strokeStyle="#15181B";ctx.lineWidth=1.5;ctx.stroke();
 
    const deg=span*180/Math.PI;
@@ -252,13 +278,16 @@ function animationFrame(){
  ensureAnimationLoop();
 }
 async function poll(){
+ if(pollActive)return;
+ pollActive=true;
  try{
    const res=await fetch(API,{cache:"no-store"});if(!res.ok)throw new Error(res.status);
    const next=await res.json();
    ObsVisibility.apply(next.visibility);
-   if(next.server_time)clockOffset=Date.parse(next.server_time)-Date.now();
+   syncSpinClock(next);
    state=next;
  }catch(e){if(!preview)state=null}
+ finally{pollActive=false}
  draw();
  ensureAnimationLoop();
 }
