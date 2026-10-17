@@ -701,6 +701,40 @@ def browser_smoke() -> None:
                                 "P15-C live glow enabled")
                         wait_js(preview, "state?.appearance?.glow_color", "#34A1F2",
                                 "P15-C live glow color")
+                        assert js(preview, """(()=> {
+                          const dark=wheelGlowPasses("#000000"),light=wheelGlowPasses("#FFFFFF");
+                          return dark.some(p=>p.contrast&&p.width>=20)
+                            && light.length>=4 && light.every(p=>!p.contrast);
+                        })()"""), "P15-D very dark glow lacks contrasting outer foundation"
+                        stream.wheel_pointer_label_enabled.setChecked(True)
+                        with patch.object(QMessageBox, "information"):
+                            stream._save_wheel_overlay_settings()
+                        wait_js(normal, "state?.appearance?.pointer_label_enabled", True,
+                                "P15-D live pointer label toggle")
+                        assert js(preview, """(()=> {
+                          const a=[{game_id:1,title:"First",weight:1},
+                                   {game_id:2,title:"Second",weight:3}];
+                          return sectorUnderPointer(a,0)?.game_id===1
+                            && sectorUnderPointer(a,90)?.game_id===2
+                            && sectorUnderPointer(a,315)?.game_id===1
+                            && sectorUnderPointer([],45)===null;
+                        })()"""), "P15-D browser sector hit geometry differs from Qt"
+                        assert js(preview, """(()=> {
+                          const old=state,oldClock=spinClock;
+                          try {
+                            state={visible:true,ready:true,sectors:[
+                              {game_id:1,title:"First",weight:1},
+                              {game_id:2,title:"Second",weight:3}],
+                              appearance:{pointer_label_enabled:true},
+                              animation:{spin_id:"P15D-TITLE",started_at:"2026-10-17T00:00:00Z",
+                                duration_ms:8000,target_rotation:720,complete:false}};
+                            spinClock={id:"P15D-TITLE",startMono:performance.now()-150};
+                            draw();
+                            return pointerLotEl.classList.contains("visible")
+                              && pointerLotEl.textContent.includes("Под стрелкой:");
+                          } finally {state=old;spinClock=oldClock;draw()}
+                        })()"""), "P15-D pointer caption not visible during active spin"
+
                         stream.wheel_glow_enabled.setChecked(False)
                         with patch.object(QMessageBox, "information"):
                             stream._save_wheel_overlay_settings()
