@@ -208,6 +208,25 @@ def ui_smoke() -> None:
     )
 
     app = QApplication.instance() or QApplication([])
+    # P15-F: synthetic square logo with an exterior black border and interior
+    # black tree stroke. Only its exterior dark margin should become green.
+    from PySide6.QtGui import QColor, QImage
+    from streaming_manager.default_wheel_icon import (
+        fill_default_icon_corners, default_wheel_icon_image,
+    )
+    synthetic = QImage(44, 44, QImage.Format.Format_ARGB32)
+    synthetic.fill(QColor("#000000"))
+    for y in range(6, 38):
+        for x in range(6, 38):
+            synthetic.setPixelColor(x, y, QColor("#34E415"))
+    for y in range(9, 34):
+        synthetic.setPixelColor(22, y, QColor("#000000"))
+    fixed = fill_default_icon_corners(synthetic)
+    assert fixed.size() == synthetic.size(), "P15-F resized fallback icon"
+    assert fixed.pixelColor(0, 0).name().upper() == "#34E415", "P15-F outer corner still black"
+    assert fixed.pixelColor(22, 22).name() == "#000000", "P15-F erased inner logo"
+    assert not default_wheel_icon_image().isNull()
+    assert default_wheel_icon_image().pixelColor(0, 0).green() > 100
     # UI-079: verify the actual local hit target, not only the ratio constant.
     # A point at 20% of wheel radius was outside the former 12% center.
     from PySide6.QtCore import QPointF
@@ -275,7 +294,41 @@ def ui_smoke() -> None:
                 assert res.status == 200
                 assert res.headers.get_content_type() == "image/png"
                 assert int(res.headers.get("Content-Length", "0")) > 100
-                assert res.read(4) == bytes([137, 80, 78, 71])
+                png = res.read()
+                assert png[:4] == bytes([137, 80, 78, 71])
+                from PySide6.QtGui import QImage
+                response_image = QImage.fromData(png)
+                assert not response_image.isNull()
+                assert response_image.pixelColor(0, 0).green() > 100
+                assert response_image.size() == default_wheel_icon_image().size()
+                assert response_image.pixelColor(0, 0) == default_wheel_icon_image().pixelColor(0, 0)
+            # UI-083: Settings and Auction quick picker share one persisted
+            # center choice. No global Save is required or allowed to revert it.
+            from streaming_manager.wheel_center_media import store_prepared_center_image
+            from streaming_manager.constants import WHEEL_CENTER_IMAGE_MEDIA_ID_KEY
+            from streaming_manager.default_wheel_icon import default_wheel_icon_png
+            asset = store_prepared_center_image(db, {
+                "data": default_wheel_icon_png(), "extension": ".png",
+                "label": "Immediate choice probe.png",
+            })
+            settings = window.settings_tab
+            settings._refresh_wheel_center_image_library()
+            selected_index = settings.wheel_center_image_combo.findData(asset.id)
+            assert selected_index > 0
+            settings.wheel_center_image_combo.setCurrentIndex(selected_index)
+            assert db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "") == str(asset.id), (
+                "P15-F Settings selection was not committed immediately"
+            )
+            assert db.current_wheel_payload()["center_image"]["enabled"]
+            settings.wheel_center_image_combo.setCurrentIndex(0)
+            assert db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "x") == "", (
+                "P15-F default image selection was not committed immediately"
+            )
+            with patch.object(QMessageBox, "information"):
+                settings.save_auction_settings()
+            assert db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "x") == "", (
+                "P15-F unrelated auction settings Save rewrote the center choice"
+            )
             stream = window.stream_tab
             assert hasattr(stream, "obs_show_modes"), "Missing common OBS mode controls"
             assert set(stream.obs_show_modes) == set(WIDGETS) - {"overlay"}
