@@ -420,6 +420,30 @@ def browser_smoke() -> None:
                         db.add_game(Game(None, title, None, 100, 0, STATUS_NOT_PLAYED, ""))
                         wait_js(normal, f"document.body.textContent.includes({json.dumps(title)})", True,
                                 route + " hidden content stays live")
+                    if widget == "auction_lots":
+                        # P14-A/UI-047: actual Chromium DOM + computed layout.
+                        # A real authoritative new lot must populate separate
+                        # rounded grid cards without fallback HTML table cells.
+                        wait_js(normal,
+                                "document.querySelectorAll('#lots-rows .lot-row').length > 0",
+                                True, "Auction Lots card row rendered")
+                        wait_js(normal, "document.querySelector('table') === null",
+                                True, "Auction Lots legacy table removed")
+                        wait_js(normal,
+                                "document.querySelectorAll('#header-row .lot-header').length >= 3",
+                                True, "Auction Lots separate header pills")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#lots-rows .lot-row')).display",
+                                "grid", "Auction Lots card grid layout")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('.lot-cell')).borderRadius",
+                                "6px", "Auction Lots rounded cell style")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#root')).borderRadius",
+                                "8px", "Auction Lots outer panel style")
+                        wait_js(normal,
+                                "getComputedStyle(document.querySelector('#lots-rows .col-title')).whiteSpace",
+                                "normal", "Auction Lots title wraps to browser width")
                     if widget == "timer":
                         runtime["mode"] = "weighted_wheel"
                         wait_js(normal, "document.querySelector('#timer').getAttribute('aria-label')",
