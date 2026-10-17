@@ -34,6 +34,8 @@ body.preview #preview-label{display:block}
 </div>
 <script>
 const API="/api/wheel";
+// UI-079: OBS mirrors the local center radius, with the same circular crop.
+const CENTER_RADIUS_RATIO=0.24;
 const PALETTE=["#4FC3F7","#FF8A65","#BA68C8","#81C784","#FFD54F","#64B5F6","#F06292","#4DB6AC","#A1887F","#90A4AE","#9575CD","#DCE775"];
 const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
 const stage=document.getElementById("stage"),winnerEl=document.getElementById("winner");
@@ -152,14 +154,14 @@ function syncCenterImage(s){
  centerImageEl.src=resolved;
 }
 function positionCenterImage(cx,cy,r){
- const cr=r*.12,inner=Math.max(1,cr-2),size=inner*2;
+ const cr=r*CENTER_RADIUS_RATIO,inner=Math.max(1,cr-2),size=inner*2;
  centerImageEl.style.left=(cx-inner)+"px";
  centerImageEl.style.top=(cy-inner)+"px";
  centerImageEl.style.width=size+"px";
  centerImageEl.style.height=size+"px";
 }
 function drawCenterBase(cx,cy,r){
- const cr=r*.12;
+ const cr=r*CENTER_RADIUS_RATIO;
  ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fillStyle="#25292D";ctx.fill();
  ctx.strokeStyle="#E8EDF2";ctx.lineWidth=2;ctx.stroke();
  positionCenterImage(cx,cy,r);
