@@ -1852,6 +1852,19 @@ def assert_wide_window_layout(app, window, test_sizes) -> None:
         raise AssertionError("P13-B FIX1 wide operator columns are not side by side")
     if auction.wheel_panel.isHidden():
         raise AssertionError("P13-B FIX1 local wheel is hidden in prestart weighted mode")
+    # P13-C UI-071: selecting wheel must expose wheel music in the shared
+    # timer, not the Max Amount music, without losing either saved editor.
+    if auction.wheel_soundtrack_widget.isHidden() or not auction.auction_soundtrack_widget.isHidden():
+        raise AssertionError("P13-C wheel prestart did not select wheel soundtrack in timer")
+    max_index = auction.mode_combo.findData("max_amount")
+    auction.mode_combo.setCurrentIndex(max_index)
+    app.processEvents()
+    if not auction.wheel_soundtrack_widget.isHidden() or auction.auction_soundtrack_widget.isHidden():
+        raise AssertionError("P13-C max-amount prestart did not select auction soundtrack in timer")
+    auction.mode_combo.setCurrentIndex(wheel_index)
+    app.processEvents()
+    if auction.wheel_soundtrack_widget.isHidden() or not auction.auction_soundtrack_widget.isHidden():
+        raise AssertionError("P13-C wheel soundtrack did not return on mode switch")
     wheel_position = auction.wheel_panel.mapTo(auction.conduct_page, QPoint(0, 0))
     setup_position = auction.setup_widget.mapTo(auction.conduct_page, QPoint(0, 0))
     timer_position = auction.timer_widget.mapTo(auction.conduct_page, QPoint(0, 0))
@@ -4092,8 +4105,19 @@ def main() -> int:
         if auction_page.wheel_panel.findChildren(type(auction_page.wheel_widget)).count(
                 auction_page.wheel_widget) != 1:
             raise AssertionError("P13-B duplicated the local wheel renderer")
-        if auction_page.wheel_soundtrack_widget.parent() is not auction_page.wheel_panel:
-            raise AssertionError("P13-B altered wheel soundtrack ownership prematurely")
+        # P13-C/UI-071: MOVE the original wheel soundtrack widgets, do not
+        # construct a second saved set. Both modes share one physical timer.
+        if auction_page.wheel_soundtrack_widget.parent() is not auction_page.timer_widget:
+            raise AssertionError("P13-C wheel soundtrack is outside shared timer")
+        if auction_page.auction_soundtrack_widget.parent() is not auction_page.timer_widget:
+            raise AssertionError("P13-C existing auction soundtrack left shared timer")
+        timer_layout = auction_page.timer_widget.layout()
+        if (timer_layout.indexOf(auction_page.auction_soundtrack_widget) < 0
+                or timer_layout.indexOf(auction_page.wheel_soundtrack_widget) < 0):
+            raise AssertionError("P13-C timer does not own both existing soundtrack editors")
+        if auction_page.wheel_panel.findChildren(type(auction_page.wheel_soundtrack_widget)).count(
+                auction_page.wheel_soundtrack_widget) != 0:
+            raise AssertionError("P13-C left a wheel soundtrack duplicate in wheel panel")
 
         # P13-A/UI-053: same authoritative /timer-overlay route; preview is
         # ?preview=1 on this existing widget, not a parallel OBS endpoint.

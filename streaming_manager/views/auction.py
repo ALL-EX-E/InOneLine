@@ -924,8 +924,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         wheel_heading_row.addStretch()
         wheel_panel_layout.addLayout(wheel_heading_row)
 
+        # P13-C/UI-071: move the ONE existing wheel soundtrack editor into
+        # the already-shared timer. The auction and wheel soundtrack widgets
+        # retain their separate saved selections/gain/mute and handlers.
         self.wheel_soundtrack_widget = self._build_wheel_soundtrack_controls()
-        wheel_panel_layout.addWidget(self.wheel_soundtrack_widget)
+        timer_layout.insertWidget(2, self.wheel_soundtrack_widget)
 
         self.wheel_widget = AuctionWheelWidget()
         self.wheel_widget.spinFinished.connect(
