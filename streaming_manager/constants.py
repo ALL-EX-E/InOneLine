@@ -120,6 +120,9 @@ WHEEL_GLOW_ENABLED_KEY = "wheel_glow_enabled"
 WHEEL_GLOW_ENABLED_DEFAULT = False
 WHEEL_GLOW_COLOR_KEY = "wheel_glow_color"
 WHEEL_GLOW_COLOR_DEFAULT = "#FFFFFF"
+# D42/UI-079: optional current sector shown during spinning (local + OBS).
+WHEEL_POINTER_LABEL_ENABLED_KEY = "wheel_pointer_label_enabled"
+WHEEL_POINTER_LABEL_ENABLED_DEFAULT = False
 
 # D19 — one application-owned center image shared by the local and OBS wheel.
 # Empty value preserves the historical standard center.
