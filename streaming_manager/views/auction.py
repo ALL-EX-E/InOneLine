@@ -45,6 +45,8 @@ from PySide6.QtWidgets import (
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
 from ..constants import (
+    AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT,
+    AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
     AUCTION_MANUAL_BID_POINTS_MAX,
     AUCTION_MANUAL_BID_POINTS_MIN,
     AUCTION_MIN_DURATION_MS,
@@ -234,15 +236,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._bets_auction_id: int | None = None
         self._bets_last_log_id = 0
         self._history_hover_brushes: list[tuple[QTableWidgetItem, QBrush]] = []
-        # A7: while a history-linked lot is hovered, the Conduct auto-scroll
-        # must stay frozen at the revealed row without changing operator selection.
-        self._history_hover_pauses_auto_scroll = False
-        # Both inner auction tables and the dedicated auction-lots OBS overlay
-        # share one session-only auto-scroll switch. It deliberately starts OFF
-        # on every application launch and is never stored in settings.
-        self._desktop_lot_auto_scroll_enabled = False
-        self._lots_scroll_direction = 1
-        self._conduct_scroll_direction = 1
+        # UI-074: only the OBS Auction Lots overlay scrolls automatically.
+        # Restore the shared setting; never move the operator's local table.
+        self._obs_lot_auto_scroll_enabled = (
+            str(self.db.get_setting(
+                AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
+                "1" if AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT else "0",
+            )).strip().casefold() in {"1", "true", "yes", "on"}
+        )
         self._init_wheel_audio()
 
         layout = QVBoxLayout(self)
@@ -309,7 +310,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             "Музыка аукциона настраивается рядом с таймером. Способ вывода звука выбирается в поле «Вывод музыки»; подробности — в подсказке «Как выводится звук в OBS?».\n\n"
             "Предпросмотр и OBS\n"
             "«Правила аукциона» открывают редактор текста и оформления правил. Предпросмотр показывает выбранный шаблон, а рабочий виджет OBS — активный сохранённый шаблон. Для изменения эфира сохраните изменения и при необходимости активируйте нужный шаблон.\n"
-            "Кнопки «Копировать URL списка лотов» и «Открыть предпросмотр списка лотов» относятся к отдельному виджету списка лотов. «Автопрокрутка» управляет прокруткой таблицы в программе.\n"
+            "Кнопки «Копировать URL списка лотов» и «Открыть предпросмотр списка лотов» относятся к отдельному виджету списка лотов. «Автопрокрутка оверлея» управляет только OBS-виджетом; локальная таблица прокручивается вручную.\n"
         )
         self.conduct_rules_label.setWordWrap(True)
         self.conduct_rules_label.setProperty("muted", True)
@@ -763,12 +764,13 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         conduct_heading_row.addWidget(self.wheel_chance_checkbox)
 
-        self.conduct_scroll_btn = QPushButton("Включить прокрутку")
+        self.conduct_scroll_btn = QPushButton("Автопрокрутка оверлея: ВЫКЛ")
         self.conduct_scroll_btn.setToolTip(
-            "Включить/выключить автоматическую прокрутку обоих локальных списков лотов "
-            "и OBS-оверлея списка лотов."
+            "Автоматически прокручивать только список лотов OBS. "
+            "Прокрутка локальной таблицы остаётся ручной. "
+            "Настройка сохраняется между перезапусками."
         )
-        self.conduct_scroll_btn.clicked.connect(self._toggle_desktop_lot_auto_scroll)
+        self.conduct_scroll_btn.clicked.connect(self._toggle_overlay_lot_auto_scroll)
         conduct_heading_row.addWidget(self.conduct_scroll_btn)
 
         self.conduct_copy_lots_overlay_url_btn = QPushButton(
@@ -1030,15 +1032,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.timer_display_timer.setInterval(25)
         self.timer_display_timer.timeout.connect(self._tick_timer_display)
 
-        # Один таймер обслуживает оба локальных списка лотов. Две кнопки
-        # показывают и меняют одно session-only состояние (default OFF).
-        # OBS/list-overlay имеют собственную независимую прокрутку.
-        self.conduct_scroll_timer = QTimer(self)
-        self.conduct_scroll_timer.setInterval(40)
-        self.conduct_scroll_timer.timeout.connect(
-            self._auto_scroll_conduct_lots
-        )
-
         self.auction_history_timer = QTimer(self)
         self.auction_history_timer.setInterval(750)
         self.auction_history_timer.timeout.connect(self._poll_auction_history)
@@ -1058,11 +1051,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.refresh_rng_availability()
         self.refresh()
         self._handle_prestart_mode_changed()
-
-        # P12-A: the one Auction page is always the Conduct page, including
-        # an open session restored after restarting the application.
-        if self._current_session() is not None:
-            QTimer.singleShot(0, self._reset_conduct_auto_scroll)
 
 
 
@@ -2015,7 +2003,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 if hasattr(self, "wheel_format_combo")
                 else self._prestart_wheel_format
             ),
-            "auto_scroll": bool(self._desktop_lot_auto_scroll_enabled),
+            "auto_scroll": bool(self._obs_lot_auto_scroll_enabled),
             "audio": self.auction_browser_audio_state(),
         }
 
@@ -2029,7 +2017,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         if not visible:
             self.timer_display_timer.stop()
-            self.conduct_scroll_timer.stop()
             self.auction_history_timer.stop()
             self.integration_status_timer.stop()
             self._clear_history_hover_highlight()
@@ -2045,10 +2032,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._sync_session_state_without_table_rebuild()
 
         self._sync_timer_display_activity()
-        self._set_timer_running(
-            self.conduct_scroll_timer,
-            bool(self._desktop_lot_auto_scroll_enabled),
-        )
         self._set_timer_running(
             self.auction_history_timer,
             True,
@@ -2523,10 +2506,9 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         if target_row < 0 or target_item is None:
             return
 
-        # A7 manual correction: a linked visible lot must become immediately
-        # visible and stay put for as long as the history card is hovered.
+        # A7 manual correction: hover brings a linked lot into view without
+        # altering operator selection or persisted OBS-autoscroll state.
         # scrollToItem changes only the viewport; it does not change selection.
-        self._history_hover_pauses_auto_scroll = True
         self.conduct_table.scrollToItem(
             target_item,
             QAbstractItemView.ScrollHint.PositionAtCenter,
@@ -2547,9 +2529,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             except RuntimeError:
                 pass
         self._history_hover_brushes.clear()
-        # Do not reset scroll direction or position: the normal timer resumes
-        # from the revealed row after the pointer leaves the history card.
-        self._history_hover_pauses_auto_scroll = False
 
     def _selected_conduct_is_temporary_lot(self) -> bool:
         row = self.conduct_table.currentRow()
