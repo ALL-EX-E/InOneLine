@@ -717,20 +717,24 @@ def browser_smoke() -> None:
                           return defaultCenterImageEl.style.display==="block"
                             && defaultCenterImageEl.style.width===centerImageEl.style.width;
                         })()"""), "P15-E fallback icon not centered"
+                        # Test async image-success behavior synchronously,
+                        # so background API polls cannot restore the prestart
+                        # empty selection before the simulated custom load.
+                        # Actual image bytes and content type were checked via
+                        # the real read-only HTTP endpoint in ui_smoke.
                         assert js(preview, """(()=> {
                           syncCenterImage({center_image:{enabled:true,
                             url:"/wheel-default-icon",asset_id:"default"}});
-                          return centerImageEl.src.includes("/wheel-default-icon");
-                        })()"""), "P15-E custom image not prioritized"
-                        wait_js(preview, "centerImageEl.style.display", "block",
-                                "P15-E custom center image overrides app logo")
-                        assert js(preview, "defaultCenterImageEl.style.display==='none'"), (
-                            "P15-E fallback logo overlays custom image")
-                        assert js(preview, """(()=> {
+                          const correctUrl=centerImageEl.src.includes("/wheel-default-icon");
+                          const hasOnload=typeof centerImageEl.onload==="function";
+                          if(hasOnload)centerImageEl.onload();
+                          const overridden=centerImageEl.style.display==="block"
+                            && defaultCenterImageEl.style.display==="none";
                           syncCenterImage({center_image:{enabled:false}});
-                          return defaultCenterImageEl.style.display==="block"
-                             && centerImageEl.style.display==="none";
-                        })()"""), "P15-E fallback not restored after custom is cleared"
+                          const restored=defaultCenterImageEl.style.display==="block"
+                            && centerImageEl.style.display==="none";
+                          return correctUrl&&hasOnload&&overridden&&restored;
+                        })()"""), "P15-E custom-overrides-default and reset restore failed"
                         stream.wheel_glow_enabled.setChecked(True)
                         stream._set_color_button(stream.wheel_glow_color_btn, "#34A1F2")
                         with patch.object(QMessageBox, "information"):
