@@ -109,6 +109,7 @@ from ..time_input import parse_duration_input
 from .common import ScrollSafeComboBox, make_screen_color_picker_button, pick_screen_color
 
 class SettingsTab(QWidget):
+    wheelCenterChanged = Signal(int)
     twitch_device_code_ready = Signal(object)
     donationalerts_oauth_ready = Signal(object)
 
@@ -360,6 +361,9 @@ class SettingsTab(QWidget):
         self.wheel_center_image_combo.setMaximumWidth(240)
         self.wheel_center_image_combo.currentIndexChanged.connect(
             self._update_wheel_center_image_status
+        )
+        self.wheel_center_image_combo.currentIndexChanged.connect(
+            self._save_wheel_center_selection_immediately
         )
         self.wheel_center_select_row.addWidget(self.wheel_center_image_combo)
         self.add_wheel_center_file_btn = QPushButton("Добавить файл…")
@@ -906,14 +910,12 @@ class SettingsTab(QWidget):
             QMessageBox.warning(self, "Настройки аукциона", str(exc))
             return
 
-        wheel_center_asset = self._selected_wheel_center_image_asset()
+        # UI-083: center image is committed on selection, never on the
+        # unrelated auction settings Save button.
         self.db.set_settings_bulk(
             {
                 "auction_max_amount_default_duration_ms": str(max_amount_duration_ms),
                 "auction_wheel_default_duration_ms": str(wheel_duration_ms),
-                WHEEL_CENTER_IMAGE_MEDIA_ID_KEY: (
-                    str(wheel_center_asset.id) if wheel_center_asset is not None else ""
-                ),
                 AUCTION_AUTO_EXTEND_LEADER_ENABLED_KEY: (
                     "1" if self.auto_extend_leader_enabled.isChecked() else "0"
                 ),
@@ -994,11 +996,29 @@ class SettingsTab(QWidget):
         combo.blockSignals(False)
         self._update_wheel_center_image_status()
 
+    def _save_wheel_center_selection_immediately(self, _index: int = -1) -> None:
+        """Same instant persistent choice as the Auction wheel quick picker."""
+        asset = self._selected_wheel_center_image_asset()
+        selected = str(asset.id) if asset is not None else ""
+        if asset is not None and not media_asset_available(self.db.path.parent, asset):
+            self._refresh_wheel_center_image_library()
+            QMessageBox.warning(
+                self, "Изображение центра",
+                "Выбранный файл недоступен. Добавьте изображение заново.",
+            )
+            return
+        previous = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
+        if previous == selected:
+            return
+        self.db.set_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, selected)
+        self._update_wheel_center_image_status()
+        self.wheelCenterChanged.emit(asset.id if asset is not None else 0)
+
     def _update_wheel_center_image_status(self, _index: int = -1) -> None:
         asset = self._selected_wheel_center_image_asset()
         if asset is None:
             self.wheel_center_image_status.setText(
-                "Используется стандартный центр колеса без пользовательского изображения."
+                "Выбрана стандартная иконка InOneLine. Выбор сохранён."
             )
             self.wheel_center_image_status.setToolTip("")
             return
@@ -1009,7 +1029,7 @@ class SettingsTab(QWidget):
         except (OSError, ValueError):
             self.wheel_center_image_status.setToolTip("")
         self.wheel_center_image_status.setText(
-            "Локальная копия готова. Нажмите «Сохранить настройки аукциона»."
+            "Изображение выбрано и сохранено."
             if available
             else "Файл локальной копии недоступен — добавьте изображение заново."
         )
@@ -1073,6 +1093,7 @@ class SettingsTab(QWidget):
         try:
             asset = store_prepared_center_image(self.db, result)
             self._refresh_wheel_center_image_library(asset.id)
+            self._save_wheel_center_selection_immediately()
             self.wheel_center_image_source.clear()
         except Exception as exc:
             self._wheel_center_image_import_failed(exc)

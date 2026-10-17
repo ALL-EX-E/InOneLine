@@ -247,6 +247,11 @@ class MainWindow(QMainWindow):
         self.auction_tab.centerImageChanged.connect(
             self.settings_tab._refresh_wheel_center_image_library
         )
+        self.settings_tab.wheelCenterChanged.connect(
+            lambda _id: self.auction_tab._update_wheel_panel(
+                self.auction_tab._current_session()
+            )
+        )
 
         # Синхронизированный поиск маршрутизируется самими вкладками через
         # sync_search_text(). MainWindow централизованно решает, какую таблицу

@@ -13,6 +13,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from ..wheel_motion import wheel_motion_progress
+from ..default_wheel_icon import default_wheel_icon_image
 
 try:
     from PySide6.QtOpenGLWidgets import QOpenGLWidget
@@ -67,7 +68,7 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._default_center_icon_path = (
             Path(__file__).resolve().parents[2] / "assets" / "InOneLine_icon_master.png"
         )
-        self._default_center_pixmap = QPixmap(str(self._default_center_icon_path))
+        self._default_center_pixmap = QPixmap.fromImage(default_wheel_icon_image())
         self._spin_id = None
         self._spin_start_monotonic: float | None = None
         self._finished_emitted_for_spin = None

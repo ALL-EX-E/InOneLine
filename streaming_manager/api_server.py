@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .constants import APP_VERSION
+from .default_wheel_icon import default_wheel_icon_png
 from .database import Database
 from .music_player import music_player_overlay_appearance
 from .media import (
@@ -443,14 +444,19 @@ class LocalApiServer:
                 parsed = urlparse(self.path)
                 path = parsed.path.rstrip("/") or "/"
                 if path == "/wheel-default-icon":
-                    # Fixed bundled asset; no file path or user input is used.
-                    self._send_local_media_path(
-                        Path(__file__).resolve().parent.parent
-                        / "assets" / "InOneLine_icon_master.png",
-                        allowed_extensions=frozenset({".png"}),
-                        not_found_error="wheel_default_icon_not_found",
-                        unsupported_error="wheel_default_icon_unsupported",
-                    )
+                    # Fixed, cached presentation-only PNG. The original bundled
+                    # square icon is untouched and never user-controlled.
+                    content = default_wheel_icon_png()
+                    if not content:
+                        self._send_json({"error": "wheel_default_icon_not_found"}, 404)
+                        return
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/png")
+                    self.send_header("Content-Length", str(len(content)))
+                    self.send_header(OVERLAY_VERSION_HEADER, APP_VERSION)
+                    self.send_header("Cache-Control", "no-store")
+                    self.end_headers()
+                    self.wfile.write(content)
                     return
                 if path == "/obs-visibility.js":
                     self._send_text(
