@@ -397,14 +397,19 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         setup.addWidget(self.wheel_format_combo, 2, 1)
 
-        # P13-B/UI-062: wheel preview shares the upper operator region
-        # with winner-method controls rather than widening the lot/history row.
-        # Its existing soundtrack stays with the panel until UI-071 moves
-        # existing controls to the common contextual timer (no duplicate).
-        self.method_wheel_row = QHBoxLayout()
-        self.method_wheel_row.setSpacing(12)
-        self.method_wheel_row.addWidget(self.setup_widget, 3)
-        conduct_layout.addLayout(self.method_wheel_row)
+        # P13-B FIX1: one responsive two-column operator area.
+        # Wide: method controls then the local wheel on the LEFT; the existing
+        # timer occupies the RIGHT from the same top edge. Narrow: stack the
+        # two columns without creating another wheel, timer, or audio source.
+        self.operator_columns = QHBoxLayout()
+        self.operator_columns.setSpacing(12)
+        self.operator_left = QVBoxLayout()
+        self.operator_left.setSpacing(8)
+        self.operator_right = QVBoxLayout()
+        self.operator_right.setSpacing(8)
+        self.operator_columns.addLayout(self.operator_left, 3)
+        self.operator_columns.addLayout(self.operator_right, 2)
+        self.operator_left.addWidget(self.setup_widget)
 
         self.wheel_obs_widget = QWidget()
         wheel_obs_row = QHBoxLayout(self.wheel_obs_widget)
@@ -417,7 +422,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         wheel_obs_row.addWidget(self.copy_wheel_url_btn)
         wheel_obs_row.addWidget(self.preview_wheel_btn)
         wheel_obs_row.addStretch()
-        conduct_layout.addWidget(self.wheel_obs_widget)
+        self.operator_left.addWidget(self.wheel_obs_widget)
 
         self.state_widget = QWidget()
         state_row = QHBoxLayout(self.state_widget)
@@ -591,10 +596,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         timer_finish_row.addWidget(self.cancel_btn)
         timer_layout.addWidget(self.timer_finish_widget)
 
-        timer_align_row = QHBoxLayout()
-        timer_align_row.addStretch()
-        timer_align_row.addWidget(self.timer_widget)
-        conduct_layout.addLayout(timer_align_row)
+        # Keep the actual shared timer in the right-hand operator column,
+        # not underneath the relocated wheel on wide windows.
+        self.operator_right.addWidget(self.timer_widget, 0, Qt.AlignTop)
+        self.operator_right.addStretch()
+        conduct_layout.addLayout(self.operator_columns)
 
         # Остальные контекстные действия относятся к ничьей, подтверждению
         # результата и проверке RNG. Запуск колеса находится в самом таймере.
@@ -934,10 +940,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         wheel_panel_layout.addWidget(self.wheel_widget, 1)
 
         self.wheel_panel.setMinimumWidth(300)
+        self.wheel_panel.setMaximumWidth(700)
         self.wheel_panel.setVisible(False)
-        # Same one wheel widget, now in the upper method region. Keep the
-        # lower workspace as exactly the table and Bets/History.
-        self.method_wheel_row.addWidget(self.wheel_panel, 2)
+        # Insert below method/format buttons and above OBS wheel actions.
+        # Soundtrack controls remain with this one original panel (UI-071 later).
+        self.operator_left.insertWidget(1, self.wheel_panel)
+        self.operator_left.addStretch()
 
         # P13-B: the lower workspace contains only lots plus Bets/History;
         # the local wheel no longer adds a third competing wide column.
