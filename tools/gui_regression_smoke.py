@@ -4136,6 +4136,38 @@ def main() -> int:
         if auction_page.wheel_panel.findChildren(type(auction_page.wheel_soundtrack_widget)).count(
                 auction_page.wheel_soundtrack_widget) != 0:
             raise AssertionError("P13-C left a wheel soundtrack duplicate in wheel panel")
+        # P13-D cosmetic follow-up: the old QWidget and QLabel dark paints
+        # must not appear as rectangular strips over the timer card surface.
+        for host in (
+            auction_page.auction_soundtrack_widget,
+            auction_page.wheel_soundtrack_widget,
+        ):
+            if host.property("cardContent") is not True:
+                raise AssertionError("P13-D follow-up soundtrack host paints dark strip")
+        from streaming_manager.views.common import APP_STYLE
+        if ('QFrame[sectionCard="true"] QLabel' not in APP_STYLE
+                or 'QWidget[cardContent="true"]' not in APP_STYLE):
+            raise AssertionError("P13-D scoped transparent card text/host styles missing")
+        # P14-A/UI-047: actual OBS HTML must render separate rounded cells,
+        # not the old HTML table grid. Keep the existing payload/poll/scroll
+        # policy and the exact adaptive position/chance/points width logic.
+        lots_html = (
+            Path(__file__).resolve().parent.parent
+            / "streaming_manager" / "web" / "auction_lots_overlay.html"
+        ).read_text(encoding="utf-8")
+        for token in (
+            'id="lots-rows"', 'class="lot-row"', 'grid-template-columns: var(--lot-columns)',
+            'border-radius: 8px', 'border-radius: 6px',
+            'gridColumns(widths, currentShowChance, currentPositionMode)',
+            'const API = "/api/auction-lots"',
+            'Boolean((payload || {}).auto_scroll)',
+        ):
+            if token not in lots_html:
+                raise AssertionError(f"P14-A Auction Lots card layout contract missing {token}")
+        if any(token in lots_html for token in (
+            "<table", "<tbody", "<thead", "border-collapse:", "buildColumnGroup("
+        )):
+            raise AssertionError("P14-A Auction Lots still contains legacy table grid")
 
         # P13-A/UI-053: same authoritative /timer-overlay route; preview is
         # ?preview=1 on this existing widget, not a parallel OBS endpoint.

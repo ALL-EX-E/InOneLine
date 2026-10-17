@@ -9,6 +9,14 @@
   --font-family: "Segoe UI", Arial, sans-serif;
   --font-size: 24px;
   --font-color: #FFFFFF;
+  /* P14-A/UI-047: glass outer panel + independently rounded list cells,
+     matching the accepted list-overlay principles without a table grid. */
+  --lot-panel-bg: rgba(10, 13, 16, .74);
+  --lot-cell-bg: rgba(24, 40, 52, .76);
+  --lot-header-bg: rgba(36, 64, 84, .94);
+  --lot-border: rgba(255, 255, 255, .8);
+  --lot-glow: rgba(175, 219, 248, .45);
+  --lot-columns: minmax(0, 1fr);
 }
 * { box-sizing: border-box; }
 html, body {
@@ -49,11 +57,18 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 10px 9px;
+  background: var(--lot-panel-bg);
+  border: 1px solid var(--lot-border);
+  box-shadow: 0 0 6px var(--lot-glow), 0 0 14px var(--lot-glow),
+    inset 0 0 8px rgba(255, 255, 255, .12);
+  border-radius: 8px;
 }
 #header-shell {
   flex: 0 0 auto;
   width: 100%;
   overflow: hidden;
+  padding-bottom: 9px;
 }
 #viewport {
   position: relative;
@@ -62,44 +77,47 @@ body {
   width: 100%;
   overflow: hidden;
 }
-table {
+#lots-rows {
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-#lots-table {
+  display: flex;
+  flex-direction: column;
   transform: translateY(0);
   will-change: transform;
 }
-th {
-  font-weight: 700;
-  text-align: center;
-  border-bottom: 1px solid currentColor;
-}
-th, td {
-  padding: .48em .65em;
-  vertical-align: middle;
-}
-tbody tr { background: transparent; }
-td { border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
-th:not(:last-child),
-td:not(:last-child) {
-  border-right: 1px solid color-mix(in srgb, currentColor 24%, transparent);
-}
-.col-pos,
-.col-chance,
-.col-points {
-  text-align: center;
-  white-space: nowrap;
-  padding-left: .45em;
-  padding-right: .45em;
-}
-.col-title {
+#header-row, .lot-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--lot-columns);
+  gap: 8px;
   min-width: 0;
-  text-align: left;
+}
+.lot-row { padding-bottom: 9px; }
+.lot-cell {
+  min-width: 0;
+  padding: .45em .58em;
+  text-align: center;
+  border: 1px solid var(--lot-border);
+  border-radius: 6px;
+  background: var(--lot-cell-bg);
+  box-shadow: 0 0 5px var(--lot-glow), inset 0 0 4px rgba(255,255,255,.06);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.lot-header {
+  background: var(--lot-header-bg);
+  font-weight: 700;
+}
+.col-pos, .col-chance, .col-points {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.col-title {
+  text-align: left;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 #empty {
   display: none;
@@ -140,16 +158,10 @@ body.preview #api-state.visible { display: block; }
 <video id="background-video" autoplay muted loop playsinline></video>
 <div id="root">
   <div id="header-shell">
-    <table id="header-table">
-      <colgroup id="header-cols"></colgroup>
-      <thead><tr id="header-row"></tr></thead>
-    </table>
+    <div id="header-row" class="lot-row" role="row"></div>
   </div>
   <div id="viewport">
-    <table id="lots-table">
-      <colgroup id="body-cols"></colgroup>
-      <tbody id="body"></tbody>
-    </table>
+    <div id="lots-rows" role="rowgroup"></div>
     <div id="empty">Список лотов пуст</div>
   </div>
 </div>
@@ -165,12 +177,10 @@ body.preview #api-state.visible { display: block; }
   if (preview) document.body.classList.add("preview");
 
   const headerShell = document.getElementById("header-shell");
-  const headerCols = document.getElementById("header-cols");
   const headerRow = document.getElementById("header-row");
   const viewport = document.getElementById("viewport");
-  const bodyCols = document.getElementById("body-cols");
-  const table = document.getElementById("lots-table");
-  const body = document.getElementById("body");
+  const table = document.getElementById("lots-rows");
+  const body = table;
   const empty = document.getElementById("empty");
   const measureCell = document.getElementById("measure-cell");
   const apiState = document.getElementById("api-state");
@@ -190,14 +200,16 @@ body.preview #api-state.visible { display: block; }
   const measureCache = new Map();
 
   function addCell(row, text, className, header = false) {
-    const cell = document.createElement(header ? "th" : "td");
-    cell.className = className;
+    const cell = document.createElement("div");
+    cell.className = className + " lot-cell" + (header ? " lot-header" : "");
     cell.textContent = String(text ?? "");
+    cell.setAttribute("role", header ? "columnheader" : "cell");
     row.appendChild(cell);
   }
 
-  function buildColumnGroup(target, widths, showChance, positionMode) {
-    const fragment = document.createDocumentFragment();
+  function gridColumns(widths, showChance, positionMode) {
+    // Preserve existing size-to-content position/chance/points policy.
+    // Title consumes the remaining width, same as the old table colgroup.
     const positionWidths = positionMode === "start_current"
       ? [widths.start, widths.current]
       : [widths.position];
@@ -207,12 +219,9 @@ body.preview #api-state.visible { display: block; }
       ...(showChance ? [widths.chance] : []),
       widths.points,
     ];
-    for (const width of ordered) {
-      const col = document.createElement("col");
-      if (Number.isFinite(width)) col.style.width = Math.ceil(width) + "px";
-      fragment.appendChild(col);
-    }
-    target.replaceChildren(fragment);
+    return ordered.map(width =>
+      Number.isFinite(width) ? Math.ceil(width) + "px" : "minmax(0, 1fr)"
+    ).join(" ");
   }
 
   function measureText(text, className, bold) {
@@ -229,7 +238,9 @@ body.preview #api-state.visible { display: block; }
     measureCell.className = className;
     measureCell.style.fontWeight = bold ? "700" : "400";
     measureCell.textContent = String(text ?? "");
-    const width = Math.ceil(measureCell.getBoundingClientRect().width) + 2;
+    // Reserve cell padding, border and glow spacing for each auto column.
+    const width = Math.ceil(measureCell.getBoundingClientRect().width)
+      + Math.ceil(parseFloat(getComputedStyle(document.body).fontSize) * 1.2) + 10;
     measureCache.set(key, width);
     return width;
   }
@@ -284,17 +295,9 @@ body.preview #api-state.visible { display: block; }
       ),
     };
 
-    buildColumnGroup(
-      headerCols,
-      widths,
-      currentShowChance,
-      currentPositionMode
-    );
-    buildColumnGroup(
-      bodyCols,
-      widths,
-      currentShowChance,
-      currentPositionMode
+    document.getElementById("root").style.setProperty(
+      "--lot-columns",
+      gridColumns(widths, currentShowChance, currentPositionMode)
     );
     clampScroll();
   }
@@ -332,7 +335,9 @@ body.preview #api-state.visible { display: block; }
 
     const fragment = document.createDocumentFragment();
     for (const item of rows) {
-      const tr = document.createElement("tr");
+      const tr = document.createElement("div");
+      tr.className = "lot-row";
+      tr.setAttribute("role", "row");
       if (positionMode === "start_current") {
         addCell(tr, item.start_position, "col-pos");
         addCell(tr, item.current_position, "col-pos");
@@ -348,7 +353,7 @@ body.preview #api-state.visible { display: block; }
 
     const hasRows = rows.length > 0;
     headerShell.style.display = hasRows ? "block" : "none";
-    table.style.display = hasRows ? "table" : "none";
+    table.style.display = hasRows ? "flex" : "none";
     empty.style.display = hasRows ? "none" : "flex";
     scheduleColumnSync();
     return true;
