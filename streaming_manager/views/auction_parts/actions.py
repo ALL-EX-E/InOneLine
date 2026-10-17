@@ -522,6 +522,19 @@ class AuctionActionMixin:
         self._stop_wheel_soundtrack(immediate=True)
         self._release_auction_audio_owner()
         self._active_auction_id = None
+        if (
+            str(session.get("mode") or "") == "weighted_wheel"
+            or str(session.get("status") or "") == "awaiting_wheel"
+            or session.get("wheel_spin_id")
+        ):
+            # The editor held this spin's live remainder. Its authoritative
+            # configured duration must seed the next spin, not that remainder.
+            full_ms = int(session.get("wheel_duration_ms") or self._prestart_wheel_duration_ms)
+            self._prestart_wheel_duration_ms = full_ms
+            self._sync_timer_display_state(None)
+            if str(self.mode_combo.currentData() or "") == "weighted_wheel":
+                self._timer_context = "wheel"
+                self._set_wheel_timer_ms(full_ms)
         self._prepare_next_max_amount_timer()
         # Отмена может перевести временные auction_only-лоты в обычные игры.
         # Сообщаем главному окну об изменении общей игровой базы: текущая

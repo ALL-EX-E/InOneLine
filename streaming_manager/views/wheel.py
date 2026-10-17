@@ -116,15 +116,25 @@ class AuctionWheelWidget(QOpenGLWidget):
 
     def _position_center_edit_label(self) -> None:
         rect = self._center_rect()
-        available_width = max(1, int(rect.width() * 0.9))
+        available_width = max(1, int(rect.width() * 0.76))
+        available_height = max(1, int(rect.height() * 0.32))
         font = self.font()
-        font.setPixelSize(11)
-        while font.pixelSize() > 7 and QFontMetricsF(font).horizontalAdvance("Изменить") + 8 > available_width:
+        font.setPixelSize(9)
+        while font.pixelSize() > 5 and (
+            QFontMetricsF(font).horizontalAdvance("Изменить") + 4 > available_width
+            or QFontMetricsF(font).height() + 2 > available_height
+        ):
             font.setPixelSize(font.pixelSize() - 1)
         metrics = QFontMetricsF(font)
         self._center_edit_label.setFont(font)
-        width = min(available_width, math.ceil(metrics.horizontalAdvance("Изменить")) + 8)
-        height = math.ceil(metrics.height()) + 4
+        # The application QWidget QSS font overrides setFont(). Scope the
+        # fitted pixel size here too, so the actual label uses these metrics.
+        self._center_edit_label.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 155); color: white; border-radius: 4px;"
+            f"font-size: {font.pixelSize()}px;"
+        )
+        width = min(available_width, math.ceil(metrics.horizontalAdvance("Изменить")) + 4)
+        height = min(available_height, math.ceil(metrics.height()) + 2)
         self._center_edit_label.setGeometry(
             round(rect.center().x() - width * 0.5),
             round(rect.center().y() - height * 0.5), width, height,
