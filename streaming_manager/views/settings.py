@@ -1291,6 +1291,29 @@ class SettingsTab(QWidget):
         self._integration_buttons = []
         self._integration_config_editors = {}
 
+    @staticmethod
+    def _integration_action_specs(view) -> tuple[tuple[str, str], ...]:
+        """Show only actions valid for the persisted provider lifecycle."""
+        if view.status == "not_configured":
+            return (("Подключить", "connect"),)
+        if not view.enabled:
+            if view.status == "connected":
+                return (
+                    ("Включить", "enable"),
+                    ("Удалить подключение", "remove_connection"),
+                )
+            return (
+                ("Включить", "enable"),
+                ("Переподключить", "reconnect"),
+                ("Удалить подключение", "remove_connection"),
+            )
+        return (
+            ("Проверить соединение", "check_connection"),
+            ("Переподключить", "reconnect"),
+            ("Отключить", "disconnect"),
+            ("Удалить подключение", "remove_connection"),
+        )
+
     def _refresh_integrations(self) -> None:
         if not hasattr(self, "integration_cards_layout"):
             return
@@ -1356,31 +1379,22 @@ class SettingsTab(QWidget):
                 self._build_twitch_b4_controls(card_layout, view)
 
             actions = QHBoxLayout()
-            specs = (
-                ("Подключить", "connect"),
-                ("Проверить соединение", "check_connection"),
-                ("Переподключить", "reconnect"),
-                ("Отключить", "disconnect"),
-            )
-            for label, action in specs:
-                if action == "connect" and view.service_key == "twitch":
-                    display_label = "Подключить Twitch"
-                elif action == "connect" and view.service_key == "donationalerts":
-                    display_label = "Подключить DonationAlerts"
+            for label, action in self._integration_action_specs(view):
+                if action == "connect":
+                    display_label = f"Подключить {view.display_name}"
                 else:
                     display_label = label
                 button = QPushButton(display_label)
-                button.clicked.connect(
-                    lambda _checked=False, key=view.service_key, op=action: self._run_integration_action(key, op)
-                )
+                if action == "remove_connection":
+                    button.clicked.connect(
+                        lambda _checked=False, key=view.service_key: self._confirm_remove_integration(key)
+                    )
+                else:
+                    button.clicked.connect(
+                        lambda _checked=False, key=view.service_key, op=action: self._run_integration_action(key, op)
+                    )
                 actions.addWidget(button)
                 self._integration_buttons.append(button)
-            remove = QPushButton("Удалить подключение")
-            remove.clicked.connect(
-                lambda _checked=False, key=view.service_key: self._confirm_remove_integration(key)
-            )
-            actions.addWidget(remove)
-            self._integration_buttons.append(remove)
             actions.addStretch()
             card_layout.addLayout(actions)
             self.integration_cards_layout.addWidget(card)
