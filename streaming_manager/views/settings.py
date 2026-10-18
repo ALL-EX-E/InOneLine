@@ -1275,26 +1275,22 @@ class SettingsTab(QWidget):
         )
 
     def save_conversion_settings(self):
+        # Keep every editor intact if any validation or SQLite write fails.
+        # The database validates the complete draft before opening its single
+        # transaction; rates and pending statuses commit (or roll back) together.
         try:
-            for unit, editor in self.conversion_rate_edits.items():
-                text = editor.text().strip()
-                if not text:
-                    self.db.clear_conversion_rate(unit)
-                    if unit == "RUB":
-                        editor.setText("1")
-                    continue
-                descriptor = self.conversion_unit_descriptors[unit]
-                normalized = self.db.set_conversion_rate(
-                    unit,
-                    text,
-                    label=descriptor.label,
-                    kind=descriptor.normalized_kind(),
-                    service=descriptor.service,
-                )
-                editor.setText(normalized.replace(".", ","))
-        except (TypeError, ValueError) as exc:
+            rows = [
+                (self.conversion_unit_descriptors[unit], editor.text().strip())
+                for unit, editor in self.conversion_rate_edits.items()
+            ]
+            normalized = self.db.set_conversion_rates_atomic(rows)
+        except (TypeError, ValueError, sqlite3.Error) as exc:
             QMessageBox.warning(self, "Конвертация", str(exc))
             return
+        for unit, stored in normalized.items():
+            editor = self.conversion_rate_edits.get(unit)
+            if editor is not None:
+                editor.setText(stored.replace(".", ","))
         self._refresh_conversion_rate_rows(force=True)
         self._refresh_pending_conversion_rows()
         QMessageBox.information(
