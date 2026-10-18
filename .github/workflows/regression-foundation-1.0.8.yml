@@ -209,6 +209,14 @@ jobs:
           python tools/integration_copy_local_time_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P18-F integration copy/local timestamps regression failed" }
 
+      - name: P18-G provider cards without unreachable empty note
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/integration_empty_note_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P18-G provider cards empty-state regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
