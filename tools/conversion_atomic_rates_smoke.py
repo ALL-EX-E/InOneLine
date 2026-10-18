@@ -113,17 +113,18 @@ class AtomicConversionRateTests(unittest.TestCase):
         real = ServicesMixin._register_conversion_unit_conn
 
         def fail_second(conn, descriptor):
-            if descriptor.normalized_unit() == "PLN":
+            if descriptor.normalized_unit() == "EUR":
                 raise sqlite3.OperationalError("Injected second-row DB failure")
             return real(conn, descriptor)
 
         with patch.object(ServicesMixin, "_register_conversion_unit_conn", side_effect=fail_second):
             with self.assertRaises(sqlite3.OperationalError):
                 self.db.set_conversion_rates_atomic([
-                    (self.unit("RUB"), "5"), (self.unit("PLN"), "2")
+                    (self.unit("PLN"), "2"), (self.unit("EUR"), "5")
                 ])
         self.assertEqual(self.db.get_conversion_rate("RUB"), "2")
         self.assertEqual(self.db.get_conversion_rate("PLN"), "")
+        self.assertEqual(self.db.get_conversion_rate("EUR"), "")
         self.assertEqual((self.pending_statuses(), self.audit_rows()), previous)
 
     def test_validation_blocks_duplicates_and_nonpositive_values(self):
