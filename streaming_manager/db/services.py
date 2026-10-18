@@ -1570,6 +1570,10 @@ class ServicesMixin:
             "timer_kind": timer_kind,
             "preparing": bool(preparation_remaining_ms > 0),
             "preparation_remaining_ms": int(preparation_remaining_ms),
+            "phase_starts_at": (
+                str(session.get("timer_phase_starts_at") or "")
+                if session is not None and preparation_remaining_ms > 0 else ""
+            ),
             "running": bool(timer_running),
             "paused": bool(timer_paused),
             "remaining_ms": int(remaining_ms),
