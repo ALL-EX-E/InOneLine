@@ -78,7 +78,7 @@ from ..constants import (
 from ..conversion import ConversionUnit
 from ..diagnostic_logs import sanitize_diagnostic_text
 from ..integrations import IntegrationManager
-from ..twitch import TwitchAdapter, TwitchDeviceCode
+from ..twitch import TWITCH_MANAGE_SCOPE, TwitchAdapter, TwitchDeviceCode
 from ..donationalerts import (
     DONATIONALERTS_REDIRECT_URI,
     DonationAlertsAdapter,
@@ -1553,13 +1553,55 @@ class SettingsTab(QWidget):
             self._populate_twitch_reward_row(row_index, definition)
         card_layout.addWidget(table)
 
+        # The adapter already reports channel eligibility and the scopes of
+        # the authorized account.  Do not offer remote mutations that cannot
+        # succeed; keep the backend manage-scope/eligibility checks authoritative.
+        row = self.db.get_integration_connection("twitch") or {}
+        provider = dict(row.get("provider_config") or {})
+        scopes_raw = provider.get("granted_scopes") or []
+        scopes = {str(value) for value in scopes_raw} if isinstance(scopes_raw, (tuple, list, set)) else set()
+        connected = view.status == "connected" and view.enabled
+        available = provider.get("channel_points_custom_rewards_available") is True
+        manage_scope = TWITCH_MANAGE_SCOPE in scopes
+        can_manage = connected and available and manage_scope
+        existing_ids = bool(service.managed_reward_ids())
+        deletable_ids = existing_ids or bool(service.retired_reward_ids())
+
+        if connected and not available:
+            reason = str(
+                provider.get("channel_points_custom_rewards_reason")
+                or "Twitch не подтвердил доступность Custom Rewards для этого канала."
+            )
+            hint = QLabel("Управление наградами недоступно: " + reason)
+            hint.setWordWrap(True)
+            hint.setProperty("muted", True)
+            card_layout.addWidget(hint)
+        elif connected and not manage_scope:
+            hint = QLabel(
+                "Для управления наградами требуется отдельное разрешение Twitch. "
+                "Подтвердите его, чтобы стали доступны действия с наградами."
+            )
+            hint.setWordWrap(True)
+            hint.setProperty("muted", True)
+            card_layout.addWidget(hint)
+            authorize = QPushButton("Подтвердить права на награды")
+            authorize.clicked.connect(
+                lambda: self._run_twitch_b4_action(
+                    service.ensure_manage_scope,
+                    success_message="Права на управление Twitch-наградами подтверждены.",
+                )
+            )
+            self._integration_buttons.append(authorize)
+            card_layout.addWidget(authorize)
+
         reward_actions = QHBoxLayout()
         add_reward = QPushButton("Добавить награду")
         add_reward.clicked.connect(self._add_twitch_reward_row)
         reward_actions.addWidget(add_reward)
 
         sync_rewards = QPushButton("Сохранить и синхронизировать награды")
-        sync_rewards.setEnabled(view.status == "connected" and view.enabled)
+        sync_rewards.setProperty("integrationAvailable", can_manage)
+        sync_rewards.setEnabled(can_manage)
         sync_rewards.clicked.connect(self._sync_twitch_rewards_from_form)
         reward_actions.addWidget(sync_rewards)
         self._integration_buttons.extend([add_reward, sync_rewards])
@@ -1567,23 +1609,29 @@ class SettingsTab(QWidget):
         card_layout.addLayout(reward_actions)
 
         availability_actions = QHBoxLayout()
-        enable_rewards = QPushButton("Включить награды")
-        disable_rewards = QPushButton("Отключить награды")
-        manual_allowed = view.status == "connected" and view.enabled
-        enable_rewards.setEnabled(manual_allowed)
-        disable_rewards.setEnabled(manual_allowed)
-        enable_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(True))
-        disable_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(False))
-        availability_actions.addWidget(enable_rewards)
-        availability_actions.addWidget(disable_rewards)
+        if config["manual_rewards_enabled"]:
+            toggle_rewards = QPushButton("Отключить награды")
+            toggle_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(False))
+        else:
+            toggle_rewards = QPushButton("Включить награды")
+            toggle_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(True))
+        toggle_allowed = can_manage and existing_ids
+        toggle_rewards.setProperty("integrationAvailable", toggle_allowed)
+        toggle_rewards.setEnabled(toggle_allowed)
+        if not existing_ids:
+            toggle_rewards.setToolTip("Сначала создайте и синхронизируйте Twitch-награды.")
+        availability_actions.addWidget(toggle_rewards)
+        self._integration_buttons.append(toggle_rewards)
 
-        delete_rewards = QPushButton("Удалить награды")
-        delete_rewards.setEnabled(view.status == "connected" and view.enabled)
-        delete_rewards.clicked.connect(self._confirm_delete_twitch_rewards)
-        availability_actions.addWidget(delete_rewards)
+        if deletable_ids:
+            delete_rewards = QPushButton("Удалить награды")
+            delete_rewards.setProperty("integrationAvailable", can_manage)
+            delete_rewards.setEnabled(can_manage)
+            delete_rewards.clicked.connect(self._confirm_delete_twitch_rewards)
+            availability_actions.addWidget(delete_rewards)
+            self._integration_buttons.append(delete_rewards)
         availability_actions.addStretch()
         card_layout.addLayout(availability_actions)
-        self._integration_buttons.extend([enable_rewards, disable_rewards, delete_rewards])
 
         state = QLabel(
             "Награды сейчас: "
@@ -1989,7 +2037,10 @@ class SettingsTab(QWidget):
 
     def _set_integration_actions_enabled(self, enabled: bool) -> None:
         for button in self._integration_buttons:
-            button.setEnabled(bool(enabled))
+            # A finished background operation must not re-enable actions that
+            # are unavailable for the connected channel, scope or reward IDs.
+            permitted = button.property("integrationAvailable")
+            button.setEnabled(bool(enabled) and (permitted is None or bool(permitted)))
 
     def _run_integration_action(self, service_key: str, action: str) -> None:
         if self._integration_worker is not None:
