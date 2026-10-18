@@ -179,7 +179,10 @@ body.preview #api-state.visible { display: block; }
 
   function currentRemaining(now = performance.now()) {
     if (!state || !state.running) return Math.max(0, Number(state?.remaining_ms) || 0);
-    return Math.max(0, anchorRemainingMs - (now - anchorPerformanceMs));
+    const preparationMs = Math.max(0, Number(state?.preparation_remaining_ms) || 0);
+    // Keep the configured duration intact until the database-owned start
+    // boundary, then let the same local monotonic clock render each frame.
+    return Math.max(0, anchorRemainingMs - Math.max(0, now - anchorPerformanceMs - preparationMs));
   }
 
   function measureGlyph(glyph) {
