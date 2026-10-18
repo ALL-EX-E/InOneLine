@@ -89,7 +89,15 @@ def main() -> int:
             conn.execute(
                 "ALTER TABLE auction_sessions DROP COLUMN rules_presentation_json"
             )
-            conn.execute("DELETE FROM schema_migrations WHERE name=?", (MIGRATION_NAME,))
+            # Reconstruct an actual schema-19 snapshot: neither nullable
+            # composite Rules storage nor the later P16-F timer phase existed.
+            conn.execute(
+                "ALTER TABLE auction_sessions DROP COLUMN timer_phase_starts_at"
+            )
+            conn.execute(
+                "DELETE FROM schema_migrations WHERE name IN (?,?)",
+                (MIGRATION_NAME, "auction_timer_preparation_boundary"),
+            )
             conn.execute(
                 "UPDATE schema_meta SET value='19' WHERE key='schema_version'"
             )
@@ -103,10 +111,10 @@ def main() -> int:
             check_columns(conn, True)
             assert conn.execute(
                 "SELECT value FROM schema_meta WHERE key='schema_version'"
-            ).fetchone()[0] == "20"
+            ).fetchone()[0] == "21"
             assert conn.execute(
                 "SELECT COUNT(*) FROM schema_migrations"
-            ).fetchone()[0] == 16
+            ).fetchone()[0] == 17
             assert conn.execute(
                 "SELECT COUNT(*) FROM schema_migrations WHERE name=?",
                 (MIGRATION_NAME,),
@@ -123,6 +131,14 @@ def main() -> int:
             assert snap["rules_template_name"] == "Основной"
             assert snap["rules_html"] == "<p>Сохранённые правила</p>"
             assert snap["rules_presentation_json"] is None
+            assert conn.execute(
+                "SELECT timer_phase_starts_at FROM auction_sessions "
+                "WHERE status='running'"
+            ).fetchone()[0] is None
+            assert conn.execute(
+                "SELECT COUNT(*) FROM schema_migrations "
+                "WHERE name='auction_timer_preparation_boundary'"
+            ).fetchone()[0] == 1
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert upgraded.current_rules_payload() == before
