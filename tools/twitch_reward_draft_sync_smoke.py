@@ -166,7 +166,7 @@ class TwitchDraftTests(unittest.TestCase):
                 self.tab._sync_twitch_rewards_from_form()
                 self.finish_action()
         self.assertEqual(self.service.common_title(), expected[0])
-        self.assertEqual(self.service.reward_definitions(), expected[1])
+        self.assertEqual(self.service.reward_definitions(), list(expected[1]))
         self.assertEqual(self.tab._collect_twitch_reward_form(), expected)
         self.assertTrue(any("Настройки наград сохранены в программе" in body and "не завершена" in body for kind, body in self.messages if kind == "critical"))
 
