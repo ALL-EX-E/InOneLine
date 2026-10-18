@@ -35,8 +35,16 @@ class WheelStopOnlyTests(unittest.TestCase):
         self.window._set_current_main_page(self.window.auction_tab)
         QTest.qWait(650)
         self.tab = self.window.auction_tab
+        # Unexpected application error dialogs must fail fast instead of
+        # hanging an unattended native Windows regression job.
+        self.critical_patch = patch.object(
+            QMessageBox, "critical",
+            side_effect=AssertionError("Unexpected application error dialog"),
+        )
+        self.critical_patch.start()
 
     def tearDown(self):
+        self.critical_patch.stop()
         self.window.thread_pool.waitForDone(5000)
         self.window.close()
         self.window.deleteLater()
@@ -149,12 +157,13 @@ class WheelStopOnlyTests(unittest.TestCase):
     def test_declined_stop_keeps_the_spin(self):
         sid = self.start_partial_spin("max_amount")
         before = self.db.get_auction_session(sid)
+        original_proof = self.proof(sid)
         with patch.object(QMessageBox, "warning", return_value=QMessageBox.No):
             self.tab.stop_wheel()
         after = self.db.get_auction_session(sid)
         self.assertEqual(after["status"], "winner_selected")
         self.assertEqual(after["wheel_spin_id"], before["wheel_spin_id"])
-        self.assertEqual(self.proof(sid), self.proof(sid))
+        self.assertEqual(self.proof(sid), original_proof)
 
     def test_clean_unspun_wheel_cannot_be_replayed(self):
         sid = self.db.create_auction_session(
