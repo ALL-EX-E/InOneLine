@@ -179,9 +179,13 @@ body.preview #api-state.visible { display: block; }
 
   function currentRemaining(now = performance.now()) {
     if (!state || !state.running) return Math.max(0, Number(state?.remaining_ms) || 0);
+    const phaseMs = state?.preparing ? Date.parse(state?.phase_starts_at || "") : NaN;
+    if (Number.isFinite(phaseMs)) {
+      // OBS Browser Source and the database share the system UTC clock. The
+      // absolute phase boundary avoids consuming HTTP/poll transport latency.
+      return Math.max(0, anchorRemainingMs - Math.max(0, Date.now() - phaseMs));
+    }
     const preparationMs = Math.max(0, Number(state?.preparation_remaining_ms) || 0);
-    // Keep the configured duration intact until the database-owned start
-    // boundary, then let the same local monotonic clock render each frame.
     return Math.max(0, anchorRemainingMs - Math.max(0, now - anchorPerformanceMs - preparationMs));
   }
 
