@@ -305,6 +305,27 @@ class IntegrationManager:
     def reconnect(self, service_key: str) -> dict:
         return self._run_adapter_operation(service_key, "reconnect")
 
+    def enable(self, service_key: str) -> dict:
+        """Explicitly activate a saved source only after a fresh health check.
+
+        Unlike Connect/Reconnect, this operation does not initiate OAuth or
+        replace a stored account.  A failed check preserves the disabled state
+        so the user can choose the separate Reconnect flow when necessary.
+        """
+        with self._operation_lock(service_key):
+            self._adapter(service_key)
+            row = self.db.get_integration_connection(service_key)
+            if row is None or str(row.get("status")) == STATUS_NOT_CONFIGURED:
+                raise IntegrationError(
+                    "Подключение не настроено. Используйте «Подключить»."
+                )
+            if bool(row.get("enabled")):
+                return row
+            checked = self.check_connection(service_key)
+            if str(checked.get("status")) != STATUS_CONNECTED:
+                return checked
+            return self.db.upsert_integration_connection(service_key, enabled=True)
+
     def disconnect(self, service_key: str) -> dict:
         with self._operation_lock(service_key):
             return self._disconnect_locked(service_key)
