@@ -324,6 +324,8 @@ class AuctionStateMixin:
         self._set_enabled_state(self.finish_btn, running or paused)
 
         can_cancel = active and status in self.db.AUCTION_OPEN_STATUSES
+        self._set_visible_state(self.stop_wheel_btn, spin_running)
+        self._set_enabled_state(self.stop_wheel_btn, spin_running)
         self._set_visible_state(self.cancel_btn, can_cancel)
         self._set_enabled_state(self.cancel_btn, can_cancel)
         self._set_visible_state(
@@ -834,6 +836,15 @@ class AuctionStateMixin:
         self._update_session_controls(session)
 
     def _handle_local_wheel_spin_finished(self):
+        session = self._current_session()
+        if (
+            not session
+            or str(session.get("status") or "") != "winner_selected"
+            or not session.get("wheel_spin_id")
+            or not self._wheel_spin_complete(session)
+        ):
+            # A queued callback from a stopped spin must not stop a replay.
+            return
         # At the exact visual boundary the wheel soundtrack must already be
         # inaudible before Music Player is restored.
         self._stop_wheel_soundtrack(immediate=True)

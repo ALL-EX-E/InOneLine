@@ -65,6 +65,11 @@ class AuctionRngMixin:
             return
 
         rng_method = str(session.get("rng_method") or "local")
+        replay_stopped = bool(
+            session.get("rng_value") is not None
+            and session.get("winner_game_id") is not None
+            and not session.get("wheel_spin_id")
+        )
         if session.get("mode") == "max_amount":
             wheel_text = (
                 "Определить победителя колесом между лотами с одинаковой "
@@ -83,6 +88,11 @@ class AuctionRngMixin:
                 )
                 + "Шанс каждого лота пропорционален его текущим баллам SM; "
                 "лот с 0 баллов участвует с минимальным весом 1."
+            )
+        if replay_stopped:
+            wheel_text = (
+                "Повторить остановленное вращение?\n\n"
+                "Результат уже сохранён: повторной жеребьёвки не будет."
             )
         wheel_text += (
             "\n\nГенератор: "
@@ -104,6 +114,17 @@ class AuctionRngMixin:
 
         try:
             auction_id = int(session["id"])
+            if replay_stopped:
+                # One previously verified draw, fresh animation only.
+                wheel_payload = self.db.prepare_wheel_animation(
+                    auction_id, replay_stopped=True
+                )
+                self._sync_audio_owner_with_session(
+                    self._current_session(), spin_running=True
+                )
+                self._schedule_wheel_soundtrack(wheel_payload)
+                self.refresh()
+                return
             draw_info = self.db.get_wheel_draw_info(auction_id)
         except Exception as exc:
             QMessageBox.critical(self, "Колесо", str(exc))
