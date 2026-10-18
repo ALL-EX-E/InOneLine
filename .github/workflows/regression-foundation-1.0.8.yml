@@ -187,6 +187,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "P16-C one-second wheel / full-width transparent stop button regression failed" }
           python tools/auction_timer_boundary_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-D Max Amount tie overtime / authoritative wheel-audio timer boundary regression failed" }
+          python tools/wheel_rng_late_callback_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P16-E late remote RNG callbacks / spin re-entry regression failed" }
           python tools/obs_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Common OBS visibility regression failed" }
 
@@ -386,9 +388,26 @@ jobs:
             throw "Required installed data files are missing"
           }
 
+          # Legitimate startup backup is scheduled 350ms after app launch.
+          # Accept zero or one completed SQLite backup, not arbitrary files.
           $backupEntries = @(Get-ChildItem "$install\backups" -Force -ErrorAction SilentlyContinue)
+          $unexpectedBackups = @($backupEntries | Where-Object {
+            $_.PSIsContainer -or $_.Name -notmatch '^streaming_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}_\d{6}\.db$'
+          })
+          if ($unexpectedBackups.Count -gt 0) {
+            throw "Unexpected installed backup entries: $($unexpectedBackups.Name -join ', ')"
+          }
+          if ($backupEntries.Count -gt 1) { throw "Unexpected multiple startup backups" }
+          if ($backupEntries.Count -eq 1) {
+            $backupValid = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              python -c 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); assert c.execute("PRAGMA integrity_check").fetchone() == ("ok",); c.close()' "$($backupEntries[0].FullName)" 2>$null
+              if ($LASTEXITCODE -eq 0) { $backupValid = $true; break }
+              Start-Sleep -Milliseconds 300
+            }
+            if (!$backupValid) { throw "Automatic startup SQLite backup is incomplete or corrupt" }
+          }
           $logEntries = @(Get-ChildItem "$install\logs" -Force -ErrorAction SilentlyContinue)
-          if ($backupEntries.Count -ne 0) { throw "Clean install created unexpected backup files" }
           if ($logEntries.Count -ne 0) { throw "Clean install created unexpected log files" }
 
           Write-Host "CLEAN_INSTALL_ROOT_DIRS=$($actualRootDirs -join ',')"
