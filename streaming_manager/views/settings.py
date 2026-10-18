@@ -330,7 +330,7 @@ class SettingsTab(QWidget):
 
         wheel_range = QLabel(
             "Ввод: 6 цифр ЧЧММСС (например 001530 → 00:15:30.000) или полный "
-            "формат ЧЧ:ММ:СС.мс. Диапазон: от 00:00:03.000 до 24:00:00.000."
+            "формат ЧЧ:ММ:СС.мс. Диапазон: от 00:00:01.000 до 24:00:00.000."
         )
         wheel_range.setProperty("muted", True)
         auction_layout.addWidget(wheel_range)
@@ -858,7 +858,7 @@ class SettingsTab(QWidget):
             value = int(raw)
         except (TypeError, ValueError):
             value = 8_000
-        if not (3_000 <= value <= 24 * 3_600_000):
+        if not (self.db.WHEEL_MIN_DURATION_MS <= value <= self.db.WHEEL_MAX_DURATION_MS):
             return 8_000
         return value
 
@@ -877,10 +877,10 @@ class SettingsTab(QWidget):
             wheel_duration_ms = self._parse_duration_text(
                 self.auction_wheel_duration.text()
             )
-            if not (3_000 <= wheel_duration_ms <= 24 * 3_600_000):
+            if not (self.db.WHEEL_MIN_DURATION_MS <= wheel_duration_ms <= self.db.WHEEL_MAX_DURATION_MS):
                 raise ValueError(
                     "Длительность вращения колеса должна быть от "
-                    "00:00:03.000 до 24:00:00.000."
+                    "00:00:01.000 до 24:00:00.000."
                 )
 
             leader_extend_ms = self._parse_duration_text(
