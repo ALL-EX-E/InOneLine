@@ -187,6 +187,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "P16-C one-second wheel / full-width transparent stop button regression failed" }
           python tools/auction_timer_boundary_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-D Max Amount tie overtime / authoritative wheel-audio timer boundary regression failed" }
+          python tools/auction_phase_preparation_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P16-F main/overtime preparation timer, Qt/OBS and soundtrack phase regression failed" }
           python tools/wheel_rng_late_callback_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-E late remote RNG callbacks / spin re-entry regression failed" }
           python tools/obs_visibility_smoke.py
