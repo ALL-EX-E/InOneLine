@@ -257,7 +257,7 @@ class AuctionActionMixin:
 
         status = str(session.get("status") or "")
         if status == "tie_break_required" and self._pending_tie_overtime:
-            self._set_prestart_timer_ms(self._saved_wheel_default_duration_ms())
+            self._set_prestart_timer_ms(self._saved_max_amount_default_duration_ms())
             return
 
         if status == "awaiting_wheel":
@@ -396,7 +396,7 @@ class AuctionActionMixin:
         # Отсчёт начинается отдельным нажатием «Старт».
         self._pending_tie_overtime = True
         self._timer_context = "auction"
-        self._set_prestart_timer_ms(self._saved_wheel_default_duration_ms())
+        self._set_prestart_timer_ms(self._saved_max_amount_default_duration_ms())
         self.refresh()
         self.timer_edit.setFocus()
 

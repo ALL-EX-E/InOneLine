@@ -185,6 +185,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "P16-B stop wheel only / replay same RNG regression failed" }
           python tools/wheel_one_second_layout_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-C one-second wheel / full-width transparent stop button regression failed" }
+          python tools/auction_timer_boundary_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P16-D Max Amount tie overtime / authoritative wheel-audio timer boundary regression failed" }
           python tools/obs_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Common OBS visibility regression failed" }
 
