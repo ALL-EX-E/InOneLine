@@ -349,31 +349,95 @@ class ServicesMixin:
         key = self._conversion_rate_key(unit)
         return self.get_setting(key, "1" if unit == "RUB" else "")
 
-    def _update_pending_rate_status(self, source_unit: str, *, has_rate: bool) -> None:
+    @staticmethod
+    def _update_pending_rate_status_conn(
+        conn: sqlite3.Connection, source_unit: str, *, has_rate: bool
+    ) -> None:
+        """Update both pending tables in the caller's SQLite transaction."""
         unit = normalize_unit_key(source_unit)
         target_status = "awaiting_manual_apply" if has_rate else "awaiting_rate"
         other_status = "awaiting_rate" if has_rate else "awaiting_manual_apply"
+        rows = conn.execute(
+            "SELECT id,external_event_row_id FROM pending_conversions "
+            "WHERE source_unit=? AND status=?",
+            (unit, other_status),
+        ).fetchall()
+        if not rows:
+            return
+        pending_ids = [int(row["id"]) for row in rows]
+        event_ids = [int(row["external_event_row_id"]) for row in rows]
+        placeholders = ",".join("?" for _ in pending_ids)
+        conn.execute(
+            f"UPDATE pending_conversions SET status=? WHERE id IN ({placeholders})",
+            (target_status, *pending_ids),
+        )
+        event_placeholders = ",".join("?" for _ in event_ids)
+        conn.execute(
+            f"UPDATE external_events SET processing_status=? "
+            f"WHERE id IN ({event_placeholders})",
+            (target_status, *event_ids),
+        )
+
+    def _update_pending_rate_status(self, source_unit: str, *, has_rate: bool) -> None:
         with self.connect() as conn:
-            rows = conn.execute(
-                "SELECT id,external_event_row_id FROM pending_conversions "
-                "WHERE source_unit=? AND status=?",
-                (unit, other_status),
-            ).fetchall()
-            if not rows:
-                return
-            pending_ids = [int(row["id"]) for row in rows]
-            event_ids = [int(row["external_event_row_id"]) for row in rows]
-            placeholders = ",".join("?" for _ in pending_ids)
-            conn.execute(
-                f"UPDATE pending_conversions SET status=? WHERE id IN ({placeholders})",
-                (target_status, *pending_ids),
+            self._update_pending_rate_status_conn(conn, source_unit, has_rate=has_rate)
+
+    def set_conversion_rates_atomic(
+        self, rows: Iterable[tuple[ConversionUnit, Any]]
+    ) -> dict[str, str]:
+        """Validate all rate editors, then commit rates and pending states together.
+
+        Empty RUB means its base default 1; an empty non-RUB editor removes
+        its rate. No schema or secondary rate store is introduced.
+        """
+        validated: dict[str, tuple[ConversionUnit, str, bool]] = {}
+        for descriptor, raw in rows:
+            if not isinstance(descriptor, ConversionUnit):
+                raise TypeError("Для курса не указано описание единицы.")
+            unit = descriptor.normalized_unit()
+            if unit in validated:
+                raise ValueError(f"Повторяется единица курса: {unit}.")
+            kind = descriptor.normalized_kind()
+            source = str(raw or "").strip()
+            normalized = (
+                format_rate(parse_positive_rate(source)).replace(",", ".")
+                if source else ("1" if unit == "RUB" else "")
             )
-            event_placeholders = ",".join("?" for _ in event_ids)
-            conn.execute(
-                f"UPDATE external_events SET processing_status=? "
-                f"WHERE id IN ({event_placeholders})",
-                (target_status, *event_ids),
+            key = self._conversion_rate_key(unit)
+            if _setting_key_is_secret(key):
+                raise ValueError("Запрещённый ключ настройки курса.")
+            validated[unit] = (
+                ConversionUnit(unit, descriptor.label, descriptor.service, kind),
+                normalized,
+                bool(source),
             )
+        if not validated:
+            return {}
+
+        with self.connect() as conn:
+            for unit, (descriptor, rate, explicitly_set) in validated.items():
+                if explicitly_set:
+                    self._register_conversion_unit_conn(conn, descriptor)
+                key = self._conversion_rate_key(unit)
+                found = conn.execute(
+                    "SELECT value FROM settings WHERE key=?", (key,)
+                ).fetchone()
+                previous = str(found["value"]) if found is not None else None
+                if previous != rate:
+                    conn.execute(
+                        "INSERT INTO settings(key,value) VALUES(?,?) "
+                        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        (key, rate),
+                    )
+                    self._log_conn(
+                        conn, "setting", None, "update",
+                        {"key": key, "value": _setting_audit_value(key, previous)},
+                        {"key": key, "value": _setting_audit_value(key, rate)},
+                    )
+                self._update_pending_rate_status_conn(
+                    conn, unit, has_rate=bool(rate)
+                )
+        return {unit: rate for unit, (_, rate, _) in validated.items()}
 
     def set_conversion_rate(
         self,
