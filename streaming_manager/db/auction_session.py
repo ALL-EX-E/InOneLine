@@ -36,7 +36,7 @@ from .common import normalize_title_key, utc_now
 
 
 class AuctionSessionMixin:
-    WHEEL_MIN_DURATION_MS = 3_000
+    WHEEL_MIN_DURATION_MS = 1_000
     WHEEL_MAX_DURATION_MS = 24 * 60 * 60 * 1000
 
     AUCTION_OPEN_STATUSES = (
@@ -248,7 +248,7 @@ class AuctionSessionMixin:
             <= self.WHEEL_MAX_DURATION_MS
         ):
             raise ValueError(
-                "Время вращения колеса должно быть от 00:00:03.000 "
+                "Время вращения колеса должно быть от 00:00:01.000 "
                 "до 24:00:00.000."
             )
 
@@ -2454,7 +2454,7 @@ class AuctionSessionMixin:
             <= self.WHEEL_MAX_DURATION_MS
         ):
             raise ValueError(
-                "Время вращения колеса должно быть от 00:00:03.000 "
+                "Время вращения колеса должно быть от 00:00:01.000 "
                 "до 24:00:00.000."
             )
 
@@ -2586,7 +2586,7 @@ class AuctionSessionMixin:
                 <= self.WHEEL_MAX_DURATION_MS
             ):
                 raise ValueError(
-                    "Время вращения колеса должно быть от 00:00:03.000 "
+                    "Время вращения колеса должно быть от 00:00:01.000 "
                     "до 24:00:00.000."
                 )
         with self.connect() as conn:
