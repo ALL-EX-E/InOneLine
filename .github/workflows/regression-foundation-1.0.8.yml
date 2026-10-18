@@ -193,6 +193,14 @@ jobs:
           python tools/twitch_reward_draft_sync_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P18-D Twitch reward form regression failed" }
 
+      - name: P18-E RANDOM.ORG saved and unsaved key status
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/random_org_key_state_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P18-E RANDOM.ORG state regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
