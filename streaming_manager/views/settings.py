@@ -618,11 +618,6 @@ class SettingsTab(QWidget):
         self.random_org_key.textChanged.connect(self._random_org_key_edited)
         integration_layout.addWidget(random_card)
 
-        self.integration_empty_label = QLabel("Подключённых сервисов пока нет.")
-        self.integration_empty_label.setWordWrap(True)
-        self.integration_empty_label.setProperty("muted", True)
-        integration_layout.addWidget(self.integration_empty_label)
-
         self.integration_cards_host = QWidget()
         self.integration_cards_layout = QVBoxLayout(self.integration_cards_host)
         self.integration_cards_layout.setContentsMargins(0, 0, 0, 0)
@@ -1361,7 +1356,6 @@ class SettingsTab(QWidget):
         draft = self._twitch_reward_unsaved_draft() if preserve_twitch_draft else None
         self._clear_integration_cards()
         views = self.integration_manager.views()
-        self.integration_empty_label.setVisible(not views)
         self.integration_cards_host.setVisible(bool(views))
         for view in views:
             card = QFrame()
