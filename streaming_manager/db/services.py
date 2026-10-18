@@ -398,7 +398,7 @@ class ServicesMixin:
             if unit in validated:
                 raise ValueError(f"Повторяется единица курса: {unit}.")
             kind = descriptor.normalized_kind()
-            source = str(raw or "").strip()
+            source = str(raw).strip() if raw is not None else ""
             normalized = (
                 format_rate(parse_positive_rate(source)).replace(",", ".")
                 if source else ("1" if unit == "RUB" else "")
