@@ -465,6 +465,43 @@ class AuctionActionMixin:
         self.refresh()
         self.timer_edit.setFocus()
 
+    def stop_wheel(self):
+        """Interrupt only an active wheel animation, never the auction."""
+        session = self._current_session()
+        if (
+            session is None
+            or str(session.get("status") or "") != "winner_selected"
+            or not session.get("wheel_spin_id")
+            or self._wheel_spin_complete(session)
+        ):
+            return
+        answer = QMessageBox.warning(
+            self,
+            "Остановить колесо",
+            "Остановить вращение колеса и сбросить его таймер?\n\n"
+            "Аукцион и участники сохранятся. Повторное вращение покажет "
+            "тот же уже определённый результат — новой жеребьёвки не будет.\n\n"
+            "Для завершения всего аукциона используйте «Остановить аукцион».",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            self.db.stop_wheel_animation(int(session["id"]))
+        except Exception as exc:
+            QMessageBox.critical(self, "Колесо", str(exc))
+            return
+        self._stop_wheel_soundtrack(immediate=True)
+        self._release_auction_audio_owner()
+        full_ms = int(session.get("wheel_duration_ms") or self._prestart_wheel_duration_ms)
+        self._prestart_wheel_duration_ms = full_ms
+        self._timer_context = "wheel"
+        self._sync_timer_display_state(self._current_session())
+        self._set_wheel_timer_ms(full_ms)
+        self.changed()
+        self.refresh()
+
     def cancel_auction(self):
         session = self._current_session()
         if session is None:
