@@ -1058,7 +1058,7 @@ class WheelMixin:
                     wheel_target_rotation=?,
                     updated_at=?
                 WHERE id=?
-                ""
+                """,
                 (
                     spin_id,
                     started_at,
