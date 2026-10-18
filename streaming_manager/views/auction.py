@@ -492,7 +492,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.timer_edit.setToolTip(
             "Ввод: 6 цифр ЧЧММСС (например 001530 → 00:15:30.000) или "
             "полный формат ЧЧ:ММ:СС.мс. Для приёма ставок: от 00:00:01.000 "
-            "до 24:00:00.000. Для колеса: от 00:00:03.000 до 24:00:00.000."
+            "до 24:00:00.000. Для колеса: от 00:00:01.000 до 24:00:00.000."
         )
         self.timer_edit.editingFinished.connect(self._timer_editing_finished)
         timer_layout.addWidget(self.timer_edit, 0, Qt.AlignHCenter)
@@ -602,22 +602,21 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._update_obs_audio_help_visibility()
 
         self.timer_finish_widget = QWidget()
+        # Reuse the transparent host style of the existing soundtrack cards:
+        # default QWidget background otherwise paints a dark rectangular strip.
+        self.timer_finish_widget.setProperty("cardContent", True)
         timer_finish_column = QVBoxLayout(self.timer_finish_widget)
         timer_finish_column.setContentsMargins(0, 0, 0, 0)
         timer_finish_column.setSpacing(5)
 
-        # Only displayed during a wheel spin, directly above auction stop.
-        stop_wheel_row = QHBoxLayout()
-        stop_wheel_row.setContentsMargins(0, 0, 0, 0)
+        # Same full available width as «Остановить аукцион», directly above it.
         self.stop_wheel_btn = QPushButton("Остановить колесо")
         self.stop_wheel_btn.setToolTip(
             "Остановить вращение и восстановить время без завершения аукциона. "
             "Повтор использует уже выбранный результат."
         )
         self.stop_wheel_btn.clicked.connect(self.stop_wheel)
-        stop_wheel_row.addStretch()
-        stop_wheel_row.addWidget(self.stop_wheel_btn)
-        timer_finish_column.addLayout(stop_wheel_row)
+        timer_finish_column.addWidget(self.stop_wheel_btn)
 
         timer_finish_row = QHBoxLayout()
         timer_finish_row.setContentsMargins(0, 0, 0, 0)
@@ -2191,7 +2190,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             <= self.db.WHEEL_MAX_DURATION_MS
         ):
             raise ValueError(
-                "Время вращения колеса должно быть от 00:00:03.000 "
+                "Время вращения колеса должно быть от 00:00:01.000 "
                 "до 24:00:00.000."
             )
         return total_ms
