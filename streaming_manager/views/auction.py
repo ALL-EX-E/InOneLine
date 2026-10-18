@@ -1064,6 +1064,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._timer_display_status = ""
         self._timer_display_kind = ""
         self._timer_display_deadline = None
+        self._timer_display_phase_start = None
         self._timer_display_wheel_start = None
         self._timer_display_wheel_duration_ms = 0
         self._timer_display_paused_ms = 0

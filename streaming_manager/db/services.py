@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import sqlite3
 import os
 import subprocess
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -1475,6 +1476,7 @@ class ServicesMixin:
         timer_kind = "auction"
         timer_running = False
         timer_paused = False
+        preparation_remaining_ms = 0
         if session is None:
             if runtime_mode == "weighted_wheel":
                 default_ms = self._timer_overlay_bounded_int(
@@ -1503,6 +1505,16 @@ class ServicesMixin:
                 remaining_ms = self._remaining_ms_from_session(session)
                 timer_running = status == "running"
                 timer_paused = status == "paused"
+                if timer_running:
+                    phase_start = self._pending_timer_phase_start(session)
+                    if phase_start is not None:
+                        preparation_remaining_ms = max(
+                            0,
+                            math.ceil(
+                                (phase_start - datetime.now(timezone.utc)).total_seconds()
+                                * 1000.0
+                            ),
+                        )
             elif status == "awaiting_wheel":
                 timer_kind = "wheel"
                 remaining_ms = max(
@@ -1556,6 +1568,12 @@ class ServicesMixin:
             "status": status,
             "mode": mode,
             "timer_kind": timer_kind,
+            "preparing": bool(preparation_remaining_ms > 0),
+            "preparation_remaining_ms": int(preparation_remaining_ms),
+            "phase_starts_at": (
+                str(session.get("timer_phase_starts_at") or "")
+                if session is not None and preparation_remaining_ms > 0 else ""
+            ),
             "running": bool(timer_running),
             "paused": bool(timer_paused),
             "remaining_ms": int(remaining_ms),
