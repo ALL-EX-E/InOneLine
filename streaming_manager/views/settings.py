@@ -345,10 +345,10 @@ class SettingsTab(QWidget):
 
         wheel_center_note = QLabel(
             "Одно изображение используется одновременно в локальном колесе и OBS. "
-            "Оно остаётся неподвижным при вращении. Внешние изображения сначала "
-            "проверяются и сохраняются как локальная PNG-копия, поэтому во время "
-            "стрима колесо не зависит от доступности внешнего сервиса. "
-            "Анимированные GIF/WebP сохраняют анимацию, если формат поддерживается Qt."
+            "Оно остаётся неподвижным при вращении. Внешние изображения "
+            "проверяются и сохраняются как локальная копия в поддерживаемом формате. "
+            "Во время стрима колесо не зависит от доступности внешнего сервиса. "
+            "Поддерживаемые GIF/WebP сохраняют анимацию."
         )
         wheel_center_note.setWordWrap(True)
         wheel_center_note.setProperty("muted", True)
@@ -462,7 +462,7 @@ class SettingsTab(QWidget):
         auto_grid.addWidget(self.auto_extend_new_lot_enabled, 2, 0)
         auto_grid.addWidget(self.auto_extend_new_lot_duration, 2, 1)
 
-        self.auto_extend_external_enabled = QCheckBox("Внешнее пожертвование")
+        self.auto_extend_external_enabled = QCheckBox("Внешнее поступление")
         self.auto_extend_external_enabled.setChecked(
             self._saved_bool_setting(
                 AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
@@ -990,7 +990,7 @@ class SettingsTab(QWidget):
         combo = self.wheel_center_image_combo
         combo.blockSignals(True)
         combo.clear()
-        combo.addItem("— стандартный центр —", "")
+        combo.addItem("— логотип InOneLine —", "")
         for asset in self._wheel_center_image_assets():
             available = media_asset_available(self.db.path.parent, asset)
             label = asset.display_name if available else f"⚠ файл недоступен: {asset.display_name}"
@@ -1023,7 +1023,7 @@ class SettingsTab(QWidget):
         asset = self._selected_wheel_center_image_asset()
         if asset is None:
             self.wheel_center_image_status.setText(
-                "Выбрана стандартная иконка InOneLine. Выбор сохранён."
+                "Используется встроенный логотип InOneLine. Выбор сохранён."
             )
             self.wheel_center_image_status.setToolTip("")
             return
