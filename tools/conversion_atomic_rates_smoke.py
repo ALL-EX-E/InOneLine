@@ -131,6 +131,7 @@ class AtomicConversionRateTests(unittest.TestCase):
             [(self.unit("RUB"), "4"), (self.unit("rub"), "5")],
             [(self.unit("RUB"), "4"), (self.unit("PLN"), "0")],
             [(self.unit("RUB"), "4"), (self.unit("PLN"), "-1")],
+            [(self.unit("RUB"), "4"), (self.unit("PLN"), 0)],
         ):
             with self.assertRaises(ValueError):
                 self.db.set_conversion_rates_atomic(rows)
