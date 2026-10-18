@@ -327,6 +327,12 @@ class SchemaMixin:
                 20,
                 self._migrate_auction_rules_presentation_storage,
             )
+            self._run_migration(
+                conn,
+                "auction_timer_preparation_boundary",
+                21,
+                self._migrate_auction_timer_preparation_boundary,
+            )
             conn.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
                 (str(SCHEMA_VERSION),),
@@ -1024,6 +1030,24 @@ class SchemaMixin:
             """
         )
 
+
+    @staticmethod
+    def _migrate_auction_timer_preparation_boundary(
+        conn: sqlite3.Connection,
+    ) -> None:
+        """P16-F: persist the phase start for initial Max Amount and tie overtime.
+
+        NULL denotes legacy sessions/no pending preparation.  Existing
+        started_at and created_at keep their source-time/audit meanings.
+        """
+        columns = {
+            str(row["name"])
+            for row in conn.execute("PRAGMA table_info(auction_sessions)").fetchall()
+        }
+        if "timer_phase_starts_at" not in columns:
+            conn.execute(
+                "ALTER TABLE auction_sessions ADD COLUMN timer_phase_starts_at TEXT"
+            )
 
     @staticmethod
     def _migrate_auction_rules_presentation_storage(
