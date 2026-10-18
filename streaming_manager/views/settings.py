@@ -169,6 +169,7 @@ class SettingsTab(QWidget):
         self._twitch_reward_table: QTableWidget | None = None
         self._twitch_common_title: QLineEdit | None = None
         self._twitch_reward_saved_snapshot: tuple[str, tuple[TwitchRewardDefinition, ...]] | None = None
+        self._twitch_reward_sync_running = False
         self.twitch_device_code_ready.connect(self._show_twitch_device_code)
         self.donationalerts_oauth_ready.connect(self._show_donationalerts_oauth)
         twitch_adapter = self.integration_manager.registry.get("twitch")
@@ -1584,6 +1585,8 @@ class SettingsTab(QWidget):
         self._twitch_reward_table = table
         for row_index, definition in enumerate(rewards):
             self._populate_twitch_reward_row(row_index, definition)
+        common_title.setEnabled(not self._twitch_reward_sync_running)
+        table.setEnabled(not self._twitch_reward_sync_running)
         card_layout.addWidget(table)
 
         # The adapter already reports channel eligibility and the scopes of
@@ -1801,6 +1804,14 @@ class SettingsTab(QWidget):
         if self._integration_worker is not None:
             return
         self._set_integration_actions_enabled(False)
+        if reload_saved_rewards_on_success:
+            # The form is frozen until the remote sync/delete completes: do
+            # not silently discard edits entered while the worker is running.
+            self._twitch_reward_sync_running = True
+            if self._twitch_common_title is not None:
+                self._twitch_common_title.setEnabled(False)
+            if self._twitch_reward_table is not None:
+                self._twitch_reward_table.setEnabled(False)
         worker = FunctionWorker(fn)
         self._integration_worker = worker
 
@@ -1873,12 +1884,14 @@ class SettingsTab(QWidget):
         service = self.twitch_channel_points_service
         if service is None or self._integration_worker is not None:
             return
+        unsaved = self._twitch_reward_unsaved_draft() is not None
         answer = QMessageBox.warning(
             self,
             "Удалить Twitch-награды?",
             "Удалить все Twitch Custom Rewards, созданные и зарегистрированные In one line для ставок?\n\n"
             "Это отдельное действие: подключение Twitch и история событий останутся. "
-            "Удалённые награды придётся создать заново.",
+            "Удалённые награды придётся создать заново."
+            + ("\n\nВнимание: несохранённые изменения наград будут сброшены." if unsaved else ""),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -2108,6 +2121,24 @@ class SettingsTab(QWidget):
     def _run_integration_action(self, service_key: str, action: str) -> None:
         if self._integration_worker is not None:
             return
+        discard_twitch_draft = bool(
+            service_key == "twitch"
+            and action in {"connect", "reconnect", "remove_connection"}
+            and self._twitch_reward_unsaved_draft() is not None
+        )
+        if discard_twitch_draft:
+            confirmation = QMessageBox.warning(
+                self,
+                "Несохранённые Twitch-награды",
+                "При смене или удалении подключения Twitch несохранённые изменения "
+                "списка наград могут относиться к другому аккаунту. "
+                "Сбросить эти изменения и продолжить?\n\n"
+                "«Нет» — оставить черновик и отменить операцию.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if confirmation != QMessageBox.Yes:
+                return
         operation = getattr(self.integration_manager, action)
         before = self.db.get_integration_connection(service_key) or {}
         expected_center = self.db.get_setting(WHEEL_CENTER_IMAGE_MEDIA_ID_KEY, "")
@@ -2158,17 +2189,21 @@ class SettingsTab(QWidget):
         self._set_integration_actions_enabled(False)
         worker = FunctionWorker(perform_operation)
         self._integration_worker = worker
-        worker.signals.result.connect(self._integration_action_done)
+        worker.signals.result.connect(
+            lambda result: self._integration_action_done(
+                result, discard_twitch_draft=discard_twitch_draft
+            )
+        )
         worker.signals.error.connect(self._integration_action_failed)
         worker.signals.finished.connect(self._integration_action_finished)
         self.thread_pool.start(worker)
 
-    def _integration_action_done(self, center_update=None) -> None:
+    def _integration_action_done(self, center_update=None, *, discard_twitch_draft: bool = False) -> None:
         self._close_twitch_auth_dialog(success=True)
         self._close_donationalerts_auth_dialog(success=True)
         self.twitch_runtime_wake()
         self.donationalerts_runtime_wake()
-        self._refresh_integrations()
+        self._refresh_integrations(preserve_twitch_draft=not discard_twitch_draft)
         self._refresh_conversion_rate_rows()
         self.integration_status_changed()
         if not isinstance(center_update, dict):
@@ -2208,6 +2243,11 @@ class SettingsTab(QWidget):
 
     def _integration_action_finished(self) -> None:
         self._integration_worker = None
+        self._twitch_reward_sync_running = False
+        if self._twitch_common_title is not None:
+            self._twitch_common_title.setEnabled(True)
+        if self._twitch_reward_table is not None:
+            self._twitch_reward_table.setEnabled(True)
         self._set_integration_actions_enabled(True)
 
     def _confirm_remove_integration(self, service_key: str) -> None:
