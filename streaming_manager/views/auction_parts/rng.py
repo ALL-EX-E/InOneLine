@@ -180,7 +180,9 @@ class AuctionRngMixin:
         worker.signals.result.connect(
             lambda draw, aid=auction_id: self._apply_wheel_draw(aid, draw)
         )
-        worker.signals.error.connect(self._wheel_rng_failed)
+        worker.signals.error.connect(
+            lambda exc, aid=auction_id: self._wheel_rng_failed(exc, aid)
+        )
         worker.signals.finished.connect(self._wheel_rng_finished)
         self.thread_pool.start(worker)
 
@@ -189,12 +191,14 @@ class AuctionRngMixin:
         # «Остановить аукцион». In that case the result belongs to a closed
         # session and must be ignored instead of surfacing a stale-state error.
         current = self._current_session()
+        # A late response from a cancelled/finished request belongs only to
+        # the ORIGINAL auction. Never release audio ownership from another
+        # auction the operator might have started while the network was busy.
         if (
             current is None
             or int(current.get("id") or 0) != int(auction_id)
             or str(current.get("status") or "") != "awaiting_wheel"
         ):
-            self._release_auction_audio_owner()
             return
         try:
             if draw is None:
@@ -220,11 +224,18 @@ class AuctionRngMixin:
         # синхронной анимации.
         self.refresh()
 
-    def _wheel_rng_failed(self, exc):
-        self._release_auction_audio_owner()
+    def _wheel_rng_failed(self, exc, auction_id: int):
+        # The remote request can fail AFTER its auction has been cancelled.
+        # Ignore errors for stale sessions: do not show a misleading modal or
+        # release the Music Player/wheel owner of a NEW auction.
         session = self._current_session()
-        if session is None or str(session.get("status") or "") != "awaiting_wheel":
+        if (
+            session is None
+            or int(session.get("id") or 0) != int(auction_id)
+            or str(session.get("status") or "") != "awaiting_wheel"
+        ):
             return
+        self._release_auction_audio_owner()
         QMessageBox.critical(self, "Колесо", str(exc))
 
     def _wheel_rng_finished(self):
