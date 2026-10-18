@@ -5,10 +5,11 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QMessageBox, QPushButton
 
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.app_paths import AppPaths
@@ -64,7 +65,8 @@ class ConversionHeadingSaveLayoutTests(unittest.TestCase):
     def test_save_callback_remains_functional_after_relocation(self):
         edit = self.tab.conversion_rate_edits["RUB"]
         edit.setText("2")
-        self._save_button().click()
+        with patch.object(QMessageBox, "information", return_value=QMessageBox.Ok):
+            self._save_button().click()
         self.assertEqual(self.db.get_conversion_rate("RUB"), "2")
         self.assertEqual(self.tab.conversion_rate_edits["RUB"].text(), "2")
 
