@@ -40,7 +40,7 @@ def check_columns(conn: sqlite3.Connection, expect: bool) -> None:
 
 
 def main() -> int:
-    assert SCHEMA_VERSION == 20
+    assert SCHEMA_VERSION == 21
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         path = Path(tmp) / "legacy_rules.db"
         db = Database(path)
