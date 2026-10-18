@@ -8,7 +8,8 @@ from tempfile import TemporaryDirectory
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtCore import QEvent, QPoint, Qt
+from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QLabel
 
@@ -16,6 +17,7 @@ from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database
 from streaming_manager.ui import MainWindow
 from streaming_manager.views.wheel import AuctionWheelWidget
+from streaming_manager.views.common import APP_STYLE
 
 
 class CenterHoverTests(unittest.TestCase):
@@ -27,20 +29,41 @@ class CenterHoverTests(unittest.TestCase):
         self.wheel = AuctionWheelWidget()
         self.wheel.resize(420, 420)
         self.wheel.show()
-        QTest.qWait(70)
+        self.wheel.raise_()
+        self.wheel.activateWindow()
+        self.assertTrue(QTest.qWaitForWindowActive(self.wheel, 2000))
+        QTest.qWait(70)  # Activation precedes the native surface/initial paint.
+        # Always enter from outside the hub: native mouseMove at the current
+        # screen position may not generate an event after a previous Qt test.
+        self.move_pointer(QPoint(12, 12))
 
     def tearDown(self):
         self.wheel.close()
         self.wheel.deleteLater()
         self.app.processEvents()
 
+    def move_pointer(self, pos):
+        # Place the real cursor for resize checks, then deliver the Qt event
+        # explicitly. Windows may coalesce native moves around GL resizes or
+        # reuse a screen position, making OS event arrival unsuitable as a
+        # clock for these widget geometry/hover regression assertions.
+        QTest.mouseMove(self.wheel, pos)
+        QTest.qWait(40)
+        event = QMouseEvent(
+            QEvent.MouseMove, QPointF(pos), QPointF(self.wheel.mapToGlobal(pos)),
+            Qt.NoButton, Qt.NoButton, Qt.NoModifier,
+        )
+        self.app.sendEvent(self.wheel, event)
+        # Assertions follow synchronously; unrelated late native Leave events
+        # must not overwrite the explicitly delivered event under test.
+
     def center(self):
         # Independently derive the existing rendered hub, including bottom caption.
         return self.wheel.rect().adjusted(10, 10, -10, -68).center()
 
     def test_center_hover_shows_edit_and_hand_only_inside_circle(self):
-        QTest.mouseMove(self.wheel, self.center())
-        QTest.qWait(40)  # Native Windows queues the pointer move asynchronously.
+        self.assertTrue(self.wheel.hasMouseTracking())
+        self.move_pointer(self.center())
         self.assertEqual(self.wheel.cursor().shape(), Qt.PointingHandCursor)
         label = self.wheel.findChild(QLabel, "wheel-center-edit")
         self.assertIsNotNone(label)
@@ -48,16 +71,14 @@ class CenterHoverTests(unittest.TestCase):
         self.assertEqual(label.text(), "Изменить")
         self.assertEqual(self.wheel.toolTip(), "")
         # Outside the circular hitbox but inside its bounding square.
-        QTest.mouseMove(self.wheel, self.center() + QPoint(37, 37))
-        QTest.qWait(40)
+        self.move_pointer(self.center() + QPoint(37, 37))
         self.assertFalse(label.isVisible())
         self.assertEqual(self.wheel.cursor().shape(), Qt.ArrowCursor)
 
     def test_edit_badge_passes_click_to_existing_center_signal(self):
         hits = []
         self.wheel.centerClicked.connect(lambda: hits.append(True))
-        QTest.mouseMove(self.wheel, self.center())
-        QTest.qWait(40)
+        self.move_pointer(self.center())
         label = self.wheel.findChild(QLabel, "wheel-center-edit")
         self.assertIsNotNone(label, "Missing center edit affordance")
         QTest.mouseClick(self.wheel, Qt.LeftButton, pos=self.center())
@@ -69,8 +90,7 @@ class CenterHoverTests(unittest.TestCase):
         for width, height in ((300, 300), (650, 420)):
             self.wheel.resize(width, height)
             QTest.qWait(30)
-            QTest.mouseMove(self.wheel, self.center())
-            QTest.qWait(40)
+            self.move_pointer(self.center())
             label = self.wheel.findChild(QLabel, "wheel-center-edit")
             self.assertIsNotNone(label, "Missing center edit affordance")
             self.assertTrue(label.isVisible())
@@ -81,8 +101,7 @@ class CenterHoverTests(unittest.TestCase):
             self.assertEqual(self.wheel.cursor().shape(), Qt.ArrowCursor)
 
     def test_stationary_pointer_stops_hover_when_resize_moves_hub(self):
-        QTest.mouseMove(self.wheel, self.center())
-        QTest.qWait(40)
+        self.move_pointer(self.center())
         label = self.wheel.findChild(QLabel, "wheel-center-edit")
         self.assertIsNotNone(label)
         self.assertTrue(label.isVisible())
@@ -90,6 +109,24 @@ class CenterHoverTests(unittest.TestCase):
         QTest.qWait(40)
         self.assertFalse(label.isVisible(), "Resize left an edit badge far from stationary pointer")
         self.assertEqual(self.wheel.cursor().shape(), Qt.ArrowCursor)
+
+    def test_badge_fits_circle_with_real_application_font_style(self):
+        self.wheel.setStyleSheet(APP_STYLE)
+        for width, height in ((300, 300), (650, 420)):
+            self.wheel.resize(width, height)
+            QTest.qWait(70)  # Let native geometry settle before mapping pointer.
+            self.move_pointer(QPoint(12, 12))
+            self.move_pointer(self.center())
+            label = self.wheel.findChild(QLabel, "wheel-center-edit")
+            self.assertIsNotNone(label)
+            self.assertTrue(label.isVisible())
+            self.assertLessEqual(label.fontMetrics().horizontalAdvance(label.text()), label.contentsRect().width(), "Application QSS overrides fitted badge font")
+            self.assertLessEqual(label.fontMetrics().height(), label.contentsRect().height(), "Badge text is vertically clipped")
+            region = self.wheel.rect().adjusted(10, 10, -10, -68)
+            radius = min(region.width(), region.height()) * 0.5 * 0.24
+            for corner in (label.geometry().topLeft(), label.geometry().topRight(), label.geometry().bottomLeft(), label.geometry().bottomRight()):
+                delta = corner - self.center()
+                self.assertLessEqual(delta.x()**2 + delta.y()**2, (radius - 2)**2, "Badge extends into center outline")
 
     def test_operator_hint_is_present_at_narrow_width_without_global_tooltip(self):
         with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
