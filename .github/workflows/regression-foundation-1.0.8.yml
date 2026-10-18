@@ -185,6 +185,14 @@ jobs:
           python tools/twitch_reward_eligibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P18-C Twitch Channel Points action eligibility regression failed" }
 
+      - name: P18-D Twitch reward draft consistency
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/twitch_reward_draft_sync_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P18-D Twitch reward form regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
