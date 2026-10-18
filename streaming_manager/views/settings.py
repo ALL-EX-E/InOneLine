@@ -149,6 +149,7 @@ class SettingsTab(QWidget):
         self.donationalerts_runtime_wake = donationalerts_runtime_wake or (lambda: None)
         self.thread_pool = QThreadPool.globalInstance()
         self._rng_worker = None
+        self._rng_checked_key: str | None = None
         self._backup_worker = None
         self._restore_worker = None
         self._full_backup_worker = None
@@ -593,6 +594,7 @@ class SettingsTab(QWidget):
         self.random_org_status = QLabel("Статус: не проверялся")
         self.random_org_status.setProperty("muted", True)
         random_layout.addWidget(self.random_org_status)
+        self.random_org_key.textChanged.connect(self._random_org_key_edited)
         integration_layout.addWidget(random_card)
 
         self.integration_empty_label = QLabel("Подключённых сервисов пока нет.")
@@ -2265,8 +2267,19 @@ class SettingsTab(QWidget):
             return
         self._run_integration_action(service_key, "remove_connection")
 
+    def _random_org_key_edited(self, _text: str) -> None:
+        """Report unsaved edits without persisting or validating an API key."""
+        key = self.random_org_key.text().strip()
+        if key != self.db.get_random_org_api_key().strip():
+            self.random_org_status.setText("Статус: ключ изменён, но ещё не сохранён")
+        elif key:
+            self.random_org_status.setText("Статус: сохранённый ключ (не проверялся)")
+        else:
+            self.random_org_status.setText("Статус: ключ не задан")
+
     def save_random_org_key(self):
         key = self.random_org_key.text().strip()
+        # Only the explicit Save action updates protected credential storage.
         self.db.set_random_org_api_key(key)
         self.random_org_status.setText(
             "Статус: ключ сохранён локально" if key else "Статус: ключ очищен"
@@ -2274,13 +2287,14 @@ class SettingsTab(QWidget):
         self.random_org_key_changed()
 
     def check_random_org_api(self):
+        if self._rng_worker is not None:
+            return
         key = self.random_org_key.text().strip()
         if not key:
             QMessageBox.information(self, "RANDOM.ORG", "Введите API key.")
             return
-        if self._rng_worker is not None:
-            return
 
+        self._rng_checked_key = key
         self.check_rng_btn.setEnabled(False)
         self.random_org_status.setText("Статус: проверка…")
         worker = FunctionWorker(RandomOrgClient(key).get_usage)
@@ -2293,20 +2307,33 @@ class SettingsTab(QWidget):
     def _random_org_usage_ready(self, usage):
         requests_left = usage.get("requestsLeft", "—")
         bits_left = usage.get("bitsLeft", "—")
-        text = (
-            f"API работает. Запросов осталось: {requests_left}; "
+        checked = self._rng_checked_key or ""
+        saved = self.db.get_random_org_api_key().strip()
+        entered = self.random_org_key.text().strip()
+        if entered != checked:
+            note = (
+                "Проверен ранее введённый ключ; поле изменилось во время проверки. "
+                "Проверьте текущий ключ отдельно."
+            )
+        elif checked != saved:
+            note = "Ключ ещё не сохранён."
+        else:
+            note = "Ключ сохранён."
+        message = (
+            f"API работает. {note} Запросов осталось: {requests_left}; "
             f"битов осталось: {bits_left}."
         )
-        self.random_org_status.setText("Статус: " + text)
-        QMessageBox.information(self, "RANDOM.ORG", text)
+        self.random_org_status.setText("Статус: " + message)
+        QMessageBox.information(self, "RANDOM.ORG", message)
 
     def _random_org_usage_failed(self, exc):
-        self.random_org_status.setText("Статус: ошибка")
+        self.random_org_status.setText("Статус: ошибка проверки; настройки не изменены")
         QMessageBox.critical(self, "RANDOM.ORG", sanitize_diagnostic_text(str(exc)))
 
     def _random_org_usage_finished(self):
         self.check_rng_btn.setEnabled(True)
         self._rng_worker = None
+        self._rng_checked_key = None
 
     def _open_folder(self, path: Path):
         path.mkdir(parents=True, exist_ok=True)
