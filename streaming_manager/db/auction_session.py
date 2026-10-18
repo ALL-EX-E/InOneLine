@@ -2156,6 +2156,9 @@ class AuctionSessionMixin:
         remaining_ms = self._remaining_ms_from_session(session)
         remaining = max(0, math.ceil(remaining_ms / 1000))
         now = utc_now()
+        # If paused before the phase actually starts, preserve that state;
+        # Resume will schedule a fresh lead-in with all time intact.
+        pending_phase = self._pending_timer_phase_start(session)
         with self.connect() as conn:
             conn.execute(
                 """
@@ -2164,10 +2167,15 @@ class AuctionSessionMixin:
                     remaining_seconds=?,
                     remaining_ms=?,
                     deadline_at=NULL,
+                    timer_phase_starts_at=?,
                     updated_at=?
                 WHERE id=? AND status='running'
                 """,
-                (remaining, remaining_ms, now, auction_id),
+                (
+                    remaining, remaining_ms,
+                    pending_phase.isoformat(timespec="microseconds") if pending_phase else None,
+                    now, auction_id,
+                ),
             )
             self._log_conn(
                 conn,
@@ -2198,7 +2206,12 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=remaining_ms)).isoformat(
+        pending_preparation = bool(session.get("timer_phase_starts_at"))
+        phase_start = (
+            now_dt + timedelta(milliseconds=AUCTION_PREPARATION_LEAD_IN_MS)
+            if pending_preparation else None
+        )
+        deadline = ((phase_start or now_dt) + timedelta(milliseconds=remaining_ms)).isoformat(
             timespec="microseconds"
         )
         with self.connect() as conn:
@@ -2207,10 +2220,15 @@ class AuctionSessionMixin:
                 UPDATE auction_sessions
                 SET status='running',
                     deadline_at=?,
+                    timer_phase_starts_at=?,
                     updated_at=?
                 WHERE id=? AND status='paused'
                 """,
-                (deadline, now, auction_id),
+                (
+                    deadline,
+                    phase_start.isoformat(timespec="microseconds") if phase_start else None,
+                    now, auction_id,
+                ),
             )
             self._log_conn(
                 conn,
@@ -2250,8 +2268,9 @@ class AuctionSessionMixin:
         after_seconds = max(0, math.ceil(after_ms / 1000))
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
+        phase_start = self._pending_timer_phase_start(session, now_dt)
         deadline = (
-            (now_dt + timedelta(milliseconds=after_ms)).isoformat(
+            ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
                 timespec="microseconds"
             )
             if status == "running" and after_ms > 0
@@ -2313,8 +2332,9 @@ class AuctionSessionMixin:
         duration_seconds = max(1, math.ceil(duration_ms / 1000))
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
+        phase_start = self._pending_timer_phase_start(session, now_dt)
         deadline = (
-            (now_dt + timedelta(milliseconds=duration_ms)).isoformat(
+            ((phase_start or now_dt) + timedelta(milliseconds=duration_ms)).isoformat(
                 timespec="microseconds"
             )
             if status == "running"
