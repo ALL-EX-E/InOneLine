@@ -163,6 +163,12 @@ jobs:
         run: |
           python tools/rules_editor_animated_media_smoke.py
 
+      - name: P18-A disabled integration diagnostic lifecycle
+        shell: pwsh
+        run: |
+          python tools/integration_diagnostic_enabled_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P18-A diagnostic check cannot re-enable a disabled integration regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
