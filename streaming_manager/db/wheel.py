@@ -928,10 +928,55 @@ class WheelMixin:
     def _wheel_animation_complete(cls, session: dict[str, Any]) -> bool:
         return bool(cls._wheel_animation_timer_state(session)["complete"])
 
+    def stop_wheel_animation(self, auction_id: int) -> None:
+        """Stop only the animation, retaining its immutable RNG result/proof."""
+        now = utc_now()
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM auction_sessions WHERE id=?", (int(auction_id),)
+            ).fetchone()
+            if row is None:
+                raise KeyError(auction_id)
+            session = dict(row)
+            if (
+                session["status"] != "winner_selected"
+                or not session.get("wheel_spin_id")
+                or self._wheel_animation_complete(session)
+                or session.get("rng_value") is None
+                or session.get("winner_game_id") is None
+            ):
+                raise RuntimeError("Сейчас нет вращения колеса, которое можно остановить.")
+            old_spin_id = str(session["wheel_spin_id"])
+            conn.execute(
+                """
+                UPDATE auction_sessions
+                SET status='awaiting_wheel',
+                    wheel_spin_id=NULL,
+                    wheel_started_at=NULL,
+                    wheel_target_rotation=NULL,
+                    updated_at=?
+                WHERE id=? AND status='winner_selected'
+                """,
+                (now, int(auction_id)),
+            )
+            self._log_conn(
+                conn, "auction_session", int(auction_id),
+                "wheel_spin_stopped",
+                {"status": "winner_selected", "wheel_spin_id": old_spin_id},
+                {
+                    "status": "awaiting_wheel",
+                    "winner_game_id": int(session["winner_game_id"]),
+                    "rng_value": int(session["rng_value"]),
+                    "wheel_duration_ms": int(session["wheel_duration_ms"]),
+                },
+            )
+
     def prepare_wheel_animation(
         self,
         auction_id: int,
         lead_in_ms: int = 1200,
+        *,
+        replay_stopped: bool = False,
     ) -> dict[str, Any]:
         """Фиксирует параметры одной синхронной визуальной анимации колеса."""
         with self.connect() as conn:
@@ -942,7 +987,14 @@ class WheelMixin:
             if session_row is None:
                 raise KeyError(auction_id)
             session = dict(session_row)
-            if session["status"] != "winner_selected":
+            if replay_stopped:
+                if (
+                    session["status"] != "awaiting_wheel"
+                    or session.get("wheel_spin_id")
+                    or session.get("winner_game_id") is None
+                ):
+                    raise RuntimeError("Повтор доступен только для остановленного колеса.")
+            elif session["status"] != "winner_selected":
                 raise RuntimeError(
                     "Анимацию колеса можно подготовить только после выбора победителя."
                 )
@@ -973,6 +1025,31 @@ class WheelMixin:
         spin_id = secrets.token_hex(12)
 
         with self.connect() as conn:
+            if replay_stopped:
+                # Atomic resume + spin preparation; no second RNG or snapshot.
+                current = conn.execute(
+                    "SELECT status, wheel_spin_id FROM auction_sessions WHERE id=?",
+                    (auction_id,),
+                ).fetchone()
+                if (
+                    current is None
+                    or current["status"] != "awaiting_wheel"
+                    or current["wheel_spin_id"]
+                ):
+                    raise RuntimeError("Колесо уже не ожидает повтора.")
+                conn.execute(
+                    "UPDATE auction_sessions SET status='winner_selected' WHERE id=?",
+                    (auction_id,),
+                )
+                self._log_conn(
+                    conn, "auction_session", auction_id, "wheel_spin_replayed",
+                    {"status": "awaiting_wheel"},
+                    {
+                        "status": "winner_selected",
+                        "winner_game_id": int(session["winner_game_id"]),
+                        "rng_value": int(session["rng_value"]),
+                    },
+                )
             conn.execute(
                 """
                 UPDATE auction_sessions
@@ -981,7 +1058,7 @@ class WheelMixin:
                     wheel_target_rotation=?,
                     updated_at=?
                 WHERE id=?
-                """,
+                ""
                 (
                     spin_id,
                     started_at,
@@ -1109,7 +1186,11 @@ class WheelMixin:
         winner = None
         winner_id = session.get("winner_game_id")
         animation_complete = self._wheel_animation_complete(session)
-        if winner_id is not None and animation_complete:
+        if (
+            winner_id is not None
+            and str(session.get("status") or "") == "winner_selected"
+            and animation_complete
+        ):
             winner_row = conn.execute(
                 "SELECT id, title FROM games WHERE id=?",
                 (int(winner_id),),

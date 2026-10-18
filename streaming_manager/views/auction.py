@@ -602,7 +602,24 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._update_obs_audio_help_visibility()
 
         self.timer_finish_widget = QWidget()
-        timer_finish_row = QHBoxLayout(self.timer_finish_widget)
+        timer_finish_column = QVBoxLayout(self.timer_finish_widget)
+        timer_finish_column.setContentsMargins(0, 0, 0, 0)
+        timer_finish_column.setSpacing(5)
+
+        # Only displayed during a wheel spin, directly above auction stop.
+        stop_wheel_row = QHBoxLayout()
+        stop_wheel_row.setContentsMargins(0, 0, 0, 0)
+        self.stop_wheel_btn = QPushButton("Остановить колесо")
+        self.stop_wheel_btn.setToolTip(
+            "Остановить вращение и восстановить время без завершения аукциона. "
+            "Повтор использует уже выбранный результат."
+        )
+        self.stop_wheel_btn.clicked.connect(self.stop_wheel)
+        stop_wheel_row.addStretch()
+        stop_wheel_row.addWidget(self.stop_wheel_btn)
+        timer_finish_column.addLayout(stop_wheel_row)
+
+        timer_finish_row = QHBoxLayout()
         timer_finish_row.setContentsMargins(0, 0, 0, 0)
         timer_finish_row.setSpacing(5)
         self.finish_btn = QPushButton("Завершить приём ставок")
@@ -612,6 +629,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.cancel_btn.clicked.connect(self.cancel_auction)
         timer_finish_row.addWidget(self.finish_btn)
         timer_finish_row.addWidget(self.cancel_btn)
+        timer_finish_column.addLayout(timer_finish_row)
         timer_layout.addWidget(self.timer_finish_widget)
 
         # Keep the actual shared timer in the right-hand operator column,
