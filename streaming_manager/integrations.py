@@ -255,6 +255,13 @@ class IntegrationManager:
         # worker at a time, as required by providers such as Twitch.
         with self._operation_lock(service_key):
             adapter = self._adapter(service_key)
+            # Diagnostics must never change the explicit enabled/disabled
+            # lifecycle, even on auth, provider or temporary network failure.
+            # Only Connect/Reconnect are user-intended activation operations.
+            enabled_on_result = True
+            if method_name == "check_connection":
+                current = self.db.get_integration_connection(service_key)
+                enabled_on_result = bool(current.get("enabled")) if current else False
             attempts = len(self.retry_delays) + 1
             last_error = ""
             for attempt in range(attempts):
@@ -263,11 +270,11 @@ class IntegrationManager:
                     result = method(self._context(service_key))
                     if not isinstance(result, IntegrationOperationResult):
                         raise IntegrationError("Adapter returned an invalid operation result.")
-                    return self._persist_result(service_key, result, enabled=True)
+                    return self._persist_result(service_key, result, enabled=enabled_on_result)
                 except IntegrationAuthRequired as exc:
                     return self.db.upsert_integration_connection(
                         service_key,
-                        enabled=True,
+                        enabled=enabled_on_result,
                         status=STATUS_REQUIRES_LOGIN,
                         last_check_at=utc_now(),
                         last_error=sanitize_diagnostic_text(str(exc)),
@@ -283,7 +290,7 @@ class IntegrationManager:
                     break
             return self.db.upsert_integration_connection(
                 service_key,
-                enabled=True,
+                enabled=enabled_on_result,
                 status=STATUS_ERROR,
                 last_check_at=utc_now(),
                 last_error=last_error,
