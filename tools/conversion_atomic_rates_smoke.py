@@ -110,6 +110,10 @@ class AtomicConversionRateTests(unittest.TestCase):
         self.db.set_conversion_rate("RUB", "2")
         self.add_pending("PLN", "awaiting_rate")
         previous = self.pending_statuses(), self.audit_rows()
+        with self.db.connect() as conn:
+            units_before = [tuple(row) for row in conn.execute(
+                "SELECT unit,label,unit_kind,service FROM conversion_units ORDER BY unit"
+            )]
         real = ServicesMixin._register_conversion_unit_conn
 
         def fail_second(conn, descriptor):
@@ -126,6 +130,13 @@ class AtomicConversionRateTests(unittest.TestCase):
         self.assertEqual(self.db.get_conversion_rate("PLN"), "")
         self.assertEqual(self.db.get_conversion_rate("EUR"), "")
         self.assertEqual((self.pending_statuses(), self.audit_rows()), previous)
+        with self.db.connect() as conn:
+            self.assertEqual(
+                [tuple(row) for row in conn.execute(
+                    "SELECT unit,label,unit_kind,service FROM conversion_units ORDER BY unit"
+                )],
+                units_before,
+            )
 
     def test_validation_blocks_duplicates_and_nonpositive_values(self):
         for rows in (
