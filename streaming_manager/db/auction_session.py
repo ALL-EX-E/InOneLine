@@ -1330,7 +1330,8 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=after_ms)).isoformat(
+        phase_start = self._pending_timer_phase_start(session, now_dt)
+        deadline = ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
             timespec="microseconds"
         )
         after_seconds = max(0, math.ceil(after_ms / 1000))
@@ -2553,7 +2554,8 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=duration_ms)).isoformat(
+        phase_start = now_dt + timedelta(milliseconds=AUCTION_PREPARATION_LEAD_IN_MS)
+        deadline = (phase_start + timedelta(milliseconds=duration_ms)).isoformat(
             timespec="microseconds"
         )
 
@@ -2576,6 +2578,7 @@ class AuctionSessionMixin:
                     duration_ms=?,
                     remaining_ms=?,
                     deadline_at=?,
+                    timer_phase_starts_at=?,
                     winner_game_id=NULL,
                     finished_at=NULL,
                     updated_at=?
@@ -2583,7 +2586,8 @@ class AuctionSessionMixin:
                 """,
                 (
                     duration_seconds, duration_seconds, duration_ms, duration_ms,
-                    deadline, now, auction_id,
+                    deadline, phase_start.isoformat(timespec="microseconds"),
+                    now, auction_id,
                 ),
             )
             conn.execute(
