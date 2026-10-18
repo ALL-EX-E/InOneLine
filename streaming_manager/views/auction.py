@@ -528,8 +528,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.timer_reset_btn = QPushButton("Сбросить")
         self.timer_reset_btn.setToolTip(
-            "Контекстный сброс: аукцион — 10 минут, допвремя — исходная длительность, "
-            "колесо — 8 секунд"
+            "Сброс времени зависит от режима:\n"
+            "до запуска — сохранённая длительность из «Настроек»;\n"
+            "при идущем аукционе — исходная длительность текущей сессии;\n"
+            "дополнительное время при ничьей — сохранённая длительность "
+            "режима «Максимальная сумма»;\n"
+            "колесо — сохранённая длительность вращения из «Настроек»."
         )
         self.timer_reset_btn.clicked.connect(self.reset_auction_timer)
 
