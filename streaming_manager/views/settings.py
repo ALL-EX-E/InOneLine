@@ -648,7 +648,7 @@ class SettingsTab(QWidget):
         conversion_note.setProperty("muted", True)
         conversion_layout.addWidget(conversion_note)
 
-        currencies_heading = QLabel("Валюты")
+        currencies_heading = QLabel("Курсы конвертации")
         currencies_heading.setStyleSheet("font-size: 12pt; font-weight: 650;")
         conversion_layout.addWidget(currencies_heading)
 
@@ -657,6 +657,12 @@ class SettingsTab(QWidget):
         self.conversion_rates_layout.setContentsMargins(0, 0, 0, 0)
         self.conversion_rates_layout.setSpacing(8)
         conversion_layout.addWidget(self.conversion_rates_widget)
+
+        save_conversion = QPushButton("Сохранить курсы")
+        save_conversion.setProperty("primary", True)
+        save_conversion.clicked.connect(self.save_conversion_settings)
+        conversion_layout.addWidget(save_conversion, 0, Qt.AlignLeft)
+
         self.conversion_rate_edits: dict[str, QLineEdit] = {}
         self.conversion_unit_descriptors: dict[str, ConversionUnit] = {}
         self._conversion_units_signature: tuple[tuple[str, str, str, str], ...] = ()
@@ -712,11 +718,6 @@ class SettingsTab(QWidget):
         pending_header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         self.pending_conversion_table.setMinimumHeight(170)
         conversion_layout.addWidget(self.pending_conversion_table)
-
-        save_conversion = QPushButton("Сохранить курсы")
-        save_conversion.setProperty("primary", True)
-        save_conversion.clicked.connect(self.save_conversion_settings)
-        conversion_layout.addWidget(save_conversion, 0, Qt.AlignLeft)
         conversion_layout.addStretch()
 
         self._prepare_settings_page(self.conversion_page, conversion_layout)
