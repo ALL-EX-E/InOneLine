@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import math
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
@@ -73,6 +75,11 @@ class AuctionAudioMixin:
         self._auction_soundtrack_copy_worker: FunctionWorker | None = None
         self._auction_audio_runtime_error = ""
         self._auction_audio_session_id: int | None = None
+        self._auction_preparation_audio_timer = QTimer(self)
+        self._auction_preparation_audio_timer.setSingleShot(True)
+        self._auction_preparation_audio_timer.timeout.connect(
+            self._start_soundtrack_at_phase_boundary
+        )
         self.auction_music_dir = self.soundtrack_dir
         self.auction_audio.set_volume_percent(self._saved_auction_soundtrack_volume())
         self.auction_audio.set_muted(self._saved_auction_soundtrack_mute())
@@ -190,6 +197,13 @@ class AuctionAudioMixin:
             return
 
         if status in ("running", "paused") and mode == "max_amount":
+            # Do not steal Music Player ownership before the actual audible
+            # main/overtime start. This also covers a pause during lead-in.
+            if self.db._pending_timer_phase_start(session) is not None or (
+                status == "paused" and session.get("timer_phase_starts_at")
+            ):
+                self._release_auction_audio_owner()
+                return
             auction_asset = self._configured_soundtrack_asset(
                 AUCTION_SOUNDTRACK_MEDIA_ID_KEY
             )
@@ -945,7 +959,10 @@ class AuctionAudioMixin:
                 if asset is None:
                     self._stop_auction_soundtrack(immediate=True)
                 else:
-                    if not self.auction_audio.muted:
+                    if (
+                        not self.auction_audio.muted
+                        and self.db._pending_timer_phase_start(session) is None
+                    ):
                         self._acquire_auction_audio_owner()
                     self._start_auction_soundtrack_for_session(
                         session,
@@ -968,6 +985,7 @@ class AuctionAudioMixin:
         if (
             not muted
             and audible_phase
+            and self.db._pending_timer_phase_start(session) is None
             and self._configured_soundtrack_asset(AUCTION_SOUNDTRACK_MEDIA_ID_KEY)
             is not None
         ):
@@ -1112,6 +1130,26 @@ class AuctionAudioMixin:
             return [], [], 0
         return [path], [int(selected.id)], 0
 
+    def _start_soundtrack_at_phase_boundary(self) -> None:
+        """Resume only the still-current session at its persisted start clock."""
+        session = self._current_session()
+        if (
+            session is None
+            or str(session.get("mode") or "") != "max_amount"
+            or str(session.get("status") or "") != "running"
+        ):
+            return
+        pending = self.db._pending_timer_phase_start(session)
+        if pending is not None:
+            remaining_ms = max(1, math.ceil(
+                (pending - datetime.now(timezone.utc)).total_seconds() * 1000.0
+            ))
+            self._auction_preparation_audio_timer.start(remaining_ms)
+            return
+        self._sync_audio_owner_with_session(session)
+        self._start_auction_soundtrack_for_session(session)
+        self._refresh_browser_audio_snapshot()
+
     def _start_auction_soundtrack_for_session(self, session: dict | None, *, restart: bool = False) -> None:
         if session is None or str(session.get("mode") or "") != "max_amount":
             return
@@ -1119,9 +1157,21 @@ class AuctionAudioMixin:
         if status not in ("running", "paused", "tie_break_required"):
             return
         session_id = int(session["id"])
+        phase_start = (
+            self.db._pending_timer_phase_start(session)
+            if status == "running" else None
+        )
+        preparing = phase_start is not None
+        if preparing:
+            remaining_ms = max(1, math.ceil(
+                (phase_start - datetime.now(timezone.utc)).total_seconds() * 1000.0
+            ))
+            self._auction_preparation_audio_timer.start(remaining_ms)
+        else:
+            self._auction_preparation_audio_timer.stop()
         if not restart and self._auction_audio_session_id == session_id:
             if self.auction_audio.active:
-                if status in ("paused", "tie_break_required"):
+                if status in ("paused", "tie_break_required") or preparing:
                     self.auction_audio.pause()
                 else:
                     self.auction_audio.resume()
@@ -1142,7 +1192,7 @@ class AuctionAudioMixin:
                 paths,
                 start_index=start_index,
                 loop_one=True,
-                start_paused=status in ("paused", "tie_break_required"),
+                start_paused=status in ("paused", "tie_break_required") or preparing,
             )
             # start_playlist() first resets the old transport and can emit
             # stopped(), so align IDs only after the new transport is live.
@@ -1181,6 +1231,7 @@ class AuctionAudioMixin:
         self._release_auction_audio_owner()
 
     def _stop_auction_soundtrack(self, *, immediate: bool = False) -> None:
+        self._auction_preparation_audio_timer.stop()
         self.auction_audio.stop(immediate=immediate, fade_ms=self.AUCTION_SOUNDTRACK_FADE_MS)
         self._auction_audio_session_id = None
         self._refresh_auction_soundtrack_availability()
@@ -1289,6 +1340,7 @@ class AuctionAudioMixin:
 
     def shutdown_audio(self) -> None:
         """Release application audio promptly during MainWindow shutdown."""
+        self._auction_preparation_audio_timer.stop()
         self._browser_audio_snapshot_timer.stop()
         self.auction_audio.stop(immediate=True)
         self.wheel_audio.stop(immediate=True)
