@@ -90,7 +90,7 @@ from ..twitch_b4 import (
     TwitchChannelPointsService,
     TwitchRewardDefinition,
 )
-from ..database import Database
+from ..database import Database, display_datetime_local
 from ..random_sources import RandomOrgClient
 from ..media import (
     MEDIA_CATEGORY_WHEEL_CENTER_ICONS,
@@ -107,6 +107,27 @@ from ..workers import FunctionWorker
 from ..ui_settings import UI_SETTINGS_FILENAME
 from ..time_input import parse_duration_input
 from .common import ScrollSafeComboBox, make_screen_color_picker_button, pick_screen_color
+
+# Presentation-only labels; provider capability IDs and auth protocols remain unchanged.
+_INTEGRATION_CAPABILITY_LABELS = {
+    "OAuth Device Code (Public)": "Безопасный вход через Twitch",
+    "Twitch identity": "Данные аккаунта Twitch",
+    "Channel Points / Custom Rewards": "Баллы канала и награды Twitch",
+    "EventSub WebSocket": "События Twitch в реальном времени",
+    "OAuth Implicit (Public desktop)": "Безопасный вход через DonationAlerts",
+    "Donation history": "История пожертвований",
+    "Centrifugo WebSocket": "События DonationAlerts в реальном времени",
+    "RUB/USD/EUR and other DonationAlerts currencies": "Пожертвования в разных валютах",
+}
+
+_INTEGRATION_DETAIL_LABELS = (
+    ("Права B4", "Права на управление наградами"),
+    ("DonationAlerts User ID", "ID пользователя DonationAlerts"),
+    ("Channel Points / Custom Rewards", "Баллы канала и награды Twitch"),
+    ("Тип канала: Partner", "Тип канала: партнёр"),
+    ("Тип канала: Affiliate", "Тип канала: компаньон"),
+)
+
 
 class SettingsTab(QWidget):
     wheelCenterChanged = Signal(int)
@@ -1361,8 +1382,8 @@ class SettingsTab(QWidget):
 
             if view.service_key == "twitch":
                 public_note = QLabel(
-                    "OAuth: Device Code Grant Flow · Public client · приложение уже настроено; "
-                    "Client Secret не требуется и не хранится."
+                    "Авторизация через официальный вход Twitch. Пароль и Client Secret "
+                    "программа не хранит; данные авторизации находятся в защищённом хранилище."
                 )
                 public_note.setWordWrap(True)
                 public_note.setProperty("muted", True)
@@ -1372,13 +1393,19 @@ class SettingsTab(QWidget):
                 self._build_donationalerts_connection_controls(card_layout, view)
 
             for detail_text in view.details:
-                detail = QLabel(str(detail_text))
+                label_text = str(detail_text)
+                for technical, friendly in _INTEGRATION_DETAIL_LABELS:
+                    label_text = label_text.replace(technical, friendly)
+                detail = QLabel(label_text)
                 detail.setWordWrap(True)
                 detail.setProperty("muted", True)
                 card_layout.addWidget(detail)
 
             if view.capabilities:
-                capabilities = QLabel("Возможности: " + ", ".join(view.capabilities))
+                capabilities = QLabel(
+                    "Возможности: "
+                    + ", ".join(_INTEGRATION_CAPABILITY_LABELS.get(text, text) for text in view.capabilities)
+                )
                 capabilities.setWordWrap(True)
                 capabilities.setProperty("muted", True)
                 card_layout.addWidget(capabilities)
@@ -1388,11 +1415,15 @@ class SettingsTab(QWidget):
                 error.setProperty("muted", True)
                 card_layout.addWidget(error)
             if view.last_check_at:
-                checked = QLabel("Последняя проверка: " + str(view.last_check_at))
+                checked = QLabel(
+                    "Последняя проверка: " + display_datetime_local(view.last_check_at)
+                )
                 checked.setProperty("muted", True)
                 card_layout.addWidget(checked)
             if view.last_event_at:
-                event = QLabel("Последняя принятая активность: " + str(view.last_event_at))
+                event = QLabel(
+                    "Последняя принятая активность: " + display_datetime_local(view.last_event_at)
+                )
                 event.setProperty("muted", True)
                 card_layout.addWidget(event)
 
@@ -1426,17 +1457,18 @@ class SettingsTab(QWidget):
             return
 
         note = QLabel(
-            "OAuth: DonationAlerts Public/Implicit Flow. После нажатия «Подключить DonationAlerts» "
-            "страница входа и подтверждения открывается в обычном браузере. Client Secret "
-            "приложение не запрашивает и не хранит; access token хранится через общий защищённый "
-            "CredentialStore (DPAPI в Windows)."
+            "После нажатия «Подключить DonationAlerts» официальный вход откроется "
+            "в обычном браузере. Пароль и Client Secret программа не хранит; "
+            "данные авторизации сохраняются в защищённом хранилище Windows."
         )
         note.setWordWrap(True)
         note.setProperty("muted", True)
         card_layout.addWidget(note)
 
         if adapter.has_built_in_client_id():
-            configured = QLabel("OAuth Client ID: встроен в сборку (public client).")
+            configured = QLabel(
+                "Приложение DonationAlerts уже настроено; вводить ID вручную не нужно."
+            )
             configured.setProperty("muted", True)
             card_layout.addWidget(configured)
             return
@@ -1575,7 +1607,7 @@ class SettingsTab(QWidget):
 
         rewards = list(draft_definitions)
         table = QTableWidget(len(rewards), 4)
-        table.setHorizontalHeaderLabels(["Стоимость", "Цвет", "Twitch Reward ID", ""])
+        table.setHorizontalHeaderLabels(["Стоимость", "Цвет", "ID награды Twitch", ""])
         table.verticalHeader().setVisible(False)
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setMinimumHeight(120)
