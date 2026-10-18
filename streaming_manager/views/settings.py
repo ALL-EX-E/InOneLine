@@ -168,6 +168,7 @@ class SettingsTab(QWidget):
         self._donationalerts_auth_timer: QTimer | None = None
         self._twitch_reward_table: QTableWidget | None = None
         self._twitch_common_title: QLineEdit | None = None
+        self._twitch_reward_saved_snapshot: tuple[str, tuple[TwitchRewardDefinition, ...]] | None = None
         self.twitch_device_code_ready.connect(self._show_twitch_device_code)
         self.donationalerts_oauth_ready.connect(self._show_donationalerts_oauth)
         twitch_adapter = self.integration_manager.registry.get("twitch")
@@ -1282,7 +1283,21 @@ class SettingsTab(QWidget):
             "Курсы конвертации в баллы сохранены.",
         )
 
+    def _twitch_reward_unsaved_draft(self) -> tuple[str, tuple[TwitchRewardDefinition, ...]] | None:
+        """Keep edits in memory across card rebuilds; never save on navigation."""
+        if self._twitch_reward_saved_snapshot is None:
+            return None
+        try:
+            title, definitions = self._collect_twitch_reward_form()
+        except (RuntimeError, ValueError):
+            return None
+        current = (title, tuple(definitions))
+        return current if current != self._twitch_reward_saved_snapshot else None
+
     def _clear_integration_cards(self) -> None:
+        self._twitch_reward_table = None
+        self._twitch_common_title = None
+        self._twitch_reward_saved_snapshot = None
         while self.integration_cards_layout.count():
             item = self.integration_cards_layout.takeAt(0)
             widget = item.widget()
@@ -1314,9 +1329,12 @@ class SettingsTab(QWidget):
             ("Удалить подключение", "remove_connection"),
         )
 
-    def _refresh_integrations(self) -> None:
+    def _refresh_integrations(self, *, preserve_twitch_draft: bool = True) -> None:
         if not hasattr(self, "integration_cards_layout"):
             return
+        # Preserve unsaved title/cost/color/row edits even when a connection
+        # status update or normal Settings navigation rebuilds provider cards.
+        draft = self._twitch_reward_unsaved_draft() if preserve_twitch_draft else None
         self._clear_integration_cards()
         views = self.integration_manager.views()
         self.integration_empty_label.setVisible(not views)
@@ -1376,7 +1394,7 @@ class SettingsTab(QWidget):
                 card_layout.addWidget(event)
 
             if view.service_key == "twitch" and self.twitch_channel_points_service is not None:
-                self._build_twitch_b4_controls(card_layout, view)
+                self._build_twitch_b4_controls(card_layout, view, draft_override=draft)
 
             actions = QHBoxLayout()
             for label, action in self._integration_action_specs(view):
@@ -1504,11 +1522,26 @@ class SettingsTab(QWidget):
             "Client ID сохранён. Теперь нажмите «Подключить DonationAlerts»."
         )
 
-    def _build_twitch_b4_controls(self, card_layout: QVBoxLayout, view) -> None:
+    def _build_twitch_b4_controls(
+        self,
+        card_layout: QVBoxLayout,
+        view,
+        *,
+        draft_override: tuple[str, tuple[TwitchRewardDefinition, ...]] | None = None,
+    ) -> None:
         service = self.twitch_channel_points_service
         if service is None:
             return
         config = service.configuration()
+        # This baseline is the persisted configuration, *not* the temporary
+        # form; it is compared on every subsequent rebuild.
+        self._twitch_reward_saved_snapshot = (
+            str(config["common_title"]), tuple(config["rewards"])
+        )
+        draft_title, draft_definitions = (
+            draft_override if draft_override is not None
+            else self._twitch_reward_saved_snapshot
+        )
 
         divider = QFrame()
         divider.setFrameShape(QFrame.HLine)
@@ -1530,14 +1563,14 @@ class SettingsTab(QWidget):
 
         title_row = QHBoxLayout()
         title_row.addWidget(QLabel("Общее название:"))
-        common_title = QLineEdit(str(config["common_title"]))
+        common_title = QLineEdit(draft_title)
         common_title.setMaxLength(45)
         common_title.setPlaceholderText("Ставка")
         title_row.addWidget(common_title, 1)
         self._twitch_common_title = common_title
         card_layout.addLayout(title_row)
 
-        rewards = list(config["rewards"])
+        rewards = list(draft_definitions)
         table = QTableWidget(len(rewards), 4)
         table.setHorizontalHeaderLabels(["Стоимость", "Цвет", "Twitch Reward ID", ""])
         table.verticalHeader().setVisible(False)
@@ -1758,7 +1791,13 @@ class SettingsTab(QWidget):
             )
         return title.text().strip(), rewards
 
-    def _run_twitch_b4_action(self, fn: Callable[[], object], *, success_message: str = "") -> None:
+    def _run_twitch_b4_action(
+        self,
+        fn: Callable[[], object],
+        *,
+        success_message: str = "",
+        reload_saved_rewards_on_success: bool = False,
+    ) -> None:
         if self._integration_worker is not None:
             return
         self._set_integration_actions_enabled(False)
@@ -1768,7 +1807,11 @@ class SettingsTab(QWidget):
         def done(_result):
             self._close_twitch_auth_dialog(success=True)
             self.twitch_runtime_wake()
-            self._refresh_integrations()
+            # A successful remote sync may have assigned/rotated Twitch reward
+            # IDs. Re-read authoritative saved values, not the pre-sync draft.
+            self._refresh_integrations(
+                preserve_twitch_draft=not reload_saved_rewards_on_success
+            )
             self._refresh_conversion_rate_rows()
             self.integration_status_changed()
             if success_message:
@@ -1785,18 +1828,37 @@ class SettingsTab(QWidget):
             return
         try:
             common_title, rewards = self._collect_twitch_reward_form()
+            # Invalid forms must not touch local settings or Twitch.
+            service._validate_configuration(common_title, rewards)
         except Exception as exc:
             QMessageBox.warning(self, "Twitch", str(exc))
             return
 
         def action():
+            # Check provider eligibility and manage permission before staging
+            # any local draft, reusing the authoritative backend guard.
+            service.ensure_manage_scope()
             service.save_configuration(
                 common_title=common_title,
                 rewards=rewards,
             )
-            return service.sync_rewards()
+            try:
+                return service.sync_rewards()
+            except Exception as exc:
+                # Sync is a sequence of external API mutations; partial remote
+                # success cannot be undone safely. Never claim local rollback.
+                raise RuntimeError(
+                    "Настройки наград сохранены в программе, но синхронизация с Twitch "
+                    "не завершена. Некоторые награды на Twitch могли уже измениться. "
+                    "Проверьте подключение и повторите «Сохранить и синхронизировать награды». "
+                    "Причина: " + sanitize_diagnostic_text(str(exc))
+                ) from exc
 
-        self._run_twitch_b4_action(action, success_message="Twitch-награды синхронизированы.")
+        self._run_twitch_b4_action(
+            action,
+            success_message="Twitch-награды синхронизированы.",
+            reload_saved_rewards_on_success=True,
+        )
 
     def _set_twitch_rewards_manual(self, enabled: bool) -> None:
         service = self.twitch_channel_points_service
@@ -1825,6 +1887,7 @@ class SettingsTab(QWidget):
         self._run_twitch_b4_action(
             service.delete_managed_rewards,
             success_message="Зарегистрированные Twitch-награды удалены.",
+            reload_saved_rewards_on_success=True,
         )
 
     def _show_twitch_device_code(self, info: TwitchDeviceCode) -> None:
