@@ -673,6 +673,7 @@ class AuctionStateMixin:
 
     def _sync_timer_display_state(self, session: dict | None) -> None:
         self._timer_display_deadline = None
+        self._timer_display_phase_start = None
         self._timer_display_wheel_start = None
         self._timer_display_wheel_duration_ms = 0
         self._timer_display_kind = ""
@@ -723,6 +724,14 @@ class AuctionStateMixin:
             self._timer_display_paused_ms = max(0, int(stored_ms))
         elif status == "running":
             self._timer_display_kind = "auction"
+            phase_raw = session.get("timer_phase_starts_at")
+            if phase_raw:
+                try:
+                    self._timer_display_phase_start = datetime.fromisoformat(
+                        str(phase_raw)
+                    )
+                except (TypeError, ValueError):
+                    self._timer_display_phase_start = None
             deadline_raw = session.get("deadline_at")
             if deadline_raw:
                 try:
@@ -764,7 +773,13 @@ class AuctionStateMixin:
         deadline = self._timer_display_deadline
         if deadline is None:
             return max(0, int(self._timer_display_paused_ms))
-        milliseconds = (deadline - datetime.now(timezone.utc)).total_seconds() * 1000.0
+        now = datetime.now(timezone.utc)
+        phase_start = self._timer_display_phase_start
+        if phase_start is not None and now < phase_start:
+            return max(0, math.ceil(
+                (deadline - phase_start).total_seconds() * 1000.0
+            ))
+        milliseconds = (deadline - now).total_seconds() * 1000.0
         return max(0, math.ceil(milliseconds))
 
     def _tick_timer_display(self):

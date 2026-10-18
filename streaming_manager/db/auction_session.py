@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ..constants import (
+    AUCTION_PREPARATION_LEAD_IN_MS,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_DEFAULT,
     AUCTION_AUTO_EXTEND_EXTERNAL_ENABLED_KEY,
     AUCTION_AUTO_EXTEND_EXTERNAL_SERVICE_UNITS_ENABLED_DEFAULT,
@@ -43,6 +44,26 @@ class AuctionSessionMixin:
         "running", "paused", "awaiting_wheel", "winner_selected", "tie_break_required",
     )
     AUCTION_MODES = ("max_amount", "weighted_wheel")
+
+    @staticmethod
+    def _pending_timer_phase_start(
+        session: dict[str, Any],
+        now: datetime | None = None,
+    ) -> datetime | None:
+        """The stored future phase boundary, independent of mutable durations."""
+        if str(session.get("status") or "") != "running":
+            return None
+        raw = session.get("timer_phase_starts_at")
+        if not raw:
+            return None
+        try:
+            start = datetime.fromisoformat(str(raw))
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return None
+        now = now or datetime.now(timezone.utc)
+        return start if now < start else None
 
     @staticmethod
     def _auction_row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -289,12 +310,19 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
+        phase_start = (
+            None if start_in_wheel_mode
+            else now_dt + timedelta(milliseconds=AUCTION_PREPARATION_LEAD_IN_MS)
+        )
         deadline = (
-            None
-            if start_in_wheel_mode
-            else (now_dt + timedelta(milliseconds=duration_ms)).isoformat(
+            None if phase_start is None
+            else (phase_start + timedelta(milliseconds=duration_ms)).isoformat(
                 timespec="microseconds"
             )
+        )
+        phase_start_raw = (
+            phase_start.isoformat(timespec="microseconds")
+            if phase_start is not None else None
         )
 
         with self.connect() as conn:
@@ -318,11 +346,12 @@ class AuctionSessionMixin:
                     name, mode, provider, started_at, created_at,
                     status, duration_seconds, remaining_seconds,
                     duration_ms, remaining_ms, deadline_at, updated_at,
+                    timer_phase_starts_at,
                     rng_method, rng_ticket_id, wheel_duration_ms, wheel_format,
                     rules_template_id, rules_template_name, rules_html,
                     rules_presentation_json
                 )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     "Новый аукцион",
@@ -337,6 +366,7 @@ class AuctionSessionMixin:
                     remaining_ms,
                     deadline,
                     now,
+                    phase_start_raw,
                     rng_method,
                     rng_ticket_id,
                     wheel_duration_ms,
@@ -1112,6 +1142,11 @@ class AuctionSessionMixin:
         try:
             deadline = datetime.fromisoformat(str(deadline_raw))
             now = datetime.now(timezone.utc)
+            phase_start = AuctionSessionMixin._pending_timer_phase_start(session, now)
+            if phase_start is not None:
+                return max(0, math.ceil(
+                    (deadline - phase_start).total_seconds() * 1000.0
+                ))
             milliseconds = (deadline - now).total_seconds() * 1000.0
             return max(0, math.ceil(milliseconds))
         except (TypeError, ValueError):
@@ -1295,7 +1330,8 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=after_ms)).isoformat(
+        phase_start = self._pending_timer_phase_start(session, now_dt)
+        deadline = ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
             timespec="microseconds"
         )
         after_seconds = max(0, math.ceil(after_ms / 1000))
@@ -2120,6 +2156,9 @@ class AuctionSessionMixin:
         remaining_ms = self._remaining_ms_from_session(session)
         remaining = max(0, math.ceil(remaining_ms / 1000))
         now = utc_now()
+        # If paused before the phase actually starts, preserve that state;
+        # Resume will schedule a fresh lead-in with all time intact.
+        pending_phase = self._pending_timer_phase_start(session)
         with self.connect() as conn:
             conn.execute(
                 """
@@ -2128,10 +2167,15 @@ class AuctionSessionMixin:
                     remaining_seconds=?,
                     remaining_ms=?,
                     deadline_at=NULL,
+                    timer_phase_starts_at=?,
                     updated_at=?
                 WHERE id=? AND status='running'
                 """,
-                (remaining, remaining_ms, now, auction_id),
+                (
+                    remaining, remaining_ms,
+                    pending_phase.isoformat(timespec="microseconds") if pending_phase else None,
+                    now, auction_id,
+                ),
             )
             self._log_conn(
                 conn,
@@ -2162,7 +2206,12 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=remaining_ms)).isoformat(
+        pending_preparation = bool(session.get("timer_phase_starts_at"))
+        phase_start = (
+            now_dt + timedelta(milliseconds=AUCTION_PREPARATION_LEAD_IN_MS)
+            if pending_preparation else None
+        )
+        deadline = ((phase_start or now_dt) + timedelta(milliseconds=remaining_ms)).isoformat(
             timespec="microseconds"
         )
         with self.connect() as conn:
@@ -2171,10 +2220,15 @@ class AuctionSessionMixin:
                 UPDATE auction_sessions
                 SET status='running',
                     deadline_at=?,
+                    timer_phase_starts_at=?,
                     updated_at=?
                 WHERE id=? AND status='paused'
                 """,
-                (deadline, now, auction_id),
+                (
+                    deadline,
+                    phase_start.isoformat(timespec="microseconds") if phase_start else None,
+                    now, auction_id,
+                ),
             )
             self._log_conn(
                 conn,
@@ -2214,8 +2268,9 @@ class AuctionSessionMixin:
         after_seconds = max(0, math.ceil(after_ms / 1000))
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
+        phase_start = self._pending_timer_phase_start(session, now_dt)
         deadline = (
-            (now_dt + timedelta(milliseconds=after_ms)).isoformat(
+            ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
                 timespec="microseconds"
             )
             if status == "running" and after_ms > 0
@@ -2277,8 +2332,9 @@ class AuctionSessionMixin:
         duration_seconds = max(1, math.ceil(duration_ms / 1000))
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
+        phase_start = self._pending_timer_phase_start(session, now_dt)
         deadline = (
-            (now_dt + timedelta(milliseconds=duration_ms)).isoformat(
+            ((phase_start or now_dt) + timedelta(milliseconds=duration_ms)).isoformat(
                 timespec="microseconds"
             )
             if status == "running"
@@ -2518,7 +2574,8 @@ class AuctionSessionMixin:
 
         now_dt = datetime.now(timezone.utc)
         now = now_dt.isoformat(timespec="microseconds")
-        deadline = (now_dt + timedelta(milliseconds=duration_ms)).isoformat(
+        phase_start = now_dt + timedelta(milliseconds=AUCTION_PREPARATION_LEAD_IN_MS)
+        deadline = (phase_start + timedelta(milliseconds=duration_ms)).isoformat(
             timespec="microseconds"
         )
 
@@ -2541,6 +2598,7 @@ class AuctionSessionMixin:
                     duration_ms=?,
                     remaining_ms=?,
                     deadline_at=?,
+                    timer_phase_starts_at=?,
                     winner_game_id=NULL,
                     finished_at=NULL,
                     updated_at=?
@@ -2548,7 +2606,8 @@ class AuctionSessionMixin:
                 """,
                 (
                     duration_seconds, duration_seconds, duration_ms, duration_ms,
-                    deadline, now, auction_id,
+                    deadline, phase_start.isoformat(timespec="microseconds"),
+                    now, auction_id,
                 ),
             )
             conn.execute(

@@ -115,7 +115,7 @@ jobs:
           from streaming_manager.database import Database
 
           assert APP_VERSION == "1.0.8"
-          assert SCHEMA_VERSION == 20
+          assert SCHEMA_VERSION == 21
           with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
               Database(path)
@@ -123,8 +123,8 @@ jobs:
                   assert conn.execute("PRAGMA quick_check").fetchone()[0] == "ok"
                   assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
                   assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
-                  assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 20
-                  assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 16
+                  assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 21
+                  assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 17
           print("FRESH_DB_1_0_8=PASS")
           '@ | python -
 
@@ -187,6 +187,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "P16-C one-second wheel / full-width transparent stop button regression failed" }
           python tools/auction_timer_boundary_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-D Max Amount tie overtime / authoritative wheel-audio timer boundary regression failed" }
+          python tools/auction_phase_preparation_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P16-F main/overtime preparation timer, Qt/OBS and soundtrack phase regression failed" }
           python tools/wheel_rng_late_callback_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P16-E late remote RNG callbacks / spin re-entry regression failed" }
           python tools/obs_visibility_smoke.py

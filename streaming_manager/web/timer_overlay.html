@@ -179,7 +179,14 @@ body.preview #api-state.visible { display: block; }
 
   function currentRemaining(now = performance.now()) {
     if (!state || !state.running) return Math.max(0, Number(state?.remaining_ms) || 0);
-    return Math.max(0, anchorRemainingMs - (now - anchorPerformanceMs));
+    const phaseMs = state?.preparing ? Date.parse(state?.phase_starts_at || "") : NaN;
+    if (Number.isFinite(phaseMs)) {
+      // OBS Browser Source and the database share the system UTC clock. The
+      // absolute phase boundary avoids consuming HTTP/poll transport latency.
+      return Math.max(0, anchorRemainingMs - Math.max(0, Date.now() - phaseMs));
+    }
+    const preparationMs = Math.max(0, Number(state?.preparation_remaining_ms) || 0);
+    return Math.max(0, anchorRemainingMs - Math.max(0, now - anchorPerformanceMs - preparationMs));
   }
 
   function measureGlyph(glyph) {
