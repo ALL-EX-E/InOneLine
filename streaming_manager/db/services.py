@@ -1157,6 +1157,7 @@ class ServicesMixin:
                 ee.event_type,
                 ee.payload_json,
                 ee.processing_status,
+                ee.created_at AS event_created_at,
                 g.title AS game_title,
                 g.archived AS game_archived,
                 g.auction_only AS game_auction_only,
@@ -1250,6 +1251,7 @@ class ServicesMixin:
             "conversion_rate": rate,
             "preview_sm_points": credited,
             "created_at": str(row["created_at"]),
+            "event_created_at": str(row["event_created_at"] or ""),
         }
 
     def list_pending_conversion_events(self) -> list[dict[str, Any]]:
