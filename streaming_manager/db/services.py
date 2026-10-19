@@ -1224,6 +1224,78 @@ class ServicesMixin:
         key = normalize_title_key(lot_title)
         return next((r for r in rows if normalize_title_key(r["title"]) == key), None) if key else None
 
+    def _post_expiry_title_lot_allowed_conn(
+        self, conn: sqlite3.Connection, auction_id: int, lot_title: str,
+    ) -> bool:
+        """Only genuinely new, non-deleted names may enter their original session."""
+        key = normalize_title_key(str(lot_title or "").strip())
+        if not key:
+            return False
+        # A previously removed temporary lot is history, never a new target.
+        for row in conn.execute(
+            "SELECT game_id,snapshot_title FROM auction_entries WHERE auction_id=?",
+            (int(auction_id),),
+        ).fetchall():
+            if (row["game_id"] is None
+                    and normalize_title_key(str(row["snapshot_title"] or "")) == key):
+                return False
+        for row in conn.execute(
+            "SELECT title,archived,auction_only FROM games"
+        ).fetchall():
+            if normalize_title_key(row["title"]) == key:
+                return not (bool(row["archived"]) or bool(row["auction_only"]))
+        return True
+
+    def _create_post_expiry_title_lot_conn(
+        self, conn: sqlite3.Connection, auction_id: int, lot_title: str, now: str,
+    ) -> int:
+        """Add one missing title-only lot, scoped strictly to its source auction."""
+        title = str(lot_title or "").strip()
+        if not self._post_expiry_title_lot_allowed_conn(conn, auction_id, title):
+            raise RuntimeError("Новый лот исходного аукциона недоступен для добавления.")
+        game_row = next((
+            row for row in conn.execute(
+                "SELECT id,title,sm_points,archived,auction_only FROM games "
+                "ORDER BY auction_only ASC,id ASC"
+            ).fetchall()
+            if normalize_title_key(row["title"]) == normalize_title_key(title)
+        ), None)
+        if game_row is None:
+            cursor = conn.execute(
+                "INSERT INTO games(title,release_date,sm_points,coop,status,review,"
+                "archived,auction_only,created_at,updated_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (title, None, 0, 0, STATUS_NOT_PLAYED, "", 0, 1, now, now),
+            )
+            target_id = int(cursor.lastrowid)
+            starting = 0
+        else:
+            target_id = int(game_row["id"])
+            starting = int(game_row["sm_points"])
+        # Late placement is appended; winner ordering is computed from points,
+        # not the historical start_position. Do not re-run the auction timer.
+        row = conn.execute(
+            "SELECT COALESCE(MAX(start_position),0)+1 AS position "
+            "FROM auction_entries WHERE auction_id=?",
+            (int(auction_id),),
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO auction_entries("
+            "auction_id,game_id,weight,active,starting_sm_points,bid_sm_points,"
+            "snapshot_title,snapshot_release_date,snapshot_coop,snapshot_status,"
+            "snapshot_review,start_position) "
+            "SELECT ?,?,?,?,?,?,title,release_date,coop,status,review,? "
+            "FROM games WHERE id=?",
+            (int(auction_id), target_id, starting, 1, starting, 0,
+             int(row["position"]), target_id),
+        )
+        self._log_conn(
+            conn, "auction_lot", target_id, "post_expiry_title_lot",
+            None, {"source_auction_id": int(auction_id), "title": title,
+                   "temporary": game_row is None, "no_timer_restart": True},
+        )
+        return target_id
+
     def _apply_post_expiry_source_entry_conn(
         self, conn: sqlite3.Connection, auction_id: int,
         game_id: int | None, lot_title: str, credited: int, now: str,
@@ -1241,6 +1313,14 @@ class ServicesMixin:
         ):
             raise RuntimeError("Исходный аукцион уже завершён или недоступен для коррекции.")
         entry = self._post_expiry_source_entry_conn(conn, auction_id, game_id, lot_title)
+        if entry is None and game_id is None:
+            # P20-C: missing title-only target from the ORIGINAL pending event.
+            created_id = self._create_post_expiry_title_lot_conn(
+                conn, auction_id, lot_title, now,
+            )
+            entry = self._post_expiry_source_entry_conn(
+                conn, auction_id, created_id, lot_title,
+            )
         if entry is None or int(entry["archived"]):
             raise RuntimeError("Лот исходного аукциона для коррекции не найден или находится в архиве.")
         target_id = int(entry["game_id"])
@@ -1332,8 +1412,16 @@ class ServicesMixin:
                 source_entry = self._post_expiry_source_entry_conn(
                     conn, stored_auction_id, game_id, resolved_title,
                 )
+                new_title_allowed = (
+                    game_id is None
+                    and source_entry is None
+                    and self._post_expiry_title_lot_allowed_conn(
+                        conn, stored_auction_id, saved_lot_title,
+                    )
+                )
             expired_correction = bool(
-                source_entry is not None and not bool(source_entry["archived"])
+                (source_entry is not None and not bool(source_entry["archived"]))
+                or new_title_allowed
             )
         if game_id is not None:
             safe_target = (
