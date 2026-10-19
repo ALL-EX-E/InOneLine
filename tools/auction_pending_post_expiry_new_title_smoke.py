@@ -1,6 +1,8 @@
 """P20-C: title-only pending conversion joins only its original expired auction."""
 from __future__ import annotations
 
+import json
+import sqlite3
 import sys
 import unittest
 from pathlib import Path
@@ -48,13 +50,26 @@ class ExpiredTitleOnlySourceLotTests(unittest.TestCase):
         return sid
 
     def pending(self, sid, title, amount=15, *, event_id="new"):
-        event = self.db.queue_external_conversion_event(
-            source="p20c-regression", external_event_id=event_id,
-            game_id=None, amount=str(amount), source_unit="PLN",
-            auction_id=sid,
-            payload={"normalized": {"lot_title": title}},
-        )
-        return event["id"]
+        # The provider's accepted title-only event is stored with game_id=NULL.
+        # queue_external_conversion_event intentionally accepts known IDs only;
+        # use the real persisted schema the integration processor produces.
+        with self.db.connect() as conn:
+            event_row = int(conn.execute(
+                "INSERT INTO external_events("
+                "source,external_event_id,event_type,payload_json,"
+                "processing_status,created_at) VALUES(?,?,?,?,?,?)",
+                ("p20c-regression", event_id, "donation",
+                 json.dumps({"normalized": {"lot_title": title}}),
+                 "awaiting_manual_apply", self.earlier),
+            ).lastrowid)
+            return int(conn.execute(
+                "INSERT INTO pending_conversions("
+                "external_event_row_id,game_id,auction_id,source_amount_text,"
+                "source_unit,source_unit_label,unit_kind,status,created_at)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (event_row, None, sid, str(amount), "PLN", "PLN", "currency",
+                 "awaiting_manual_apply", self.earlier),
+            ).lastrowid)
 
     def snapshot(self, sid):
         with self.db.connect() as conn:
@@ -158,13 +173,18 @@ class ExpiredTitleOnlySourceLotTests(unittest.TestCase):
         self.assertEqual(self.db.get_auction_session(sid)["remaining_ms"], 0)
         self.assertIsNone(self.db.get_auction_session(sid)["deadline_at"])
         self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 0)
-        replay = self.db.queue_external_conversion_event(
-            source="p20c-regression", external_event_id="tie",
-            game_id=None, amount="100", source_unit="PLN", auction_id=sid,
-            payload={"normalized": {"lot_title": "Late tie"}},
-        )
-        self.assertEqual(replay["id"], pid)
-        self.assertEqual(replay["status"], "applied")
+        with self.assertRaises(sqlite3.IntegrityError):
+            with self.db.connect() as conn:
+                conn.execute(
+                    "INSERT INTO external_events("
+                    "source,external_event_id,event_type,payload_json,"
+                    "processing_status,created_at) VALUES(?,?,?,?,?,?)",
+                    ("p20c-regression", "tie", "donation", "{}",
+                     "awaiting_manual_apply", self.earlier),
+                )
+        self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "applied")
+        with self.assertRaises(RuntimeError):
+            self.db.apply_pending_conversion_event(pid)
         with self.db.connect() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM contributions").fetchone()[0], 1)
 
