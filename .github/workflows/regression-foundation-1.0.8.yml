@@ -301,6 +301,14 @@ jobs:
           python tools/auction_pending_post_expiry_new_title_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-C source-auction title-only correction failed" }
 
+      - name: P20-D direct weighted wheel pending-freeze native regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_weighted_pending_freeze_gate_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-D weighted pending freeze gate failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
