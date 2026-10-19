@@ -1219,6 +1219,10 @@ class SettingsTab(QWidget):
             self._refresh_pending_conversion_rows()
 
     def _refresh_pending_conversion_rows(self) -> None:
+        # An accepted external event registers its unknown source unit and
+        # pending row in one transaction. Whenever the queue is refreshed,
+        # reflect newly registered rate editors in the same UI pass.
+        self._refresh_conversion_rate_rows()
         events = self.db.list_pending_conversion_events()
         self.pending_conversion_table.setRowCount(len(events))
         for row_index, event in enumerate(events):

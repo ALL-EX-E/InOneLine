@@ -265,6 +265,14 @@ jobs:
           python tools/conversion_rate_draft_preservation_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P19-F conversion rate draft preservation failed" }
 
+      - name: P19-G new currency and dynamic service-unit pending regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/conversion_unknown_unit_pending_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P19-G unknown source unit pending regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
