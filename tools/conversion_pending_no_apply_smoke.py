@@ -117,6 +117,16 @@ class NoApplyPendingTests(unittest.TestCase):
             self.db.apply_pending_conversion_event(pending_id)
         with self.assertRaises(RuntimeError):
             self.db.reject_pending_conversion_event(pending_id)
+        # Real incoming events require an enabled connected provider.
+        # Reproduce that lifecycle before simulating a provider replay.
+        with self.db.connect() as conn:
+            conn.execute(
+                "INSERT INTO integration_connections("
+                "service_key,enabled,status,created_at,updated_at"
+                ") VALUES(?,?,?,?,?)",
+                ("test", 1, "connected", "2026-10-19T08:00:00+00:00",
+                 "2026-10-19T08:00:00+00:00"),
+            )
         duplicate = self.db.process_normalized_integration_event(
             service_key="test", external_event_id="manual-no-apply",
             event_type="donation", source_amount="4", source_unit="PLN",
