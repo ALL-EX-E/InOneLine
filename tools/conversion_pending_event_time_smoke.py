@@ -125,6 +125,10 @@ class PendingEventTimeTests(unittest.TestCase):
             tab._refresh_pending_conversion_rows()
             table = tab.pending_conversion_table
             self.assertEqual(table.item(0, 1).text(), original)
+            self.assertEqual(
+                self.db.get_pending_conversion_event(pid)["event_created_at"],
+                "2026-07-01T20:11:12+00:00",
+            )
             self.assertEqual(table.item(0, 5).text(), "10 баллов (× 2)")
             self.assertTrue(table.cellWidget(0, 6).isEnabled())
             self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_manual_apply")
