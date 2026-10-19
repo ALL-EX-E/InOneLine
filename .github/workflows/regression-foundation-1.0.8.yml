@@ -309,6 +309,14 @@ jobs:
           python tools/auction_weighted_pending_freeze_gate_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-D weighted pending freeze gate failed" }
 
+      - name: P20-E post-expiry manual existing-lot bid and leader recalculation
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_post_expiry_manual_bid_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-E Max Amount manual correction failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
