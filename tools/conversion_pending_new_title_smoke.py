@@ -6,10 +6,11 @@ import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.app_paths import AppPaths
@@ -87,7 +88,11 @@ class PendingNewTitleTests(unittest.TestCase):
             tab._refresh_pending_conversion_rows()
             self.assertTrue(tab.pending_conversion_table.cellWidget(0, 5).isEnabled())
             self.assertEqual(tab.pending_conversion_table.item(0, 2).text(), "Игра без предварительной записи")
-            self.assertEqual(self.db.get_pending_conversion_event(pid)["game_id"], None)
+            self.assertIsNone(self.db.get_pending_conversion_event(pid)["game_id"])
+            with patch.object(QMessageBox, "question", return_value=QMessageBox.No) as confirm:
+                tab._apply_pending_conversion(pid)
+            self.assertIn("Игра без предварительной записи", confirm.call_args.args[2])
+            self.assertEqual(self.counts(), (0, 0))
         finally:
             tab.thread_pool.waitForDone(5000)
             tab.deleteLater()
