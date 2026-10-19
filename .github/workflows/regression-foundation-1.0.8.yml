@@ -257,6 +257,14 @@ jobs:
           python tools/conversion_pending_no_apply_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P19-E manual No Apply regression failed" }
 
+      - name: P19-F conversion rate unsaved drafts and adapter visibility native regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/conversion_rate_draft_preservation_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P19-F conversion rate draft preservation failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
