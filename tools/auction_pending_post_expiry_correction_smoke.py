@@ -168,19 +168,30 @@ class ExpiredSourceCorrectionTests(unittest.TestCase):
             self.db.apply_pending_conversion_event(pid)
         self.assertEqual(self.contribution_count(), 1)
 
-    def test_missing_source_lot_is_safe_disabled_and_no_new_game_is_created(self):
+    def test_missing_source_lot_is_now_allowed_only_in_source_session_p20c(self):
+        # P20-C changes exactly this P20-B blocked-case expectation; all
+        # four pre-existing source-locked correction tests stay unchanged.
         sid = self.session()
         pid = self.pending(sid, "Неизвестный лот", 15, link_by_id=False)
-        self.assertFalse(self.db.get_pending_conversion_event(pid)["can_apply"])
+        before = self.db.get_auction_session(sid)
+        self.assertTrue(self.db.get_pending_conversion_event(pid)["can_apply"])
         with self.db.connect() as conn:
             games_before = int(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0])
-        with self.assertRaisesRegex(RuntimeError, "Лот исходного аукциона"):
-            self.db.apply_pending_conversion_event(pid)
+        result = self.db.apply_pending_conversion_event(pid)
+        self.assertEqual(result["auction_id"], sid)
+        self.assertEqual(self.db.get_game(result["game_id"]).title, "Неизвестный лот")
+        self.assertEqual(self.db.get_game(result["game_id"]).sm_points, 15)
         with self.db.connect() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM games").fetchone()[0],
-                             games_before)
-        self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 1)
-        self.assertEqual(self.contribution_count(), 0)
+                             games_before + 1)
+            self.assertEqual(conn.execute(
+                "SELECT auction_only FROM games WHERE id=?", (result["game_id"],)
+            ).fetchone()[0], 1)
+        after = self.db.get_auction_session(sid)
+        for key in ("remaining_ms", "deadline_at", "finished_at"):
+            self.assertEqual(before[key], after[key])
+        self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 0)
+        self.assertEqual(self.contribution_count(), 1)
 
 
 if __name__ == "__main__":
