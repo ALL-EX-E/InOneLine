@@ -414,11 +414,23 @@ class AuctionStateMixin:
         ))
         self._set_visible_state(self.session_buttons_widget, has_actions)
 
-        # Ручные ставки существуют только в реальном периоде приёма ставок.
-        self._set_visible_state(self.bid_widget, running)
-        self._set_enabled_state(self.add_bid_btn, running)
+        # P20-E: only adding to a surviving lot is allowed after 00:00,
+        # while Max Amount is provisional. Subtraction/new/delete remain
+        # separate follow-up stages; they must not silently become editable.
+        late_max_bid = bool(
+            mode == "max_amount"
+            and status in {"winner_selected", "tie_break_required"}
+            and not session.get("wheel_spin_id")
+        )
+        self._set_visible_state(self.bid_widget, running or late_max_bid)
+        self._set_enabled_state(self.add_bid_btn, running or late_max_bid)
         self._set_enabled_state(self.decrease_bid_btn, running)
-        self._set_enabled_state(self.bid_amount, running)
+        self._set_enabled_state(self.bid_amount, running or late_max_bid)
+        self.add_bid_btn.setToolTip(
+            "После 00:00 можно добавить баллы только существующему лоту; "
+            "лидер или ничья пересчитываются без перезапуска таймера."
+            if late_max_bid else ""
+        )
         self._update_delete_lot_action_state(running=running)
 
         self._set_visible_state(self.new_lot_widget, running)
