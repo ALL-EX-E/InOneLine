@@ -701,9 +701,9 @@ class SettingsTab(QWidget):
         pending_note.setProperty("muted", True)
         conversion_layout.addWidget(pending_note)
 
-        self.pending_conversion_table = QTableWidget(0, 6)
+        self.pending_conversion_table = QTableWidget(0, 7)
         self.pending_conversion_table.setHorizontalHeaderLabels(
-            ["Источник", "Событие", "Игра", "Исходное значение", "К зачислению", "Действие"]
+            ["Источник", "Время", "Событие", "Игра", "Исходное значение", "К зачислению", "Действие"]
         )
         self.pending_conversion_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.pending_conversion_table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -712,10 +712,11 @@ class SettingsTab(QWidget):
         pending_header = self.pending_conversion_table.horizontalHeader()
         pending_header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         pending_header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        pending_header.setSectionResizeMode(2, QHeaderView.Stretch)
-        pending_header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        pending_header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        pending_header.setSectionResizeMode(3, QHeaderView.Stretch)
         pending_header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         pending_header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        pending_header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
         self.pending_conversion_table.setMinimumHeight(170)
         conversion_layout.addWidget(self.pending_conversion_table)
         conversion_layout.addStretch()
@@ -1206,6 +1207,7 @@ class SettingsTab(QWidget):
                 source = f"{source} — {event['contributor']}"
             values = [
                 source,
+                display_datetime_local(event.get("event_created_at")) or "—",
                 event["external_event_id"],
                 event.get("game_title") or "Игра недоступна",
                 f"{event['source_amount_text']} {event['source_unit_label']}",
@@ -1217,10 +1219,19 @@ class SettingsTab(QWidget):
             else:
                 result_text = "Курс не задан"
             values.append(result_text)
+            context = [
+                f"Источник: {event['source']}",
+                f"Отправитель: {event.get('contributor') or 'не указан'}",
+                f"ID события: {event['external_event_id']}",
+                f"Игра: {event.get('game_title') or 'не указана'}",
+            ]
+            if event.get("auction_id") is not None:
+                context.append(f"Аукцион-источник: №{event['auction_id']}")
+            tooltip = "\n".join(context)
             for column, text in enumerate(values):
-                self.pending_conversion_table.setItem(
-                    row_index, column, QTableWidgetItem(str(text))
-                )
+                cell = QTableWidgetItem(str(text))
+                cell.setToolTip(tooltip)
+                self.pending_conversion_table.setItem(row_index, column, cell)
 
             apply_btn = QPushButton("Применить")
             apply_btn.setEnabled(bool(event.get("can_apply")))
@@ -1228,7 +1239,8 @@ class SettingsTab(QWidget):
                 lambda _checked=False, pending_id=event["id"]: 
                     self._apply_pending_conversion(pending_id)
             )
-            self.pending_conversion_table.setCellWidget(row_index, 5, apply_btn)
+            apply_btn.setToolTip(tooltip)
+            self.pending_conversion_table.setCellWidget(row_index, 6, apply_btn)
 
     def _apply_pending_conversion(self, pending_id: int) -> None:
         try:
