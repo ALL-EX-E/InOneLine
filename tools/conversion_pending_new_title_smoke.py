@@ -81,14 +81,14 @@ class PendingNewTitleTests(unittest.TestCase):
         tab = SettingsTab(self.db, self.paths, LocalApiServer(self.db))
         try:
             self.assertEqual(tab.pending_conversion_table.rowCount(), 1)
-            self.assertEqual(tab.pending_conversion_table.item(0, 2).text(), "Игра без предварительной записи")
-            btn = tab.pending_conversion_table.cellWidget(0, 5)
+            self.assertEqual(tab.pending_conversion_table.item(0, 3).text(), "Игра без предварительной записи")
+            btn = tab.pending_conversion_table.cellWidget(0, 6)
             self.assertIsInstance(btn, QPushButton)
             self.assertFalse(btn.isEnabled())
             self.db.set_conversion_rate("PLN", "2")
             tab._refresh_pending_conversion_rows()
-            self.assertTrue(tab.pending_conversion_table.cellWidget(0, 5).isEnabled())
-            self.assertEqual(tab.pending_conversion_table.item(0, 2).text(), "Игра без предварительной записи")
+            self.assertTrue(tab.pending_conversion_table.cellWidget(0, 6).isEnabled())
+            self.assertEqual(tab.pending_conversion_table.item(0, 3).text(), "Игра без предварительной записи")
             self.assertIsNone(self.db.get_pending_conversion_event(pid)["game_id"])
             with patch.object(QMessageBox, "question", return_value=QMessageBox.No) as confirm:
                 tab._apply_pending_conversion(pid)
