@@ -701,9 +701,9 @@ class SettingsTab(QWidget):
         pending_note.setProperty("muted", True)
         conversion_layout.addWidget(pending_note)
 
-        self.pending_conversion_table = QTableWidget(0, 7)
+        self.pending_conversion_table = QTableWidget(0, 8)
         self.pending_conversion_table.setHorizontalHeaderLabels(
-            ["Источник", "Время", "Событие", "Игра", "Исходное значение", "К зачислению", "Действие"]
+            ["Источник", "Время", "Событие", "Игра", "Исходное значение", "К зачислению", "Применить", "Не применять"]
         )
         self.pending_conversion_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.pending_conversion_table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -717,6 +717,7 @@ class SettingsTab(QWidget):
         pending_header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         pending_header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         pending_header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        pending_header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
         self.pending_conversion_table.setMinimumHeight(170)
         conversion_layout.addWidget(self.pending_conversion_table)
         conversion_layout.addStretch()
@@ -1241,6 +1242,54 @@ class SettingsTab(QWidget):
             )
             apply_btn.setToolTip(tooltip)
             self.pending_conversion_table.setCellWidget(row_index, 6, apply_btn)
+
+            reject_btn = QPushButton("Не применять")
+            reject_btn.setToolTip(tooltip + "\nБез начисления; событие останется в журнале.")
+            reject_btn.clicked.connect(
+                lambda _checked=False, pending_id=event["id"]:
+                    self._reject_pending_conversion(pending_id)
+            )
+            self.pending_conversion_table.setCellWidget(row_index, 7, reject_btn)
+
+    def _reject_pending_conversion(self, pending_id: int) -> None:
+        try:
+            event = self.db.get_pending_conversion_event(pending_id)
+        except (KeyError, ValueError) as exc:
+            QMessageBox.warning(self, "Конвертация", str(exc))
+            self._refresh_pending_conversion_rows()
+            return
+        if event.get("status") not in {"awaiting_rate", "awaiting_manual_apply"}:
+            QMessageBox.warning(
+                self, "Конвертация", "Это событие уже обработано и недоступно для отклонения."
+            )
+            self._refresh_pending_conversion_rows()
+            return
+        answer = QMessageBox.question(
+            self,
+            "Не применять внешнее событие?",
+            f"Игра: {event.get('game_title') or 'не указана'}\n"
+            f"Источник: {event['source']}\n"
+            f"ID события: {event['external_event_id']}\n"
+            f"Исходное значение: {event['source_amount_text']} {event['source_unit_label']}\n\n"
+            "Отклонить это событие без начисления баллов?\n"
+            "Восстановление через очередь будет недоступно. "
+            "Исходное событие и запись в журнале сохранятся.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            self.db.reject_pending_conversion_event(pending_id)
+        except (KeyError, RuntimeError, sqlite3.Error) as exc:
+            QMessageBox.warning(self, "Конвертация", str(exc))
+            self._refresh_pending_conversion_rows()
+            return
+        self._refresh_pending_conversion_rows()
+        QMessageBox.information(
+            self, "Конвертация",
+            "Событие отклонено без начисления. История сохранена в журнале.",
+        )
 
     def _apply_pending_conversion(self, pending_id: int) -> None:
         try:
