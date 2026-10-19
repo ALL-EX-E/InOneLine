@@ -281,6 +281,14 @@ jobs:
           python tools/auction_pending_result_gate_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-A source-auction gate regression failed" }
 
+      - name: P20-B post-expiry source-auction pending correction native regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_pending_post_expiry_correction_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-B expired source auction correction failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
