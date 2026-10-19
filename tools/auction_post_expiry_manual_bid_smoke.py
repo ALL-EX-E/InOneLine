@@ -1,6 +1,7 @@
 """P20-E: manually correct surviving Max Amount lot after 00:00, before freeze."""
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -87,7 +88,7 @@ class ProvisionalLateManualBidTests(unittest.TestCase):
                 "WHERE entity_type='auction_bid' ORDER BY id DESC LIMIT 1"
             ).fetchone()
             self.assertEqual(row["action"], "post_expiry_add")
-            self.assertIn('"no_timer_restart": true', row["after_json"])
+            self.assertTrue(json.loads(row["after_json"])["no_timer_restart"])
 
     def test_tie_and_inactive_nonleader_can_be_recalculated_without_new_lot(self):
         sid = self.source(tie=True)
