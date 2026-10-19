@@ -510,8 +510,9 @@ class AuctionSessionMixin:
         self,
         conn: sqlite3.Connection,
         auction_id: int,
+        *, include_nonleaders: bool = False,
     ) -> list[dict[str, Any]]:
-        """Return the authoritative ordered lot rows through an existing connection."""
+        """Return active rows, or surviving nonleaders for provisional corrections."""
         rows = conn.execute(
             """
             SELECT
@@ -532,7 +533,12 @@ class AuctionSessionMixin:
                 COALESCE(g.auction_only, 0) AS auction_only
             FROM auction_entries ae
             LEFT JOIN games g ON g.id = ae.game_id
-            WHERE ae.auction_id=? AND ae.active=1
+            WHERE ae.auction_id=?
+              AND (
+                  ae.active=1 OR
+                  (?=1 AND ae.game_id IS NOT NULL
+                   AND COALESCE(ae.result,'') <> 'removed')
+              )
             ORDER BY
                 total_sm_points DESC,
                 CASE WHEN ae.start_position IS NULL THEN 1 ELSE 0 END ASC,
@@ -541,7 +547,7 @@ class AuctionSessionMixin:
                 ae.game_id ASC,
                 ae.id ASC
             """,
-            (int(auction_id),),
+            (int(auction_id), int(bool(include_nonleaders))),
         ).fetchall()
         result = [dict(row) for row in rows]
         for current_position, row in enumerate(result, start=1):
@@ -551,6 +557,24 @@ class AuctionSessionMixin:
     def list_auction_entries(self, auction_id: int) -> list[dict[str, Any]]:
         with self.connect() as conn:
             return self._list_auction_entries_conn(conn, auction_id)
+
+    def list_provisional_max_amount_entries(self, auction_id: int) -> list[dict[str, Any]]:
+        """Conduct-only view of all surviving lots before Max Amount confirmation."""
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
+                (int(auction_id),),
+            ).fetchone()
+            if (
+                session is None
+                or str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {"winner_selected", "tie_break_required"}
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError("Исходный аукцион недоступен для ручной корректировки.")
+            return self._list_auction_entries_conn(
+                conn, auction_id, include_nonleaders=True,
+            )
 
     def list_auction_history_events(
         self,
