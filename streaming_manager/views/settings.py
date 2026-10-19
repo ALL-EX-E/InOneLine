@@ -1223,7 +1223,7 @@ class SettingsTab(QWidget):
                 )
 
             apply_btn = QPushButton("Применить")
-            apply_btn.setEnabled(bool(rate) and bool(event.get("game_title")))
+            apply_btn.setEnabled(bool(event.get("can_apply")))
             apply_btn.clicked.connect(
                 lambda _checked=False, pending_id=event["id"]: 
                     self._apply_pending_conversion(pending_id)
