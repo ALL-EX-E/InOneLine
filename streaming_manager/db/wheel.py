@@ -261,6 +261,10 @@ class WheelMixin:
                 raise RuntimeError(
                     "Колесо доступно только после завершения приёма ставок."
                 )
+            # P20-D: all wheel modes must resolve source-scoped pending
+            # conversions BEFORE RNG/verification snapshot freezes the weights.
+            # The tie-wheel entry point already checks this same invariant.
+            self._require_auction_conversions_resolved_conn(conn, auction_id)
 
             draw_upper = int(draw["draw_upper"])
             total_weight = int(draw["total_weight"])

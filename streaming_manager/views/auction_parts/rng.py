@@ -49,6 +49,30 @@ class AuctionRngMixin:
         if session is None or session.get("status") != "awaiting_wheel":
             return
 
+        # P20-D: reject BEFORE a remote RNG request, audio takeover or even a
+        # duration write. A replay of an already frozen/stopped draw is exempt.
+        replay_of_frozen_draw = bool(
+            session.get("rng_value") is not None
+            and session.get("winner_game_id") is not None
+            and not session.get("wheel_spin_id")
+        )
+        if not replay_of_frozen_draw:
+            try:
+                waiting = self.db.count_unresolved_auction_conversions(
+                    int(session["id"])
+                )
+            except Exception as exc:
+                QMessageBox.critical(self, "Колесо", str(exc))
+                return
+            if waiting:
+                QMessageBox.warning(
+                    self, "Колесо",
+                    f"Есть необработанные поступления этого аукциона: {waiting}. "
+                    "Перейдите в «Настройки → Конвертация», примените или "
+                    "отклоните каждое событие перед запуском колеса.",
+                )
+                return
+
         try:
             wheel_duration_ms = self._wheel_timer_ms()
             self.db.set_auction_wheel_duration_ms(

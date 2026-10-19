@@ -199,8 +199,8 @@ class AuctionStateMixin:
             f"Есть необработанные поступления этого аукциона: {unresolved}. "
             "Перейдите в «Настройки → Конвертация» и выберите "
             "«Применить» или «Не применять» для каждого события. "
-            "Пока они остаются, подтверждение результата и переход "
-            "к колесу при ничьей заблокированы."
+            "Пока они остаются, подтверждение результата и новый "
+            "розыгрыш колеса заблокированы."
             if unresolved else ""
         )
         self._set_visible_state(self.auction_pending_conversion_warning, bool(unresolved))
@@ -283,11 +283,29 @@ class AuctionStateMixin:
             or awaiting_wheel
         )
         self._set_visible_state(self.start_btn, timer_action_visible)
+        # An already-frozen, stopped draw may be replayed, but a fresh
+        # direct weighted spin cannot freeze unresolved source contributions.
+        frozen_replay = bool(
+            awaiting_wheel
+            and session
+            and session.get("rng_value") is not None
+            and session.get("winner_game_id") is not None
+            and not session.get("wheel_spin_id")
+        )
+        wheel_pending_blocked = bool(
+            awaiting_wheel and unresolved and not frozen_replay
+        )
         self._set_enabled_state(
             self.start_btn,
             timer_action_visible
             and not preparing_rng
-            and not preparing_wheel_rng,
+            and not preparing_wheel_rng
+            and not wheel_pending_blocked,
+        )
+        self.start_btn.setToolTip(
+            "Есть необработанные поступления этого аукциона. "
+            "Откройте «Настройки → Конвертация» перед вращением."
+            if wheel_pending_blocked else ""
         )
         if not preparing_rng and not preparing_wheel_rng:
             if paused:
