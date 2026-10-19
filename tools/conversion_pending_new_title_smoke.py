@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database
+from streaming_manager.db.common import Game
 from streaming_manager.views.settings import SettingsTab
 
 
@@ -32,7 +33,7 @@ class PendingNewTitleTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def add_pending(self, event_id, title, *, auction_id=None, amount="4", source_unit="PLN"):
+    def add_pending(self, event_id, title, *, auction_id=None, game_id=None, amount="4", source_unit="PLN"):
         payload = (
             json.dumps({"normalized": {"lot_title": title}}, ensure_ascii=False)
             if title is not None else "{}"
@@ -47,10 +48,10 @@ class PendingNewTitleTests(unittest.TestCase):
             )
             pending = conn.execute(
                 "INSERT INTO pending_conversions("
-                "external_event_row_id,auction_id,source_amount_text,"
+                "external_event_row_id,game_id,auction_id,source_amount_text,"
                 "source_unit,source_unit_label,unit_kind,status,created_at"
-                ") VALUES(?,?,?,?,?,?,?,?)",
-                (ext.lastrowid, auction_id, amount, source_unit, source_unit,
+                ") VALUES(?,?,?,?,?,?,?,?,?)",
+                (ext.lastrowid, game_id, auction_id, amount, source_unit, source_unit,
                  "currency", "awaiting_rate", "2026-10-19T00:00:00+00:00"),
             )
             return int(pending.lastrowid)
@@ -121,6 +122,20 @@ class PendingNewTitleTests(unittest.TestCase):
             self.db.apply_pending_conversion_event(first)
         self.assertEqual(self.counts(), (1, 2))
 
+    def test_existing_game_id_remains_applicable_without_payload_title(self):
+        game_id = self.db.add_game(Game(
+            None, "Уже существующая игра", None, 2, 0, "not_played", ""
+        ))
+        pid = self.add_pending("known-id", None, game_id=game_id)
+        self.db.set_conversion_rate("PLN", "2")
+        event = self.db.get_pending_conversion_event(pid)
+        self.assertEqual(event["game_id"], game_id)
+        self.assertEqual(event["game_title"], "Уже существующая игра")
+        self.assertTrue(event["can_apply"])
+        result = self.db.apply_pending_conversion_event(pid)
+        self.assertEqual(result["game_id"], game_id)
+        self.assertEqual(self.counts(), (1, 1))
+
     def test_missing_title_malformed_payload_and_zero_credit_are_not_enabled(self):
         missing = self.add_pending("missing", None)
         zero = self.add_pending("zero", "Нулевой перевод", amount="0")
@@ -142,13 +157,18 @@ class PendingNewTitleTests(unittest.TestCase):
                 "INSERT INTO auction_sessions(name,mode,provider,created_at,status) "
                 "VALUES(?,?,?,?,?)",
                 ("Old auction", "normal", "local",
-                 "2026-10-19T00:00:00+00:00", "finished"),
+                 "2026-10-19T00:00:00+00:00", "running"),
             ).lastrowid
         pid = self.add_pending("old-event", "Старая игра", auction_id=aid)
         self.db.set_conversion_rate("PLN", "1")
         event = self.db.get_pending_conversion_event(pid)
         self.assertEqual(event["game_title"], "Старая игра")
-        self.assertFalse(event["can_apply"])
+        self.assertTrue(event["can_apply"])
+        with self.db.connect() as conn:
+            conn.execute(
+                "UPDATE auction_sessions SET status='finished' WHERE id=?", (aid,)
+            )
+        self.assertFalse(self.db.get_pending_conversion_event(pid)["can_apply"])
         with self.assertRaises(RuntimeError):
             self.db.apply_pending_conversion_event(pid)
         self.assertEqual(self.counts(), (0, 0))
