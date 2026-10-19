@@ -158,6 +158,17 @@ class ProvisionalLateManualBidTests(unittest.TestCase):
             x["game_id"] for x in self.db.list_provisional_max_amount_entries(sid)
         })
 
+    def test_other_source_session_snapshot_does_not_change(self):
+        first = self.source()
+        newer = self.source()
+        old_before = self.snapshot(first)
+        new_before = self.snapshot(newer)
+        self.db.add_post_expiry_manual_bid(newer, self.beta, 15)
+        self.assertEqual(self.snapshot(first), old_before)
+        self.assertEqual(self.db.get_auction_session(newer)["winner_game_id"], self.beta)
+        self.assertEqual(self.snapshot(newer)[2], new_before[2] + 1)
+        self.assertEqual(self.db.get_auction_session(first)["remaining_ms"], 0)
+
     def test_conduct_late_add_only_and_manual_action_use_existing_lot(self):
         sid = self.source(tie=True)
         tab = AuctionTab(self.db)
