@@ -1178,7 +1178,9 @@ class ServicesMixin:
                 g.title AS game_title,
                 g.archived AS game_archived,
                 g.auction_only AS game_auction_only,
-                a.status AS source_auction_status
+                a.status AS source_auction_status,
+                a.mode AS source_auction_mode,
+                a.wheel_spin_id AS source_wheel_spin_id
             FROM pending_conversions pc
             JOIN external_events ee ON ee.id=pc.external_event_row_id
             LEFT JOIN games g ON g.id=pc.game_id
@@ -1206,6 +1208,88 @@ class ServicesMixin:
             if isinstance(normalized, dict) else ""
         )
 
+    def _post_expiry_source_entry_conn(
+        self, conn: sqlite3.Connection, auction_id: int,
+        game_id: int | None, lot_title: str,
+    ) -> sqlite3.Row | None:
+        """Only an existing lot from the exact source session qualifies."""
+        rows = conn.execute(
+            "SELECT ae.id AS entry_id,ae.game_id,g.title,g.archived "
+            "FROM auction_entries ae JOIN games g ON g.id=ae.game_id "
+            "WHERE ae.auction_id=?",
+            (int(auction_id),),
+        ).fetchall()
+        if game_id is not None:
+            return next((r for r in rows if int(r["game_id"]) == int(game_id)), None)
+        key = normalize_title_key(lot_title)
+        return next((r for r in rows if normalize_title_key(r["title"]) == key), None) if key else None
+
+    def _apply_post_expiry_source_entry_conn(
+        self, conn: sqlite3.Connection, auction_id: int,
+        game_id: int | None, lot_title: str, credited: int, now: str,
+    ) -> int:
+        """Correct an expired Max Amount source session; never restart timer."""
+        session = conn.execute(
+            "SELECT status,mode,wheel_spin_id FROM auction_sessions WHERE id=?",
+            (int(auction_id),),
+        ).fetchone()
+        if (
+            session is None
+            or str(session["mode"]) != "max_amount"
+            or str(session["status"]) not in {"winner_selected", "tie_break_required"}
+            or session["wheel_spin_id"]
+        ):
+            raise RuntimeError("Исходный аукцион уже завершён или недоступен для коррекции.")
+        entry = self._post_expiry_source_entry_conn(conn, auction_id, game_id, lot_title)
+        if entry is None or int(entry["archived"]):
+            raise RuntimeError("Лот исходного аукциона для коррекции не найден или находится в архиве.")
+        target_id = int(entry["game_id"])
+        conn.execute(
+            "UPDATE games SET sm_points=sm_points+?,updated_at=? WHERE id=?",
+            (int(credited), now, target_id),
+        )
+        conn.execute(
+            "UPDATE auction_entries SET bid_sm_points=bid_sm_points+?, "
+            "weight=starting_sm_points+bid_sm_points+? WHERE id=?",
+            (int(credited), int(credited), int(entry["entry_id"])),
+        )
+        # The previous tie may have deactivated non-leaders: restore them all
+        # for the next provisional outcome calculation.
+        conn.execute(
+            "UPDATE auction_entries SET active=1 WHERE auction_id=?",
+            (int(auction_id),),
+        )
+        _maximum, leaders = self._max_leaders_conn(conn, int(auction_id))
+        new_status = "winner_selected" if len(leaders) == 1 else "tie_break_required"
+        winner_id = leaders[0] if len(leaders) == 1 else None
+        conn.execute(
+            "UPDATE auction_sessions SET status=?,winner_game_id=?,updated_at=? WHERE id=?",
+            (new_status, winner_id, now, int(auction_id)),
+        )
+        if winner_id is not None:
+            conn.execute(
+                "UPDATE auction_entries SET result=CASE WHEN game_id=? "
+                "THEN 'winner' ELSE 'not_winner' END WHERE auction_id=?",
+                (winner_id, int(auction_id)),
+            )
+        else:
+            placeholders = ",".join("?" for _ in leaders)
+            conn.execute(
+                f"UPDATE auction_entries SET active=CASE WHEN game_id IN ({placeholders}) "
+                f"THEN 1 ELSE 0 END, result=CASE WHEN game_id IN ({placeholders}) "
+                f"THEN 'tie' ELSE 'not_winner' END WHERE auction_id=?",
+                (*leaders, *leaders, int(auction_id)),
+            )
+        self._log_conn(
+            conn, "auction_session", int(auction_id),
+            "post_expiry_pending_correction",
+            {"status": str(session["status"]), "auction_id": int(auction_id)},
+            {"status": new_status, "winner_game_id": winner_id,
+             "target_game_id": target_id, "credited_sm_points": int(credited),
+             "source_auction_id": int(auction_id), "no_timer_restart": True},
+        )
+        return target_id
+
     def _pending_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
         unit = str(row["source_unit"])
         status = str(row["status"])
@@ -1231,17 +1315,36 @@ class ServicesMixin:
             stored_auction_id is not None
             and str(row["source_auction_status"] or "") == "running"
         )
+        expired_correction = bool(
+            stored_auction_id is not None
+            and str(row["source_auction_mode"] or "") == "max_amount"
+            and str(row["source_auction_status"] or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not row["source_wheel_spin_id"]
+        )
+        if expired_correction:
+            with self.connect() as conn:
+                source_entry = self._post_expiry_source_entry_conn(
+                    conn, stored_auction_id, game_id, resolved_title,
+                )
+            expired_correction = bool(
+                source_entry is not None and not bool(source_entry["archived"])
+            )
         if game_id is not None:
             safe_target = (
                 bool(row["game_title"])
                 and not bool(row["game_archived"])
-                and (running_source_auction or not bool(row["game_auction_only"]))
+                and (
+                    running_source_auction or expired_correction
+                    or (stored_auction_id is None and not bool(row["game_auction_only"]))
+                )
             )
         else:
             # A saved source-auction event cannot be reassigned to a different
             # auction or a new permanent game after its source session closes.
             safe_target = bool(saved_lot_title) and (
-                stored_auction_id is None or running_source_auction
+                stored_auction_id is None or running_source_auction or expired_correction
             )
         can_apply = bool(
             status in {"awaiting_rate", "awaiting_manual_apply"}
@@ -1343,15 +1446,9 @@ class ServicesMixin:
         return {**context, "status": "cancelled", "reason": "operator_no_apply"}
 
     def apply_pending_conversion_event(self, pending_id: int) -> dict[str, Any]:
-        """Apply one unknown-rate event without retroactively mutating closed auctions.
+        """Apply an event to its source; post-00:00 Max Amount is provisional.
 
-        A stored running-auction context is used only while that exact session is
-        still ``running``.  If it has since paused/closed, a matched permanent
-        game may still receive its points (the approved outside-auction rule),
-        but auction entries/timer/wheel state stay immutable.  A title-only event
-        that originally arrived outside any auction may create/reuse a permanent
-        game when explicitly applied; a title-only event that originally belonged
-        to an auction still cannot be reinterpreted after that auction stops.
+        No late timer restart; confirmed/cancelled auction history is untouched.
         """
         now = utc_now()
         with self.connect() as conn:
@@ -1404,13 +1501,21 @@ class ServicesMixin:
 
             stored_auction_id = int(row["auction_id"]) if row["auction_id"] is not None else None
             running_auction_id: int | None = None
+            correcting_source_id: int | None = None
             if stored_auction_id is not None:
                 session = conn.execute(
-                    "SELECT id,status FROM auction_sessions WHERE id=?",
+                    "SELECT id,status,mode,wheel_spin_id FROM auction_sessions WHERE id=?",
                     (stored_auction_id,),
                 ).fetchone()
                 if session is not None and str(session["status"]) == "running":
                     running_auction_id = stored_auction_id
+                elif (
+                    session is not None
+                    and str(session["mode"]) == "max_amount"
+                    and str(session["status"]) in {"winner_selected", "tie_break_required"}
+                    and not session["wheel_spin_id"]
+                ):
+                    correcting_source_id = stored_auction_id
 
             target_game_id = game_id
             auction_applied = False
@@ -1439,6 +1544,11 @@ class ServicesMixin:
                         (target_game_id,),
                     ).fetchone()
                     before_game_points = max(0, int(created_game["sm_points"] or 0) - credited)
+            elif correcting_source_id is not None:
+                target_game_id = self._apply_post_expiry_source_entry_conn(
+                    conn, correcting_source_id, game_id, lot_title, credited, now,
+                )
+                auction_applied = True
             else:
                 if game is not None and game_id is not None:
                     if int(game["auction_only"]):
@@ -1532,7 +1642,7 @@ class ServicesMixin:
                 {
                     "pending_id": int(pending_id),
                     "game_id": int(target_game_id),
-                    "auction_id": running_auction_id if auction_applied else None,
+                    "auction_id": (running_auction_id or correcting_source_id) if auction_applied else None,
                     "source_amount_text": str(row["source_amount_text"]),
                     "source_unit": unit,
                     "conversion_rate": normalized_rate,
@@ -1544,7 +1654,7 @@ class ServicesMixin:
         return {
             "id": int(pending_id),
             "game_id": int(target_game_id),
-            "auction_id": running_auction_id if auction_applied else None,
+            "auction_id": (running_auction_id or correcting_source_id) if auction_applied else None,
             "source_unit": unit,
             "source_amount_text": str(row["source_amount_text"]),
             "conversion_rate": normalized_rate,
