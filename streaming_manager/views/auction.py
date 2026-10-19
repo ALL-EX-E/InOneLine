@@ -2161,6 +2161,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 }
                 for position, g in enumerate(self.db.auction_eligible_games(), start=1)
             ]
+        if (
+            str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {"winner_selected", "tie_break_required"}
+            and not session.get("wheel_spin_id")
+        ):
+            # The post-00:00 edit table must include surviving nonleaders
+            # hidden from winner/tie OBS projections; removed lots stay hidden.
+            return self.db.list_provisional_max_amount_entries(int(session["id"]))
         return self.db.list_auction_entries(int(session["id"]))
 
     @staticmethod

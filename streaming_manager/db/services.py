@@ -1299,6 +1299,7 @@ class ServicesMixin:
     def _apply_post_expiry_source_entry_conn(
         self, conn: sqlite3.Connection, auction_id: int,
         game_id: int | None, lot_title: str, credited: int, now: str,
+        *, audit_action: str = "post_expiry_pending_correction",
     ) -> int:
         """Correct an expired Max Amount source session; never restart timer."""
         session = conn.execute(
@@ -1366,7 +1367,7 @@ class ServicesMixin:
             )
         self._log_conn(
             conn, "auction_session", int(auction_id),
-            "post_expiry_pending_correction",
+            audit_action,
             {"status": str(session["status"]), "auction_id": int(auction_id)},
             {"status": new_status, "winner_game_id": winner_id,
              "target_game_id": target_id, "credited_sm_points": int(credited),
