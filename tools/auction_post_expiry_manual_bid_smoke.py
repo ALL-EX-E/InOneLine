@@ -182,7 +182,10 @@ class ProvisionalLateManualBidTests(unittest.TestCase):
             tab.refresh()
             self.assertTrue(tab.bid_widget.isVisible())
             self.assertTrue(tab.add_bid_btn.isEnabled())
-            self.assertFalse(tab.decrease_bid_btn.isEnabled())
+            # P20-F supersedes P20-E's former add-only UI contract.
+            # The old manual-add behavior still works; the separately
+            # guarded subtraction control is now intentionally enabled.
+            self.assertTrue(tab.decrease_bid_btn.isEnabled())
             self.assertFalse(tab.new_lot_btn.isEnabled())
             self.assertEqual(tab.conduct_table.rowCount(), 3)
             tab.select_conduct_game_id(self.gamma)
