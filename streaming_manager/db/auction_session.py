@@ -1931,6 +1931,104 @@ class AuctionSessionMixin:
                 source="local_auction",
             )
 
+    def add_post_expiry_manual_bid(
+        self,
+        auction_id: int,
+        game_id: int,
+        sm_points: int,
+        contributor: str = "Ручная ставка",
+    ) -> None:
+        """P20-E: manual top-up to a surviving original Max Amount lot after 00:00.
+
+        This deliberately excludes new lot creation, subtraction, closed
+        results and wheel freeze. Reuse P20-B/C's one-transaction leader/tie
+        recalculation, never resetting the already expired clock.
+        """
+        auction_id = int(auction_id)
+        game_id = int(game_id)
+        sm_points = int(sm_points)
+        if sm_points <= 0:
+            raise ValueError("Количество баллов должно быть больше нуля.")
+
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
+                (auction_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if (
+                str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {
+                    "winner_selected", "tie_break_required"
+                }
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError(
+                    "Ручная корректировка после 00:00 доступна только до "
+                    "подтверждения результата и перехода к колесу."
+                )
+
+            # An inactive non-leader is still a valid historical participant.
+            # A removed tombstone, archived game or foreign session is not.
+            entry = conn.execute(
+                "SELECT ae.id,ae.starting_sm_points,ae.bid_sm_points,ae.result,"
+                "g.title,g.archived FROM auction_entries ae "
+                "JOIN games g ON g.id=ae.game_id "
+                "WHERE ae.auction_id=? AND ae.game_id=?",
+                (auction_id, game_id),
+            ).fetchone()
+            if (
+                entry is None
+                or bool(entry["archived"])
+                or str(entry["result"] or "") == "removed"
+            ):
+                raise RuntimeError(
+                    "Лот недоступен для корректировки в этом аукционе."
+                )
+            before_total = int(entry["starting_sm_points"]) + int(entry["bid_sm_points"])
+
+            self._apply_post_expiry_source_entry_conn(
+                conn, auction_id, game_id, str(entry["title"]), sm_points, now,
+                audit_action="post_expiry_manual_bid",
+            )
+
+            # Same contribution ledger shape as an ordinary manual bid, but
+            # with an explicit post-expiry note and no timer auto-extension.
+            conn.execute(
+                """
+                INSERT INTO contributions(
+                    game_id, source, external_event_id, contributor,
+                    amount_minor, currency, points, unit, note, created_at,
+                    source_amount_text, source_unit, conversion_rate,
+                    credited_sm_points
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    game_id, "local_auction", None, contributor,
+                    None, None, sm_points, "SM",
+                    f"auction:{auction_id};post_expiry", now,
+                    str(sm_points), "SM", "1", sm_points,
+                ),
+            )
+            self._log_conn(
+                conn, "auction_bid", int(entry["id"]), "post_expiry_add",
+                {
+                    "auction_id": auction_id,
+                    "game_id": game_id,
+                    "sm_points": before_total,
+                    "source_status": str(session["status"]),
+                },
+                {
+                    "auction_id": auction_id,
+                    "game_id": game_id,
+                    "added_sm_points": sm_points,
+                    "sm_points": before_total + sm_points,
+                    "no_timer_restart": True,
+                },
+            )
+
     def decrease_auction_bid(
         self,
         auction_id: int,
