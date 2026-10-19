@@ -295,6 +295,12 @@ jobs:
           python tools/auction_pending_removed_lot_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-B FIX1 deleted-lot correction failed" }
 
+      - name: P20-C new title-only original auction lot after expiry
+        shell: pwsh
+        run: |
+          python tools/auction_pending_post_expiry_new_title_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-C source-auction title-only correction failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
