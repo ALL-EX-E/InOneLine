@@ -146,20 +146,27 @@ class ExpiredSourceCorrectionTests(unittest.TestCase):
         self.db.reject_pending_conversion_event(p2)
         self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 0)
 
-    def test_closed_history_never_auto_credited_or_reassigned_to_newer_auction(self):
+    def test_closed_history_remains_immutable_and_no_new_auction_capture(self):
         old = self.session(status="confirmed")
         newer = self.session()
         pid = self.pending(old, "Бета", 15)
+        # Existing S1 legacy compatibility: a direct backend Apply to a
+        # persistent game may still credit that game outside a closed auction.
+        # It must NEVER rewrite the old auction or capture the newer one.
         self.assertFalse(self.db.get_pending_conversion_event(pid)["can_apply"])
         before_newer = self.entries(newer)
         before_old = self.entries(old)
-        with self.assertRaises(RuntimeError):
-            self.db.apply_pending_conversion_event(pid)
+        old_session = self.db.get_auction_session(old)
+        result = self.db.apply_pending_conversion_event(pid)
+        self.assertIsNone(result["auction_id"])
         self.assertEqual(self.entries(newer), before_newer)
         self.assertEqual(self.entries(old), before_old)
-        self.assertEqual(self.contribution_count(), 0)
-        self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_manual_apply")
-        self.assertEqual(self.db.get_auction_session(old)["status"], "confirmed")
+        self.assertEqual(self.db.get_auction_session(old), old_session)
+        self.assertEqual(self.contribution_count(), 1)
+        self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "applied")
+        with self.assertRaises(RuntimeError):
+            self.db.apply_pending_conversion_event(pid)
+        self.assertEqual(self.contribution_count(), 1)
 
     def test_missing_source_lot_is_safe_disabled_and_no_new_game_is_created(self):
         sid = self.session()
