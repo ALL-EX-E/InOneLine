@@ -1157,10 +1157,14 @@ class ServicesMixin:
                 ee.event_type,
                 ee.payload_json,
                 ee.processing_status,
-                g.title AS game_title
+                g.title AS game_title,
+                g.archived AS game_archived,
+                g.auction_only AS game_auction_only,
+                a.status AS source_auction_status
             FROM pending_conversions pc
             JOIN external_events ee ON ee.id=pc.external_event_row_id
             LEFT JOIN games g ON g.id=pc.game_id
+            LEFT JOIN auction_sessions a ON a.id=pc.auction_id
         """
         params: tuple[Any, ...] = ()
         if pending_id is None:
@@ -1170,6 +1174,19 @@ class ServicesMixin:
             params = (int(pending_id),)
         with self.connect() as conn:
             return conn.execute(query, params).fetchall()
+
+    @staticmethod
+    def _pending_lot_title_from_payload(raw_payload: Any) -> str:
+        """Use the same authoritative normalized target saved for manual apply."""
+        try:
+            payload = json.loads(str(raw_payload or "{}"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return ""
+        normalized = payload.get("normalized", {}) if isinstance(payload, dict) else {}
+        return (
+            str(normalized.get("lot_title") or "").strip()
+            if isinstance(normalized, dict) else ""
+        )
 
     def _pending_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
         unit = str(row["source_unit"])
@@ -1186,14 +1203,43 @@ class ServicesMixin:
             credited: int | None = None
             if rate:
                 credited = convert_source_to_sm_points(row["source_amount_text"], rate)
+        game_id = int(row["game_id"]) if row["game_id"] is not None else None
+        stored_auction_id = (
+            int(row["auction_id"]) if row["auction_id"] is not None else None
+        )
+        saved_lot_title = self._pending_lot_title_from_payload(row["payload_json"])
+        resolved_title = str(row["game_title"] or "") or saved_lot_title
+        running_source_auction = (
+            stored_auction_id is not None
+            and str(row["source_auction_status"] or "") == "running"
+        )
+        if game_id is not None:
+            safe_target = (
+                bool(row["game_title"])
+                and not bool(row["game_archived"])
+                and (running_source_auction or not bool(row["game_auction_only"]))
+            )
+        else:
+            # A saved source-auction event cannot be reassigned to a different
+            # auction or a new permanent game after its source session closes.
+            safe_target = bool(saved_lot_title) and (
+                stored_auction_id is None or running_source_auction
+            )
+        can_apply = bool(
+            status in {"awaiting_rate", "awaiting_manual_apply"}
+            and rate
+            and credited is not None and credited > 0
+            and safe_target
+        )
         return {
             "id": int(row["id"]),
             "source": str(row["source"]),
             "external_event_id": str(row["external_event_id"]),
             "event_type": str(row["event_type"]),
-            "game_id": int(row["game_id"]) if row["game_id"] is not None else None,
-            "game_title": str(row["game_title"] or ""),
-            "auction_id": int(row["auction_id"]) if row["auction_id"] is not None else None,
+            "game_id": game_id,
+            "game_title": resolved_title,
+            "can_apply": can_apply,
+            "auction_id": stored_auction_id,
             "source_amount_text": str(row["source_amount_text"]),
             "source_unit": unit,
             "source_unit_label": str(row["source_unit_label"]),
@@ -1260,14 +1306,7 @@ class ServicesMixin:
             if credited <= 0:
                 raise RuntimeError("Событие не даёт положительного количества баллов.")
 
-            try:
-                payload = json.loads(str(row["payload_json"] or "{}"))
-            except (TypeError, ValueError, json.JSONDecodeError):
-                payload = {}
-            normalized_payload = payload.get("normalized", {}) if isinstance(payload, dict) else {}
-            if not isinstance(normalized_payload, dict):
-                normalized_payload = {}
-            lot_title = str(normalized_payload.get("lot_title") or "").strip()
+            lot_title = self._pending_lot_title_from_payload(row["payload_json"])
 
             game_id = int(row["game_id"]) if row["game_id"] is not None else None
             game = None
