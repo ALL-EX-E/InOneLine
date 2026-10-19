@@ -666,13 +666,19 @@ class SettingsTab(QWidget):
         self.conversion_rate_edits: dict[str, QLineEdit] = {}
         self.conversion_unit_descriptors: dict[str, ConversionUnit] = {}
         self._conversion_units_signature: tuple[tuple[str, str, str, str], ...] = ()
+        # UI-only unsaved drafts survive provider capability/status rebuilds.
+        # Never persist these values before explicit "Сохранить курсы".
+        self._conversion_rate_drafts: dict[str, str] = {}
+        self._conversion_rate_saved_text: dict[str, str] = {}
 
         conversion_visibility_note = QLabel(
             "RUB остаётся базовой валютой программы. Другие валюты появляются, "
             "когда их сообщает подключённый донат-сервис, когда такая валюта "
             "впервые встречается во внешнем событии или когда для неё уже "
             "сохранён курс. Неденежные единицы конкретного сервиса видны только "
-            "пока этот сервис подключён; сохранённый курс при отключении не удаляется."
+            "пока этот сервис подключён; сохранённый курс при отключении не удаляется. "
+            "Несохранённые изменения остаются в полях при смене подключения "
+            "до закрытия программы, но записываются в базу только по кнопке «Сохранить курсы»."
         )
         conversion_visibility_note.setWordWrap(True)
         conversion_visibility_note.setProperty("muted", True)
@@ -1150,6 +1156,13 @@ class SettingsTab(QWidget):
     def _visible_conversion_units(self) -> list[ConversionUnit]:
         return self.db.visible_conversion_units(self._connected_conversion_units())
 
+    def _remember_conversion_rate_draft(self, unit: str, value: str) -> None:
+        """Track only changed editor text; hidden service drafts stay in memory."""
+        if value == self._conversion_rate_saved_text.get(unit, ""):
+            self._conversion_rate_drafts.pop(unit, None)
+        else:
+            self._conversion_rate_drafts[unit] = value
+
     def _refresh_conversion_rate_rows(self, *, force: bool = False) -> None:
         units = self._visible_conversion_units()
         signature = tuple(
@@ -1180,7 +1193,13 @@ class SettingsTab(QWidget):
             editor.setMaximumWidth(180)
             editor.setPlaceholderText("не настроено")
             saved = self.db.get_conversion_rate(unit)
-            editor.setText(saved.replace(".", ",") if saved else "")
+            saved_text = saved.replace(".", ",") if saved else ""
+            self._conversion_rate_saved_text[unit] = saved_text
+            editor.setText(self._conversion_rate_drafts.get(unit, saved_text))
+            editor.textChanged.connect(
+                lambda text, source_unit=unit:
+                    self._remember_conversion_rate_draft(source_unit, text)
+            )
             row.addWidget(editor)
             row.addWidget(QLabel("баллов"))
             row.addStretch()
@@ -1349,9 +1368,14 @@ class SettingsTab(QWidget):
             QMessageBox.warning(self, "Конвертация", str(exc))
             return
         for unit, stored in normalized.items():
+            # Only successfully saved visible editors clear their drafts.
+            # Hidden provider-specific drafts remain for later reconnection.
+            self._conversion_rate_drafts.pop(unit, None)
+            saved_text = stored.replace(".", ",")
+            self._conversion_rate_saved_text[unit] = saved_text
             editor = self.conversion_rate_edits.get(unit)
             if editor is not None:
-                editor.setText(stored.replace(".", ","))
+                editor.setText(saved_text)
         self._refresh_conversion_rate_rows(force=True)
         self._refresh_pending_conversion_rows()
         QMessageBox.information(
