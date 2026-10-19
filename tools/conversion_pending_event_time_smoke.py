@@ -77,11 +77,11 @@ class PendingEventTimeTests(unittest.TestCase):
         tab = self.create_view()
         try:
             table = tab.pending_conversion_table
-            self.assertEqual(table.columnCount(), 7)
+            self.assertEqual(table.columnCount(), 8)
             self.assertEqual(
-                [table.horizontalHeaderItem(i).text() for i in range(7)],
+                [table.horizontalHeaderItem(i).text() for i in range(8)],
                 ["Источник", "Время", "Событие", "Игра",
-                 "Исходное значение", "К зачислению", "Действие"],
+                 "Исходное значение", "К зачислению", "Применить", "Не применять"],
             )
             self.assertEqual(table.rowCount(), 1)
             self.assertEqual(table.item(0, 1).text(), display_datetime_local(event_time))
@@ -89,6 +89,8 @@ class PendingEventTimeTests(unittest.TestCase):
             self.assertEqual(table.item(0, 3).text(), "Новая игра")
             self.assertIsInstance(table.cellWidget(0, 6), QPushButton)
             self.assertFalse(table.cellWidget(0, 6).isEnabled())
+            self.assertIsInstance(table.cellWidget(0, 7), QPushButton)
+            self.assertTrue(table.cellWidget(0, 7).isEnabled())
         finally:
             self.close_view(tab)
         with self.db.connect() as conn:
