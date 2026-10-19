@@ -481,11 +481,28 @@ class ServicesMixin:
         """
         connected = list(connected_service_units)
         connected_keys = {item.normalized_unit() for item in connected}
+        # A provider can accept a previously unknown service unit without
+        # advertising it in its static capability list. Its accepted event
+        # registers that unit transactionally; show the editor while that
+        # *originating* provider is connected, then hide it on disconnect.
+        with self.connect() as conn:
+            active_sources = {
+                str(row["service_key"])
+                for row in conn.execute(
+                    "SELECT service_key FROM integration_connections "
+                    "WHERE enabled=1 AND status='connected'"
+                ).fetchall()
+            }
         registered = self.list_registered_conversion_units()
         persistent_visible = [
             item for item in registered
             if item.normalized_kind() == UNIT_KIND_CURRENCY
             or item.normalized_unit() in connected_keys
+            or (
+                item.normalized_kind() == UNIT_KIND_SERVICE
+                and bool(item.service)
+                and item.service in active_sources
+            )
         ]
         return merge_conversion_units(
             BASE_CURRENCY_CONVERSION_UNITS,
