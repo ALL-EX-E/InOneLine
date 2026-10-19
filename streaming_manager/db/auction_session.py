@@ -2657,6 +2657,8 @@ class AuctionSessionMixin:
                 raise KeyError(auction_id)
             if session["status"] != "tie_break_required":
                 raise RuntimeError("Колесо как тай-брейк доступно только при ничьей.")
+            # UI-086: never freeze tie wheel weights while source events await resolution.
+            self._require_auction_conversions_resolved_conn(conn, auction_id)
 
             effective_duration = (
                 wheel_duration_ms
@@ -2685,6 +2687,33 @@ class AuctionSessionMixin:
                 },
             )
 
+    @staticmethod
+    def _unresolved_auction_conversion_count_conn(
+        conn: sqlite3.Connection, auction_id: int
+    ) -> int:
+        """Count only pending events tied to this source auction session."""
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM pending_conversions "
+            "WHERE auction_id=? AND status IN ('awaiting_rate','awaiting_manual_apply')",
+            (int(auction_id),),
+        ).fetchone()
+        return int(row["total"] or 0)
+
+    def count_unresolved_auction_conversions(self, auction_id: int) -> int:
+        with self.connect() as conn:
+            return self._unresolved_auction_conversion_count_conn(conn, auction_id)
+
+    def _require_auction_conversions_resolved_conn(
+        self, conn: sqlite3.Connection, auction_id: int
+    ) -> None:
+        pending = self._unresolved_auction_conversion_count_conn(conn, auction_id)
+        if pending:
+            raise RuntimeError(
+                f"Есть необработанные поступления этого аукциона: {pending}. "
+                "Перейдите в «Настройки → Конвертация», примените или "
+                "отклоните каждое событие перед подтверждением результата."
+            )
+
     def confirm_auction_winner(self, auction_id: int) -> int:
         """Фиксирует результат и переводит выигравшую игру в ПРОХОДИТСЯ."""
         now = utc_now()
@@ -2697,6 +2726,8 @@ class AuctionSessionMixin:
                 raise KeyError(auction_id)
             if session["status"] != "winner_selected":
                 raise RuntimeError("В этой сессии ещё нет выбранного победителя.")
+            # Guard at the transaction boundary; UI disable alone is not safe.
+            self._require_auction_conversions_resolved_conn(conn, auction_id)
             if (
                 str(session["mode"] or "") == "weighted_wheel"
                 and str(session["wheel_format"] or "") == AUCTION_WHEEL_FORMAT_ELIMINATION

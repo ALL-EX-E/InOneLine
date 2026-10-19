@@ -1,0 +1,154 @@
+"""UI-086 P20-A: unresolved source-auction warning and irreversible result guards."""
+from __future__ import annotations
+
+import json
+import sys
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from PySide6.QtWidgets import QApplication
+
+from streaming_manager.app_paths import AppPaths
+from streaming_manager.database import Database, Game
+from streaming_manager.views.auction import AuctionTab
+
+
+class AuctionUnresolvedGateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        self.temp = TemporaryDirectory(ignore_cleanup_errors=True)
+        self.paths = AppPaths.from_root(self.temp.name)
+        self.paths.ensure_runtime_dirs()
+        self.db = Database(self.paths.database_path)
+        self.db.add_game(Game(None, "Проверочный лот", None, 50, 0, "not_played", ""))
+        with self.db.connect() as conn:
+            self.game_id = int(conn.execute(
+                "SELECT id FROM games WHERE title='Проверочный лот'"
+            ).fetchone()["id"])
+        self.now = "2026-10-19T09:35:00+00:00"
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def session(self, status="running"):
+        with self.db.connect() as conn:
+            sid = int(conn.execute(
+                "INSERT INTO auction_sessions("
+                "name,mode,provider,created_at,status,winner_game_id"
+                ") VALUES(?,?,?,?,?,?)",
+                ("Проверочный аукцион", "max_amount", "local", self.now,
+                 status, self.game_id if status == "winner_selected" else None),
+            ).lastrowid)
+        return sid
+
+    def pending(self, auction_id, event_id="source-pending", status="awaiting_rate"):
+        with self.db.connect() as conn:
+            event_row_id = int(conn.execute(
+                "INSERT INTO external_events("
+                "source,external_event_id,event_type,payload_json,"
+                "processing_status,created_at"
+                ") VALUES(?,?,?,?,?,?)",
+                ("test", event_id, "donation",
+                 json.dumps({"normalized": {"lot_title": "Проверочный лот"}},
+                            ensure_ascii=False), status, self.now),
+            ).lastrowid)
+            pid = int(conn.execute(
+                "INSERT INTO pending_conversions("
+                "external_event_row_id,game_id,auction_id,source_amount_text,"
+                "source_unit,source_unit_label,unit_kind,status,created_at"
+                ") VALUES(?,?,?,?,?,?,?,?,?)",
+                (event_row_id, self.game_id, auction_id, "3", "PLN", "PLN",
+                 "currency", status, self.now),
+            ).lastrowid)
+        return pid
+
+    def count_contributions(self):
+        with self.db.connect() as conn:
+            return int(conn.execute("SELECT COUNT(*) FROM contributions").fetchone()[0])
+
+    def test_count_is_scoped_to_source_session_and_waiting_status(self):
+        first = self.session()
+        second = self.session()
+        self.pending(first, "waiting-first")
+        self.pending(first, "ready-first", "awaiting_manual_apply")
+        self.pending(second, "waiting-second")
+        self.pending(None, "outside-session")
+        self.assertEqual(self.db.count_unresolved_auction_conversions(first), 2)
+        self.assertEqual(self.db.count_unresolved_auction_conversions(second), 1)
+        self.assertEqual(self.db.count_unresolved_auction_conversions(first + second + 99), 0)
+        self.assertEqual(self.count_contributions(), 0)
+
+    def test_database_rejects_confirm_without_mutation_and_allows_after_decline(self):
+        sid = self.session("winner_selected")
+        pid = self.pending(sid)
+        with self.assertRaisesRegex(RuntimeError, "необработанные поступления"):
+            self.db.confirm_auction_winner(sid)
+        self.assertEqual(self.db.get_auction_session(sid)["status"], "winner_selected")
+        self.assertEqual(self.db.get_game(self.game_id).status, "not_played")
+        self.assertEqual(self.count_contributions(), 0)
+        self.db.reject_pending_conversion_event(pid)
+        self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 0)
+        self.assertEqual(self.db.confirm_auction_winner(sid), self.game_id)
+        self.assertEqual(self.db.get_auction_session(sid)["status"], "confirmed")
+
+    def test_tie_wheel_blocked_until_this_source_session_resolved(self):
+        sid = self.session("tie_break_required")
+        another = self.session("running")
+        self.pending(another, "other-session")
+        self.db.start_auction_tie_wheel(sid, wheel_duration_ms=1000)
+        self.assertEqual(self.db.get_auction_session(sid)["status"], "awaiting_wheel")
+        with self.db.connect() as conn:
+            conn.execute("UPDATE auction_sessions SET status='tie_break_required' WHERE id=?", (sid,))
+        pid = self.pending(sid)
+        with self.assertRaisesRegex(RuntimeError, "необработанные поступления"):
+            self.db.start_auction_tie_wheel(sid, wheel_duration_ms=1000)
+        self.assertEqual(self.db.get_auction_session(sid)["status"], "tie_break_required")
+        self.db.reject_pending_conversion_event(pid)
+        self.db.start_auction_tie_wheel(sid, wheel_duration_ms=1000)
+        self.assertEqual(self.db.get_auction_session(sid)["status"], "awaiting_wheel")
+        self.assertEqual(self.db.count_unresolved_auction_conversions(another), 1)
+
+    def test_auction_warning_and_buttons_update_after_no_apply(self):
+        sid = self.session("winner_selected")
+        pid = self.pending(sid)
+        tab = AuctionTab(self.db)
+        try:
+            tab.show()
+            tab._active_auction_id = sid
+            tab.refresh()
+            self.assertFalse(tab.auction_pending_conversion_warning.isHidden())
+            self.assertIn("1", tab.auction_pending_conversion_warning.text())
+            self.assertIn("Конвертация", tab.auction_pending_conversion_warning.text())
+            self.assertFalse(tab.confirm_btn.isEnabled())
+            self.assertIn("ожидающие", tab.confirm_btn.toolTip())
+            self.db.reject_pending_conversion_event(pid)
+            tab.refresh()
+            self.assertTrue(tab.auction_pending_conversion_warning.isHidden())
+            self.assertTrue(tab.confirm_btn.isEnabled())
+            self.assertEqual(self.count_contributions(), 0)
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_timer_finishing_does_not_auto_decline_or_credit(self):
+        sid = self.session("running")
+        pid = self.pending(sid)
+        # P20-A is a result gate, not a rewrite of timer transition.
+        result = self.db.finish_auction(sid)
+        self.assertEqual(result["status"], "finished_no_winner")
+        self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 1)
+        self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_rate")
+        self.assertEqual(self.count_contributions(), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
