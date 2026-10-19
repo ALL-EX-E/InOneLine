@@ -414,9 +414,9 @@ class AuctionStateMixin:
         ))
         self._set_visible_state(self.session_buttons_widget, has_actions)
 
-        # P20-E: only adding to a surviving lot is allowed after 00:00,
-        # while Max Amount is provisional. Subtraction/new/delete remain
-        # separate follow-up stages; they must not silently become editable.
+        # P20-F: add/subtract for surviving original Max Amount lots
+        # after 00:00. Only existing auction bid points may be subtracted;
+        # create/delete/rename and frozen wheel stages stay protected.
         late_max_bid = bool(
             mode == "max_amount"
             and status in {"winner_selected", "tie_break_required"}
@@ -424,11 +424,16 @@ class AuctionStateMixin:
         )
         self._set_visible_state(self.bid_widget, running or late_max_bid)
         self._set_enabled_state(self.add_bid_btn, running or late_max_bid)
-        self._set_enabled_state(self.decrease_bid_btn, running)
+        self._set_enabled_state(self.decrease_bid_btn, running or late_max_bid)
         self._set_enabled_state(self.bid_amount, running or late_max_bid)
         self.add_bid_btn.setToolTip(
-            "После 00:00 можно добавить баллы только существующему лоту; "
+            "После 00:00 можно добавить баллы существующему лоту; "
             "лидер или ничья пересчитываются без перезапуска таймера."
+            if late_max_bid else ""
+        )
+        self.decrease_bid_btn.setToolTip(
+            "После 00:00 можно уменьшить только баллы, добавленные "
+            "в этом аукционе, не ниже стартовой суммы лота."
             if late_max_bid else ""
         )
         self._update_delete_lot_action_state(running=running)
