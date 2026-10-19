@@ -1263,6 +1263,68 @@ class ServicesMixin:
             raise KeyError(pending_id)
         return self._pending_row_to_dict(rows[0])
 
+    def reject_pending_conversion_event(self, pending_id: int) -> dict[str, Any]:
+        """P19-E explicit terminal no-credit outcome, preserving raw provenance.
+
+        The SQLite status 'cancelled' already exists in the accepted schema.
+        Rejecting never creates a game/contribution or mutates an auction.
+        Rate recalculation handles only the two waiting statuses; rejection is
+        final, and source+external ID uniqueness still deduplicates replays.
+        """
+        now = utc_now()
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                SELECT pc.*,ee.source,ee.external_event_id,ee.event_type,
+                       ee.processing_status,ee.payload_json
+                FROM pending_conversions pc
+                JOIN external_events ee ON ee.id=pc.external_event_row_id
+                WHERE pc.id=?
+                """,
+                (int(pending_id),),
+            ).fetchone()
+            if row is None:
+                raise KeyError(pending_id)
+            previous_status = str(row["status"])
+            if previous_status not in {"awaiting_rate", "awaiting_manual_apply"}:
+                raise RuntimeError("Это внешнее событие уже обработано или недоступно для отклонения.")
+
+            result = conn.execute(
+                "UPDATE pending_conversions SET status='cancelled' "
+                "WHERE id=? AND status IN ('awaiting_rate','awaiting_manual_apply')",
+                (int(pending_id),),
+            )
+            if result.rowcount != 1:
+                raise RuntimeError("Статус события изменился. Обновите очередь и попробуйте снова.")
+            conn.execute(
+                "UPDATE external_events SET processing_status='cancelled',processed_at=? "
+                "WHERE id=?",
+                (now, int(row["external_event_row_id"])),
+            )
+            lot_title = self._pending_lot_title_from_payload(row["payload_json"])
+            context = {
+                "pending_id": int(pending_id),
+                "source": str(row["source"]),
+                "external_event_id": str(row["external_event_id"]),
+                "event_type": str(row["event_type"]),
+                "game_id": int(row["game_id"]) if row["game_id"] is not None else None,
+                "auction_id": int(row["auction_id"]) if row["auction_id"] is not None else None,
+                "lot_title": lot_title,
+                "source_amount_text": str(row["source_amount_text"]),
+                "source_unit": str(row["source_unit"]),
+            }
+            self._log_conn(
+                conn,
+                "integration_event",
+                int(row["external_event_row_id"]),
+                "reject_pending",
+                {**context, "status": previous_status,
+                 "processing_status": str(row["processing_status"])},
+                {**context, "status": "cancelled", "processing_status": "cancelled",
+                 "reason": "operator_no_apply"},
+            )
+        return {**context, "status": "cancelled", "reason": "operator_no_apply"}
+
     def apply_pending_conversion_event(self, pending_id: int) -> dict[str, Any]:
         """Apply one unknown-rate event without retroactively mutating closed auctions.
 
