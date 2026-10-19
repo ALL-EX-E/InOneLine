@@ -225,6 +225,14 @@ jobs:
           python tools/conversion_heading_save_layout_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P19-A conversion heading/Save position regression failed" }
 
+      - name: P19-B atomic conversion rate persistence and pending states
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/conversion_atomic_rates_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P19-B atomic conversion rates regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
