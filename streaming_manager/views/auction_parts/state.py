@@ -190,6 +190,20 @@ class AuctionStateMixin:
         pending_overtime = bool(
             tie_break_required and self._pending_tie_overtime
         )
+        unresolved = (
+            self.db.count_unresolved_auction_conversions(int(session["id"]))
+            if active and status in self.db.AUCTION_OPEN_STATUSES
+            else 0
+        )
+        self.auction_pending_conversion_warning.setText(
+            f"Есть необработанные поступления этого аукциона: {unresolved}. "
+            "Перейдите в «Настройки → Конвертация» и выберите "
+            "«Применить» или «Не применять» для каждого события. "
+            "Пока они остаются, подтверждение результата и переход "
+            "к колесу при ничьей заблокированы."
+            if unresolved else ""
+        )
+        self._set_visible_state(self.auction_pending_conversion_warning, bool(unresolved))
 
         spin_running = bool(
             winner_selected
@@ -338,7 +352,14 @@ class AuctionStateMixin:
             "В архив" if elimination else "Подтвердить победителя"
         )
         self._set_visible_state(self.confirm_btn, can_confirm)
-        self._set_enabled_state(self.confirm_btn, can_confirm)
+        self._set_enabled_state(self.confirm_btn, can_confirm and not unresolved)
+        if unresolved:
+            self.confirm_btn.setToolTip(
+                "Нельзя подтвердить результат: сначала обработайте ожидающие "
+                "поступления этого аукциона в Настройки → Конвертация."
+            )
+        else:
+            self.confirm_btn.setToolTip("")
 
         self._set_visible_state(
             self.tie_overtime_btn,
@@ -351,7 +372,13 @@ class AuctionStateMixin:
         # Пока пользователь настраивает допвремя, возможность вместо него
         # перейти к колесу остаётся доступной.
         self._set_visible_state(self.tie_wheel_btn, tie_break_required)
-        self._set_enabled_state(self.tie_wheel_btn, tie_break_required)
+        self._set_enabled_state(
+            self.tie_wheel_btn, tie_break_required and not unresolved
+        )
+        self.tie_wheel_btn.setToolTip(
+            "Сначала обработайте ожидающие поступления этого аукциона."
+            if unresolved else ""
+        )
 
         ticket_id = session.get("rng_ticket_id") if active else None
         signed_proof = bool(

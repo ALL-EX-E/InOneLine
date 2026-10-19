@@ -340,6 +340,19 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         integration_status_row.addStretch()
         conduct_layout.addWidget(self.integration_status_widget)
 
+        # UI-086 P20-A: read-only session-scoped warning, not a second
+        # conversion queue or an implicit decision about received events.
+        self.auction_pending_conversion_warning = QLabel()
+        self.auction_pending_conversion_warning.setWordWrap(True)
+        self.auction_pending_conversion_warning.setProperty("warning", True)
+        self.auction_pending_conversion_warning.setToolTip(
+            "Только поступления, записанные за текущим аукционом. "
+            "Для решения откройте Настройки → Конвертация → Ожидают применения. "
+            "Завершение отсчёта и аварийная остановка не отклоняют события."
+        )
+        self.auction_pending_conversion_warning.setVisible(False)
+        conduct_layout.addWidget(self.auction_pending_conversion_warning)
+
         self.setup_widget = QWidget()
         setup = QGridLayout(self.setup_widget)
         setup.setContentsMargins(0, 0, 0, 0)
