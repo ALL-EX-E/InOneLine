@@ -1253,10 +1253,12 @@ class ServicesMixin:
             "weight=starting_sm_points+bid_sm_points+? WHERE id=?",
             (int(credited), int(credited), int(entry["entry_id"])),
         )
-        # The previous tie may have deactivated non-leaders: restore them all
-        # for the next provisional outcome calculation.
+        # Restore surviving non-leaders, never deleted temporary-lot history.
+        # Normalize old erroneous active tombstones before recomputing.
         conn.execute(
-            "UPDATE auction_entries SET active=1 WHERE auction_id=?",
+            "UPDATE auction_entries SET active=CASE "
+            "WHEN game_id IS NOT NULL AND COALESCE(result, '') <> 'removed' "
+            "THEN 1 ELSE 0 END WHERE auction_id=?",
             (int(auction_id),),
         )
         _maximum, leaders = self._max_leaders_conn(conn, int(auction_id))
@@ -1269,7 +1271,8 @@ class ServicesMixin:
         if winner_id is not None:
             conn.execute(
                 "UPDATE auction_entries SET result=CASE WHEN game_id=? "
-                "THEN 'winner' ELSE 'not_winner' END WHERE auction_id=?",
+                "THEN 'winner' ELSE 'not_winner' END WHERE auction_id=? "
+                "AND game_id IS NOT NULL AND COALESCE(result, '') <> 'removed'",
                 (winner_id, int(auction_id)),
             )
         else:
@@ -1277,7 +1280,8 @@ class ServicesMixin:
             conn.execute(
                 f"UPDATE auction_entries SET active=CASE WHEN game_id IN ({placeholders}) "
                 f"THEN 1 ELSE 0 END, result=CASE WHEN game_id IN ({placeholders}) "
-                f"THEN 'tie' ELSE 'not_winner' END WHERE auction_id=?",
+                f"THEN 'tie' ELSE 'not_winner' END WHERE auction_id=? "
+                "AND game_id IS NOT NULL AND COALESCE(result, '') <> 'removed'",
                 (*leaders, *leaders, int(auction_id)),
             )
         self._log_conn(
