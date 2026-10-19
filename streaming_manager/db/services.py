@@ -1237,7 +1237,7 @@ class ServicesMixin:
             (int(auction_id),),
         ).fetchall():
             if (row["game_id"] is None
-                    and normalize_title_key(row["snapshot_title"]) == key):
+                    and normalize_title_key(str(row["snapshot_title"] or "")) == key):
                 return False
         for row in conn.execute(
             "SELECT title,archived,auction_only FROM games"
