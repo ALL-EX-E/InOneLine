@@ -365,6 +365,14 @@ jobs:
           python tools/auction_post_expiry_temporary_rename_smoke.py -k qt_modal
           if ($LASTEXITCODE -ne 0) { throw "P20-K modal rename and cancellation regression failed" }
 
+      - name: P20-L source-pending warning on full auction cancel
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_pending_result_gate_smoke.py -k cancel_auction
+          if ($LASTEXITCODE -ne 0) { throw "P20-L cancel pending-event warning regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
