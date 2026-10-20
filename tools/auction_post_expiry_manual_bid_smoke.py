@@ -186,7 +186,8 @@ class ProvisionalLateManualBidTests(unittest.TestCase):
             # The old manual-add behavior still works; the separately
             # guarded subtraction control is now intentionally enabled.
             self.assertTrue(tab.decrease_bid_btn.isEnabled())
-            self.assertFalse(tab.new_lot_btn.isEnabled())
+            # P20-G extends the provisional editor with guarded new-title reuse.
+            self.assertTrue(tab.new_lot_btn.isEnabled())
             self.assertEqual(tab.conduct_table.rowCount(), 3)
             tab.select_conduct_game_id(self.gamma)
             self.assertEqual(tab.selected_conduct_game_id(), self.gamma)
