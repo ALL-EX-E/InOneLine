@@ -325,6 +325,14 @@ jobs:
           python tools/auction_post_expiry_manual_decrease_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-F Max Amount manual decrease failed" }
 
+      - name: P20-G post-expiry new and reused original Max Amount lot
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_post_expiry_manual_new_lot_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-G Max Amount new lot regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
