@@ -2053,6 +2053,96 @@ class AuctionSessionMixin:
                 },
             )
 
+    def decrease_post_expiry_manual_bid(
+        self, auction_id: int, game_id: int, sm_points: int,
+    ) -> None:
+        """P20-F: audited subtraction from a provisional Max Amount original lot.
+
+        Never decrease below auction starting points. Does not alter the
+        contribution ledger, draw a new wheel, or restart the expired timer.
+        """
+        auction_id = int(auction_id)
+        game_id = int(game_id)
+        sm_points = int(sm_points)
+        if sm_points <= 0:
+            raise ValueError("Количество баллов должно быть больше нуля.")
+
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
+                (auction_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if (
+                str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {
+                    "winner_selected", "tie_break_required"
+                }
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError(
+                    "Уменьшение после 00:00 доступно только до "
+                    "подтверждения победителя или перехода к колесу."
+                )
+
+            row = conn.execute(
+                "SELECT ae.id,ae.starting_sm_points,ae.bid_sm_points,ae.result,"
+                "g.title,g.archived,g.sm_points AS game_sm_points "
+                "FROM auction_entries ae JOIN games g ON g.id=ae.game_id "
+                "WHERE ae.auction_id=? AND ae.game_id=?",
+                (auction_id, game_id),
+            ).fetchone()
+            if (
+                row is None
+                or bool(row["archived"])
+                or str(row["result"] or "") == "removed"
+            ):
+                raise RuntimeError(
+                    "Лот недоступен для корректировки в этом аукционе."
+                )
+            starting = int(row["starting_sm_points"])
+            current_bid = int(row["bid_sm_points"])
+            if sm_points > current_bid:
+                raise ValueError(
+                    f"Можно уменьшить максимум на {current_bid} баллов. "
+                    f"Ниже стартовой суммы {starting} опустить лот нельзя."
+                )
+            if int(row["game_sm_points"]) < sm_points:
+                raise ValueError(
+                    "Баллы игры изменились: уменьшение сделало бы сумму отрицательной."
+                )
+            before_total = starting + current_bid
+
+            # Reuse the accepted P20-B/C/E atomic leader/tie update for the
+            # original provisional source session. The negative delta is only
+            # passed after checking the current auction-only bid bound.
+            self._apply_post_expiry_source_entry_conn(
+                conn, auction_id, game_id, str(row["title"]), -sm_points, now,
+                audit_action="post_expiry_manual_decrease",
+            )
+            self._log_conn(
+                conn, "auction_bid", int(row["id"]), "post_expiry_decrease",
+                {
+                    "auction_id": auction_id,
+                    "game_id": game_id,
+                    "starting_sm_points": starting,
+                    "bid_sm_points": current_bid,
+                    "sm_points": before_total,
+                    "source_status": str(session["status"]),
+                },
+                {
+                    "auction_id": auction_id,
+                    "game_id": game_id,
+                    "starting_sm_points": starting,
+                    "decreased_sm_points": sm_points,
+                    "bid_sm_points": current_bid - sm_points,
+                    "sm_points": before_total - sm_points,
+                    "no_timer_restart": True,
+                },
+            )
+
     def decrease_auction_bid(
         self,
         auction_id: int,
