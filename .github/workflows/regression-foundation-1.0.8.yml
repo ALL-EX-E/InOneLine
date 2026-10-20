@@ -333,6 +333,14 @@ jobs:
           python tools/auction_post_expiry_manual_new_lot_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-G Max Amount new lot regression failed" }
 
+      - name: P20-H post-expiry temporary lot deletion and tombstone protection
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_post_expiry_temporary_lot_delete_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-H temporary lot deletion regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
