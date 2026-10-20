@@ -757,11 +757,22 @@ class AuctionActionMixin:
 
     def delete_temporary_lot(self):
         session = self._current_session()
-        if session is None or session.get("status") != "running":
+        late_max_delete = bool(
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not session.get("wheel_spin_id")
+        )
+        if session is None or (
+            session.get("status") != "running" and not late_max_delete
+        ):
             QMessageBox.information(
                 self,
                 "Удалить лот",
-                "Удалить временный лот можно только во время приёма ставок.",
+                "Удалить временный лот можно во время приёма ставок "
+                "или после 00:00 до подтверждения результата.",
             )
             return
 
@@ -794,7 +805,12 @@ class AuctionActionMixin:
             "Удалить временный лот?",
             f"Удалить временный лот «{title}» из текущего аукциона?\n\n"
             "Он не будет перенесён в основной список после завершения или "
-            "отмены аукциона. История создания и удаления останется в журнале.",
+            "отмены аукциона. История создания и удаления останется в журнале."
+            + (
+                "\nПосле 00:00 предварительный победитель или ничья "
+                "будут пересчитаны; таймер не перезапустится."
+                if late_max_delete else ""
+            ),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )

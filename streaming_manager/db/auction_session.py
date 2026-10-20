@@ -2396,10 +2396,22 @@ class AuctionSessionMixin:
             ).fetchone()
             if session is None:
                 raise KeyError(auction_id)
-            if session["status"] != "running":
+            late_provisional = bool(
+                str(session["mode"] or "") == "max_amount"
+                and str(session["status"] or "") in {
+                    "winner_selected", "tie_break_required"
+                }
+                and not session["wheel_spin_id"]
+            )
+            if session["status"] != "running" and not late_provisional:
                 raise RuntimeError(
-                    "Удалить временный лот можно только во время приёма ставок."
+                    "Удалить временный лот можно при приёме ставок или после "
+                    "00:00 до подтверждения результата «Максимальной суммы»."
                 )
+            if late_provisional:
+                # P20-H: do not remove a lot while its source auction has
+                # unresolved external conversions awaiting credit.
+                self._require_auction_conversions_resolved_conn(conn, auction_id)
 
             row = conn.execute(
                 """
@@ -2414,18 +2426,55 @@ class AuctionSessionMixin:
                     g.auction_only
                 FROM auction_entries ae
                 JOIN games g ON g.id=ae.game_id
-                WHERE ae.auction_id=? AND ae.game_id=? AND ae.active=1
+                WHERE ae.auction_id=? AND ae.game_id=?
+                  AND (ae.active=1 OR
+                       (?=1 AND COALESCE(ae.result,'') <> 'removed'))
                 """,
-                (auction_id, game_id),
+                (auction_id, game_id, int(late_provisional)),
             ).fetchone()
             if row is None:
                 raise ValueError(
-                    "Выбранная игра не является активным лотом этого аукциона."
+                    "Выбранная игра не является доступным лотом этого аукциона."
                 )
             if int(row["auction_only"] or 0) != 1:
                 raise ValueError(
                     "Удалить можно только временный лот, созданный в текущем аукционе."
                 )
+
+            if late_provisional:
+                # Avoid wiping donations or another session's references
+                # through global DELETE + foreign-key cascade.
+                external = conn.execute(
+                    "SELECT 1 FROM contributions WHERE game_id=? AND "
+                    "(external_event_id IS NOT NULL OR "
+                    "source NOT IN ('manual_new_lot','local_auction')) LIMIT 1",
+                    (game_id,),
+                ).fetchone()
+                if external is not None:
+                    raise RuntimeError(
+                        "Удаление заблокировано: у временного лота есть "
+                        "внешние поступления. Сначала обработайте их отдельно."
+                    )
+                used_elsewhere = conn.execute(
+                    "SELECT 1 FROM auction_entries "
+                    "WHERE game_id=? AND auction_id<>? LIMIT 1",
+                    (game_id, auction_id),
+                ).fetchone()
+                if used_elsewhere is not None:
+                    raise RuntimeError(
+                        "Лот используется другим аукционом и не может "
+                        "быть физически удалён."
+                    )
+                surviving = conn.execute(
+                    "SELECT COUNT(*) FROM auction_entries "
+                    "WHERE auction_id=? AND game_id IS NOT NULL "
+                    "AND COALESCE(result,'') <> 'removed' AND game_id<>?",
+                    (auction_id, game_id),
+                ).fetchone()
+                if int(surviving[0]) < 1:
+                    raise RuntimeError(
+                        "Нельзя удалить последний лот исходного аукциона."
+                    )
 
             entry_id = int(row["entry_id"])
             title = str(row["title"] or row["snapshot_title"] or "")
@@ -2477,6 +2526,57 @@ class AuctionSessionMixin:
                 },
             )
             conn.execute("DELETE FROM games WHERE id=?", (game_id,))
+
+            if late_provisional:
+                # Keep the historic removed entry as an irreversible
+                # tombstone, then recompute provisional winner/tie from
+                # survivors in the same SQLite transaction.
+                conn.execute(
+                    "UPDATE auction_entries SET active=CASE "
+                    "WHEN game_id IS NOT NULL AND COALESCE(result,'') <> 'removed' "
+                    "THEN 1 ELSE 0 END WHERE auction_id=?",
+                    (auction_id,),
+                )
+                _maximum, leaders = self._max_leaders_conn(conn, auction_id)
+                if not leaders:
+                    raise RuntimeError(
+                        "Не удалось определить оставшиеся лоты аукциона."
+                    )
+                new_status = (
+                    "winner_selected" if len(leaders) == 1 else "tie_break_required"
+                )
+                winner_id = leaders[0] if len(leaders) == 1 else None
+                conn.execute(
+                    "UPDATE auction_sessions SET status=?,winner_game_id=?,updated_at=? "
+                    "WHERE id=?",
+                    (new_status, winner_id, now, auction_id),
+                )
+                if winner_id is not None:
+                    conn.execute(
+                        "UPDATE auction_entries SET result=CASE "
+                        "WHEN game_id=? THEN 'winner' ELSE 'not_winner' END "
+                        "WHERE auction_id=? AND game_id IS NOT NULL "
+                        "AND COALESCE(result,'') <> 'removed'",
+                        (winner_id, auction_id),
+                    )
+                else:
+                    placeholders = ",".join("?" for _ in leaders)
+                    conn.execute(
+                        f"UPDATE auction_entries SET active=CASE "
+                        f"WHEN game_id IN ({placeholders}) THEN 1 ELSE 0 END, "
+                        f"result=CASE WHEN game_id IN ({placeholders}) "
+                        f"THEN 'tie' ELSE 'not_winner' END "
+                        "WHERE auction_id=? AND game_id IS NOT NULL "
+                        "AND COALESCE(result,'') <> 'removed'",
+                        (*leaders, *leaders, auction_id),
+                    )
+                self._log_conn(
+                    conn, "auction_session", auction_id,
+                    "post_expiry_temporary_lot_delete",
+                    {"status": str(session["status"]), "winner_game_id": session["winner_game_id"]},
+                    {"status": new_status, "winner_game_id": winner_id,
+                     "removed_game_id": game_id, "no_timer_restart": True},
+                )
 
             return {
                 "auction_id": auction_id,
