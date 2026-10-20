@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QDialog, QLineEdit, QMessageBox
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database, Game
 from streaming_manager.views.auction import AuctionTab
@@ -227,7 +227,7 @@ class LateTemporaryRenameTests(unittest.TestCase):
             self.db.rename_post_expiry_temporary_lot(sid, tmp, "New")
         self.assertEqual(before, self.snapshot(sid))
 
-    def test_qt_inline_edit_selected_temporary_then_freeze(self):
+    def test_qt_modal_edit_selected_temporary_then_freeze(self):
         sid = self.source()
         tmp = self.db.add_post_expiry_manual_lot(sid, "Temp Qt", 110)["game_id"]
         tab = AuctionTab(self.db)
@@ -238,22 +238,91 @@ class LateTemporaryRenameTests(unittest.TestCase):
             tab.select_conduct_game_id(tmp)
             self.app.processEvents()
             self.assertTrue(tab.rename_lot_btn.isEnabled())
-            self.assertTrue(tab.rename_lot_widget.isVisible())
-            tab.rename_lot_title.setText("Edited Qt")
-            tab.rename_temporary_lot()
+            self.assertTrue(tab.rename_lot_btn.isVisible())
+            self.assertFalse(hasattr(tab, "rename_lot_widget"))
+            self.assertFalse(hasattr(tab, "rename_lot_title"))
+            self.assertIs(
+                tab.rename_lot_btn.parentWidget(), tab.bid_widget
+            )
+
+            def fill_dialog(dialog):
+                current = dialog.findChild(
+                    QLineEdit, "auction_rename_current_title"
+                )
+                editor = dialog.findChild(
+                    QLineEdit, "auction_rename_new_title"
+                )
+                self.assertIsNotNone(current)
+                self.assertTrue(current.isReadOnly())
+                self.assertEqual(current.text(), "Temp Qt")
+                self.assertEqual(editor.text(), "Temp Qt")
+                editor.setText("Edited Qt")
+                return QDialog.DialogCode.Accepted
+
+            with patch.object(QDialog, "exec", autospec=True,
+                              side_effect=fill_dialog):
+                with patch.object(
+                    QMessageBox, "question", return_value=QMessageBox.Yes
+                ) as question:
+                    tab.rename_temporary_lot()
+            self.assertEqual(question.call_count, 1)
+            self.assertEqual(
+                question.call_args.args[-1], QMessageBox.No
+            )
             self.assertEqual(self.db.get_game(tmp).title, "Edited Qt")
             self.assertEqual(self.db.get_auction_session(sid)["remaining_ms"], 0)
             tab.select_conduct_game_id(self.alpha)
             self.app.processEvents()
-            self.assertFalse(tab.rename_lot_widget.isVisible())
+            self.assertFalse(tab.rename_lot_btn.isVisible())
             with self.db.connect() as conn:
                 conn.execute(
-                    "UPDATE auction_sessions SET status='confirmed' WHERE id=?", (sid,),
+                    "UPDATE auction_sessions SET status='confirmed' WHERE id=?",
+                    (sid,),
                 )
             tab.refresh()
             tab.select_conduct_game_id(tmp)
             self.app.processEvents()
             self.assertFalse(tab.rename_lot_btn.isEnabled())
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_qt_modal_cancel_or_no_confirmation_never_writes(self):
+        sid = self.source()
+        tmp = self.db.add_post_expiry_manual_lot(sid, "Keep Name", 111)["game_id"]
+        tab = AuctionTab(self.db)
+        try:
+            tab.show()
+            tab._active_auction_id = sid
+            tab.refresh()
+            tab.select_conduct_game_id(tmp)
+            self.app.processEvents()
+            before = self.snapshot(sid)
+            with patch.object(
+                QDialog, "exec", return_value=QDialog.DialogCode.Rejected
+            ):
+                with patch.object(QMessageBox, "question") as question:
+                    tab.rename_temporary_lot()
+            question.assert_not_called()
+            self.assertEqual(self.snapshot(sid), before)
+
+            def changed(dialog):
+                dialog.findChild(
+                    QLineEdit, "auction_rename_new_title"
+                ).setText("Do Not Apply")
+                return QDialog.DialogCode.Accepted
+
+            with patch.object(
+                QDialog, "exec", autospec=True, side_effect=changed
+            ):
+                with patch.object(
+                    QMessageBox, "question", return_value=QMessageBox.No
+                ) as question:
+                    tab.rename_temporary_lot()
+            question.assert_called_once()
+            self.assertEqual(self.snapshot(sid), before)
         finally:
             tab.auction_timer.stop()
             tab.close()
