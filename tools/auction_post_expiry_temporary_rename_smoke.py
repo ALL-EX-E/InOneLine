@@ -259,8 +259,7 @@ class LateTemporaryRenameTests(unittest.TestCase):
                 editor.setText("Edited Qt")
                 return QDialog.DialogCode.Accepted
 
-            with patch.object(QDialog, "exec", autospec=True,
-                              side_effect=fill_dialog):
+            with patch.object(QDialog, "exec", new=fill_dialog):
                 with patch.object(
                     QMessageBox, "question", return_value=QMessageBox.Yes
                 ) as question:
@@ -314,9 +313,7 @@ class LateTemporaryRenameTests(unittest.TestCase):
                 ).setText("Do Not Apply")
                 return QDialog.DialogCode.Accepted
 
-            with patch.object(
-                QDialog, "exec", autospec=True, side_effect=changed
-            ):
+            with patch.object(QDialog, "exec", new=changed):
                 with patch.object(
                     QMessageBox, "question", return_value=QMessageBox.No
                 ) as question:
