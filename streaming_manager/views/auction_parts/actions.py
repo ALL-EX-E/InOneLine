@@ -688,11 +688,21 @@ class AuctionActionMixin:
 
     def decrease_manual_bid(self):
         session = self._current_session()
-        if session is None or session.get("status") != "running":
+        late_max_correction = bool(
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not session.get("wheel_spin_id")
+        )
+        if session is None or (
+            session.get("status") != "running" and not late_max_correction
+        ):
             QMessageBox.information(
-                self,
-                "Аукцион",
-                "Сначала запустите аукцион.",
+                self, "Аукцион",
+                "Уменьшение баллов доступно при приёме ставок либо "
+                "после 00:00 до подтверждения результата.",
             )
             return
 
@@ -708,11 +718,14 @@ class AuctionActionMixin:
         points = int(self.bid_amount.value())
         try:
             self.db.set_auction_manual_bid_points(points)
-            self.db.decrease_auction_bid(
-                int(session["id"]),
-                game_id,
-                points,
-            )
+            if late_max_correction:
+                self.db.decrease_post_expiry_manual_bid(
+                    int(session["id"]), game_id, points,
+                )
+            else:
+                self.db.decrease_auction_bid(
+                    int(session["id"]), game_id, points,
+                )
         except Exception as exc:
             QMessageBox.critical(self, "Аукцион", str(exc))
             return
