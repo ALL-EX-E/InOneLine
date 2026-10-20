@@ -756,6 +756,7 @@ class AuctionActionMixin:
         self.decrease_bid_btn.clearFocus()
 
     def delete_temporary_lot(self):
+        """Delete temporary game or (P20-I) exclude permanent late lot."""
         session = self._current_session()
         late_max_delete = bool(
             session
@@ -765,30 +766,27 @@ class AuctionActionMixin:
             }
             and not session.get("wheel_spin_id")
         )
-        if session is None or (
-            session.get("status") != "running" and not late_max_delete
-        ):
+        running = bool(session and session.get("status") == "running")
+        if not running and not late_max_delete:
             QMessageBox.information(
-                self,
-                "Удалить лот",
-                "Удалить временный лот можно во время приёма ставок "
-                "или после 00:00 до подтверждения результата.",
+                self, "Удалить лот",
+                "Удаление лотов доступно при приёме ставок или после 00:00 "
+                "до подтверждения результата «Максимальной суммы».",
             )
             return
-
         game_id = self.selected_conduct_game_id()
         if game_id is None:
             QMessageBox.information(
-                self,
-                "Удалить лот",
-                "Выберите временный лот на вкладке «Проведение».",
+                self, "Удалить лот",
+                "Выберите лот на вкладке «Проведение».",
             )
             return
-        if not self._selected_conduct_is_temporary_lot():
+
+        temporary = self._selected_conduct_is_temporary_lot()
+        if not temporary and not late_max_delete:
             QMessageBox.information(
-                self,
-                "Удалить лот",
-                "Удалить можно только временный лот, созданный в текущем аукционе.",
+                self, "Удалить лот",
+                "Во время приёма ставок можно удалить только временный лот.",
             )
             return
 
@@ -796,39 +794,47 @@ class AuctionActionMixin:
         title_column = int(getattr(self, "_conduct_title_column", 2))
         title_item = (
             self.conduct_table.item(row, title_column)
-            if row >= 0
-            else None
+            if row >= 0 else None
         )
         title = title_item.text().strip() if title_item is not None else str(game_id)
-        answer = QMessageBox.warning(
-            self,
-            "Удалить временный лот?",
-            f"Удалить временный лот «{title}» из текущего аукциона?\n\n"
-            "Он не будет перенесён в основной список после завершения или "
-            "отмены аукциона. История создания и удаления останется в журнале."
-            + (
+        if temporary:
+            dialog_title = "Удалить временный лот?"
+            question = (
+                f"Удалить временный лот «{title}» из текущего аукциона?\n\n"
+                "Он не будет перенесён в основной список после завершения "
+                "или отмены аукциона. История создания и удаления останется."
+            )
+        else:
+            dialog_title = "Исключить постоянный лот?"
+            question = (
+                f"Исключить лот «{title}» только из этого аукциона?\n\n"
+                "Игра останется в основном списке. Накопленные баллы "
+                "и история поступлений не удаляются. В этот же аукцион "
+                "вернуть исключённый лот с тем же названием нельзя."
+            )
+        if late_max_delete:
+            question += (
                 "\nПосле 00:00 предварительный победитель или ничья "
                 "будут пересчитаны; таймер не перезапустится."
-                if late_max_delete else ""
-            ),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            )
+        answer = QMessageBox.warning(
+            self, dialog_title, question,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         )
         if answer != QMessageBox.Yes:
             return
-
         try:
-            self.db.delete_temporary_auction_lot(
-                int(session["id"]),
-                game_id,
-            )
+            if temporary:
+                self.db.delete_temporary_auction_lot(
+                    int(session["id"]), game_id,
+                )
+            else:
+                self.db.exclude_post_expiry_permanent_auction_lot(
+                    int(session["id"]), game_id,
+                )
         except Exception as exc:
             QMessageBox.critical(self, "Удалить лот", str(exc))
             return
-
-        # Удалённый temporary game больше не существует. Обычные списки его и
-        # раньше не показывали, но журнал и текущий аукцион должны немедленно
-        # получить dirty/update через общий проверенный путь.
         self.changed()
         self.conduct_table.clearFocus()
         self.delete_lot_btn.clearFocus()

@@ -2370,6 +2370,153 @@ class AuctionSessionMixin:
                 },
             )
 
+    def exclude_post_expiry_permanent_auction_lot(
+        self, auction_id: int, game_id: int,
+    ) -> dict[str, Any]:
+        """P20-I: exclude a permanent original lot, never delete game/points.
+
+        Retain auction entry as a removed historical tombstone with its
+        existing game_id, all credits/contributions and other sessions.
+        Recompute provisional Max Amount winner/tie atomically after 00:00.
+        """
+        auction_id = int(auction_id)
+        game_id = int(game_id)
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id,winner_game_id "
+                "FROM auction_sessions WHERE id=?",
+                (auction_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if (
+                str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {
+                    "winner_selected", "tie_break_required"
+                }
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError(
+                    "Исключение постоянного лота доступно после 00:00 "
+                    "до подтверждения результата, но не после перехода к колесу."
+                )
+            self._require_auction_conversions_resolved_conn(conn, auction_id)
+
+            entry = conn.execute(
+                "SELECT ae.id AS entry_id,ae.result,ae.starting_sm_points,"
+                "ae.bid_sm_points,ae.start_position,ae.snapshot_title,"
+                "g.title,g.sm_points,g.auction_only,g.archived "
+                "FROM auction_entries ae "
+                "JOIN games g ON g.id=ae.game_id "
+                "WHERE ae.auction_id=? AND ae.game_id=?",
+                (auction_id, game_id),
+            ).fetchone()
+            if (
+                entry is None
+                or str(entry["result"] or "") == "removed"
+                or bool(entry["archived"])
+            ):
+                raise ValueError(
+                    "Лот не существует в исходном аукционе, удалён или находится в архиве."
+                )
+            if int(entry["auction_only"] or 0) != 0:
+                raise ValueError(
+                    "Временный лот удаляется отдельной командой «Удалить лот»."
+                )
+            surviving = conn.execute(
+                "SELECT COUNT(*) FROM auction_entries "
+                "WHERE auction_id=? AND game_id IS NOT NULL "
+                "AND COALESCE(result,'') <> 'removed' AND game_id<>?",
+                (auction_id, game_id),
+            ).fetchone()
+            if int(surviving[0]) < 1:
+                raise RuntimeError(
+                    "Нельзя исключить последний лот исходного аукциона."
+                )
+
+            # Unlike deletion of a temporary auction-only game, this only
+            # tombstones this session entry. In particular, contributions
+            # and permanent game points must not be decremented.
+            conn.execute(
+                "UPDATE auction_entries SET active=0,result='removed' WHERE id=?",
+                (int(entry["entry_id"]),),
+            )
+            conn.execute(
+                "UPDATE auction_entries SET active=CASE "
+                "WHEN game_id IS NOT NULL AND COALESCE(result,'') <> 'removed' "
+                "THEN 1 ELSE 0 END WHERE auction_id=?",
+                (auction_id,),
+            )
+            _maximum, leaders = self._max_leaders_conn(conn, auction_id)
+            if not leaders:
+                raise RuntimeError("Не осталось доступных лотов для определения победителя.")
+            new_status = (
+                "winner_selected" if len(leaders) == 1 else "tie_break_required"
+            )
+            winner_id = leaders[0] if len(leaders) == 1 else None
+            conn.execute(
+                "UPDATE auction_sessions SET status=?,winner_game_id=?,updated_at=? "
+                "WHERE id=?",
+                (new_status, winner_id, now, auction_id),
+            )
+            if winner_id is not None:
+                conn.execute(
+                    "UPDATE auction_entries SET result=CASE "
+                    "WHEN game_id=? THEN 'winner' ELSE 'not_winner' END "
+                    "WHERE auction_id=? AND game_id IS NOT NULL "
+                    "AND COALESCE(result,'') <> 'removed'",
+                    (winner_id, auction_id),
+                )
+            else:
+                placeholders = ",".join("?" for _ in leaders)
+                conn.execute(
+                    f"UPDATE auction_entries SET active=CASE "
+                    f"WHEN game_id IN ({placeholders}) THEN 1 ELSE 0 END, "
+                    f"result=CASE WHEN game_id IN ({placeholders}) "
+                    f"THEN 'tie' ELSE 'not_winner' END "
+                    "WHERE auction_id=? AND game_id IS NOT NULL "
+                    "AND COALESCE(result,'') <> 'removed'",
+                    (*leaders, *leaders, auction_id),
+                )
+            self._log_conn(
+                conn, "auction_lot", game_id, "post_expiry_permanent_exclude",
+                {
+                    "auction_id": auction_id,
+                    "entry_id": int(entry["entry_id"]),
+                    "title": str(entry["title"] or entry["snapshot_title"] or ""),
+                    "starting_sm_points": int(entry["starting_sm_points"]),
+                    "bid_sm_points": int(entry["bid_sm_points"]),
+                    "sm_points": int(entry["sm_points"]),
+                    "start_position": entry["start_position"],
+                    "temporary": False,
+                    "previous_status": str(session["status"]),
+                },
+                {
+                    "auction_id": auction_id,
+                    "entry_id": int(entry["entry_id"]),
+                    "game_id": game_id,
+                    "result": "removed",
+                    "active": False,
+                    "game_preserved": True,
+                    "contributions_preserved": True,
+                    "no_timer_restart": True,
+                },
+            )
+            self._log_conn(
+                conn, "auction_session", auction_id,
+                "post_expiry_permanent_lot_exclude",
+                {"status": str(session["status"]),
+                 "winner_game_id": session["winner_game_id"]},
+                {"status": new_status, "winner_game_id": winner_id,
+                 "excluded_game_id": game_id, "no_timer_restart": True},
+            )
+            return {
+                "auction_id": auction_id, "entry_id": int(entry["entry_id"]),
+                "game_id": game_id, "status": new_status,
+                "winner_game_id": winner_id,
+            }
+
     def delete_temporary_auction_lot(
         self,
         auction_id: int,
