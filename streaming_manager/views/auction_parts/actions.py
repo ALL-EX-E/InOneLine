@@ -581,11 +581,22 @@ class AuctionActionMixin:
 
     def add_new_auction_lot(self):
         session = self._current_session()
-        if session is None or session.get("status") != "running":
+        late_max_lot = bool(
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not session.get("wheel_spin_id")
+        )
+        if session is None or (
+            session.get("status") != "running" and not late_max_lot
+        ):
             QMessageBox.information(
                 self,
                 "Новый лот",
-                "Новый лот можно добавить только во время приёма ставок.",
+                "Новый лот можно добавить при приёме ставок или после 00:00 "
+                "в режиме «Максимальная сумма» до подтверждения результата.",
             )
             return
 
@@ -600,13 +611,19 @@ class AuctionActionMixin:
 
         points = int(self.new_lot_points.value())
         try:
-            result = self.db.add_or_increment_auction_lot(
-                int(session["id"]),
-                title,
-                points,
-                source="manual_new_lot",
-                contributor="Ручное добавление",
-            )
+            if late_max_lot:
+                result = self.db.add_post_expiry_manual_lot(
+                    int(session["id"]), title, points,
+                    contributor="Ручное добавление",
+                )
+            else:
+                result = self.db.add_or_increment_auction_lot(
+                    int(session["id"]),
+                    title,
+                    points,
+                    source="manual_new_lot",
+                    contributor="Ручное добавление",
+                )
         except Exception as exc:
             QMessageBox.critical(self, "Новый лот", str(exc))
             return

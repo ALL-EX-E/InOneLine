@@ -1447,6 +1447,134 @@ class AuctionSessionMixin:
                 external_event_id=external_event_id,
             )
 
+    def add_post_expiry_manual_lot(
+        self, auction_id: int, title: str, sm_points: int = 0,
+        contributor: str = "Ручное добавление",
+    ) -> dict[str, Any]:
+        """P20-G: add/merge surviving original Max Amount lot after 00:00.
+
+        Within one transaction reuse P20-C creation/duplicate policy and
+        P20-B/C/E's atomic provisional leader/tie recalculation. Never
+        resurrect deleted history, restart the clock or change a frozen draw.
+        """
+        auction_id = int(auction_id)
+        title = str(title or "").strip()
+        key = normalize_title_key(title)
+        if not key:
+            raise ValueError("Введите название нового лота.")
+        sm_points = int(sm_points)
+        if sm_points < 0:
+            raise ValueError("Баллы нового лота не могут быть отрицательными.")
+
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
+                (auction_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if (
+                str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {
+                    "winner_selected", "tie_break_required"
+                }
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError(
+                    "Добавление лота после 00:00 доступно только до "
+                    "подтверждения победителя и перехода к колесу."
+                )
+
+            # Search ALL session entries, not only active tie leaders: the
+            # operator may reuse a surviving inactive nonleader but never a
+            # deleted tombstone, including a removed permanent-game entry.
+            matches = []
+            rows = conn.execute(
+                "SELECT ae.game_id,ae.result,ae.snapshot_title,"
+                "g.title,g.archived,g.auction_only "
+                "FROM auction_entries ae LEFT JOIN games g ON g.id=ae.game_id "
+                "WHERE ae.auction_id=?",
+                (auction_id,),
+            ).fetchall()
+            for row in rows:
+                if (
+                    normalize_title_key(str(row["snapshot_title"] or "")) != key
+                    and normalize_title_key(str(row["title"] or "")) != key
+                ):
+                    continue
+                if (
+                    row["game_id"] is None
+                    or str(row["result"] or "") == "removed"
+                    or bool(row["archived"])
+                ):
+                    raise RuntimeError(
+                        "Удалённый или архивный лот нельзя повторно добавить "
+                        "в этот аукцион."
+                    )
+                matches.append(row)
+            if len(matches) > 1:
+                raise RuntimeError(
+                    "Несколько лотов совпадают по названию. "
+                    "Выберите нужный лот в таблице и измените его баллы."
+                )
+
+            merged = bool(matches)
+            if merged:
+                game_id = int(matches[0]["game_id"])
+                temporary = bool(matches[0]["auction_only"])
+                final_title = str(matches[0]["title"])
+            else:
+                # Reuse the accepted P20-C title-only late source-lot helper:
+                # existing regular games attach by ID; unknown titles become
+                # temporary auction_only=1, hidden from the public list.
+                game_id = self._create_post_expiry_title_lot_conn(
+                    conn, auction_id, title, now,
+                )
+                row = conn.execute(
+                    "SELECT title,auction_only FROM games WHERE id=?",
+                    (game_id,),
+                ).fetchone()
+                temporary = bool(row["auction_only"])
+                final_title = str(row["title"])
+
+            self._apply_post_expiry_source_entry_conn(
+                conn, auction_id, game_id, final_title, sm_points, now,
+                audit_action="post_expiry_manual_lot",
+            )
+
+            if sm_points:
+                conn.execute(
+                    """
+                    INSERT INTO contributions(
+                        game_id, source, external_event_id, contributor,
+                        amount_minor, currency, points, unit, note, created_at,
+                        source_amount_text, source_unit, conversion_rate,
+                        credited_sm_points
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        game_id, "manual_new_lot", None, contributor,
+                        None, None, sm_points, "SM",
+                        f"auction:{auction_id};post_expiry:new_lot", now,
+                        str(sm_points), "SM", "1", sm_points,
+                    ),
+                )
+            self._log_conn(
+                conn, "auction_lot", game_id,
+                "post_expiry_merge" if merged else "post_expiry_create",
+                None, {
+                    "auction_id": auction_id, "title": final_title,
+                    "added_sm_points": sm_points, "temporary": temporary,
+                    "merged": merged, "no_timer_restart": True,
+                },
+            )
+            return {
+                "game_id": game_id, "title": final_title,
+                "created": not merged, "temporary": temporary,
+                "merged": merged,
+            }
+
     def _add_or_increment_auction_lot_conn(
         self,
         conn: sqlite3.Connection,
