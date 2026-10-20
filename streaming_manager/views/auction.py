@@ -2614,12 +2614,29 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         return bool(item.data(Qt.UserRole + 1))
 
     def _update_delete_lot_action_state(self, *args, running: bool | None = None):
+        session = self._current_session()
         if running is None:
-            session = self._current_session()
             running = bool(session and session.get("status") == "running")
-        enabled = bool(running and self._selected_conduct_is_temporary_lot())
+        late_temporary_delete = bool(
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not session.get("wheel_spin_id")
+        )
+        enabled = bool(
+            (running or late_temporary_delete)
+            and self._selected_conduct_is_temporary_lot()
+        )
         self._set_visible_state(self.delete_lot_btn, enabled)
         self._set_enabled_state(self.delete_lot_btn, enabled)
+        self.delete_lot_btn.setToolTip(
+            "После 00:00 можно удалить только временный лот, пока "
+            "результат «Максимальной суммы» не подтверждён."
+            if late_temporary_delete else
+            "Удалить ошибочно созданный временный лот текущего аукциона"
+        )
 
     @staticmethod
     def _set_visible_state(widget: QWidget, visible: bool):
