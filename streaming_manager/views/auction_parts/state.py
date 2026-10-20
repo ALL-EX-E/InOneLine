@@ -438,10 +438,17 @@ class AuctionStateMixin:
         )
         self._update_delete_lot_action_state(running=running)
 
-        self._set_visible_state(self.new_lot_widget, running)
-        self._set_enabled_state(self.new_lot_title, running)
-        self._set_enabled_state(self.new_lot_points, running)
-        self._set_enabled_state(self.new_lot_btn, running)
+        # P20-G: in provisional Max Amount, late new/reused titles follow
+        # the same original-auction scope and wheel freeze as bid corrections.
+        self._set_visible_state(self.new_lot_widget, running or late_max_bid)
+        self._set_enabled_state(self.new_lot_title, running or late_max_bid)
+        self._set_enabled_state(self.new_lot_points, running or late_max_bid)
+        self._set_enabled_state(self.new_lot_btn, running or late_max_bid)
+        self.new_lot_btn.setToolTip(
+            "После 00:00 можно добавить новый лот или увеличить уже "
+            "существующий; удалённые лоты восстановить нельзя."
+            if late_max_bid else ""
+        )
 
         self._sync_wheel_chance_visibility(session)
         self._update_wheel_panel(session, wheel_payload=wheel_payload)
