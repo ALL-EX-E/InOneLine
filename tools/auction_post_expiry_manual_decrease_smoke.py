@@ -187,7 +187,8 @@ class PostExpiryManualDecreaseTests(unittest.TestCase):
             tab.refresh()
             self.assertTrue(tab.add_bid_btn.isEnabled())
             self.assertTrue(tab.decrease_bid_btn.isEnabled())
-            self.assertFalse(tab.new_lot_btn.isEnabled())
+            # P20-G extends the provisional editor with guarded new-title reuse.
+            self.assertTrue(tab.new_lot_btn.isEnabled())
             tab.select_conduct_game_id(self.beta)
             tab.bid_amount.setValue(10)
             tab.decrease_manual_bid()
