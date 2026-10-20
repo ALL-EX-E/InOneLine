@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -46,6 +47,18 @@ class AuctionUnresolvedGateTests(unittest.TestCase):
                 ("Проверочный аукцион", "max_amount", "local", self.now,
                  status, self.game_id if status == "winner_selected" else None),
             ).lastrowid)
+        return sid
+
+    def live_running_session(self):
+        """Use a future deadline; a zero-duration running fixture auto-expires in Qt."""
+        sid = self.session("running")
+        deadline = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+        with self.db.connect() as conn:
+            conn.execute(
+                "UPDATE auction_sessions SET deadline_at=?, remaining_seconds=?, "
+                "remaining_ms=? WHERE id=?",
+                (deadline, 300, 300_000, sid),
+            )
         return sid
 
     def pending(self, auction_id, event_id="source-pending", status="awaiting_rate"):
@@ -184,7 +197,7 @@ class AuctionUnresolvedGateTests(unittest.TestCase):
             self.app.processEvents()
 
     def test_cancel_auction_with_own_pending_yes_preserves_pending_without_credit(self):
-        sid = self.session()
+        sid = self.live_running_session()
         pid = self.pending(sid, "pending-cancel-yes")
         tab = AuctionTab(self.db)
         try:
@@ -231,7 +244,7 @@ class AuctionUnresolvedGateTests(unittest.TestCase):
             self.app.processEvents()
 
     def test_cancel_auction_pending_count_error_aborts_before_confirmation(self):
-        sid = self.session()
+        sid = self.live_running_session()
         tab = AuctionTab(self.db)
         try:
             tab._active_auction_id = sid
