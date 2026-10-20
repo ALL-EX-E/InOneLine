@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import (
+    QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
+)
 
 from ...diagnostic_logs import sanitize_diagnostic_text
 from ...random_sources import RandomOrgClient
@@ -756,7 +758,7 @@ class AuctionActionMixin:
         self.decrease_bid_btn.clearFocus()
 
     def rename_temporary_lot(self):
-        """P20-J: edit only a selected temporary title after 00:00."""
+        """P20-K: modal rename with explicit second Yes/No confirmation."""
         session = self._current_session()
         if not (
             session
@@ -779,24 +781,82 @@ class AuctionActionMixin:
                 "Выберите временный лот текущего аукциона.",
             )
             return
-        title = self.rename_lot_title.text().strip()
+        selected_game = self.db.get_game(game_id)
+        if selected_game is None:
+            QMessageBox.warning(
+                self, "Переименовать лот", "Выбранный лот больше не существует.",
+            )
+            return
+        old_title = str(selected_game.title)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Переименовать лот")
+        dialog.setMinimumWidth(430)
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+
+        layout.addWidget(QLabel("Текущее название выбранного лота:"))
+        current_title = QLineEdit(old_title)
+        current_title.setObjectName("auction_rename_current_title")
+        current_title.setReadOnly(True)
+        layout.addWidget(current_title)
+
+        layout.addWidget(QLabel("Новое название:"))
+        new_title = QLineEdit(old_title)
+        new_title.setObjectName("auction_rename_new_title")
+        new_title.setClearButtonEnabled(True)
+        layout.addWidget(new_title)
+
+        controls = QHBoxLayout()
+        controls.addStretch(1)
+        confirm_btn = QPushButton("Переименовать")
+        confirm_btn.setObjectName("auction_rename_dialog_accept")
+        confirm_btn.clicked.connect(dialog.accept)
+        controls.addWidget(confirm_btn)
+        cancel_btn = QPushButton("Отмена")
+        cancel_btn.clicked.connect(dialog.reject)
+        controls.addWidget(cancel_btn)
+        layout.addLayout(controls)
+        new_title.setFocus()
+        new_title.selectAll()
+
+        # Closing / Escape is a cancellation: no write and no second prompt.
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        title = new_title.text().strip()
         if not title:
             QMessageBox.information(
                 self, "Переименовать лот", "Введите новое название.",
             )
             return
+        if title == old_title:
+            QMessageBox.information(
+                self, "Переименовать лот", "Новое название совпадает с текущим.",
+            )
+            return
+
+        # Separate irreversible-action confirmation: default answer is NO.
+        decision = QMessageBox.question(
+            self, "Подтвердить переименование",
+            "Вы точно хотите переименовать выбранный лот?\n\n"
+            f"Было: «{old_title}»\n"
+            f"Станет: «{title}»",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if decision != QMessageBox.Yes:
+            return
         try:
+            # Backend re-checks session, original lot, uniqueness, pending
+            # conversions and wheel freeze after the confirmation dialog.
             self.db.rename_post_expiry_temporary_lot(
                 int(session["id"]), int(game_id), title,
             )
         except Exception as exc:
             QMessageBox.critical(self, "Переименовать лот", str(exc))
             return
-        self._rename_selected_game_id = None
         self.changed()
         self.select_conduct_game_id(game_id)
         self.rename_lot_btn.clearFocus()
-        self.rename_lot_title.clearFocus()
 
     def delete_temporary_lot(self):
         """Delete temporary game or (P20-I) exclude permanent late lot."""
