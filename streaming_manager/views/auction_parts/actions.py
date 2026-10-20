@@ -541,6 +541,26 @@ class AuctionActionMixin:
                 "Новые временные лоты этой сессии будут перенесены в основной список."
             )
 
+        # UI-086 / P20-L: stopping remains an explicit operator choice,
+        # but pending source-auction events must never be silently overlooked.
+        # Reuse the accepted session-scoped counter; no new storage or gate.
+        try:
+            unresolved = self.db.count_unresolved_auction_conversions(
+                int(session["id"])
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Аукцион", str(exc))
+            return
+        if unresolved:
+            message += (
+                "\n\nВнимание! Необработанные поступления "
+                f"этого аукциона: {unresolved}.\n"
+                "Остановка НЕ применит и НЕ отклонит эти поступления. "
+                "После остановки они не изменят результат исходного аукциона.\n"
+                "Чтобы сначала обработать поступления, нажмите «Нет» и откройте "
+                "Настройки → Конвертация → Ожидают применения."
+            )
+
         answer = QMessageBox.warning(
             self,
             title,
