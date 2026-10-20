@@ -373,6 +373,14 @@ jobs:
           python tools/auction_pending_result_gate_smoke.py -k cancel_auction
           if ($LASTEXITCODE -ne 0) { throw "P20-L cancel pending-event warning regression failed" }
 
+      - name: P20-M source-pending quick jump to Settings Conversion Qt regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_pending_result_gate_smoke.py -k conversion_jump
+          if ($LASTEXITCODE -ne 0) { throw "P20-M conversion jump Qt regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:

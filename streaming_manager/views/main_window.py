@@ -181,6 +181,7 @@ class MainWindow(QMainWindow):
             self.refresh_game_data_views,
             integration_manager=self.integration_manager,
             open_integrations=self.open_integrations_settings,
+            open_conversion=self.open_conversion_settings,
             integration_runtime_health=self._integration_runtime_health_snapshot,
             audio_coordinator=self.audio_coordinator,
             import_rules_background=self.stream_tab.import_rules_background_media,
@@ -796,6 +797,17 @@ class MainWindow(QMainWindow):
             self.settings_tab.integration_page
         )
         self.settings_tab._refresh_integrations()
+
+    def open_conversion_settings(self) -> None:
+        """Open the existing conversion queue without creating a second view."""
+        if not hasattr(self, "settings_tab"):
+            return
+        self._set_current_main_page(self.settings_tab)
+        self.settings_tab.settings_tabs.setCurrentWidget(
+            self.settings_tab.conversion_page
+        )
+        self.settings_tab._refresh_pending_conversion_rows()
+        self.settings_tab.pending_conversion_table.setFocus()
 
     def _make_menu(self):
         refresh_action = QAction("Обновить", self)
