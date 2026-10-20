@@ -204,6 +204,8 @@ class AuctionStateMixin:
             if unresolved else ""
         )
         self._set_visible_state(self.auction_pending_conversion_warning, bool(unresolved))
+        self._set_visible_state(self.auction_pending_conversion_jump_btn, bool(unresolved))
+        self._set_visible_state(self.auction_pending_conversion_notice, bool(unresolved))
 
         spin_running = bool(
             winner_selected
