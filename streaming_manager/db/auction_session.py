@@ -2517,6 +2517,130 @@ class AuctionSessionMixin:
                 "winner_game_id": winner_id,
             }
 
+    def rename_post_expiry_temporary_lot(
+        self, auction_id: int, game_id: int, new_title: str,
+    ) -> dict[str, Any]:
+        """P20-J: rename only an isolated original-auction temporary game.
+
+        Rename never merges permanent games, moves contributions, changes
+        points, reopens an expired timer or resurrects a removed lot.
+        """
+        auction_id = int(auction_id)
+        game_id = int(game_id)
+        new_title = str(new_title or "").strip()
+        new_key = normalize_title_key(new_title)
+        if not new_key:
+            raise ValueError("Введите новое название временного лота.")
+        now = utc_now()
+        with self.connect() as conn:
+            session = conn.execute(
+                "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
+                (auction_id,),
+            ).fetchone()
+            if session is None:
+                raise KeyError(auction_id)
+            if (
+                str(session["mode"] or "") != "max_amount"
+                or str(session["status"] or "") not in {
+                    "winner_selected", "tie_break_required"
+                }
+                or session["wheel_spin_id"]
+            ):
+                raise RuntimeError(
+                    "Переименование временного лота доступно только после "
+                    "00:00 до подтверждения результата «Максимальной суммы»."
+                )
+            self._require_auction_conversions_resolved_conn(conn, auction_id)
+
+            row = conn.execute(
+                "SELECT ae.id AS entry_id,ae.result,ae.snapshot_title,"
+                "g.title,g.archived,g.auction_only,g.sm_points "
+                "FROM auction_entries ae "
+                "JOIN games g ON g.id=ae.game_id "
+                "WHERE ae.auction_id=? AND ae.game_id=?",
+                (auction_id, game_id),
+            ).fetchone()
+            if (
+                row is None
+                or bool(row["archived"])
+                or str(row["result"] or "") == "removed"
+            ):
+                raise RuntimeError("Этот лот удалён, архивирован или не принадлежит аукциону.")
+            if int(row["auction_only"] or 0) != 1:
+                raise ValueError(
+                    "Название постоянной игры нельзя менять через "
+                    "переименование временного лота."
+                )
+            old_title = str(row["title"])
+            if new_title == old_title:
+                raise ValueError("Новое название совпадает с текущим.")
+
+            # The physical game's title is global. Reject shared temporary
+            # entities to keep other auctions and external references safe.
+            shared = conn.execute(
+                "SELECT 1 FROM auction_entries WHERE game_id=? "
+                "AND auction_id<>? LIMIT 1",
+                (game_id, auction_id),
+            ).fetchone()
+            if shared is not None:
+                raise RuntimeError(
+                    "Временный лот используется другим аукционом. "
+                    "Переименование заблокировано."
+                )
+            external = conn.execute(
+                "SELECT 1 FROM contributions WHERE game_id=? AND "
+                "(external_event_id IS NOT NULL OR "
+                "source NOT IN ('manual_new_lot','local_auction')) LIMIT 1",
+                (game_id,),
+            ).fetchone()
+            if external is not None:
+                raise RuntimeError(
+                    "У временного лота есть внешние начисления; "
+                    "переименование пока запрещено."
+                )
+
+            for game in conn.execute(
+                "SELECT id,title FROM games WHERE id<>?", (game_id,),
+            ).fetchall():
+                if normalize_title_key(str(game["title"])) == new_key:
+                    raise ValueError(
+                        "Игра с таким названием уже существует. "
+                        "Объединение лотов выполняется отдельно."
+                    )
+            for old in conn.execute(
+                "SELECT id,snapshot_title FROM auction_entries "
+                "WHERE auction_id=? AND id<>?",
+                (auction_id, int(row["entry_id"])),
+            ).fetchall():
+                if normalize_title_key(str(old["snapshot_title"] or "")) == new_key:
+                    raise ValueError(
+                        "Название уже встречалось в этом аукционе, "
+                        "в том числе у удалённого лота."
+                    )
+
+            conn.execute(
+                "UPDATE games SET title=?,updated_at=? WHERE id=?",
+                (new_title, now, game_id),
+            )
+            conn.execute(
+                "UPDATE auction_entries SET snapshot_title=? WHERE id=?",
+                (new_title, int(row["entry_id"])),
+            )
+            self._log_conn(
+                conn, "auction_lot", game_id, "post_expiry_temporary_rename",
+                {"auction_id": auction_id, "entry_id": int(row["entry_id"]),
+                 "old_title": old_title, "sm_points": int(row["sm_points"]),
+                 "temporary": True},
+                {"auction_id": auction_id, "entry_id": int(row["entry_id"]),
+                 "new_title": new_title, "sm_points": int(row["sm_points"]),
+                 "temporary": True, "no_timer_restart": True},
+            )
+            return {
+                "auction_id": auction_id, "entry_id": int(row["entry_id"]),
+                "game_id": game_id, "old_title": old_title,
+                "title": new_title,
+            }
+
     def delete_temporary_auction_lot(
         self,
         auction_id: int,

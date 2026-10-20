@@ -349,6 +349,14 @@ jobs:
           python tools/auction_post_expiry_permanent_exclusion_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-I permanent lot exclusion regression failed" }
 
+      - name: P20-J post-expiry temporary lot title rename and collision guards
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_post_expiry_temporary_rename_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P20-J temporary lot rename regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
