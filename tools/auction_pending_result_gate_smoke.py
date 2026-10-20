@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database, Game
@@ -148,6 +148,108 @@ class AuctionUnresolvedGateTests(unittest.TestCase):
         self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 1)
         self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_rate")
         self.assertEqual(self.count_contributions(), 0)
+
+
+    # P20-L: only the approved pending-event warning for full-auction stop.
+    # The existing cancel_auction operation, session status and point policy
+    # must remain exactly as before; nothing auto-applies or auto-declines.
+    def test_cancel_auction_with_own_pending_no_keeps_db_and_default_no(self):
+        sid = self.session("winner_selected")
+        pid = self.pending(sid, "pending-own")
+        other = self.session()
+        self.pending(other, "pending-other")
+        self.pending(None, "pending-outside")
+        tab = AuctionTab(self.db)
+        try:
+            tab._active_auction_id = sid
+            with patch.object(
+                QMessageBox, "warning", return_value=QMessageBox.No
+            ) as confirm:
+                tab.cancel_auction()
+            confirm.assert_called_once()
+            args = confirm.call_args.args
+            self.assertIn("Необработанные поступления", args[2])
+            self.assertIn("этого аукциона: 1", args[2])
+            self.assertIn("НЕ применит и НЕ отклонит", args[2])
+            self.assertIn("Настройки → Конвертация", args[2])
+            self.assertEqual(args[-1], QMessageBox.No)
+            self.assertEqual(self.db.get_auction_session(sid)["status"], "winner_selected")
+            self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_rate")
+            self.assertEqual(self.count_contributions(), 0)
+            self.assertEqual(self.db.count_unresolved_auction_conversions(other), 1)
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_cancel_auction_with_own_pending_yes_preserves_pending_without_credit(self):
+        sid = self.session()
+        pid = self.pending(sid, "pending-cancel-yes")
+        tab = AuctionTab(self.db)
+        try:
+            tab._active_auction_id = sid
+            with patch.object(
+                QMessageBox, "warning", return_value=QMessageBox.Yes
+            ) as confirm:
+                tab.cancel_auction()
+            confirm.assert_called_once()
+            self.assertIn("Необработанные поступления", confirm.call_args.args[2])
+            self.assertEqual(self.db.get_auction_session(sid)["status"], "cancelled")
+            self.assertEqual(self.db.count_unresolved_auction_conversions(sid), 1)
+            self.assertEqual(self.db.get_pending_conversion_event(pid)["status"], "awaiting_rate")
+            self.assertEqual(self.count_contributions(), 0)
+            self.assertEqual(self.db.get_game(self.game_id).sm_points, 50)
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_cancel_auction_without_own_pending_keeps_original_warning(self):
+        sid = self.session()
+        other = self.session()
+        self.pending(other, "only-other")
+        self.pending(None, "only-outside")
+        tab = AuctionTab(self.db)
+        try:
+            tab._active_auction_id = sid
+            with patch.object(
+                QMessageBox, "warning", return_value=QMessageBox.No
+            ) as confirm:
+                tab.cancel_auction()
+            confirm.assert_called_once()
+            message = confirm.call_args.args[2]
+            self.assertIn("Остановить текущую сессию", message)
+            self.assertNotIn("Необработанные поступления", message)
+            self.assertEqual(self.db.get_auction_session(sid)["status"], "running")
+            self.assertEqual(self.db.count_unresolved_auction_conversions(other), 1)
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_cancel_auction_pending_count_error_aborts_before_confirmation(self):
+        sid = self.session()
+        tab = AuctionTab(self.db)
+        try:
+            tab._active_auction_id = sid
+            with patch.object(
+                self.db, "count_unresolved_auction_conversions",
+                side_effect=RuntimeError("read failed")
+            ), patch.object(QMessageBox, "critical") as error_dialog, patch.object(
+                QMessageBox, "warning"
+            ) as confirm:
+                tab.cancel_auction()
+            error_dialog.assert_called_once()
+            confirm.assert_not_called()
+            self.assertEqual(self.db.get_auction_session(sid)["status"], "running")
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
 
 
 if __name__ == "__main__":
