@@ -190,12 +190,14 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         integration_runtime_health: Callable[[], dict[str, dict]] | None = None,
         audio_coordinator: AudioCoordinator | None = None,
         import_rules_background: Callable[[Callable[[int], None], QWidget], None] | None = None,
+        open_conversion: Callable[[], None] | None = None,
     ):
         super().__init__()
         self.db = db
         self.changed = changed or (lambda: None)
         self.integration_manager = integration_manager or IntegrationManager(db)
         self.open_integrations = open_integrations or (lambda: None)
+        self.open_conversion = open_conversion or (lambda: None)
         self.integration_runtime_health = integration_runtime_health or (lambda: {})
         self.audio_coordinator = audio_coordinator or AudioCoordinator(self)
         self._import_rules_background = import_rules_background
@@ -340,18 +342,34 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         integration_status_row.addStretch()
         conduct_layout.addWidget(self.integration_status_widget)
 
-        # UI-086 P20-A: read-only session-scoped warning, not a second
-        # conversion queue or an implicit decision about received events.
+        # UI-086: reuse the existing source-session warning, with the approved
+        # direct jump to Settings -> Conversion. No second queue or data path.
+        self.auction_pending_conversion_notice = QWidget()
+        pending_notice_layout = QVBoxLayout(self.auction_pending_conversion_notice)
+        pending_notice_layout.setContentsMargins(0, 0, 0, 0)
+        pending_notice_layout.setSpacing(6)
         self.auction_pending_conversion_warning = QLabel()
         self.auction_pending_conversion_warning.setWordWrap(True)
         self.auction_pending_conversion_warning.setProperty("warning", True)
         self.auction_pending_conversion_warning.setToolTip(
             "Только поступления, записанные за текущим аукционом. "
-            "Для решения откройте Настройки → Конвертация → Ожидают применения. "
             "Завершение отсчёта и аварийная остановка не отклоняют события."
         )
+        pending_notice_layout.addWidget(self.auction_pending_conversion_warning)
+        pending_link_row = QHBoxLayout()
+        pending_link_row.setContentsMargins(0, 0, 0, 0)
+        self.auction_pending_conversion_jump_btn = QPushButton("Перейти к конвертации")
+        self.auction_pending_conversion_jump_btn.clicked.connect(self.open_conversion)
+        self.auction_pending_conversion_jump_btn.setToolTip(
+            "Открыть Настройки → Конвертация → Ожидают применения."
+        )
+        pending_link_row.addWidget(self.auction_pending_conversion_jump_btn)
+        pending_link_row.addStretch()
+        pending_notice_layout.addLayout(pending_link_row)
         self.auction_pending_conversion_warning.setVisible(False)
-        conduct_layout.addWidget(self.auction_pending_conversion_warning)
+        self.auction_pending_conversion_jump_btn.setVisible(False)
+        self.auction_pending_conversion_notice.setVisible(False)
+        conduct_layout.addWidget(self.auction_pending_conversion_notice)
 
         self.setup_widget = QWidget()
         setup = QGridLayout(self.setup_widget)
