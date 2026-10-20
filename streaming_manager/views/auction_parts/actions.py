@@ -755,6 +755,49 @@ class AuctionActionMixin:
         self.add_bid_btn.clearFocus()
         self.decrease_bid_btn.clearFocus()
 
+    def rename_temporary_lot(self):
+        """P20-J: edit only a selected temporary title after 00:00."""
+        session = self._current_session()
+        if not (
+            session
+            and str(session.get("mode") or "") == "max_amount"
+            and str(session.get("status") or "") in {
+                "winner_selected", "tie_break_required"
+            }
+            and not session.get("wheel_spin_id")
+        ):
+            QMessageBox.information(
+                self, "Переименовать лот",
+                "Переименование временного лота доступно после 00:00 "
+                "до подтверждения результата «Максимальной суммы».",
+            )
+            return
+        game_id = self.selected_conduct_game_id()
+        if game_id is None or not self._selected_conduct_is_temporary_lot():
+            QMessageBox.information(
+                self, "Переименовать лот",
+                "Выберите временный лот текущего аукциона.",
+            )
+            return
+        title = self.rename_lot_title.text().strip()
+        if not title:
+            QMessageBox.information(
+                self, "Переименовать лот", "Введите новое название.",
+            )
+            return
+        try:
+            self.db.rename_post_expiry_temporary_lot(
+                int(session["id"]), int(game_id), title,
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Переименовать лот", str(exc))
+            return
+        self._rename_selected_game_id = None
+        self.changed()
+        self.select_conduct_game_id(game_id)
+        self.rename_lot_btn.clearFocus()
+        self.rename_lot_title.clearFocus()
+
     def delete_temporary_lot(self):
         """Delete temporary game or (P20-I) exclude permanent late lot."""
         session = self._current_session()

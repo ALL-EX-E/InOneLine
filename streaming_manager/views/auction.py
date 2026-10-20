@@ -792,6 +792,25 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         new_lot_layout.addWidget(self.new_lot_rule)
         conduct_layout.addWidget(self.new_lot_widget)
 
+        # P20-J: isolated compact inline rename editor, not a global
+        # "edit game" dialog. Only selected auction-only lots may use it.
+        self.rename_lot_widget = QWidget()
+        rename_lot_row = QHBoxLayout(self.rename_lot_widget)
+        rename_lot_row.setContentsMargins(0, 0, 0, 0)
+        rename_lot_row.setSpacing(6)
+        rename_lot_row.addWidget(QLabel("Название временного лота:"))
+        self.rename_lot_title = QLineEdit()
+        self.rename_lot_title.setPlaceholderText("Новое название")
+        self.rename_lot_title.setClearButtonEnabled(True)
+        self.rename_lot_title.setMinimumWidth(160)
+        rename_lot_row.addWidget(self.rename_lot_title, 1)
+        self.rename_lot_btn = QPushButton("Переименовать")
+        self.rename_lot_btn.clicked.connect(self.rename_temporary_lot)
+        rename_lot_row.addWidget(self.rename_lot_btn)
+        self._rename_selected_game_id = None
+        self.rename_lot_widget.hide()
+        conduct_layout.addWidget(self.rename_lot_widget)
+
         conduct_heading_row = QHBoxLayout()
         conduct_list_heading = QLabel("Список лотов")
         conduct_list_heading.setStyleSheet(
@@ -2649,6 +2668,24 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 "Удалить ошибочно созданный временный лот текущего аукциона"
             )
         )
+        rename_available = bool(
+            late_temporary_delete and selected_game_id is not None
+            and selected_temporary
+        )
+        self._set_visible_state(self.rename_lot_widget, rename_available)
+        self._set_enabled_state(self.rename_lot_title, rename_available)
+        self._set_enabled_state(self.rename_lot_btn, rename_available)
+        if selected_game_id != self._rename_selected_game_id:
+            self._rename_selected_game_id = selected_game_id
+            if rename_available:
+                row = self.conduct_table.currentRow()
+                col = int(getattr(self, "_conduct_title_column", 2))
+                item = self.conduct_table.item(row, col)
+                self.rename_lot_title.setText(
+                    item.text().strip() if item is not None else ""
+                )
+            else:
+                self.rename_lot_title.clear()
 
     @staticmethod
     def _set_visible_state(widget: QWidget, visible: bool):
