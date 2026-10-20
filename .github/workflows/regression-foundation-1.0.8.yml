@@ -357,6 +357,14 @@ jobs:
           python tools/auction_post_expiry_temporary_rename_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P20-J temporary lot rename regression failed" }
 
+      - name: P20-K rename modal and second confirmation Qt regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/auction_post_expiry_temporary_rename_smoke.py -k qt_modal
+          if ($LASTEXITCODE -ne 0) { throw "P20-K modal rename and cancellation regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
