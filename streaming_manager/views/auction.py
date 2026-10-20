@@ -2625,17 +2625,29 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             }
             and not session.get("wheel_spin_id")
         )
+        selected_game_id = self.selected_conduct_game_id()
+        selected_temporary = self._selected_conduct_is_temporary_lot()
         enabled = bool(
-            (running or late_temporary_delete)
-            and self._selected_conduct_is_temporary_lot()
+            selected_game_id is not None
+            and (late_temporary_delete or (running and selected_temporary))
         )
         self._set_visible_state(self.delete_lot_btn, enabled)
         self._set_enabled_state(self.delete_lot_btn, enabled)
+        exclude_permanent = bool(
+            late_temporary_delete and enabled and not selected_temporary
+        )
+        self.delete_lot_btn.setText(
+            "Исключить лот" if exclude_permanent else "Удалить лот"
+        )
         self.delete_lot_btn.setToolTip(
-            "После 00:00 можно удалить только временный лот, пока "
-            "результат «Максимальной суммы» не подтверждён."
-            if late_temporary_delete else
-            "Удалить ошибочно созданный временный лот текущего аукциона"
+            "Исключить постоянный лот только из этого аукциона; "
+            "сама игра, её баллы и история поступлений сохраняются."
+            if exclude_permanent else (
+                "После 00:00 временный лот можно удалить до "
+                "подтверждения результата «Максимальной суммы»."
+                if late_temporary_delete else
+                "Удалить ошибочно созданный временный лот текущего аукциона"
+            )
         )
 
     @staticmethod
