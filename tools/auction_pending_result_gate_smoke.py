@@ -7,15 +7,17 @@ from datetime import datetime, timedelta, timezone
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QTableWidget, QTabWidget, QWidget
 
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.database import Database, Game
 from streaming_manager.views.auction import AuctionTab
+from streaming_manager.views.main_window import MainWindow
 
 
 class AuctionUnresolvedGateTests(unittest.TestCase):
@@ -262,6 +264,72 @@ class AuctionUnresolvedGateTests(unittest.TestCase):
             tab.auction_timer.stop()
             tab.close()
             tab.deleteLater()
+            self.app.processEvents()
+
+
+    # P20-M UI-086: reuse the approved visible warning and Settings conversion
+    # page, never create a second pending queue or a background rate save.
+    def test_conversion_jump_only_with_source_pending_and_no_data_mutation(self):
+        sid = self.session("winner_selected")
+        other = self.session("running")
+        self.pending(other, "other-jump")
+        jump = MagicMock()
+        tab = AuctionTab(self.db, open_conversion=jump)
+        try:
+            tab.show()
+            tab._active_auction_id = sid
+            tab.refresh()
+            self.assertTrue(tab.auction_pending_conversion_warning.isHidden())
+            self.assertTrue(tab.auction_pending_conversion_jump_btn.isHidden())
+            pending_id = self.pending(sid, "own-jump")
+            tab.refresh()
+            self.assertFalse(tab.auction_pending_conversion_warning.isHidden())
+            self.assertFalse(tab.auction_pending_conversion_jump_btn.isHidden())
+            self.assertEqual(
+                tab.auction_pending_conversion_jump_btn.text(),
+                "Перейти к конвертации",
+            )
+            tab.auction_pending_conversion_jump_btn.click()
+            jump.assert_called_once_with()
+            self.assertEqual(self.db.get_pending_conversion_event(pending_id)["status"], "awaiting_rate")
+            self.assertEqual(self.count_contributions(), 0)
+            self.db.reject_pending_conversion_event(pending_id)
+            tab.refresh()
+            self.assertTrue(tab.auction_pending_conversion_jump_btn.isHidden())
+            self.assertEqual(self.db.count_unresolved_auction_conversions(other), 1)
+        finally:
+            tab.auction_timer.stop()
+            tab.close()
+            tab.deleteLater()
+            self.app.processEvents()
+
+    def test_conversion_jump_main_window_routes_existing_settings_page(self):
+        # The real MainWindow method is exercised without starting a second
+        # streaming server, OBS/Chromium instance or a duplicate Settings tab.
+        container = QTabWidget()
+        old_page = QWidget()
+        conversion_page = QWidget()
+        container.addTab(old_page, "Интеграции")
+        container.addTab(conversion_page, "Конвертация")
+        queue = QTableWidget()
+        refresh_pending = MagicMock()
+        settings = SimpleNamespace(
+            settings_tabs=container, conversion_page=conversion_page,
+            pending_conversion_table=queue,
+            _refresh_pending_conversion_rows=refresh_pending,
+        )
+        target = SimpleNamespace(
+            settings_tab=settings, _set_current_main_page=MagicMock()
+        )
+        try:
+            MainWindow.open_conversion_settings(target)
+            target._set_current_main_page.assert_called_once_with(settings)
+            self.assertIs(container.currentWidget(), conversion_page)
+            refresh_pending.assert_called_once_with()
+            self.assertEqual(container.count(), 2)
+        finally:
+            container.deleteLater()
+            queue.deleteLater()
             self.app.processEvents()
 
 
