@@ -1409,3 +1409,8 @@ P20-B late original-source Max Amount existing-lot correction received original 
 
 - UI-081 #1 user manually accepted and clean exact 4 tested source PR #338 MERGED to main as `2db21f39b6d3d1b0855faf0308725e2012aa16fe`, promotion Windows #39589888769 SUCCESS, independent postmerge Windows #39591353841 still in progress.
 - UI-081 #2 separate clean QA draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f` based on accepted main, 4 files; one label copy exact approved text, Qt smoke, workflow and doc. SHA-identical source tree to staging PR #339 (closed unmerged). Native Windows #39591490607 running, wording SUCCESS. No user manual QA yet, no Drive ZIP yet; do NOT merge #341. Next require Windows success, verified archive SHA256/CRC, Drive upload and user's six-point Windows acceptance before exact-blob promotion. UI-081 #3 untouched; app 1.0.8/schema19 no release.
+
+## CURRENT 2026-10-21 — UI-081 #1 independently verified; #2 clean QA
+
+- UI-081 #1 manually accepted and merged main PR #338 `2db21f39b6d3d1b0855faf0308725e2012aa16fe`. Promotion native Windows #39589888769 SUCCESS, **main postmerge native Windows #39591353841 SUCCESS**, Publication wording SUCCESS.
+- UI-081 #2 clean draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f`, QA Windows #39591490607 running, dedicated new description Qt smoke PASS and wording SUCCESS, no installer ZIP/Drive/user acceptance yet. One exact replacement of obsolete Journal description; four-file scope incl smoke, CI and QA doc. UI-081 #3 deliberately not started. Do not merge QA PR before user accepts.
