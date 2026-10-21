@@ -381,6 +381,14 @@ jobs:
           python tools/auction_pending_result_gate_smoke.py -k conversion_jump
           if ($LASTEXITCODE -ne 0) { throw "P20-M conversion jump Qt regression failed" }
 
+      - name: P21-A UI-087 blank message per-session auction lot regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/integration_blank_message_auction_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P21-A blank-message integration regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
