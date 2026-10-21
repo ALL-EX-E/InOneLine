@@ -24,6 +24,7 @@ class BlankAuctionLotTests(unittest.TestCase):
         self.paths.ensure_runtime_dirs()
         self.db = Database(self.paths.database_path)
         self.db.add_game(Game(None, "Стартовый лот", None, 10, 0, "not_played", ""))
+        self.db.add_game(Game(None, "Второй стартовый лот", None, 5, 0, "not_played", ""))
         with self.db.connect() as conn:
             conn.execute(
                 "INSERT INTO integration_connections("
