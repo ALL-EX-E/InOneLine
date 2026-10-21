@@ -429,6 +429,14 @@ jobs:
           python tools/completed_auction_history_events_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "UI-080 History audit event presentation regression failed" }
 
+      - name: UI-081 shared dark QTableView and QTableWidget style
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/journal_shared_dark_table_style_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "UI-081 shared dark table regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
