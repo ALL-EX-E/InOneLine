@@ -617,6 +617,47 @@ class ServicesMixin:
             "reason": reason,
         }
 
+    def _reserve_blank_auction_lot_title_conn(
+        self,
+        conn: sqlite3.Connection,
+        auction_id: int,
+        event_row_id: int,
+        payload: dict[str, Any],
+    ) -> str:
+        """UI-087: durable session ordinal, independent of later lot renames.
+
+        Dedup and source-auction validation run before this function. The
+        original provider message remains empty in normalized.lot_title.
+        A generated ordinal is recorded on the source event, not the game
+        title, so renaming/deleting a lot cannot release its number.
+        """
+        last_number = 0
+        for existing in conn.execute(
+            "SELECT payload_json FROM external_events "
+            "WHERE id<? AND payload_json LIKE ?",
+            (int(event_row_id), '%"generated_blank_auction_id"%'),
+        ):
+            try:
+                normalized = json.loads(existing["payload_json"]).get("normalized", {})
+                if int(normalized.get("generated_blank_auction_id") or 0) != int(auction_id):
+                    continue
+                number = int(normalized.get("generated_blank_number") or 0)
+                if number > last_number:
+                    last_number = number
+            except (TypeError, ValueError, AttributeError, json.JSONDecodeError):
+                continue
+        next_number = last_number + 1
+        title = f"Без текста {next_number}"
+        payload["normalized"]["generated_blank_auction_id"] = int(auction_id)
+        payload["normalized"]["generated_blank_number"] = next_number
+        payload["normalized"]["generated_blank_title"] = title
+        conn.execute(
+            "UPDATE external_events SET payload_json=? WHERE id=?",
+            (json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True),
+             int(event_row_id)),
+        )
+        return title
+
     def process_normalized_integration_event(
         self,
         *,
@@ -757,6 +798,14 @@ class ServicesMixin:
                     else None
                 )
 
+            # Only ordinary no-target/no-message events in a running auction
+            # enter the approved UI-087 placeholder path. Outside-auction and
+            # explicitly game-targeted events retain their B3 behavior.
+            blank_running_message = (
+                running_auction_id is not None
+                and normalized_game_id is None
+                and not title
+            )
             game_row = None
             if normalized_game_id is not None:
                 game_row = conn.execute(
@@ -800,7 +849,7 @@ class ServicesMixin:
                         now=now,
                     )
                 title = str(game_row["title"])
-            elif not title:
+            elif not title and not blank_running_message:
                 return self._mark_external_event_inapplicable_conn(
                     conn,
                     event_row_id=event_row_id,
@@ -860,6 +909,22 @@ class ServicesMixin:
             ).fetchone()
             rate = str(rate_row["value"]) if rate_row is not None else ("1" if unit == "RUB" else "")
             if not rate:
+                if blank_running_message:
+                    # Create the visible lot immediately with zero credit.
+                    # Leave global title-match/reuse policy unchanged: the
+                    # operator is responsible for renaming prior placeholders
+                    # between auction sessions.
+                    title = self._reserve_blank_auction_lot_title_conn(
+                        conn, running_auction_id, event_row_id, payload
+                    )
+                    placeholder = self._add_or_increment_auction_lot_conn(
+                        conn, running_auction_id, title, 0,
+                        source=source,
+                        contributor=str(contributor or "") or None,
+                        external_event_id=provider_event_id,
+                        record_contribution=False,
+                    )
+                    normalized_game_id = int(placeholder["game_id"])
                 pending_cursor = conn.execute(
                     "INSERT INTO pending_conversions("
                     "external_event_row_id,game_id,auction_id,source_amount_text,"
@@ -929,6 +994,10 @@ class ServicesMixin:
             auction_applied = False
             target_game_id = normalized_game_id
             if running_auction_id is not None:
+                if blank_running_message:
+                    title = self._reserve_blank_auction_lot_title_conn(
+                        conn, running_auction_id, event_row_id, payload
+                    )
                 lot_result = self._add_or_increment_auction_lot_conn(
                     conn,
                     running_auction_id,
