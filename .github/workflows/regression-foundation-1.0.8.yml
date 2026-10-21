@@ -437,6 +437,14 @@ jobs:
           python tools/journal_shared_dark_table_style_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "UI-081 shared dark table regression failed" }
 
+      - name: UI-081 current Journal description Qt regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/journal_current_description_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "UI-081 Journal description Qt regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
