@@ -1397,3 +1397,20 @@ P20-B late original-source Max Amount existing-lot correction received original 
 - UI-081 #1 exactly 4-file QA draft PR #336 HEAD `36b650f8bb7229ec674758fa583e3aff04c7f6e9` based on accepted main code, full native Windows #39585563054 SUCCESS and wording SUCCESS. Includes shared dark APP_STYLE QTableView/QTableWidget selector and actual Qt rendered alternate row smoke, no other UI-081 tasks.
 - Frozen installer ZIP GitHub Actions artifact 12341080605 size 46,883,961 bytes SHA256 `034036e2b11b4bce6c9400a89333f87ee039b81ff63efddb69ec68e47dbc9a88`, local CRC PASS, only `InOneLine_Setup_1.0.8.exe` 47,743,891 bytes. Verified same Google Drive QA ZIP https://drive.google.com/file/d/1_Xnj8TF934GsSS_kVuMfKwN-8zQGy-39/view?usp=drivesdk under Обзор_UI_1.0.8, metadata title/size/parent verified.
 - **NEXT USER ACTION: install UI-081 #1 QA and run all 6 Windows steps** in `docs/P23_A_UI081_DARK_TABLE_QA.md`. Await explicit user manual PASS, do not merge PR #336 or expand UI-081 #2 stale description / #3 Russian presentation. No public release, version 1.0.8 schema19/migrations15 unchanged.
+
+## CURRENT 2026-10-21 — UI-081 #1 user PASS / promotion gated; #2 single-copy QA staging
+
+- UI-081 #1 dark QTableView alternating rows installed Windows QA accepted directly by user. Source PR #336 HEAD `36b650f8bb7229ec674758fa583e3aff04c7f6e9`, native Windows #39585563054 SUCCESS, wording SUCCESS. Exact ZIP 46,883,961 bytes SHA256 `034036e2b11b4bce6c9400a89333f87ee039b81ff63efddb69ec68e47dbc9a88`, CRC PASS, verified Google Drive https://drive.google.com/file/d/1_Xnj8TF934GsSS_kVuMfKwN-8zQGy-39/view.
+- Exact 4 tested Git blobs staged for accepted promotion PR #338 HEAD `6236875c7bc549f3e98c0a3720748216ab37c55b`. Fresh promotion Windows #39589888769 IN PROGRESS, wording required SUCCESS; do not merge until full PASS, then main postmerge Windows.
+- NEXT UI-081 #2 (not accepted): replace one obsolete `Журнал` header `QLabel` with ledger-approved «Журнал изменений и событий программы, включая аукционы, настройки и подключённые интеграции.», no further UI-081 #3 technical event changes. Staging draft PR #339 HEAD `252c8d6de8e6619b58ef75cab0253fff40112570` based on promotion branch. After #338 merges, clean exact four-file QA branch on then-current main; native Windows, verified installer CRC/SHA256, Drive, explicit manual PASS before any merging.
+- Version 1.0.8 schema19/migrations15, no new release; supersedes earlier notes that UI-081 #1 was awaiting manual verification.
+
+## CURRENT 2026-10-21 — UI-081 #1 accepted/merged; #2 clean native Windows QA
+
+- UI-081 #1 user manually accepted and clean exact 4 tested source PR #338 MERGED to main as `2db21f39b6d3d1b0855faf0308725e2012aa16fe`, promotion Windows #39589888769 SUCCESS, independent postmerge Windows #39591353841 still in progress.
+- UI-081 #2 separate clean QA draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f` based on accepted main, 4 files; one label copy exact approved text, Qt smoke, workflow and doc. SHA-identical source tree to staging PR #339 (closed unmerged). Native Windows #39591490607 running, wording SUCCESS. No user manual QA yet, no Drive ZIP yet; do NOT merge #341. Next require Windows success, verified archive SHA256/CRC, Drive upload and user's six-point Windows acceptance before exact-blob promotion. UI-081 #3 untouched; app 1.0.8/schema19 no release.
+
+## CURRENT 2026-10-21 — UI-081 #1 independently verified; #2 clean QA
+
+- UI-081 #1 manually accepted and merged main PR #338 `2db21f39b6d3d1b0855faf0308725e2012aa16fe`. Promotion native Windows #39589888769 SUCCESS, **main postmerge native Windows #39591353841 SUCCESS**, Publication wording SUCCESS.
+- UI-081 #2 clean draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f`, QA Windows #39591490607 running, dedicated new description Qt smoke PASS and wording SUCCESS, no installer ZIP/Drive/user acceptance yet. One exact replacement of obsolete Journal description; four-file scope incl smoke, CI and QA doc. UI-081 #3 deliberately not started. Do not merge QA PR before user accepts.
