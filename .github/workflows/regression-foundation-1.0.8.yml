@@ -453,6 +453,14 @@ jobs:
           python tools/journal_russian_presentation_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "UI-081 Russian Journal presentation regression failed" }
 
+      - name: FINAL GATE P07 elimination position lifecycle regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/position_policy_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "FINAL GATE P07 position lifecycle regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
