@@ -978,8 +978,6 @@ class AuctionSessionMixin:
         )
         sort_sql = {
             "oldest": "sort_time ASC, s.id ASC",
-            "name_asc": "s.name COLLATE NOCASE ASC, sort_time DESC, s.id DESC",
-            "name_desc": "s.name COLLATE NOCASE DESC, sort_time DESC, s.id DESC",
         }.get(sort_order, "sort_time DESC, s.id DESC")
         limit = max(1, min(500, int(limit or 50)))
         offset = max(0, int(offset or 0))

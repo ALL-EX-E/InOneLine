@@ -397,6 +397,14 @@ jobs:
           python tools/integration_journal_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P22-A integration Journal visibility regression failed" }
 
+      - name: P22-B UI-080 completed-auction history date sorting
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/completed_auction_history_sort_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P22-B history sorting regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
