@@ -409,7 +409,9 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
                 parts.append(f"ID лота: {target}")
             credited = after.get("credited_sm_points")
             if credited is not None:
-                parts.append(f"изменение: {int(credited):+d} баллов")
+                amount = int(credited)
+                sign = "−" if amount < 0 else "+"
+                parts.append(f"изменение: {sign}{abs(amount)} баллов")
             parts.append("без перезапуска таймера")
             details = "; ".join(parts)
         elif action == "confirm_winner":
