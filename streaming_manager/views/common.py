@@ -51,7 +51,7 @@ QPushButton:pressed { background: #25292d; }
 QPushButton:disabled { color: #777; background: #252729; border-color: #333; }
 QPushButton[primary="true"] { background: #176da5; border-color: #238dce; font-weight: 600; }
 QPushButton[danger="true"] { border-color: #8a4b4b; }
-QTableWidget {
+QTableWidget, QTableView {
     background: #202326; alternate-background-color: #24282b; color: #ededed;
     border: 1px solid #393e43; selection-background-color: #295e83;
     selection-color: white; gridline-color: #32373b;
