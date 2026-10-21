@@ -11,6 +11,100 @@ MODE_LABELS = {
 }
 
 
+def format_completed_auction_mode(
+    session: dict[str, Any],
+    evidence: dict[str, Any] | None = None,
+) -> str:
+    """Render executed winner-selection stages from existing audit and snapshots."""
+    mode = str(session.get("mode") or "")
+    if mode not in {"max_amount", "weighted_wheel"}:
+        return MODE_LABELS.get(mode, mode or "—")
+
+    evidence = evidence if isinstance(evidence, dict) else {}
+    events = evidence.get("events") or []
+    snapshots = evidence.get("spins") or []
+    allowed = {"standard", "elimination"}
+    selected = str(session.get("wheel_format") or "standard")
+    selected = selected if selected in allowed else "standard"
+
+    by_run = {
+        str(spin.get("run_id") or ""): spin
+        for spin in snapshots if isinstance(spin, dict) and spin.get("run_id")
+    }
+    by_index = {
+        int(spin.get("spin_index") or 1): spin
+        for spin in snapshots if isinstance(spin, dict)
+    }
+
+    def snapshot_format(spin: dict[str, Any] | None) -> str | None:
+        if not isinstance(spin, dict):
+            return None
+        result_kind = str(spin.get("result_kind") or "")
+        if result_kind == "eliminated":
+            return "elimination"
+        if result_kind == "winner":
+            return "standard"
+        return None
+
+    current_format = selected
+    tie_wheel_chosen = False
+    recorded_spins: list[tuple[int, str]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        action = str(event.get("action") or "")
+        after = event.get("after")
+        after = after if isinstance(after, dict) else {}
+        new_format = str(after.get("wheel_format") or "")
+        if action in {"create", "wheel_format"} and new_format in allowed:
+            current_format = new_format
+        elif action == "tie_wheel":
+            tie_wheel_chosen = True
+        elif action == "wheel":
+            try:
+                index = int(after.get("spin_index") or len(recorded_spins) + 1)
+            except (TypeError, ValueError):
+                index = len(recorded_spins) + 1
+            snapshot = by_run.get(str(after.get("verification_run_id") or ""))
+            if snapshot is None:
+                snapshot = by_index.get(index)
+            actual = (
+                new_format if new_format in allowed
+                else snapshot_format(snapshot) or current_format
+            )
+            recorded_spins.append((index, actual))
+            current_format = actual
+
+    seen_indices = {index for index, _fmt in recorded_spins}
+    for spin in snapshots:
+        if not isinstance(spin, dict):
+            continue
+        index = int(spin.get("spin_index") or 1)
+        if index not in seen_indices:
+            actual = snapshot_format(spin)
+            if actual is not None:
+                recorded_spins.append((index, actual))
+    recorded_spins.sort(key=lambda item: item[0])
+
+    labels = {"standard": "Обычное колесо", "elimination": "Выбывание"}
+    actual_path: list[str] = []
+    for _index, wheel_format in recorded_spins:
+        name = labels[wheel_format]
+        if not actual_path or actual_path[-1] != name:
+            actual_path.append(name)
+
+    if mode == "max_amount":
+        if not actual_path:
+            return "Максимальная сумма"
+        if tie_wheel_chosen:
+            return "Максимальная сумма → Колесо при ничьей"
+        return "Максимальная сумма → " + " → ".join(actual_path)
+
+    if not actual_path:
+        return labels[selected]
+    return " → ".join(actual_path)
+
+
 def _points(value: Any) -> str:
     try:
         number = max(0, int(value or 0))

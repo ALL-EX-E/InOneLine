@@ -963,6 +963,58 @@ class AuctionSessionMixin:
             params.extend((pattern, pattern, pattern))
         return " AND ".join(clauses), params
 
+    @staticmethod
+    def _completed_auction_mode_evidence_conn(
+        conn: sqlite3.Connection, auction_ids: list[int],
+    ) -> dict[int, dict[str, Any]]:
+        """Batch-read audit and immutable spin facts for displayed History rows."""
+        ids = sorted({int(value) for value in auction_ids})
+        if not ids:
+            return {}
+        evidence: dict[int, dict[str, Any]] = {
+            auction_id: {"events": [], "spins": []}
+            for auction_id in ids
+        }
+        placeholders = ",".join("?" for _ in ids)
+        events = conn.execute(
+            f"SELECT entity_id, action, after_json FROM change_log "
+            f"WHERE entity_type='auction_session' "
+            f"AND entity_id IN ({placeholders}) "
+            f"AND action IN ('create','tie_wheel','wheel_format','wheel') "
+            f"ORDER BY id ASC",
+            ids,
+        ).fetchall()
+        for event in events:
+            try:
+                after = json.loads(str(event["after_json"] or "{}"))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                after = {}
+            if not isinstance(after, dict):
+                after = {}
+            evidence[int(event["entity_id"])]["events"].append({
+                "action": str(event["action"] or ""),
+                "after": {
+                    key: after.get(key)
+                    for key in (
+                        "wheel_format", "verification_run_id", "spin_index",
+                    )
+                },
+            })
+        snapshots = conn.execute(
+            f"SELECT auction_id, run_id, spin_index, result_kind "
+            f"FROM wheel_verification_snapshots "
+            f"WHERE auction_id IN ({placeholders}) "
+            f"ORDER BY auction_id, spin_index",
+            ids,
+        ).fetchall()
+        for snapshot in snapshots:
+            evidence[int(snapshot["auction_id"])]["spins"].append({
+                "run_id": str(snapshot["run_id"] or ""),
+                "spin_index": int(snapshot["spin_index"] or 1),
+                "result_kind": str(snapshot["result_kind"] or ""),
+            })
+        return evidence
+
     def list_completed_auction_sessions(
         self,
         *,
@@ -1002,7 +1054,13 @@ class AuctionSessionMixin:
                 """,
                 (*params, limit, offset),
             ).fetchall()
-        return [dict(row) for row in rows]
+            result = [dict(row) for row in rows]
+            evidence = self._completed_auction_mode_evidence_conn(
+                conn, [int(row["id"]) for row in result]
+            )
+        for row in result:
+            row["mode_evidence"] = evidence.get(int(row["id"]), {})
+        return result
 
     def completed_auction_summary(
         self,
@@ -1058,6 +1116,9 @@ class AuctionSessionMixin:
                 """,
                 (auction_id,),
             ).fetchall()
+            mode_evidence = self._completed_auction_mode_evidence_conn(
+                conn, [auction_id]
+            ).get(auction_id, {})
             winner_title = ""
             for entry in entries:
                 if entry["result"] == "winner" or (
@@ -1070,6 +1131,7 @@ class AuctionSessionMixin:
             "session": dict(session),
             "entries": [dict(row) for row in entries],
             "winner_title": winner_title,
+            "mode_evidence": mode_evidence,
         }
 
     def _auction_position_map_conn(

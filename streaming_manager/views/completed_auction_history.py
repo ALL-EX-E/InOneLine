@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 
 from ..database import Database, display_datetime_local, format_points
 from ..random_sources import RandomDraw
-from .auction_history import MODE_LABELS, format_auction_history_event
+from .auction_history import format_auction_history_event, format_completed_auction_mode
 from .winner_verification import format_verification_snapshot, show_readonly_text_dialog
 
 
@@ -300,7 +300,7 @@ class CompletedAuctionHistoryTab(QWidget):
             values = (
                 display_datetime_local(row.get("sort_time")),
                 str(row.get("name") or f"Аукцион #{row['id']}"),
-                MODE_LABELS.get(str(row.get("mode") or ""), str(row.get("mode") or "—")),
+                format_completed_auction_mode(row, row.get("mode_evidence")),
                 STATUS_LABELS.get(str(row.get("status") or ""), str(row.get("status") or "—")),
                 str(row.get("winner_title") or "—") if row.get("status") == "confirmed" else "—",
                 str(int(row.get("lot_count") or 0)),
@@ -544,7 +544,9 @@ class CompletedAuctionHistoryTab(QWidget):
         status = str(session.get("status") or "")
         self.general_labels["id"].setText(str(session.get("id") or "—"))
         self.general_labels["name"].setText(str(session.get("name") or "—"))
-        self.general_labels["mode"].setText(MODE_LABELS.get(str(session.get("mode") or ""), str(session.get("mode") or "—")))
+        self.general_labels["mode"].setText(
+            format_completed_auction_mode(session, data.get("mode_evidence"))
+        )
         self.general_labels["status"].setText(STATUS_LABELS.get(status, status or "—"))
         self.general_labels["started"].setText(display_datetime_local(session.get("started_at")) or "—")
         self.general_labels["finished"].setText(display_datetime_local(session.get("finished_at") or session.get("sort_time")) or "—")
