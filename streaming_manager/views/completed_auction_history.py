@@ -79,7 +79,6 @@ class CompletedAuctionHistoryTab(QWidget):
         self.sort = QComboBox()
         for label, code in (
             ("Новые → старые", "newest"), ("Старые → новые", "oldest"),
-            ("Название А → Я", "name_asc"), ("Название Я → А", "name_desc"),
         ):
             self.sort.addItem(label, code)
         controls.addWidget(self.sort)
