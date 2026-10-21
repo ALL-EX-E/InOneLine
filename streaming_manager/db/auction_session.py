@@ -662,7 +662,13 @@ class AuctionSessionMixin:
                     and int(entity_id) == auction_id
                 )
                 if not belongs:
-                    payload_auction_id = after.get("auction_id", before.get("auction_id"))
+                    payload_auction_id = after.get(
+                        "auction_id",
+                        before.get(
+                            "auction_id",
+                            after.get("source_auction_id", before.get("source_auction_id")),
+                        ),
+                    )
                     try:
                         belongs = int(payload_auction_id) == auction_id
                     except (TypeError, ValueError):
