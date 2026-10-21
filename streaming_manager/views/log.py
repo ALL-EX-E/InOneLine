@@ -91,7 +91,7 @@ class LogTab(QWidget):
         layout.setSpacing(9)
 
         desc = QLabel(
-            "Журнал локальных изменений. Новые интеграции позже будут писать события сюда же."
+            "Журнал изменений и событий программы, включая аукционы, настройки и подключённые интеграции."
         )
         desc.setProperty("muted", True)
         layout.addWidget(desc)
