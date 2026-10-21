@@ -1,264 +1,545 @@
-# InOneLine Roadmap
+# InOneLine — Current Project State
 
 Обновлено: **2026-10-10**
 
-Этот файл — короткий канонический inventory будущей работы. Он восстановлен после повторной сверки чатов «Программа для стрима» 1–31, исторических Drive-roadmap/reconciliation-файлов, GitHub Issues, release notes и exact current source.
+## CURRENT / RELEASED
 
-## CURRENT
+- Version: **1.0.8**
+- Scope: **Global Conditional UI Visibility / Issue #3**
+- Status: **RELEASED / MANUALLY ACCEPTED**
+- SQLite schema: **19**
+- Named migrations: **15**
+- Accepted candidate commit: `af29d033d5d8cf6bcb774355771121c1bdc7d10f`
+- Final release commit on `main`: `946365a10fa276f203846f6741da9c0bbce0ad5f`
+- Accepted Windows candidate gate: `36739896076` — SUCCESS
+- Post-acceptance metadata branch gate: `36746181439` — SUCCESS
+- Final main publication wording gate: `36746572696` — SUCCESS
+- GitHub publication workflow: `36746572837` — SUCCESS
+- Accepted artifact: `11110716356`
+- Manual Windows QA: **PASS 1–10 / FINAL**
 
-- Released product version: **1.0.8 / Global Conditional UI Visibility**.
-- Latest accepted 1.0.8 maintenance baseline includes the filesystem/codebase maintenance accepted through **A9**.
-- SQLite schema: **19**.
-- Named migrations: **15**.
-- Все A1–A10 findings контрольного codebase audit 2026-10-01 закрыты.
-- Новый product implementation scope после maintenance-аудита **не выбран автоматически**.
-- **QA-1.0.8-01 — Conduct integration last-event visibility** — новый reconciliation/QA finding: ранее принятый B1 contract требует показывать время последнего принятого integration event в компактном `Аукцион → Проведение` status UI. Current 1.0.8 сохраняет `last_event_at` и показывает последнюю активность в Settings, но не в Conduct status/dialog. Статус: **ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED / NOT AUTO-AUTHORIZED**.
-- GitHub Issues используются для отдельных tracking-задач, но **не являются исчерпывающим backlog**; полный survivable future inventory находится в этом файле. Полная история пользовательских идей и их статусов — `docs/IDEA_INVENTORY.md`.
+## Официальные артефакты 1.0.8
 
-## Известный accepted-requirement QA finding
+Installer: `InOneLine_Setup_1.0.8.exe`
 
-- **QA-1.0.8-01 — Conduct integration last-event visibility**. Это не новая feature idea и не меняет retained future dependency order. Перед runtime fix нужен fresh exact-CURRENT review и отдельное approval; исправление должно переиспользовать существующий `integration_connections.last_event_at`/B1 status infrastructure, без второго event/history backend.
-- **QA-1.0.8-02 — accepted B2 test-event safety contract is not represented generically in current normalized-event core**. Direct user acceptance exists: provider events explicitly marked test/sandbox/demo must never credit points, create/increment game/lot, change leader, extend timer or affect wheel/winner; diagnostics/history-only is allowed. Current 1.0.8 has no explicit normalized test-event field/gate. Classification: **ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**. No current supported-provider reproduction was established; implement only through fresh exact-current review and common B2/B3 reuse.
-- **QA-1.0.8-03 — B3 empty-message current-runtime gap — TARGET APPROVED IN UI-087 / AWAITS REVIEW-BATCH IMPLEMENTATION**. The earlier generic manual `Требует привязки` target is superseded for an ordinary accepted external event received during a running auction with empty message. UI-087 requires an automatic temporary lot `Без текста N`: each accepted empty-message event gets its own sequential placeholder within that auction session; a known-rate event credits it immediately, while an unknown-rate event creates the placeholder immediately but keeps the credit in `Ожидают применения` until the rate is saved and the operator presses `Применить`. Current 1.0.8 still marks `missing_target` as `inapplicable`, so runtime remains out of contract until the approved review batch is implemented after the user's future `«всё делаем»` command. A separate `Требует привязки` workflow must not be created just for standard empty-message donations; provider-specific events that cannot safely map to an ordinary lot-targeted credit remain separate edge cases.
+- Size: `47,607,483` bytes
+- SHA-256: `b960ece03364788941dacec0723cf4664ea4fb11461ec4322a2c03fb79ca66e4`
+
+Source: `InOneLine_Source_1.0.8.zip`
+
+- Size: `13,816,053` bytes
+- Files: `192`
+- SHA-256: `babd51bc5f6c3e72924f39848253c28d22d36b9e68c9c5d13a24fca5151e2b15`
+- ZIP CRC: PASS
+
+GitHub Release/tag: **v1.0.8**
+
+Publication workflow повторно скачал опубликованные installer/source и подтвердил те же SHA-256.
+
+## ACCEPTED MAINTENANCE BASELINE — 2026-10-01
+
+Текущий принятый runtime 1.0.8 дополнен maintenance-scope из filesystem/source audit.
+
+- App version: **1.0.8**
+- SQLite schema: **19**
+- Named migrations: **15**
+- Release cadence: **не изменён**
+- PR: **#12**
+- Accepted candidate head: `6fa7589625027bc47f51757782f66836b5e60293`
+- Merge commit: `9d31b4af1ea19c80f257be2fec2b660b3cc4aadb`
+- Candidate vs merged tree: **131 blob files / 0 differences**
+- Final candidate regression: `36862136841` — **SUCCESS**
+- Accepted artifact build: `36862185114` — **SUCCESS**
+- Post-merge main regression: `36881245153` — **SUCCESS**
+- Maintenance publication: `36881837005` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-filesystem-maintenance.md`
+- Filesystem audit: `docs/audits/FILESYSTEM_AUDIT_2026-10-01.md`
+
+Accepted maintenance release/tag:
+
+**v1.0.8-maintenance-2026-10-01**
+
+Installer: `InOneLine_1.0.8_MAINTENANCE_FINAL.exe`
+
+- Size: `47,629,306` bytes
+- SHA-256: `2b469e334480d5073a15f48c0e0d84ce3926b990dd4e415c4c90ff0885ba28f1`
+
+Source: `InOneLine_Source_1.0.8_MAINTENANCE_FINAL.zip`
+
+- Size: `1,408,876` bytes
+- SHA-256: `bba8214b87729517036f3d422d5e86b6d56b9f23738d396bd4069b4801429e83`
+- Non-empty duplicate groups: **0**
+
+Maintenance changes accepted:
+- retired legacy `data/wheel_jingles` with safe migration into `data/soundtrack`;
+- preserved 1.0.6 full-backup compatibility;
+- retired unused stock `data/import_template.csv` while preserving user-edited copies;
+- added conservative stale staging cleanup while preserving recovery/rollback data;
+- source snapshots now use Git-tracked bytes only;
+- clean-install root/data filesystem and duplicate checks are permanent regression coverage.
+
+The original `v1.0.8` release remains the historical initial 1.0.8 publication. For the latest accepted 1.0.8 maintenance baseline, use `v1.0.8-maintenance-2026-10-01`.
+
+## Контрольный codebase audit — 2026-10-01
+
+Проведён отдельный audit-only проход exact accepted/released 1.0.8.
+
+- Runtime drift accepted candidate -> current main: **0 differences across 83 runtime files**.
+- Python compile: PASS.
+- Circular imports: не обнаружены.
+- Accidental mixin method collisions: не обнаружены.
+- Runtime 1.0.8 этим аудитом **не изменялся**.
+- Подробный отчёт: `docs/audits/CODEBASE_AUDIT_2026-10-01.md`.
+
+Maintenance-последовательность контрольного аудита завершена: regression/QA foundation восстановлен, Source/filesystem cleanup принят, а последующие A4–A9 закрыты и слиты. Все A1–A10 findings этого аудита теперь CLOSED; следующего незакрытого maintenance-пункта из него нет.
+
+## A4 Managed Media Sync — accepted 2026-10-02
+
+Maintenance scope A4 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#13**
+- Accepted candidate head: `8269dc99db3398ae4fa861fdcea3ef085ff517a1`
+- Squash merge on `main`: `278b77ca037756e1ef17f9b8f8634ad05d88e1fc`
+- Final candidate workflow: `36890302480` — **SUCCESS**
+- Final candidate artifact: `11176662125`
+- Post-merge main regression: `36949173717` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-media-sync-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted optimization:
+- managed-media category sync uses one SQLite connection/transaction instead of reopening/re-querying once per file;
+- D26 music/soundtrack stale-row semantics, external rows, IDs, original names and non-D26 recovery behavior remain preserved;
+- permanent regression now includes `tools/media_sync_smoke.py`.
+
+Exact accepted candidate bytes:
+- Installer: 47,618,508 bytes; SHA-256 `72151570eb5d6e3b29c3ea51942ea7ba8dd5be476bb8a0b8c05fa48869ff9e5e`
+- Source: 1,415,954 bytes; SHA-256 `54f77e99e5d6dafc49c566d109514be3c2f2a74c3bb1fa5217c529d4ca2dca42`
+
+A5, A6, A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
+
+## A5 Verified Unused Imports — accepted 2026-10-02
+
+Maintenance scope A5 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#14**
+- Candidate build commit: `8a7a79e38b34912ab77493c20372bf4f9d75b3d4`
+- Final clean PR head: `9f13c0ceff19217bcf62dfebc3b5dc15a86886b1`
+- Squash merge on `main`: `15990f955e596d87436044b38548f53d3b033e00`
+- Corrected candidate regression: `36950070546` — **SUCCESS**
+- Candidate build: `36950066325` — **SUCCESS**
+- Candidate artifact: `11203681918`
+- Final clean PR regression: `36950474408` — **SUCCESS**
+- Post-merge main regression: `36952721884` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-unused-import-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted cleanup:
+- removed **366** verified unused imported names from 10 UI modules;
+- preserved intentional re-exports and compatibility contracts;
+- the permanent GUI gate caught and prevented accidental removal of the `AuctionTimeDialog` compatibility re-export;
+- A6 private helpers and compatibility shims were not touched.
+
+Exact accepted candidate bytes:
+- Installer: 47,629,836 bytes; SHA-256 `85e5d006f9bbfddea3c27bd4b2f98b458a9f46b1c3040cd2087eea54bba305f9`
+- Source: 1,416,072 bytes; SHA-256 `e852f8df397389d775ef09d48a95b6e8917a0edfebe0664a12c73a8f336c3305`
+
+A6, A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
+
+## A6 Dead Private Helpers — accepted 2026-10-02
+
+Maintenance scope A6 from the codebase audit is complete.
+
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#15**
+- Corrected candidate build head: `d176e5bd91357eabcbed58ca05221ba8bd174395`
+- Final clean PR head: `81aef4a3ae9cda20b6c2ba1cb7270749b491d064`
+- Squash merge on `main`: `452daf5742a62e95b2c5470ae476b509e05908e8`
+- Corrected candidate workflow: `36958423991` — **SUCCESS**
+- Corrected candidate artifact: `11206613134`
+- Final clean PR regression: `36958711684` — **SUCCESS**
+- Post-merge main regression: `36959577220` — **SUCCESS**
+- Corrected manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-dead-helper-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted cleanup:
+- removed **7** verified dead/private helpers;
+- retained `AuctionSessionMixin._remaining_from_session` and both deprecated Twitch B4 compatibility shims;
+- first A6 candidate artifact `11205260970` was rejected after manual QA exposed a missing `normalize_text_key` runtime dependency;
+- fresh review also found and prevented a missing `RandomOrgClient` runtime dependency;
+- permanent regression now includes `tools/a6_dependency_smoke.py`.
+
+Exact accepted corrected candidate bytes:
+- Installer: 47,627,232 bytes; SHA-256 `8b1a213989cdd8d3e8c864d2b299327d72ef2fc7426e6c7c3bebbbf9669164c9`
+- Source: 1,419,509 bytes; SHA-256 `5da7afe8f167413a4718bb1b9e0e42ae8b0f5b03090a059d682037766cf963da`
+
+A7 and A8 are closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
+
+## A7 Publication CI Consolidation — accepted 2026-10-02
+
+Maintenance scope A7 from the codebase audit is complete.
+
+- Status: **CLOSED / ACCEPTED / MERGED**
+- PR: **#16**
+- Accepted PR head: `a04cea9852367dc39a8f40fea2c12b0d1f1ba23a`
+- Squash merge on `main`: `d03602f5f8197abcda2d21eee10d86abb4b98d62`
+- PR publisher parse-only run: `36961378735` — **SKIPPED AS DESIGNED**
+- Final PR regression: `36961378739` — **SUCCESS**
+- Post-merge publication wording: `36962356350` — **SUCCESS**
+- Post-merge main regression: `36962356315` — **SUCCESS**
+- Manual Windows QA: **N/A — CI/release infrastructure only**
+- Canonical QA: `docs/qa/1.0.8-publication-ci-maintenance.md`
+- Publication contract: `docs/RELEASE_PUBLICATION.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted infrastructure change:
+- retired active per-release publishers `publish-1.0.4.yml` through `publish-1.0.8.yml`;
+- historical releases/tags/assets/release notes remain unchanged and are preserved by Git history;
+- future publication uses one `.github/workflows/publish-accepted-release.yml`;
+- normal publication requires a newly added immutable `.github/release/requests/*.json` manifest containing the exact accepted artifact ID, target commit, public asset names and SHA-256 values;
+- publisher refuses existing tags/releases, verifies accepted bytes before publication and verifies downloaded release bytes again afterward;
+- no A7 publication request was added, therefore A7 merge did not create any GitHub Release;
+- permanent regression now includes `tools/publication_ci_smoke.py`.
+
+Immediately after A7 merge, the public release set remains unchanged: 10 tags from `v1.0.0` through `v1.0.8-maintenance-2026-10-01`.
+
+A8 is now closed. A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
+
+## A8 GitHub Actions Version Refresh — accepted 2026-10-02
+
+Maintenance scope A8 from the codebase audit is complete.
+
+- Status: **CLOSED / ACCEPTED / MERGED**
+- PR: **#17**
+- Accepted clean PR head: `bc266c8be8916611846a7c7ff50a28de03ecebcd`
+- Squash merge on `main`: `488865ab7420239ff07d6c4eb8244d46cb54b520`
+- Direct Actions v7 validation: `36963052321` — **SUCCESS**
+- Final clean PR regression: `36963105972` — **SUCCESS**
+- Post-merge publication wording: `36964693488` — **SUCCESS / NO DEPRECATION WARNINGS**
+- Post-merge main regression: `36964693520` — **SUCCESS**
+- Manual Windows QA: **N/A — CI-only**
+- Canonical QA: `docs/qa/1.0.8-actions-version-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
+
+Accepted infrastructure change:
+- all active `actions/checkout`, `actions/setup-python` and `actions/upload-artifact` references now use major `v7`;
+- product/build semantics, Python versions, build lock and artifact naming were not changed;
+- temporary direct-action validation proved checkout/setup-python/upload-artifact v7 execute successfully without the Node 20 deprecation warning;
+- permanent regression now includes `tools/actions_version_smoke.py`;
+- the permanent regression triggers on any `.github/workflows/**` change.
+
+A9 is now closed. No unresolved maintenance findings remain from the 2026-10-01 control audit.
 
 
-## Текущий утверждённый review-batch — не реализован
+## A9 Installer User-State / HKCU Ownership — accepted 2026-10-02
 
-Полный UI/function review завершён 2026-10-07. Детальный source of truth для накопленных решений — `docs/ACTIVE_REVIEW_LEDGER.md`.
+Maintenance scope A9 from the codebase audit is complete.
 
-- Runtime/source остаётся **1.0.8 / schema 19 / 15 named migrations**.
-- Это уже не fresh-review candidate list: большинство UI/BUG-пунктов имеют принятый target и ждут общей команды пользователя `«всё делаем»`.
-- До этой команды **код не менять**.
-- Главные cross-cutting supersession текущего batch:
-  - UI-074: локальный список аукциона без автопрокрутки; persisted autoscroll только для Auction Lots OBS overlay;
-  - UI-087: empty message во время running auction → `Без текста N`;
-  - UI-088/UI-090: CSV/JSON/Excel file export переносится на `Публичный список`; legacy compatible export и внутренняя вкладка `Настройки → Экспорт` удаляются;
-  - UI-044 в прежнем виде не реализуется, потому что target `Настройки → Экспорт → Публичный API` исчезает вместе с вкладкой; `/api/public` сохраняется.
-- Не считать released 1.0.8 layout/behavior в исторических записях более поздним target, если оно явно superseded текущим ledger.
-- UI-053 закрыт 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`; действие работает и для Max Amount, и для wheel context и переиспользует существующий `/timer-overlay?preview=1`.
-- AUCTION-TIMER-REVIEW-002 закрыт решением пользователя 2026-10-07: tie overtime Max Amount использует saved Max Amount duration default; pending-overtime reset возвращает тот же default; отдельной overtime-настройки нет. Current 1.0.8 требует изменения, потому что сейчас использует wheel default.
-- AUCTION-TIMER-REVIEW-003 закрыт решением пользователя 2026-10-07: сохранить ~1.2 s как отдельный preparation lead-in; до его окончания установленная длительность не расходуется, затем timer / применимое wheel motion / soundtrack стартуют одновременно от общей authoritative start boundary; repeated Start/Spin during lead-in must be re-entry protected.
-- После этого неразрешённых timer-behavior вопросов перед dependency sorting не осталось.
-- QA-1.0.8-01 и QA-1.0.8-02 остаются documented findings и **не включаются автоматически** в batch без отдельного решения пользователя. QA-1.0.8-03 уже покрыт UI-087.
+- Status: **CLOSED / MANUALLY ACCEPTED / MERGED**
+- PR: **#18**
+- Corrected V2 candidate build head: `f0f4a47aa7c6b51f1ca531f4a6d673cd56b7b361`
+- Final clean runtime PR head before acceptance documentation: `340022e9d3ca35052c5ab2dad269dc0413cdc07c`
+- Manual-acceptance documentation head: `3ba9f3bb0e9402c9267d80a0b1879884139ad892`
+- Squash merge on `main`: `74ad16c5772d5cc191f7e307203b6a574af7815c`
+- Corrected candidate workflow: `36972036097` — **SUCCESS**
+- Corrected candidate artifact: `11211662949`
+- Final clean PR regression: `36972339831` — **SUCCESS**
+- Post-merge publication wording: `36978675956` — **SUCCESS**
+- Post-merge main regression: `36978675944` — **SUCCESS**
+- Manual Windows QA: **COMPLETE / PASS**
+- Canonical QA: `docs/qa/1.0.8-installer-user-state-maintenance.md`
+- App version/schema/migrations remain **1.0.8 / 19 / 15**
+- Normal accepted-release cadence is unchanged.
 
-## Dependency reconciliation — point 2 COMPLETE
+Accepted maintenance:
+- elevated installer mode remains intentionally `PrivilegesRequired=admin`;
+- administrative installer no longer owns or deletes per-user HKCU UI state;
+- MainWindow state is now app-owned in `data/ui_state.ini`;
+- frozen Windows migration checks both Registry32 and Registry64 views;
+- legacy state is copied to `data/legacy_ui_state_backup.ini` before cleanup;
+- legacy Registry is cleared only after successful INI write and backup;
+- post-install launch uses `runasoriginaluser`;
+- per-install `QLockFile` single-instance protection prevents concurrent UI-state writers;
+- permanent regression covers dual-view migration, legacy backup and single-instance behavior.
 
-- All accepted current-review decisions have been cross-checked against each other and exact CURRENT 1.0.8.
-- Supersession/precedence is now explicit in `docs/ACTIVE_REVIEW_LEDGER.md`; no unresolved logical conflict remains in the approved review target.
-- Critical shared boundaries: one position policy, one media library/availability path, one OBS visibility policy, one auction session state machine, one integration/conversion provenance pipeline, one authoritative timer/wheel start boundary.
-- Rules Overlay is the main resolved exception case: UI-060 composite template owns Rules text/appearance; GLOBAL-OBS-VISIBILITY-001 later owns widget-level show-mode; Stream/OBS does not host a second Rules settings/save copy.
-- Stop with unresolved source-auction pending does not auto-discard it: Stop closes without winner/materializes lots; later explicit Apply can credit the corresponding persistent target exactly once without reopening session state.
-- Next plan step is point 3: sort implementation so shared foundations are changed before dependent UI and each accepted change can be manually verified in isolation.
-## P01 progress — A/B/C/D source + regression assertion complete
+Corrected A9 V2 accepted bytes:
+- Package: 49,060,040 bytes; SHA-256 `a4707ed4c149085ebb52c550fb9bca236e944591774c46a31ba84ac753ceb044`
+- Installer: 47,618,014 bytes; SHA-256 `38540d8bc6aa8268c5ec727120cd4646f186e6c38759f5c32bd348fdfe08b402`
+- Source: 1,441,202 bytes; SHA-256 `0414cb0e15c449bf6965d725e48fe632ce71a4e17d96b0a68353ba5db5fa8211`
 
-- Candidate `candidate/p01-mainwindow-shell-cleanup`.
-- A: remove `Файл` menu/actions — source check PASS.
-- B: remove `Вид` menu; keep one direct F5 → `refresh_all()` — source check PASS.
-- C: add exact non-clickable hint `F5 — обновить данные во всех разделах` in existing top menu-bar area — source check PASS.
-- D: lock the shell contract in the existing GUI regression smoke — commit `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; source/diff check PASS.
-- Candidate now changes `streaming_manager/views/main_window.py` plus the regression assertion in `tools/gui_regression_smoke.py`; runtime behavior change remains isolated to MainWindow.
-- E: draft PR #19 opened as QA-only trigger; Windows regression run `37582729729` / job `112665869659` against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c` — **SUCCESS**.
-- P01-focused Native GUI regression, frozen build/startup, installer build and silent-install regression all passed.
-- Separate publication-wording gate failed only on pre-existing docs wording; keep outside P01 runtime scope unless separately selected.
-- Temporary installer-artifact PR #20 was closed unused/no-merge after its newly added QA workflow did not trigger; P01 runtime candidate was not changed.
-- Manual QA installer produced successfully by Windows regression run `37583488177`; artifact `11465802252`.
-- Google Drive package ready for user QA: `InOneLine_P01_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `1VvMjue9GOFet2XSN8PpttBkX1nyB03Gk`, verified size `46756638` bytes.
-- Installer SHA-256: `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
-- P01 manual QA accepted by user on 2026-10-07.
-- PR #19 merged to `main` as `d40c0dc7798aae3c9d7a8d7b8faab97756e06512`.
-- Post-merge verification run `37586507639` — **SUCCESS**; QA-only PR #21 closed without merge.
-- Separate Publication wording gate `37586507550` remains an unrelated known documentation finding.
+The first A9 candidate artifact `11210430783` remains **REJECTED / DO NOT ACCEPT**.
+
+With A9 accepted and merged, **all A1–A10 findings from the 2026-10-01 control codebase audit are closed**. No larger architectural rewrite is implied by this closeout.
+
+
+## Regression foundation — restored 2026-10-01
+
+- PR: **#8**
+- Squash merge: `f7386fa324fa82a42cd38f743d655859163ccf11`
+- Windows regression gate: `36833625221` — **SUCCESS**
+- Publication wording gate: `36833625136` — **SUCCESS**
+- Product runtime changes: **0**
+- Version/schema/migrations remain **1.0.8 / 19 / 15**
+- Canonical QA record: `docs/qa/1.0.8-regression-foundation.md`
+
+Persistent regression coverage now includes exact dependency lock, DB backup/restore and rollback, fresh DB integrity, native GUI current-contract checks, frozen EXE/Browser Source smoke, installer build and silent-install startup.
+
+Permanent repository gate:
+- PR: **#11**
+- Squash merge: `90ab778f2952dadb203f467b6d69e1930f34751c`
+- PR regression: `36835785368` — **SUCCESS**
+- Main push regression: `36836121385` — **SUCCESS**
+- Main publication wording: `36836120962` — **SUCCESS**
+- Runs automatically for relevant product/build/test changes on PRs to `main` and pushes to `main`; documentation-only changes are filtered out.
+
+## Последние принятые функциональные релизы
+
+- **1.0.4 / D19** — пользовательское/анимированное изображение в центре колеса и быстрый выбор.
+- **1.0.5 / D43** — OBS Browser Audio Transport через Timer Browser Source + AudioCoordinator foundation.
+- **1.0.6 / D21** — формат weighted wheel «Выбывание» + multi-spin verification.
+- **1.0.7 / D26** — полноценный Music Player, shared soundtrack library, AudioCoordinator ownership и отдельный OBS Music Player Overlay.
+- **1.0.8 / Global Conditional UI Visibility** — логически неприменимые controls скрываются; временно недоступные controls остаются visible + disabled.
+
+Подробности каждой версии находятся в `RELEASE_NOTES_<version>.md`.
+
+## Текущая рабочая очередь — reconciled 2026-10-02
+
+После принятия A9 все maintenance findings контрольного codebase audit закрыты. Новый product implementation scope **не выбран автоматически**.
+
+Отдельно после повторной cross-source сверки 2026-10-02 зафиксирован **QA-1.0.8-01 — Conduct integration last-event visibility**:
+- исторический B1 contract прямо включал показ времени последнего принятого integration event в compact Conduct integration status;
+- current 1.0.8 продолжает сохранять `integration_connections.last_event_at` и Settings показывает последнюю принятую активность;
+- current Conduct integration status/dialog это время не показывает;
+- более позднего direct-user superseding decision не найдено;
+- статус: **ACCEPTED-REQUIREMENT OMISSION / DOCUMENTED / NOT FIXED / NOT AUTO-AUTHORIZED**;
+- version/schema/migrations остаются **1.0.8 / 19 / 15**, runtime этим documentation pass не изменялся.
+
+- **Global Multi-File Import / Issue #4** — текущий post-D26 eligible candidate для fresh review; это не pre-authorization.
+- **Repository hygiene:** PR #9 `Make 1.0.8 regression foundation persistent` всё ещё открыт, хотя его purpose уже superseded/closed более поздним принятым PR #11 `Make 1.0.8 regression foundation permanent`. PR #9 не содержит нового product scope и не меняет CURRENT; это stale repository object, оставленный без автоматического закрытия в ходе documentation audit.
+- **QA-1.0.8-02 — B2 test-event safety contract gap:** direct user acceptance was recovered for the adapter-neutral rule that provider-marked test/sandbox/demo events cannot mutate real points/auction/timer/wheel/winner state. Current 1.0.8 generic normalized-event core has no explicit test-event field/gate. Status: **ACCEPTED SAFETY CONTRACT GAP / NOT FIXED / PROVIDER-CAPABILITY-DEPENDENT / NOT AUTO-AUTHORIZED**. No current supported-provider reproduction was established in this audit.
+- **QA-1.0.8-03 — B3 missing-target current-runtime gap — SUPERSEDED PRODUCT TARGET / STILL NOT FIXED IN 1.0.8:** the earlier manual `Требует привязки` workflow is no longer the product target for an ordinary accepted external event received during a running auction with empty message. UI-087 now requires automatic temporary lots `Без текста N`; known-rate events credit that placeholder, unknown-rate events remain pending but already target it. Current 1.0.8 still marks `missing_target` as `inapplicable`, so the runtime gap remains until batch implementation. Provider-specific events that cannot safely map to a normal lot-targeted credit remain separate edge cases.
+- DonationAlerts accepted built-in public OAuth Client ID **20915** and Rules opacity/padding control UX were restored to durable documentation.
+- **B3 provenance correction:** direct user acceptance was recovered for outside-auction unknown-title auto-creation of a normal persistent game. Current 1.0.8 already implements this; it is documentation/provenance correction, not a runtime defect.
+- Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**; the repeated reconciliation changed documentation only.
+- **Repeated audit final status:** seventh–ninth passes recovered/corrected QA-1.0.8-02, QA-1.0.8-03 and multiple compressed historical/future contract details; the subsequent **tenth orphan-only control was CLEAN / zero additional delta after corrections**. This does not mean the whole repeated audit found nothing; it means no further orphan remained after the recorded corrections.
+- **Twenty-third reconciliation documentation delta:** direct user S1 decisions were recovered explicitly: unknown-rate external events remain pending and require manual `Применить` after the rate is saved; service-specific conversion rows are shown only while the corresponding service is connected/available. Current 1.0.8 already implements both. Documentation-only, no new product scope or runtime change.
+- **Eleventh recheck documentation delta:** recovered the historical 2026-08-21 reference-image archive gap and the durable `QA-<version>-NN` defect-numbering rule. Both are documentation/process findings only; no new product scope was selected and no runtime bytes changed.
+- **Twelfth recheck documentation delta:** restored exact Timer-viewer idle/default-duration behavior, W1 input/re-entrancy guards, W2 external-reference safety, advanced History identity/comparability rules and deferred A8 compensation invariants. These are preserved accepted contracts; no new implementation scope was selected and runtime/version/schema/migrations remain unchanged.
+- **Thirteenth recheck documentation delta:** restored exact S2 collision/threshold semantics, standalone-widget architecture boundary, B6 protected-secret/common-backend rule, Winner Verification public-hosting boundary and Product A7 card/hover semantics. Documentation only; no runtime code, version, schema or migrations changed.
+- **Fourteenth recheck documentation/source-hygiene delta:** restored the full B1 plaintext-secret exclusion and disabled-integration/no-background-validation lifecycle. Source review also found an unreachable shipped-path DonationAlerts manual-Client-ID fallback after the built-in 20915 gate; classified as source-hygiene/compatibility residue, not a runtime defect and not auto-authorized for cleanup. Runtime/version/schema/migrations unchanged.
+- **Fifteenth post-correction orphan-only control: CLEAN.** After all eleventh–fourteenth corrections were written, no additional durable direct-user requirement or hidden GitHub/source scope was found. D1–D43 remain fully accounted for, there is no actual D44 item, and no implementation scope is auto-selected. Runtime remains **1.0.8 / 19 / 15**.
+- **Sixteenth recheck: NOT CLEAN / documentation correction.** A later direct-chat/source pass found that the exhaustive inventory still retained the superseded early B4 reward-availability coupling. Authoritative B4/I1 behavior is manual reward enable/disable in Settings, independent of auction start/resume/pause/finish; current 1.0.8 already implements this. The same pass restored direct implemented decisions for RANDOM.ORG key location (`Настройки → Интеграции`), removal of the date from the lower-right OBS info block, and Restore rejection of the current working `data\streaming.db` as its own source. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. Another post-correction control pass is required before claiming a new clean stop.
+- **Seventeenth recheck: NOT CLEAN / process+public-doc correction.** Recovered the direct workflow rule that manual Windows/PowerShell checks are requested only when they add real verification and preferably one focused check/command at a time; also restored the accepted public install wording `Запустить установщик`. A direct-chat provenance recheck confirmed Games `Всего` including archive was already correctly recorded as historical `0.2.22`; only the previous provenance assessment was wrong. Runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**. Another post-correction control is required.
+- **Eighteenth recheck: NOT CLEAN / documentation correction.** Restored the full permanent engineering invariant (`reuse first -> minimal diff -> no parallel logic -> no new persistence unless unavoidable`; stability/reliability over optimization) and expanded accepted D43/D26 audio lifecycle/backup/collision behavior. Current 1.0.8 already matches these released audio contracts; no new runtime defect, feature identifier, schema or migration was found. Another post-correction control pass is required.
+- **Nineteenth recheck: NOT CLEAN / documentation precision.** Restored exact D10/D11/D12 official-link boundaries and the historical-artifact retention rule. No runtime defect or new product identifier was found; another post-correction control pass is required.
+- **Twentieth recheck: NOT CLEAN / documentation precision.** Restored exact historical A1 safe-update QA details and B2 restart-persistence details. No new runtime defect or product identifier was found; another control pass is required.
+- **D22 / Issue #5** — остаётся approved post-completion, но был явно отложен пользователем 2026-09-29 и не является автоматическим следующим пунктом.
+- Восстановленная retained dependency/complexity chain после D26: **D40 → D34 → D41 → older YouTube integration candidate → D38 → Public Web → D27 → D7**.
+- Отдельно сохранены approved/parked **D23, D24, D25, D42**, а также deferred **D16, D17, D18, D20, D22, W1, Saved Auctions/New Auction, A8, B6** и provider-specific follow-ups.
+- Более старый PASS13 не используется без поздних corrections: Games/List Autoscroll позже был прямо отклонён как ненужное добавление; Compact presentation отложен; D15 не подтверждён как InOneLine item; D39 не actionable без нового прямого решения пользователя.
+
+- **Twenty-fourth reconciliation documentation delta:** restored accepted D26 media-identity behavior: case-insensitive filename dedup across managed/external Music Player rows, external→managed promotion preserving media ID/queue, and context-local external soundtrack selections that clear safely without D26 recovery UI. Current 1.0.8 already implements this; documentation only, no new scope/runtime change.
+- **Twenty-fifth reconciliation/public-doc delta:** restored exact S1 legacy-money migration boundary (1 RUB = 1 SM point, positive fractional RUB rounds upward, historical change_log JSON untouched) and identified the accepted SmartScreen/Unknown Publisher step-by-step guidance gap. The README guidance has now been corrected; no runtime change.
+- **Twenty-sixth recheck: NOT CLEAN / documentation+public-guidance correction.** Recovered the Drive audit log/screenshot archive rule, R1.0.4 uninstall backup recommendation, D19 animated-center runtime boundary, D21 no-final-winner elimination terminal semantics, S1 user-facing `Баллы` naming, R1/S3 Windows-input details, Auction session-only autoscroll boundary, A11.1 1-minute/24-hour local+OBS motion acceptance, A12 real-operator smoke path, and the historical public-Git privacy/history-cleanup process. Current runtime already implements applicable runtime behavior; README SmartScreen guidance was corrected. No new product identifier, future implementation candidate or runtime QA omission was found. A post-correction clean control is still required before declaring this latest repeated audit closed.
+- **Twenty-seventh post-correction control: CLEAN.** After all pass-26 corrections were written, a new direct-chat orphan search, Drive current/history/review/policy check, GitHub source TODO/FIXME/future scan, open Issue/PR check and identifier/QA mechanical reconciliation found **0 additional durable delta**. Current runtime stays **1.0.8 / 19 / 15**; no implementation scope is auto-selected.
+- Current known runtime accepted-scope gaps remain exactly **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**; none is auto-authorized for runtime implementation.
+
+Полный текущий inventory и статусы: `docs/ROADMAP.md`.
+
+Полная история пользовательских идей, включая уже реализованные/отложенные/отклонённые: `docs/IDEA_INVENTORY.md`.
+
+Повторная сверка чатов/Drive/GitHub: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.md`.
+
+Выбор следующего scope требует отдельного решения пользователя и fresh exact-CURRENT review.
+
+## Release cadence
+
+В счёт cadence входят только версии, которые прошли финальную пользовательскую приёмку и стали CURRENT/released. Candidate/FIX версии не считаются.
+
+Последняя явно зафиксированная отметка после 1.0.3 была 16/25; с принятыми 1.0.4–1.0.8 текущая арифметическая отметка — **21/25**. Перед фактическим C1 gate счётчик нужно сверить с release history, а не с candidate APP_VERSION.
+
+### Reconciliation pass 28 — 2026-10-03
+
+- Same-scenario recheck was **NOT CLEAN** because additional already-implemented/accepted detail had to be restored to the exhaustive inventory: exact Games/Public status-group ordering, Product A7 hover/autoscroll semantics, D21 between-round format switching, and the historical timer/B1 visual provenance notes.
+- These are documentation precision/provenance corrections, not new feature identifiers and not new auto-authorized runtime work.
+- Current known accepted-scope runtime gaps remain **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**.
+- Current runtime/source/version/schema/migrations remain **1.0.8 / 19 / 15**.
+- A new post-correction control pass is required before claiming a clean stop for this iteration.
+### Reconciliation pass 29 — 2026-10-03
+
+- Post-pass-28 direct-chat, Drive and GitHub/source control is **CLEAN**.
+- No additional durable user requirement, future idea, rejected/superseded item, runtime QA omission or hidden source scope was found after the pass-28 corrections.
+- Current runtime QA findings remain exactly **QA-1.0.8-01 / QA-1.0.8-02 / QA-1.0.8-03**.
+- Open tracking remains Issues **#4 / #5** and stale PR **#9** repository hygiene.
+- No product implementation scope is selected automatically.
+- Runtime/version/schema/migrations remain **1.0.8 / 19 / 15**.
+
+
+## Completed UI review reconciliation — 2026-10-07
+
+- Подробный визуальный/функциональный разбор всех вкладок завершён. Рабочий target текущего review находится в `docs/ACTIVE_REVIEW_LEDGER.md`.
+- Runtime/source остаётся exact CURRENT **1.0.8 / schema 19 / 15 named migrations**. До команды пользователя `«всё делаем»` принятые UI/BUG-решения не реализуются.
+- Текущий review **не возвращает старую roadmap-очередь как автоматический следующий scope**: сначала должен быть завершён reconciliation текущего review, затем dependency sorting, и только потом — реализация по одному пункту после отдельной команды пользователя.
+- Ключевые поздние supersession, которые нельзя смешивать с released 1.0.8 baseline:
+  - **UI-074** заменяет future-target старой auction-autoscroll модели: локальная auction table больше не автопрокручивается; persisted switch управляет только `/auction-lots-overlay`.
+  - **UI-087** заменяет manual `Требует привязки` для обычного empty-message event во время running auction на отдельный временный `Без текста N`.
+  - **UI-088/UI-090** заменяют retained R1.0.9 UI organization как future target: file exports CSV/JSON/Excel возвращаются на `Публичный список`, legacy `Совместимый экспорт` удаляется, внутренняя `Настройки → Экспорт` удаляется целиком.
+  - **UI-044** в прежнем виде superseded: `Публичный API` не создаётся внутри удаляемой `Настройки → Экспорт`; endpoint `/api/public` сохраняется.
+- QA status после review:
+  - **QA-1.0.8-01** — остаётся documented finding без отдельного implementation approval;
+  - **QA-1.0.8-02** — остаётся documented safety finding без отдельного implementation approval;
+  - **QA-1.0.8-03** — target уже определён UI-087 и ждёт общей batch-команды, runtime 1.0.8 пока не соответствует этому target.
+- После сверки прошлых решений исправлены stale statuses UI-018/TEST-001/BUG-007/UI-055; UI-053 закрыт решением 2026-10-07: на странице `Аукцион` рядом с `Копировать URL таймера` добавить `Открыть предпросмотр таймера`, доступный и для Max Amount, и для wheel context через существующий `/timer-overlay?preview=1`.
+- AUCTION-TIMER-REVIEW-002 закрыт прямым решением пользователя 2026-10-07: tie overtime Max Amount должен использовать saved Max Amount duration default; current 1.0.8 пока ошибочно использует wheel-duration default. Отдельный overtime setting не создаётся; pending-overtime `Сбросить` также возвращает Max Amount default; ручное изменение времени до `Старт` сохраняется.
+- AUCTION-TIMER-REVIEW-003 закрыт решением пользователя 2026-10-07: ~1.2 s остаётся отдельным technical preparation lead-in после `Старт`/`Крутить`; пользовательская длительность до его окончания не расходуется. После lead-in timer + applicable wheel animation + soundtrack стартуют от одной общей authoritative boundary. Повторный action во время подготовки должен быть re-entry protected. Неразрешённых timer-review вопросов не осталось.
+
+## Dependency reconciliation complete — 2026-10-07
+
+- Point 2 of the post-review plan is complete: all accepted UI/BUG/GLOBAL/timer decisions were cross-checked for shared backend dependencies, supersession and ordering hazards.
+- Final precedence corrections include: UI-025 over old hidden-list Enter behavior; UI-043 over stale `Локальный API` undecided text; UI-060 over the old Rules model with separate formatting and save actions; GLOBAL-OBS-VISIBILITY-001 over the earlier Rules no-program-visibility rule; AUCTION-TIMER-REVIEW-003 over the old unresolved short-spin lead-in note.
+- Rules final boundary: one composite rules template for text/appearance, no duplicate Rules settings in Stream/OBS, common widget show-mode remains a separate widget-level persisted policy, preview stays override.
+- Timer final boundary: ~1.2 s preparation is outside configured duration; actual timer/wheel/audio start is synchronized; source-time auction membership begins at the actual Max Amount/overtime start boundary; re-entry is blocked during preparation.
+- Max Amount/Conversion final dependency: pre-close pending gates irreversible result; post-close new events use persistent path; Stop remains no-winner emergency exit and does not implicitly discard pending events.
+- UI-088/UI-090 final export boundary: public file exports move to Public List; Settings Export and legacy compatible-export UI disappear; `/api/public` remains but has no new visible access point in this batch.
+- QA-1.0.8-01/02 remain outside the implementation batch unless separately approved.
+- No unresolved logical conflict remains inside the accepted current-review target. Point 3 can now sort implementation by shared foundations/dependencies.
+## P01 candidate progress — A/B/C/D complete — 2026-10-07
+
+- Candidate branch: `candidate/p01-mainwindow-shell-cleanup`; CURRENT/main runtime remains unchanged.
+- P01-A `8d50ef21f5e05cebce1ba70866e71369f93b893c`: removed duplicate `Файл` menu/actions only.
+- P01-B `183c6accb3f974058ac3abbd1949da558f7f6c9f`: removed `Вид` menu and retained one direct MainWindow `F5 → refresh_all()` action.
+- P01-C `0845c3c624edd907acd68a0f7e5f669f5b96a0f4`: added non-clickable `F5 — обновить данные во всех разделах` label in the existing menu-bar area.
+- P01-D `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`: added focused shell assertions to the existing GUI regression smoke for no menus, exact/noninteractive hint, exactly one F5 action and real `refresh_all()` dispatch.
+- Candidate source diff now contains `streaming_manager/views/main_window.py` plus `tools/gui_regression_smoke.py`; product/runtime behavior is still changed only in `main_window.py`.
+- P01-E QA trigger: draft PR #19 opened only to run existing PR-gated automation against candidate SHA `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; no merge/publication authorized.
+- Main Windows regression run `37582729729`, job `112665869659` — **SUCCESS**.
+- PASS includes compile, Actions/publication regressions, A9 UI-state/installer checks, backup/restore/media regressions, source snapshot, fresh DB integrity, the P01-focused Native GUI regression, frozen application build/startup/browser-source checks, Inno Setup, installer build and silent-install startup/filesystem regression.
+- Automatic `Publication wording gate` run `37582729787` failed only on pre-existing documentation wording in `ACTIVE_REVIEW_LEDGER.md`, `IDEA_INVENTORY.md` and `PROJECT_STATE.md`; no P01 runtime/new-regression file was cited, so it remains a separate documentation finding outside P01.
+- P01 manual-QA artifact attempt: temporary QA branch `qa/p01-windows-artifact` and draft PR #20 were created from exact tested runtime commit `4dfd487f700ab1c1cd456df9ee9d34dcf582397c`; the newly introduced artifact workflow did not trigger from the API-created QA event. PR #20 was closed **without merge**. Candidate runtime remained unchanged.
+- Manual QA artifact was subsequently produced by permanent Windows regression run `37583488177` — **SUCCESS** after adding artifact preservation to the existing regression workflow. GitHub artifact: `11465802252` / `InOneLine_1.0.8_WINDOWS_QA`.
+- Google Drive handoff completed: `InOneLine_P01_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive file ID `1VvMjue9GOFet2XSN8PpttBkX1nyB03Gk`, verified size `46756638` bytes, stored in folder `Программа для стриминга`; ZIP contains `InOneLine_Setup_1.0.8.exe`.
+- Extracted installer: `InOneLine_P01_CANDIDATE_Setup_1.0.8.exe`, 47,616,617 bytes, SHA-256 `c931ae5d7abba8ac8ae3d0f43e61fcacb1dc4344e746c028551c3eafec32ce82`.
+- Product runtime remained the P01 candidate; the later branch commit only synchronized CI artifact-preservation infrastructure.
+- P01 automated candidate gate — **PASS**. Manual QA accepted by user on 2026-10-07: top `Файл`/`Вид` menus absent; F5 produced no error and its non-visual refresh behavior was accepted.
+- PR #19 merged into `main`: `d40c0dc7798aae3c9d7a8d7b8faab97756e06512`.
+- Post-merge verification: QA-only PR #21 from the exact merge commit; regression run `37586507639` — **SUCCESS**. PR #21 closed without merge.
+- Separate Publication wording gate `37586507550` failed on the already-known documentation wording issue; it did not invalidate the Windows runtime regression.
 - **P01 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
-- **P02 is next and unblocked.**
-- P02-A / UI-010 complete on `candidate/p02-list-public-labels`: main tab `Игры` -> `Список`; implementation `f6481b6668019b45af3d9d11040117baf2868f4c`, regression expectation `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`.
-- P02-B / UI-011 complete: button `Добавить игру` -> `Добавить`; implementation `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`, GUI assertion `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`.
-- P02-C / UI-012 complete: GameDialog titles -> `Добавить` / `Изменить`, internal headings removed; implementation `dc4197fc05f9eec7885705f77eda1ed7053962b3`, GUI regression `57789c7dbbc1202f000cf8c74f04239f8772c4d9`.
-- P02-D / UI-013 complete: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`; implementation `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`, GUI regression `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`.
-- P02-E / UI-015 complete: `Дата`, `Баллы`, `Отзыв` explicitly marked `(необязательно)`; `Кооператив/Статус` unchanged. Implementation `635e4405ffd12ed35f8c0385616ff1f1193a689f`, GUI regression `1f73618165e5e3f1cd3acad833209cc4cef58f45`.
-- P02-F / UI-022 complete: full-list clear UI now uses `Очистить список`, `Будут удалены все записи: N`, `УДАЛИТЬ ЗАПИСИ`, `Удалить записи`; worker completion preserves the new button label. Implementation `8781b4bafbfdfdafcbfd960f6d667924ca08f822` + `6a7746c956460ca9464951551f5b7242af174958`; GUI regression `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`.
-- P02-G / UI-024 complete: sorting-rules window wording simplified without changing sort semantics. Implementation `99ecc55ef2556957f0957c61098a4ae6df03c2d6`; GUI regression `7b03ca8786ec81b507a0ad4c265dcf07928cc4bd`.
-- P02-H / UI-029 complete: Public List explanatory text and read-only table header now use `НАЗВАНИЕ`; data/API/XLSX/export semantics unchanged. Implementation `282ca506ad6376c5ee165009bff8bfa1c9969f44`; GUI regression `6566370f056feaa2063f0bed5f6164877d62b34a`.
-- P02-I / UI-030 complete: visible `Открыть локальный JSON` button removed from Public List; `/api/public` remains unchanged. Implementation `a82154e53ad61a25c7026de64592ad1ba422a802`; GUI regression `655dc42510cd726eaa3098ab00ded28e49958bb5`.
-- P02 implementation items are complete as candidate.
-- Draft PR #22 / candidate SHA `655dc42510cd726eaa3098ab00ded28e49958bb5`: candidate-wide regression run `37590831341` — **SUCCESS**, including Native GUI, frozen build/startup, installer and silent-install gates.
-- Manual-QA ZIP uploaded to Drive: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`; installer SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
-- Separate wording gate failure remains the known docs-only finding.
-- Manual QA found one remaining P02 issue only: user-facing game terminology. **P02 REOPENED**; all other checked P02 behavior is reported correct.
-- GLOBAL-TERMINOLOGY-001 is now active across the project. P02-J1/J2 remove current List/Public/general fallback wording; CSV/import terminology moves with P03; export/XLSX P05/P07; Stream/OBS P09; Auction P12/P20; integrations P18/P19; Journal P22.
-- P02-J1 commits: `a49e7a41134479675fb558df6960319f45129d3f`, `1748a31d8606a513cbcb67d9ba1035e5861d98b7`, regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
-- P02-J2 commits: `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
-- Previous P02 installer is superseded.
-- Fresh P02-J head `4bf4c7e2a4b15837e172073098dcf5595c227e8c`; Windows regression `37594380334` — **SUCCESS**.
-- V2 manual-QA ZIP: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`; installer SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
-- Repeat manual QA PASS 2026-10-07: P02 works as intended and J1/J2 terminology cleanup is accepted.
-- `ИГРАЛ / НЕ ИГРАЛ` are explicitly protected because they participate in sorting/status mechanics; terminology changes must be context-checked and user-facing only.
-- Clean accepted promotion PR #23 merged as `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
-- Clean-promotion regression `37596838501` — **SUCCESS**; post-merge regression `37597234911` — **SUCCESS**. QA PR #24 and superseded PR #22 closed without merge.
+- P02 is now unblocked.
+
+## P02 candidate progress — A/B/C/D/E complete — 2026-10-07
+- Branch: `candidate/p02-list-public-labels`.
+- **P02-A / UI-010** implementation commit `f6481b6668019b45af3d9d11040117baf2868f4c`: visible main tab label `Игры` -> `Список` only; internal `GamesTab/games_tab`, DB/API semantics and behavior unchanged.
+- P02-A regression expectation commit `cc1bad8b3e6a0d882dec429f043997b64fcb11cf`: existing GUI smoke expects `Список`.
+- **P02-B / UI-011** implementation commit `1ccc1ad65ad6a050380ce469f99ae307976b2dbd`: only the main-list button label `Добавить игру` -> `Добавить`; existing `GamesTab.add_game` action unchanged.
+- P02-B regression commit `772af23741caa81ddc8ad8f8562dad0ec65d6b9e`: GUI smoke asserts the button text is exactly `Добавить`.
+- **P02-C / UI-012** implementation commit `dc4197fc05f9eec7885705f77eda1ed7053962b3`: common GameDialog window title is exactly `Добавить` or `Изменить`; internal headings `Новая игра` and `Редактирование записи` removed.
+- P02-C regression commit `57789c7dbbc1202f000cf8c74f04239f8772c4d9`: GUI smoke instantiates both dialog modes and checks titles/headings.
+- **P02-D / UI-013** implementation commit `e62c0b08de7bd358e85eaf3d6354816dbb3d7063`: visible field labels only: `Название игры:` -> `Название:`; `Дата выхода:` -> `Дата:`. Widgets, payload keys, parsing, DB and storage semantics unchanged.
+- P02-D regression commit `e7b90528e3b17ac3b16a4e846a5dec98ba8c4915`: both add/edit GameDialog modes assert new labels and absence of legacy labels.
+- **P02-E / UI-015** implementation commit `635e4405ffd12ed35f8c0385616ff1f1193a689f`: visible labels only: `Дата (необязательно):`, `Баллы (необязательно):`, `Отзыв (необязательно):`. `Название` remains required; `Кооператив` and `Статус` keep their current default selections and are not marked optional.
+- P02-E regression commit `1f73618165e5e3f1cd3acad833209cc4cef58f45`: add/edit dialogs assert the optional labels, absence of incorrect optional markers on `Кооператив/Статус`, and preserved default `Баллы = 0`.
+- Focused P02-E diff versus P02-D: `games.py` 3 additions / 3 deletions; remaining changes are regression-only.
+- **P02-F / UI-022** implementation commits `8781b4bafbfdfdafcbfd960f6d667924ca08f822` + `6a7746c956460ca9464951551f5b7242af174958`: main button `Очистить список`; dialog title `Очистить список`; heading `Будут удалены все записи: N`; warning uses `обычные, архивные и временные записи`; exact confirm text `УДАЛИТЬ ЗАПИСИ`; destructive button `Удалить записи`; worker completion also restores `Очистить список` instead of the legacy label.
+- P02-F regression commits `7ac2eb591a9af5c93aa5a542d07f3c049dcac3ab` + `00abccc2301d72076ad4caa1a36f32440c23bd73`: verify exact texts, inexact/exact confirmation enablement, Enter acceptance, and post-worker label persistence.
+- Existing open-auction guard, isolated safety-backup, background worker, completed-auction history/Journal preservation and destructive workflow logic are unchanged.
+- Focused P02-F diff versus P02-E: `games.py` 7 additions / 7 deletions; remaining changes are regression-only.
+- **P02-G / UI-024** implementation commit `99ecc55ef2556957f0957c61098a4ae6df03c2d6`: sorting-rules wording only — heading `Автоматическая сортировка списка`; intro `Сначала список распределяется по статусу:`; archive wording `В режиме «Всего» сначала идут все записи вне архива` and `Архивные записи располагаются отдельным блоком в самом низу`. Sorting semantics and order are unchanged.
+- P02-G regression commit `7b03ca8786ec81b507a0ad4c265dcf07928cc4bd`: GUI smoke captures the actual QMessageBox and asserts exact new wording plus absence of legacy wording.
+- Focused P02-G diff versus P02-F: `games.py` 4 additions / 4 deletions; remaining changes are regression-only.
+- **P02-H / UI-029** implementation commit `282ca506ad6376c5ee165009bff8bfa1c9969f44`: on `Публичный список` only, the top explanatory text and read-only table title header change `НАЗВАНИЕ ИГРЫ` -> `НАЗВАНИЕ`. Data field `title`, API/JSON keys, public XLSX headers/mapping, CSV/XLSX exporters and sorting remain unchanged.
+- P02-H regression commit `6566370f056feaa2063f0bed5f6164877d62b34a`: GUI smoke asserts the explanatory text uses `НАЗВАНИЕ`, contains no legacy `НАЗВАНИЕ ИГРЫ`, and table column 3 is exactly `НАЗВАНИЕ`.
+- Focused P02-H diff versus P02-G: `public.py` 2 additions / 2 deletions; remaining changes are regression-only.
+- **P02-I / UI-030** implementation commit `a82154e53ad61a25c7026de64592ad1ba422a802`: removed only the visible `Открыть локальный JSON` button and its click connection from `Публичный список`; dead imports `QDesktopServices` / `QUrl` removed after reference check.
+- `/api/public` remains unchanged in `api_server.py`; Public List data model, read-only table, XLSX mirror, API payload and exports are untouched.
+- P02-I regression commit `655dc42510cd726eaa3098ab00ded28e49958bb5`: GUI smoke asserts the legacy Public List JSON button is absent.
+- Focused P02-I diff versus P02-H: only `public.py` and regression smoke; `api_server.py` is not in the diff.
+- **P02 implementation scope UI-010..013, UI-015, UI-022, UI-024, UI-029, UI-030 is complete as candidate.**
+- Draft PR #22 opened for QA only; candidate SHA `655dc42510cd726eaa3098ab00ded28e49958bb5`, 20 small commits, 4 changed files (`games.py`, `main_window.py`, `public.py`, existing `gui_regression_smoke.py`).
+- Candidate-wide Windows regression run `37590831341` — **SUCCESS**. Passed compile, Actions-version, publication CI consolidation, A9 UI-state/installer checks, backup/restore/media, clean source snapshot, fresh DB integrity, **Native GUI regression core with all P02 focused assertions**, frozen build/startup/browser-source, Inno Setup, installer build, silent-install startup and installer artifact preservation.
+- Separate Publication wording gate `37590831319` failed only on pre-existing documentation wording in `docs/ACTIVE_REVIEW_LEDGER.md`, `docs/IDEA_INVENTORY.md`, `docs/PROJECT_STATE.md`; P02 runtime/new GUI regression files were not cited.
+- Manual-QA artifact: GitHub artifact `11469195381` / `InOneLine_1.0.8_WINDOWS_QA`; ZIP SHA-256 `4602b57a8547075fe9362f0ffa970cd7a170c8082b6755da3846c9adad95301c`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,609,680 bytes, SHA-256 `8aaf388bb20b59b0c039f4a529b3298f7d3258002890498ee60dac7a74920647`.
+- Google Drive handoff complete: `InOneLine_P02_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp`, verified size 46,749,709 bytes in folder `Программа для стриминга`.
+- Manual QA 2026-10-07: user confirmed the rest of P02 looks/works as intended, but found remaining user-facing game terminology in screenshots. **P02 = REOPENED / MANUAL QA FAIL ON TERMINOLOGY ONLY.**
+- New global rule: **GLOBAL-TERMINOLOGY-001** — user-facing object terminology must be neutral (`список / запись / название / лот` by context); internal `Game/GamesTab/game_id` and legacy compatibility remain technical contracts.
+- **P02-J1** fixes the screenshot-visible List/Public terminology: commits `a49e7a41134479675fb558df6960319f45129d3f` + `1748a31d8606a513cbcb67d9ba1035e5861d98b7`; regression `f2b9e9218d81aea5a0b533a2e8b629a4894e6b92`.
+- **P02-J2** fixes remaining safe current-package wording in list-toggle, restore counts, duplicate fallback and clear-list failure messages: commits `a0ee0a764da4360cd93869295df67dc7cb9e4530`, `404919075f3b54e840a0cb277739abfeea318201`, `e75af0d0195a41665d5839ab6039314e46a33230`, `eba81eb4934984fd2ca1f85da0be3106f51b765b`; regression `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
+- CSV/import wording is intentionally deferred to P03 so preferred neutral headers/messages and backward-compatible aliases are changed together. Remaining terminology is routed to P05/P07, P09, P12/P20, P18/P19 and P22.
+- Previous Drive artifact `1bRyJ2SJMvRIBadjwgSCOY12JjBp1Ajpp` is superseded for acceptance.
+- Fresh P02-J candidate head: `4bf4c7e2a4b15837e172073098dcf5595c227e8c`.
+- Fresh candidate-wide Windows regression run `37594380334` — **SUCCESS**. Native GUI regression, frozen build/startup, Browser Source, installer build, silent-install and artifact preservation all passed.
+- New manual-QA artifact: GitHub artifact `11470436517`; ZIP SHA-256 `6105bcfc17c93eabbf1cf4aa6ace35dd520bad38fe1f6b76a6e2f3e2a7e41085`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,627,996 bytes, SHA-256 `39dc8bb825ff6d6b58cf880668d0fa687fc37708802c0a424357b76337dc42d6`.
+- Google Drive V2 handoff: `InOneLine_P02_CANDIDATE_V2_1.0.8_WINDOWS_QA.zip`, Drive ID `1fGGNR1_2FZl1mgKwFAPexmE1HFzXKygt`, verified size 46,767,800 bytes.
+- Repeat manual QA 2026-10-07: user confirmed **everything is correct and works**. P02 terminology fixes J1/J2 accepted.
+- Safety clarification accepted: **do not change `ИГРАЛ / НЕ ИГРАЛ`**; they are coupled to sorting/status mechanics. Terminology changes must be targeted user-facing substitutions only, never bulk renames that may alter parsers, persisted/API keys, status values or business logic.
+- Clean promotion PR #23 merged into `main`: merge commit `e89b178f4816b30e3a54e59ea5407eab2e782e6d`.
+- Pre-merge clean-promotion regression `37596838501` — **SUCCESS**.
+- Post-merge QA-only PR #24 from the exact merge commit completed Regression Foundation run `37597234911` — **SUCCESS** and was closed without merge. Historical candidate PR #22 also closed without merge.
 - **P02 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
-- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
-- P03-A / UI-021 complete on `candidate/p03-csv-date-caret`: canonical CSV headers `НАЗВАНИЕ` + `ДАТА` are accepted while legacy `НАЗВАНИЕ ИГРЫ` + `ДАТА ВЫХОДА` remain aliases. Implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`; regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`.
-- P03-B / UI-020 complete: CSV help rewritten to the accepted neutral/canonical wording while explicitly preserving legacy aliases and `ИГРАЛ / НЕ ИГРАЛ` status labels. Implementation `a70f00688650638ff2173ba942b418db26ba8201`; GUI regression `ec74bed827edaa675f6360dd703326e442f38ee9`.
-- P03-C / UI-019 complete: CSV error messages now state the problem, source row/value and correction guidance; TEST-001 error scenarios + atomicity + backup-path preservation are automated in the existing GUI smoke. Implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`; regression `2230c10a06a986389bff3ab546afbe011368730c` + `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`.
-- P03-D / BUG-002 complete: existing date auto-format now preserves logical caret position instead of jumping to the end. Implementation `7872121a09c740e99073053d9b1ee9e776296202`; regression `2fd76ae1260738fdf289b36de084ac2b15234e19` covers Add/Edit, Backspace, Delete, selection replacement and sequential input.
-- P03 clean review branch `candidate/p03-review`, head `9fb64bc0d0867f439b0866f82826b406c22ef012`, draft PR #25; exactly 3 changed files.
-- Candidate-wide Windows regression `37633288322` — **SUCCESS**, including Native GUI P03 checks, frozen build/startup, Browser Source, installer and silent-install gates.
-- Manual-QA ZIP uploaded to Drive: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`; installer SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
-- **P03 automated gate PASS; complete user manual QA PASS / ACCEPTED («Работает. Идём дальше.»).** Merge and post-merge regression passed. **P04-A / UI-025 is CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS; P04-B / BUG-003 is next.**
-## P00 baseline gate — PASS — 2026-10-07
+- **P03 is now unblocked.** GLOBAL-TERMINOLOGY-001 remains active, with `ИГРАЛ / НЕ ИГРАЛ` explicitly protected.
 
-- Exact CURRENT reconfirmed: **1.0.8 / schema 19 / 15 named migrations**.
-- Accepted A9 runtime anchor `74ad16c5772d5cc191f7e307203b6a574af7815c`; subsequent `main` changes before P00 were docs/README only.
-- Fresh rerun of permanent Windows regression: run `36972339831`, fresh job `112658659175` — **SUCCESS**.
-- Compile, DB integrity, GUI, frozen Browser Source, backup/restore, A9 migration/single-instance, Inno Setup and silent-install regressions all passed.
-- P00 changed no runtime/product behavior. **P01 is the next implementation package.**
-## Final implementation queue — point 3 COMPLETE
+## P03 candidate progress — A/B/C complete — 2026-10-07
+- Branch: `candidate/p03-csv-date-caret`.
+- **P03-A / UI-021** implementation `d6b8b30a1336f5b7864b1ca3f19c41c4473815f2`: CSV importer accepts canonical headers `НАЗВАНИЕ` and `ДАТА`; legacy aliases `НАЗВАНИЕ ИГРЫ` and `ДАТА ВЫХОДА` remain accepted. Existing points/coop/status/review semantics are unchanged and `ИГРАЛ / НЕ ИГРАЛ` values are untouched.
+- P03-A regression `2ac0f44deaa3f6234af194d88b755e36fc729c72`: isolated DB verifies new and legacy title/date headers map correctly.
+- **P03-B / UI-020** implementation `a70f00688650638ff2173ba942b418db26ba8201`: rewrites only `Правила импорта CSV` using canonical `НАЗВАНИЕ / ДАТА`, explicit optional fields, `0` guidance, neutral `запись` wording, compatibility aliases, and atomic-import/backup explanation.
+- P03-B regression `ec74bed827edaa675f6360dd703326e442f38ee9`: captures the actual help QMessageBox and checks canonical wording, compatibility aliases and preserved `НЕ ИГРАЛ / ИГРАЛ` status labels.
+- **P03-C / UI-019** implementation `0f7f8b24b3b702607b9c1ef4b167745f714230c7`: CSV validation errors now follow `что не так -> строка/значение -> как исправить` for duplicate title, status, coop, date, points, missing headers and legacy `Название|Баллы`. Duplicate tracking now remembers the first source line only to improve the error message; parsed data and transaction semantics are unchanged.
+- P03-C regression `2230c10a06a986389bff3ab546afbe011368730c` + cleanup `e7a32323fbe3f951f966b8a2d538961ed34f6fa6`: existing GUI smoke verifies the TEST-001 error set, preserves explicit `ИГРАЛ / НЕ ИГРАЛ` allowed statuses, checks `0` guidance, confirms safety-backup path survives wrapper errors, and confirms full-file atomicity.
+- Focused P03-C runtime diff versus P03-B is limited to `streaming_manager/db/services.py`; regression changes remain in existing `gui_regression_smoke.py`.
+- **P03-D / BUG-002** implementation `7872121a09c740e99073053d9b1ee9e776296202`: `_format_date_while_typing()` keeps the existing auto-dot formatter but restores caret using the formatted prefix left of the current caret instead of forcing `len(formatted)`. No new widget; `normalize_date_text()` and accepted date formats are unchanged.
+- P03-D regression `2fd76ae1260738fdf289b36de084ac2b15234e19`: both Add/Edit GameDialog modes verify middle-of-field formatting, Backspace, Delete, selection replacement and sequential compact input; caret no longer jumps to the end.
+- Focused P03-D diff versus P03-C: `games.py` caret-preservation logic + regression-only changes in existing `gui_regression_smoke.py`.
+- **P03 implementation scope is complete as candidate.**
+- Clean review branch: `candidate/p03-review`, head `9fb64bc0d0867f439b0866f82826b406c22ef012`; draft PR #25. Diff from current `main`: exactly 3 files — `streaming_manager/db/services.py`, `streaming_manager/views/games.py`, existing `tools/gui_regression_smoke.py`.
+- Candidate-wide Windows regression run `37633288322` — **SUCCESS**. Passed compile, current dependency/toolchain gates, backup/restore/media, fresh DB, Native GUI regression with P03 header/help/error/atomicity/caret checks, frozen build/startup/Browser Source, installer build, silent-install startup and artifact preservation.
+- Separate Publication wording gate `37633288273` failed only on the already-known documentation wording in `docs/ACTIVE_REVIEW_LEDGER.md`, `docs/IDEA_INVENTORY.md`, and `docs/PROJECT_STATE.md`; P03 runtime/regression files were not cited.
+- Manual-QA artifact: GitHub artifact `11487761077`; ZIP SHA-256 `b3dd8056d15430ad407472ff27951c760fffec34149cbcf24d0ff778d7bdb8be`.
+- ZIP contains exactly `InOneLine_Setup_1.0.8.exe`, 47,615,165 bytes, SHA-256 `5f82f276e36ab316b2f2bc9f130036791e2b3f0c7de2d9c7d067690e9a57086d`.
+- Google Drive handoff: `InOneLine_P03_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1Fpk09-w7nq22ao8qdgDMLyJBSJIwD9tu`, verified ZIP size 46,755,018 bytes.
+- **P03 automated candidate gate = PASS; user manual QA = PASS / ACCEPTED.** Merge and post-merge regression passed.
+## P00 exact baseline verification — PASS — 2026-10-07
 
-Detailed source of truth: `docs/ACTIVE_REVIEW_LEDGER.md` §4.7.
+- Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**.
+- No runtime/source change occurred during P00.
+- Accepted A9 runtime anchor is `74ad16c5772d5cc191f7e307203b6a574af7815c`; post-A9 changes before this gate were documentation/README only.
+- Permanent Windows regression was freshly rerun: run `36972339831`, fresh job `112658659175`, conclusion **success**.
+- Key green areas: compile, fresh DB integrity, native GUI, frozen startup/Browser Source, full backup/restore and rollback, A9 UI-state migration/single-instance, media/filesystem, Inno Setup and silent-install startup/filesystem.
+- CURRENT 1.0.8 is therefore the verified rollback/reference baseline for the first implementation candidate P01.
+## Implementation planning complete — 2026-10-07
 
-Execution rule: each package below is one candidate/review gate. Do not start the next package before automated checks + user manual acceptance of the previous package. Exact CURRENT 1.0.8 remains rollback baseline until a candidate is accepted.
+- Point 3 is complete: the accepted review batch is sorted into P00–P22 + FINAL GATE in dependency order.
+- Detailed queue and package membership are canonical in `docs/ACTIVE_REVIEW_LEDGER.md` §4.7; `docs/ROADMAP.md` contains the compact sequence.
+- Mechanical coverage verified: UI-001…UI-090 all accounted for, no missing IDs and no duplicate package assignment.
+- Ordering principle: low-risk UI first; then shared list/state/position/media foundations; then OBS/Rules/Auction structure; then timing; then Settings/integrations/conversion; then auction business/accounting cross-links; History/Journal last.
+- Every package is a separate candidate with automated checks and mandatory user manual acceptance before the next package.
+- Runtime remains exact CURRENT **1.0.8 / schema 19 / 15 named migrations**. No implementation package has started yet.
+## Active review / bugfix phase
 
-1. **P00** — exact baseline/regression gate.
-2. **P01** — MainWindow shell/menu/F5 cleanup.
-3. **P02** — low-risk List/Public labels/dialogs.
-4. **P03** — CSV/import + date/caret correctness.
-5. **P04** — search/filter/selection/hide-list cleanup + total points.
-6. **P05** — Public file export relocation + remove Settings Export.
-7. **P06** — window sizing/state/tab-order migration + full backup ui_state — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-8. **P07** — one position policy + XLSX derived position — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-9. **P08** — shared media dedup/availability foundation — **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-10. **P09** — Stream/OBS structural cleanup and API-control removal — **CLOSED** (UI-033–UI-043 CLOSED; UI-038 satisfied by accepted UI-036/P08; UI-043 exact promotion/postmerge Windows PASS).
-11. **P10** — common OBS show-mode + timer/music widget presentation/audio help — **IN PROGRESS** (next isolated candidate: GLOBAL-OBS-VISIBILITY-001).
-12. **P11** — Rules composite editor/overlay.
-13. **P12** — single Auction page + lot-search scope.
-14. **P13** — Auction layout/timer contextual UI/quick actions.
-15. **P14** — Auction Lots Overlay + OBS-only autoscroll/footer.
-16. **P15** — Wheel OBS widget + appearance/center-image UX.
-17. **P16** — authoritative timer/wheel/audio timing core.
-18. **P17** — Auction Settings over final timer/wheel foundations.
-19. **P18** — integration connection/state UX + Auction readiness/RNG navigation.
-20. **P19** — conversion/pending-rate workflow.
-21. **P20** — Max Amount/Wheel business state machine.
-22. **P21** — source-time pending gate + `Без текста N`.
-23. **P22** — integration transparency + final History/Journal presentation.
-24. **FINAL GATE** — complete automated/manual regression and release acceptance.
+Новые product features временно приостановлены по прямому решению пользователя. Текущий рабочий протокол и накопительная очередь замечаний находятся в `docs/ACTIVE_REVIEW_LEDGER.md`.
 
-Mechanical coverage: UI-001…UI-090 = 90/90 accounted for, no missing IDs, no duplicate package assignment. UI-014/016/017/018/023/026/027/031/044/057 are preserve/resolved/superseded validation-only items; QA-1.0.8-01/02 remain outside this batch; QA-1.0.8-03 is handled by P21/UI-087.
-## Сохранённые future scope после текущего review-batch
+Правило этапа: сначала разбор скриншота и запись замечаний без изменения runtime; реализация начинается только после команды пользователя **«всё делаем»**. После неё задачи сортируются по сложности/зависимостям и выполняются по одной; после каждого исправления обязательна отдельная ручная проверка пользователя. Existing-first/minimal-diff/stability-first invariant сохраняется.
 
-Эти пункты сохранены для будущего и **не являются следующей автоматической очередью**, пока текущий review-batch не сверён по зависимостям и не реализован/закрыт. Для каждого из них позже всё равно требуется fresh exact-CURRENT review и отдельное решение пользователя.
+## P03 manual acceptance and current handoff
 
-1. **Global Multi-File Import** — текущий post-D26 candidate, tracking **#4**. Распространить стандартный Windows Ctrl/Shift multi-select на применимые потоки «Добавить файл…», переиспользуя уже работающий D26 multi-select и существующие managed/external/duplicate rules.
-2. **D40 — ручной порядок soundtrack/music library** — сохранённая future-идея, не реализована D26. Должна переиспользовать D43/D26 audio/media/playback state, а не создавать второй player/library backend. Это **не восстановление** superseded pre-D26 Auction playlist/Loop-One модели: с D26 текущий Auction soundtrack — один выбранный зацикленный файл из shared soundtrack library.
-3. **D34 — Tourniquet donation adapter** — possible/deferred integration; перед реализацией требуется свежая проверка официального API/event delivery/auth/currencies/security.
-4. **D41 — кроссплатформенная агрегация чатов + отдельный OBS chat overlay** — user-requested post-completion idea; обычные сообщения чата сами по себе не меняют auction/SM-points/timer/wheel state.
-5. **Older YouTube platform/integration candidate** — сохранённая отдельная integration-direction с неуточнённым scope. Не путать с историческим W3 YouTube soundtrack-source wording и не путать с закрытым «Трейлер (YouTube)».
-6. **D38 — optional LAN access to standalone OBS widgets** — post-completion only; localhost остаётся default, Internet exposure по умолчанию запрещён.
-7. **Public Web / ordinary site presentation** — сохранённое future/publication direction; exact hosting/security/update/UI scope не определён и не auto-authorized.
-8. **D27 — «Честное колесо»** — optional physics/final-stop winner mode; default RNG-first wheel не меняется.
-9. **D7 — whole-snapshot cryptographic verification hardening** — security hardening поверх уже реализованной verification model. Public Internet verification is not implied; any LAN/public viewer endpoint remains a separate D38/Public-Web/security decision.
+- User manual acceptance: **«Работает. Идём дальше.»** in reply to the complete P03 checklist. CSV headers/help/errors, compatibility aliases, merge without clearing empty values, atomicity/backup path and date editing in both Add/Edit modes are **PASS / MANUALLY ACCEPTED**.
+- Exact manually checked candidate head: `9fb64bc0d0867f439b0866f82826b406c22ef012`; Windows regression `37633288322` was successful. Accepted installer/ZIP bytes remain unchanged.
+- Manual checklist: `InOneLine_P03_MANUAL_QA.zip`, 15 CSV files + README; Drive ID `1eJG2u16e6xpLgJadVp0ugju04WSVn_FB`.
+- **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-A / UI-025 is CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04-B / BUG-003 is next.**
 
-Порядок 2–9 восстановлен из ранее принятого complexity/dependency planning. Он нужен, чтобы не потерять зависимости, но **не означает автоматического выбора следующей реализации**.
-
-## Явно отложенные / пропущенные пользователем
-
-Эти пункты живы, но не должны автоматически возвращаться в текущую очередь:
-
-- **D16 — local-wheel hover highlight** — explicitly deferred.
-- **D17 — random spin duration** — explicitly skipped for now.
-- **D18 — wheel visual style selector** — explicitly skipped for now.
-- **D20 — visual sector split** — explicitly deferred.
-- **D22 — Battle Royale** — approved post-completion, explicitly deferred 2026-09-29; tracking **#5**.
-- **W1 — Space -> existing «Крутить»** — ранее реализовывался, затем сознательно снят из MAIN и оставлен post-completion. If reopened, Space must reuse the existing Spin action, stay inactive while focus is in text/numeric/other controls with normal Space behavior, and be blocked during invalid/re-entrant/ongoing spin states.
-- **Сохранённые аукционы** + зависимый полный **«Новый аукцион...»** — deferred reusable-auction workflow.
-- **A8 compensating Undo** — только possible post-completion; прежний whitelist не считается pre-approved, fresh safety review обязателен. Retained invariants: compensation appends an auditable reversal event instead of deleting original history, is blocked after unsafe dependent changes, and remains operator-only/not viewer-facing.
-- **B6 external auction-service API adapter contract** — deferred; fresh source-of-truth/conflict/ID/dedup/write-policy review обязателен. Provider token must use B1 protected credential storage; B6 must wrap the common integration/auction backend rather than create a second auction engine.
-- Дополнительные provider adapters: **iHAQ Donate v2.0, ODA Digital/OpenDonationAssistant, DonateX, VK Video Live rewards/points, Kick Channel Points/Custom Rewards, Donate Helper, DonatePay** — deferred. Все используют общий B2/B3 dedup/conversion/history/matching path, official/reliable APIs only, no page/OBS/browser scraping; provider test flags obey QA-1.0.8-02 safety invariant. Kick/VK remain feasibility-conditional; Donate Helper/iHAQ feasibility-gated; DonatePay exact realtime payload/auth contract and DonateX delivery contract require fresh revalidation; ODA remains contract-blocked.
-- Реальная Twitch Channel Points/Custom Rewards verification — eligibility-dependent, не потерянная feature-задача.
-
-## Approved/retained post-completion wheel items, пока не выбранные
-
-- **D23 — import custom participants**: destination «в текущий аукцион» через existing add/increment path либо temporary wheel-only participants; preview/confirmation и duplicate merge остаются частью сохранённого design.
-- **D24 — отдельный OBS Browser Source со списком участников колеса**: независим от operator list и Wheel Overlay; должен использовать authoritative wheel state.
-- **D25 — cumulative probability лотов с суммой <= сумме победителя**: approved only as post-completion / **не нужно сейчас**; считать по resolved weighted-wheel snapshot.
-- **D42 — текущий лот/сектор под стрелкой во время вращения**: approved post-completion; local + OBS, включаемое/выключаемое отображение, без изменения RNG/weights/winner.
-
-## Принятые/сохранённые future ideas, не выбранные в реализацию
-
-Наличие здесь означает сохранённое пользовательское решение/идею, а не разрешение начать код.
-
-- **D1** double timer / elapsed count-up — user-accepted as possible / deferred.
-- **D2** pin/unpin lot — user-accepted as possible / deferred.
-- **D5 advanced History analytics** — **USER-ACCEPTED POST-COMPLETION / POST-INTEGRATION**, а не assistant-only possibility: activity heatmap, weekdays distribution, participant rankings, separate points/donations analytics, record cards и «Самый дорогой победивший лот». Core History уже реализован. Fresh review must preserve the accepted identity/comparability rules: participant identity uses provider/source + stable external user ID rather than mutable nickname; cross-service accounts are not auto-merged by matching names; unlike point systems/currencies are not naively combined without an explicit comparable basis/base-currency rule; analytics reuse authoritative completed-history snapshots rather than a second backend.
-- **D9** localization/languages — user-accepted / deferred post-completion; централизованная UI-localization, без автоматического перевода пользовательских данных, названий игр и History/Journal content.
-- **D10** GitHub link — conditional future item; only the official InOneLine repository is valid. The public repo exists; placement still needs fresh review.
-- **D11** Telegram link — conditional on an official project Telegram resource; official project link only.
-- **D12** support/Boosty link — conditional on completion/publication and an official support resource; informational/project UI, not Auction business UI.
-- **D13** optional Pending/manual-processing queue — user-accepted as possible post-completion; MAIN automatic acceptance не меняется.
-- **D28** artificial/fixed probability mode — user-accepted as possible post-completion, only explicit artificial-chance mode.
-- **D29** viewer names in viewer-facing table — user-accepted as possible / integration-dependent.
-- **D30** blind/hidden viewer amounts — user-accepted as possible post-completion; authoritative values/RNG unchanged.
-- **D31** Never/Match/Always auto-processing selector — user-accepted as possible extension of future D13.
-- **D32** viewer name as order text — user-accepted, later narrowed to a separate future participant/viewer-based mode.
-- **D33** alternative display sorts old/new/cheap/expensive — user-accepted as possible; default amount-desc stays.
-- **D35** per-bet fortune multiplier — user-accepted as possible post-completion.
-- **D36** viewer chooses lot — user-accepted as possible, dependent on D35 and fresh interaction review.
-- **D37** presets export/import — user-accepted / deferred post-completion.
-- **Games/List Compact presentation** — earlier accepted, 2026-09-28 explicitly postponed until a real future need appears.
-- **Auction Lots Normal/Compact applicability** — only specification-reconciliation territory; not a confirmed defect.
-
-## Неутверждённые / review-later только
-
-- **D3** universal inline editing in all tables — possible post-completion; no current approval to implement.
-- **Auction Lots Normal/Compact** remains specification-reconciliation territory unless separately selected.
-
-## Важные status corrections
-
-- Games/List shared persisted **Autoscroll** из старого PASS13 **не является живой задачей**: 2026-09-28 пользователь прямо решил не добавлять её, потому что автопрокрутка уже реализована там, где нужна.
-- **D15 Twitch AI-bot/neural-network** — не подтверждён как InOneLine roadmap item; historical identifier only.
-- **D39 per-scene widget style profiles** — historical assistant-proposed possibility; **NOT ACTIONABLE** без нового прямого решения пользователя.
-- Historical W3 **YouTube URL/video-ID soundtrack source** — reference-only possibility, не direct-user-approved roadmap scope.
-- Historical **«Трейлер (YouTube)»** — resolved/closed; не возвращать.
-- **D4** separate top-level Wheel page, **D6** generic Widgets umbrella, **D8** video requests, **D14** old umbrella item — rejected/superseded; не возвращать автоматически.
-- F-series rejected/superseded items не являются backlog.
-- H-series — existing behavior to preserve, а не новые задачи.
-
-## Недавние закрытые roadmap items
-
-- **QA-1.0.2-01 / unified OBS onboarding** — CLOSED in 1.0.2.
-- **QA-1.0.2-02 / external donation auto-extension completion** — CLOSED in 1.0.3.
-- **D19 — custom center image + remote Twitch/7TV/BTTV/FFZ sources + quick picker** — RELEASED in 1.0.4.
-- **D43 — OBS Browser Audio Transport** — RELEASED in 1.0.5.
-- **D21 — Elimination wheel** — RELEASED in 1.0.6.
-- **D26 — Music Player + shared soundtrack library + OBS overlay** — RELEASED in 1.0.7.
-- **Global Conditional UI Visibility / #3** — RELEASED in 1.0.8.
-- Старый deferred stale-OBS-page reload/version-handshake уже закрыт реализованным overlay handshake; отдельной roadmap-задачей больше не является.
-- Старый wheel-overlay infinite RAF optimization также не является открытой задачей: current wheel overlay запускает animation RAF только во время реального wheel animation.
-- Старые release-hygiene/unused-file cleanup темы закрыты maintenance-аудитом 2026-10-01/02.
-
-## Process gate
-
-Release cadence считает **только принятые CURRENT/released версии**; rejected candidate/FIX не считаются.
-
-После принятых 1.0.4–1.0.8 текущая арифметическая отметка — **21/25**. Перед фактическим C1 gate счётчик всё равно сверяется с release history.
-
-## Roadmap safety rule
-
-Наличие идеи в этом файле не означает разрешения на реализацию. Перед product change:
-
-1. сверить latest exact CURRENT code/data/UI;
-2. проверить, не была ли идея позже реализована, отложена, отклонена или superseded;
-3. выбрать ровно один scope;
-4. определить минимальный reuse-first diff;
-5. получить явное approval;
-6. automated QA -> native Windows/manual gate -> explicit acceptance -> promotion exact tested bytes.
-
-Подробный повторный reconciliation от 2026-10-02: docs/history/ROADMAP_RECONCILIATION_2026-10-02.md.
-
-## Current implementation handoff
-
-- P03: full manual checklist accepted, merged and post-merge regression passed. P04-A / UI-025 is unblocked.
-- P04: first remove obsolete list hide/show state/hooks and fallback automatic selection, then implement the accepted search/Enter/deselect contract and total-points snapshot reuse. Keep individual implementation steps small.
-- Manual checks for each current candidate package are delivered together as one complete checklist.
+- Current manual-QA format: issue the complete current-package checklist in one message; do not repeat already accepted scenarios without a reason. Other latest workflow and terminology rules remain active.
 
 ## P03 technical closure and P04-A start
 
@@ -267,8 +548,8 @@ Release cadence считает **только принятые CURRENT/released 
 - Pre-merge Windows regression `37647359158` and wording gate `37647358838` — **SUCCESS**.
 - Exact merge-commit Windows regression `37647803098` and wording gate `37647803210` — **SUCCESS**. Historical QA PR #25 closed without merge. Accepted installer bytes were not replaced.
 - **P03 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.**
-- **P04-A / UI-025 = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION.** Accepted scope removes obsolete hide/show-list buttons, spacers, MainWindow/Enter visibility hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys while preserving tables/data, geometry/tab state and explicit search navigation. Selection/search/total-points remain separate later small steps.
-- P04 remains open. Clean-promote, merge and pass exact post-merge regression before starting the next implementation step.
+- **P04-A / UI-025 = MANUALLY ACCEPTED / AWAITING CLEAN PROMOTION.** Accepted scope removes obsolete hide/show-list buttons, spacers, MainWindow/Enter visibility hooks and `lists/visible`, `games/list_visible`, `public/list_visible` UI-state keys while preserving the existing tables, `ui_state.ini` geometry/tab restoration, data, filters and explicit search navigation. Selection/search/total-points follow-up scopes remain separate later steps.
+- P04 remains open. Do not start the next implementation step until P04-A is clean-promoted, merged and exact post-merge regression passes.
 
 ## P04-A / UI-025 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS
 
@@ -279,36 +560,37 @@ Release cadence считает **только принятые CURRENT/released 
 - Artifact `11495357287`, ZIP size 46,751,606 bytes, GitHub SHA-256 digest `1eb7e5f9589f71fae4cf778d6da90f06e5d08badea0fd67035fd8d3f900bfcee`. Installer CI SHA-256 `086ed75bf046036a0d7d74efff677626f460d6346c5a849249d3fd53d229bdc0`.
 - Drive handoff: `InOneLine_P04_A_CANDIDATE_1.0.8_WINDOWS_QA.zip`, file ID `13AHiI075GQtGE5stmsQFUhUrnuDA9KRR`; uploaded directly from the GitHub artifact reference, verified Drive size 46,751,606 bytes.
 - Complete manual checklist issued together: (1) both lists and existing records visible, hide/show buttons absent; (2) repeated tab switches do not resize the window or hide either table; (3) Enter search on both tabs selects/navigates to an active existing record and synchronizes selection; (4) F5 keeps both tables visible and data accessible; (5) restart restores window position/size and selected tab, both tables remain visible.
-- **P04-A = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04 remains open.** Clean promotion PR #28 passed regression `37652474014` + wording `37652474280`, merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`, and exact post-merge regression `37653013085` + wording `37653013097` succeeded. Candidate PR #27 closed without merge. **P04-B / BUG-003 is the next isolated step.** Full search/filter/total-points changes remain later scopes.
+- **P04-A = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS. P04 remains open.** User accepted the complete checklist with «Работает. Записывай. Пока дальше не идём.» Clean promotion PR #28 (`7fe09b7543b666ae6657377a9d782bac9442ec77`) passed regression `37652474014` + wording `37652474280`, merged as `fddf49014ffb34ff48c6871027a817f1453edb9e`, and exact post-merge regression `37653013085` + wording `37653013097` succeeded. Candidate PR #27 closed without merge. **Next: P04-B / BUG-003 only.**
 
 
-## P04-B / BUG-003 — next isolated implementation step
+## P04-B / BUG-003 start
 
-- Remove only the implicit fallback that selects row 0 during ordinary refresh when the former selected record is no longer present.
-- Preserve selection when the same record remains visible; preserve no-selection when there was none.
-- Add empty-area click deselection to the main list without a new selection subsystem.
-- Preserve explicit Enter-search and `focus_game()` selection.
-- Do not include UI-007/UI-008/UI-009/UI-028 or UI-076 in P04-B.
+- Scope is intentionally small: ordinary refresh/filter must preserve selection only when the same row remains visible; otherwise leave no row selected. If nothing was selected before refresh, keep no selection.
+- Add a lightweight empty-area click deselect behavior for the main list.
+- Existing explicit actions that intentionally select a row remain unchanged: Enter search and `focus_game()`.
+- Search-across-filters, removal of search/reset buttons, Public search changes, and total-points counter remain later P04 scopes.
 
 
-## P04-B / BUG-003 candidate — AUTOMATED PASS / AWAITING MANUAL QA
+## P04-B / BUG-003 candidate gate — PASS / AWAITING MANUAL QA
 
-- Candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`, draft PR #29; only main-list selection runtime + existing GUI regression changed.
-- Removed implicit first-row fallback from ordinary refresh; still-visible selection is preserved, missing/no selection remains empty.
-- Empty-area left click clears selection/current cell; explicit Enter search and `focus_game()` remain selection commands.
-- Regression Foundation `37654068727` and wording gate `37654069253` = SUCCESS.
-- Drive manual-QA build: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`.
-- Do not start UI-007/UI-008/UI-009/UI-028/UI-076 until P04-B is manually accepted, clean-promoted, merged and post-merge verified.
+- Implementation `b059d9dc997b1df6af2b75a7f73de2db9d852694`; regression head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`; draft PR #29.
+- Ordinary refresh/filter no longer auto-selects a replacement first row. Selection is restored only for the same still-visible game; otherwise selection/current cell are cleared.
+- Left click on empty main-list table space clears selection/current cell through the existing viewport and action-state logic.
+- Explicit Enter search and `focus_game()` selection are preserved.
+- Windows regression `37654068727` = SUCCESS; wording gate `37654069253` = SUCCESS.
+- Artifact `11497079107`: ZIP SHA-256 `8bd07c0e3a38d568afede9591a340d7ae93de8b34d5451f99482c7fbf0716d8b`; installer SHA-256 `c4156a66265d77d12a7359f6dbfbd42b0e38c34e98923d40bd8df582810522f8`.
+- Drive: `InOneLine_P04_B_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1eRIdxzl8ny6svzrZlgKeS-3nsDJI9IOu`, 46,766,270 bytes.
+- **P04-B = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT ACCEPTED / NOT MERGED.**
 
-## P04-B CLOSED / P04-C candidate gate — 2026-10-07
+## P04-B CLOSED / P04-C automated candidate — 2026-10-07
 
-- P04-B / BUG-003 manually accepted by user («Работает. Идём дальше.»), promoted and merged as `f2cc6e9f0968eac1be75f7d5b91ead7afe7e76df`.
-- Exact post-merge Regression Foundation `37655810706` and wording gate `37655810503` = **SUCCESS**. P04-B = **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
-- P04-C / BUG-004 candidate: `candidate/p04-c-public-selection-v2`, head `68f11b92fe2dd5ebb91752cf8723a9d5c66a0e09`, draft PR #31.
-- Scope remains isolated: Public empty-area deselection + existing GUI regression only. Public ordinary refresh has no implicit selection fallback; Enter and `select_synced_search_result()` remain explicit selection actions.
-- Windows regression `37656101654` and wording checks = **SUCCESS**.
-- Drive manual-QA build: `InOneLine_P04_C_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`.
-- P04-C = **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. Do not begin the next P04 scope until manual acceptance.
+- P04-B / BUG-003 is fully closed: user manual PASS, merge `f2cc6e9f0968eac1be75f7d5b91ead7afe7e76df`, post-merge regression `37655810706` SUCCESS and wording `37655810503` SUCCESS.
+- P04-C / BUG-004 is implemented only on candidate head `68f11b92fe2dd5ebb91752cf8723a9d5c66a0e09` / PR #31.
+- Candidate changes only Public empty-area deselection and its existing GUI-smoke coverage; search/data/sort/Public XLSX and other P04 scopes remain unchanged.
+- Regression Foundation `37656101654` = SUCCESS; wording checks = SUCCESS.
+- Artifact `11498364307`: ZIP SHA-256 `a8aae91a3edcef92e8ed95f5b9152182dd58b2d123da5730f7c3c1a348df4bf8`; installer SHA-256 `c5c64e75a53434d75de068d51747ab8c1175b8facc465fcbecd2d12f0bc628b1`.
+- Drive file ID `1M0ooksHuIEa0_50oJEcICJtkzzWCxK5L`, 46,761,453 bytes.
+- **P04-C = AWAITING USER MANUAL QA / NOT MERGED.**
 
 ## GLOBAL-FOCUS-001 — единое снятие focus/selection во всей программе — DEFERRED / RECORDED — 2026-10-07
 
@@ -340,100 +622,114 @@ Release cadence считает **только принятые CURRENT/released 
 - Drive handoff: `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`, ID `1o1BEOnoJqFCwkgTJVQoBgahGiVWYslSC`, verified 46,756,657 bytes.
 - **P04-D = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED.** Do not start UI-008/UI-009 or later P04 scopes before manual acceptance and technical closure.
 
-## P04-D / UI-007 — завершение 2026-10-08
+## P04-D / UI-007 — ПРИНЯТ И ТЕХНИЧЕСКИ ЗАКРЫТ — 2026-10-08
 
-- **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. Пользователь подтвердил 6/6 сценариев. Изолированный поиск игнорирует статистический фильтр только при непустом запросе, включает обычный архив и возвращает выбранный фильтр после очистки.
-- QA candidate `943a26d76bbaf0784b9e38fed84076d9597e82e3` / PR #33; чистый PR #35 переносит те же два Git blob; принят в `main` коммитом `e9e22d27d0f0101773c7016367f867e2bb61e7c8`. Pre-merge regression `37748280816`, wording `37748280794`, post-merge regression `37748751586`, wording `37748751519` — все SUCCESS.
-- **Дальше P04 / UI-008** (убрать дублирующую кнопку `Найти`, сохранив live-search + Enter). Затем отдельными небольшими scope UI-009 / UI-028 / UI-076 в порядке согласованных зависимостей. P05 и далее пока не начаты.
+- Пользователь подтвердил **ручной PASS всех шести проверок** поиска и сохранения фильтра на `InOneLine_P04_D_CANDIDATE_1.0.8_WINDOWS_QA.zip`.
+- Original QA candidate `943a26d76bbaf0784b9e38fed84076d9597e82e3`; исторический PR #33 закрыт без merge после принятия.
+- Чистый перенос через PR #35, два файла с теми же SHA Git blob, что и у вручную проверенного кандидата; merge commit `e9e22d27d0f0101773c7016367f867e2bb61e7c8`.
+- До merge Windows Regression `37748280816` = SUCCESS и wording `37748280794` = SUCCESS; **точный post-merge** Regression `37748751586` = SUCCESS и wording `37748751519` = SUCCESS.
+- **P04-D = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** В `main` теперь действуют независимый от статистического фильтра поиск по всем обычным записям с архивом и возврат выбранного фильтра после очистки строки. Следующая отдельная задача P04 — **UI-008**.
+- Публичный maintenance installer не заменён; текущий исходный код и официальный опубликованный установщик могут отличаться при одинаковом `APP_VERSION=1.0.8`. Не объявлять новый релиз.
+- PR #34 (полный аудит и отдельные исправления) остаётся самостоятельным не принятым пакетом; после этого merge его изменения в общем `tools/gui_regression_smoke.py` требуют повторной совместной проверки, прежде чем объединять #34.
 
-## UI-008 — кандидат / ожидает ручной проверки 2026-10-08
+## UI-008 — отдельный кандидат ожидает ручной QA — 2026-10-08
 
-- `UI-008` реализован изолированно на branch `candidate/p04-e-ui008-search-button`, draft PR #37, head `f8f03430d0ed77fddde18ba58e2db7b8030cead4`. **AUTOMATED PASS / AWAITING MANUAL QA / NOT MERGED**.
-- Только убрать дублирующую кнопку `Найти` в основном списке; live-search/Enter сохраняются. UI-009, UI-028, UI-076 и GLOBAL-FOCUS-001 не включены.
-- Windows CI run `37749509764` и publication wording `37749509711` = SUCCESS. QA ZIP сохранён на Drive: `1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ`, SHA-256 `44ef8a29606af13c7af3f4a9343a2c890e25a90bf43f67649a7499de21e0029d`.
-- Следующий шаг: только ручная QA UI-008, затем чистый перенос в `main` + точная post-merge проверка при PASS. Другие P04 части пока не начинать.
+- После принятого/закрытого P04-D подготовлен только UI-008: убрать кнопку `Найти` на основном списке, сохранив live-search/Enter, публичный список и отдельный UI-009.
+- Exact head `f8f03430d0ed77fddde18ba58e2db7b8030cead4`, draft PR #37. Windows regression `37749509764` = SUCCESS, wording `37749509711` = SUCCESS.
+- QA artifact `11537451402`, ZIP SHA-256 `44ef8a29606af13c7af3f4a9343a2c890e25a90bf43f67649a7499de21e0029d`; Drive ZIP ID `1ME2RkaJSUpME4PQE3-mIXZHjpaUP9XMQ`. ZIP CRC PASS, единственный installer SHA-256 `f96bc5804d3f19de8fbe18587f612cc57fcd4a17723eb95b4c40a1a9d4902815`.
+- **UI-008 = AUTOMATED PASS / AWAITING MANUAL QA / NOT MERGED.** CURRENT main остаётся принятым P04-D. Следующий UI-009 запрещён до ручной приёмки и отдельной технической финализации UI-008.
 
-## UI-008 — ручная QA выявила дефект / REOPENED — 2026-10-08
+## UI-008 — MANUAL FAIL / REOPENED (2026-10-08)
 
-- На присланном скриншоте основного списка кнопка `Найти` всё ещё отображается; 4/5 остальных ручных проверок PASS, 1/5 FAIL. **UI-008 не принят; PR #37 не merge.**
-- Candidate source `f8f03430d0ed77fddde18ba58e2db7b8030cead4` не содержит кнопку; проверка source GUI CI не равна проверке UI реально установленного EXE. Диагностика: путь/хэш активного процесса и использованного установщика, возможный старый экземпляр или альтернативный каталог, проверка упаковки/обновления той же 1.0.8.
-- До устранения причины и повторного ручного PASS очередь остановлена на UI-008. UI-009 и дальнейшие пакеты не начинать.
+- Пользователь прислал скриншот: в основном `Список` остаётся кнопка `Найти`. Остальные четыре ручные проверки пройдены. Итог: **FAIL 1/5, PASS 4/5**. Текущий кандидат НЕ принят, PR #37 открыт/draft, код UI-008 не в `main`.
+- Удаление `self.search_btn` подтверждено в исходном коде candidate, но текущий Windows CI не проверяет визуальный интерфейс установленного бинарника (только source GUI smoke плюс installed EXE startup/API), а каталог/хэш фактически запущенного пользователем `InOneLine.exe` пока неизвестны.
+- Требуется сопоставить исполняемый путь и SHA-256 процесса с установщиком из exact QA ZIP; не делать новый runtime patch до идентификации сбоя упаковки/установки/запуска. Существующий accepted P04-D в `main` остаётся неизменным. UI-009 НЕ начинать.
 
-## UI-008 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
+## UI-008 / P04 — закрытие после повторной установки — 2026-10-08
 
-- После первой QA (4/5 PASS, кнопка `Найти` осталась) пользователь повторно установил проверяемую сборку и прислал скриншот `Список` без этой кнопки. Суммарно **5/5 ручных сценариев PASS**. Первопричина первоначального отображения кнопки неизвестна; QA-наблюдение сохранить, не придумывать вывод об installer.
-- Чистый перенос проверенных файлов: PR #40, merge `f5e244d04db63ddb421213d3ee1272ed77aee55c`; pre-merge Windows `37771721603` + wording `37771721591`, точный post-merge Windows `37772054443` + wording `37772054420` — все SUCCESS. PR #37 закрыт без merge; принятый installer не пересобирался.
-- **Следующее по утверждённой очереди — UI-009**: удалить дублирующую кнопку `Сбросить фильтры` на основном списке, используя уже существующий крестик поля поиска, при этом сохранять выбранный statistic filter. UI-028 (Public `Найти`) и UI-076 (счётчик баллов) после отдельной приёмки.
+- Первоначальная ручная QA: 4/5 PASS, 1/5 FAIL (кнопка `Найти` оставалась). После переустановки пользователь прислал скриншот без `Найти` на `Список`; совместно с ранее подтверждёнными четырьмя пунктами — **ручной PASS 5/5**. Точная причина старого экрана неизвестна: путь и SHA запущенного EXE первой попытки не получены. Не считать это доказанным дефектом обновления.
+- Проверенный кандидат `f8f03430d0ed77fddde18ba58e2db7b8030cead4` / historical PR #37 закрыт без merge. Принятые Git blobs перенесены через PR #40, head `fa831a05d6e474337e1012752003be639d6ce9c6`; `main` merge commit `f5e244d04db63ddb421213d3ee1272ed77aee55c`.
+- Pre-merge Windows regression `37771721603` = SUCCESS, wording `37771721591` = SUCCESS; точный post-merge regression `37772054443` = SUCCESS, wording `37772054420` = SUCCESS. Два Git blob в `main` соответствуют ручному кандидату, без изменений иных файлов.
+- **UI-008 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. APP_VERSION 1.0.8, schema 19, 15 migrations, published installer и rollback не менялись. Следующий UI-009 только в отдельном candidate; проверка same-version reinstallation/frozen UI оставлена как QA-наблюдение, без неподтверждённого fix.
 
-## UI-009 — candidate / AWAITING MANUAL QA — 2026-10-08
+## UI-009 — подготовлен кандидат, ожидается ручной PASS — 2026-10-08
 
-- Exact candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e`, PR #42 (draft). Removes redundant main-list `Сбросить фильтры`; existing native clear X removes search text without changing statistic filter. No new state/subsystem; Public `Найти` and subsequent P04 scope preserved.
-- Windows regression `37772947602` + wording `37772947662` = SUCCESS; QA Drive ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9`; SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`.
-- Status: **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-028/UI-076 and further scopes wait for separate manual approval and technical closure.
+- Пакет после закрытого UI-008: только убрать `Сбросить фильтры` в основном `Список`; native clear X сохраняет выбранный filter `Не играл`/`Архив`. Не затрагивать Public/OBS/БД и другие P04 scope.
+- Exact code: `candidate/p04-f-ui009-clear-search` head `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e`, [draft PR #42](https://github.com/ALL-EX-E/InOneLine/pull/42). Only `games.py` + existing GUI smoke; sole unreferenced `reset_filters()` removed after repo-wide reference check.
+- Automated Windows regression `37772947602` = SUCCESS; wording `37772947662` = SUCCESS. Artifact `11547684618`, ZIP SHA-256 `d0d4c0b4cf5a96d428c829e27b19d5c77cc7c58d78d9c7b9e78e509447c24bb7`, one setup EXE SHA-256 `8d326e0386b536dd3403331897cf2c357e52fddcf29be78588c1b37d5f86441b`. ZIP CRC PASS.
+- Google Drive QA ZIP `1I6wRbxVqhXPmG_wI4bm4NaY3ujK1f-C9` size confirmed 46 756 918 bytes.
+- **UI-009 = AWAITING USER MANUAL QA / NOT MERGED.** Official published release/installer unchanged. Do not advance before manual QA + clean promotion + post-merge.
 
-## UI-009 — завершение 2026-10-08
+## UI-009 — технически закрыт 2026-10-08
 
-- **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** Пользователь принял 5/5 сценариев. Убрана лишняя основная кнопка `Сбросить фильтры`, native крестик очистки поиска сохраняет активный фильтр; единственный лишний helper `reset_filters()` убран после проверки ссылок.
-- Clean PR #44 merged `464136d144e054efcf38a10da8e075ed5fec8281`; pre-merge Windows `37778466982`, wording `37778467039`, exact post-merge Windows `37778963533`, wording `37778963540` — SUCCESS. Historical PR #42 closed without merge, accepted QA ZIP unchanged.
-- **Следующий отдельный шаг P04 — UI-028 (публичный поиск без кнопки `Найти`)**, затем UI-076 по дорожной карте; не включать другие UI задачи в UI-028.
+- Ручная приёмка 5/5 PASS, original candidate `2fd8fa5c31b94469e681aaf0d8b1f3699f0c354e` (PR #42 closed without merge). PR #44 перенёс два exact candidate Git blobs в `main` merge `464136d144e054efcf38a10da8e075ed5fec8281`.
+- Pre-merge Windows CI `37778466982` + wording `37778467039` SUCCESS; post-merge Windows `37778963533` + wording `37778963540` SUCCESS. UI-009 = **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**.
+- Удалены `Сбросить фильтры` и неиспользуемый `reset_filters()`, существующий крестик поиска/фильтры/Enter и Public List сохранены. 1.0.8/schema 19/15 migrations/accepted installer/rollback unchanged. Следующий scope — **UI-028** (Public `Найти`), только отдельным кандидатом.
 
-## UI-028 — candidate / AUTOMATED PASS / AWAITING MANUAL QA — 2026-10-08
+## UI-028 — isolated candidate, Windows PASS, ожидает ручной QA — 2026-10-08
 
-- UI-028 isolated branch `candidate/p04-g-ui028-public-find-removal`, head `e23e4d2fea50cdc6f962c3486244d4a018279c77` (draft PR #46), изменены только Public GUI и существующий regression smoke. Удалена `Найти` из `Публичный список`, сохранены live-search/Enter, подсистема фильтров основного списка и API.
-- Windows CI `37779716348` + wording `37779716372` SUCCESS. Drive QA ZIP `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`.
-- Status **AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**. UI-076 и дальнейшие шаги не начинать до ручной приёмки UI-028 и точной post-merge проверки.
+- После UI-009 CLOSED подготовлен UI-028 только для Public: удалить кнопку `Найти`; сохранить live-search, Enter selection/focus/sync/no-match, native X. Вне scope Main Games/OBS/DB/медиа/UI-076/GLOBAL-FOCUS-001.
+- Code head `e23e4d2fea50cdc6f962c3486244d4a018279c77`, draft PR #46, ровно два файла Public view + existing GUI smoke.
+- Windows regression `37779716348` SUCCESS; wording `37779716372` SUCCESS. GitHub artifact `11550914358`: ZIP SHA-256 `67e41ad6777bdea66b0f460998ad6014970d4c3b0e0e243bbcc93de3b43f1502`, CRC PASS; installer SHA-256 `fd9a9d70c74434c6f45b28e63cb6e0239dfe90b986802627701c92f685b5e967`. Drive ZIP ID `1INEdrDa7vnmkioU4C_DWswix-JVXJqfh`, verified 46 763 712 bytes.
+- **UI-028 = AWAITING USER MANUAL QA / NOT MERGED**. `main` по-прежнему принят до UI-009, VERSION 1.0.8/schema19/15 migrations и официальный релиз unchanged.
 
-## UI-028 — CLOSED / ACCEPTED / POST-MERGE PASS — 2026-10-08
+## UI-028 — техническое закрытие — 2026-10-08
 
-- Ручной PASS 5/5. Чистый PR #48 объединил точно проверенные два файла: merge `974515f8065c8aa11e9b244d9b4841d346259a64`. Original draft PR #46 закрыт без повторного merge.
-- Pre-merge CI Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — SUCCESS.
-- Следующий изолированный пункт `UI-076`: добавить справа информационный `Всего баллов: N` на основной статистической строке; существующий `_game_stats_conn` должен суммировать `sm_points` всех `auction_only=0` независимо от статуса/архива/фильтра. Без дополнительного SQL, Public, API, OBS и нового фильтра.
+- Ручная приёмка 5/5 PASS. Candidate `e23e4d2fea50cdc6f962c3486244d4a018279c77`, historic PR #46 CLOSED without merge. Clean PR #48 merged `974515f8065c8aa11e9b244d9b4841d346259a64`, два blob exact-match.
+- Pre-merge Windows `37795531310`, wording `37795531399`; exact post-merge Windows `37796011497`, wording `37796011272` — все **SUCCESS**. UI-028 **CLOSED / ACCEPTED / POST-MERGE PASS**.
+- Все текущие P04 удаления кнопок (`UI-008`, `UI-009`, `UI-028`) приняты; следующая отдельная задача `UI-076` — общий счётчик баллов только внутри основного «Список». Version/schema/migrations/accepted installer/rollback без изменений.
 
-## UI-076 — candidate / AUTOMATED PASS / AWAITING USER MANUAL QA — 2026-10-08
+## UI-076 — candidate готов, ожидает ручной приёмки — 2026-10-08
 
-- Точный candidate `ad6a913dceaa3ea05584211845a1c9755e5fdebf`, PR #50 (draft), основан на закрытом UI-028. Информационный счётчик справа в статистической строке через existing single-query `_game_stats_conn` + existing `games_refresh_snapshot -> _update_stats`. В сумме `sm_points` всех обычных записей с архивом независимо от фильтра; `auction_only=1` исключаются до materialization.
-- Regression Windows `37797159783` и wording `37797159654` SUCCESS. QA ZIP [Google Drive](https://drive.google.com/file/d/1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5/view) (46 774 807 bytes; declared GitHub artifact digest `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`).
-- **NOT ACCEPTED / NOT MERGED**. Следующий шаг — ручная проверка UI-076. Не начинать следующий самостоятельный пункт до приёмки и clean promotion + точного post-merge PASS.
+- Exact branch `candidate/p04-h-ui076-total-points` head `ad6a913dceaa3ea05584211845a1c9755e5fdebf` / draft PR #50; isolated 3 files: existing aggregate `_game_stats_conn` adds `COALESCE(SUM(sm_points),0) AS total_points` with `auction_only=0`, stat snapshot unchanged, non-clickable `QLabel` `Всего баллов: N` at right of existing stats buttons, current GUI smoke expanded.
+- Scope: normal entries all statuses + archived included; temporary auction-only excluded before materialization; no new DB connection, Public/OBS/API, filters, migration.
+- Windows CI `37797159783` **SUCCESS**; wording `37797159654` **SUCCESS**. GitHub QA artifact `11559571188`, ZIP 46 774 807 bytes, repository SHA-256 `5796783f2b563c4348174c9e5bed4dc0d7f34b5b957432fbc645c0fe7628297d`. Local CRC/hash verification unavailable; no independent checksum claim. QA Drive ID `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5`; file size verified 46 774 807 bytes.
+- **UI-076 = AUTOMATED PASS / AWAITING USER MANUAL QA / NOT MERGED**; `main` retains accepted UI-028. Version 1.0.8, schema 19, 15 migrations and published release unchanged.
 
-## UI-076 — REOPENED after MANUAL FAIL, fixed candidate AWAITING RETEST — 2026-10-08
+## UI-076 — MANUAL FAIL на 1100 px, исправлен; повторная QA ожидается — 2026-10-08
 
-- Пользовательские скриншоты: при 1100 px исходные фильтры и новый счётчик `Всего баллов: N` обрезались (пункт 6 FAIL; остальные 5 PASS). UI-076 **не принят**.
-- В первоначальном draft PR #50 обновлён код до head `cbc0056daba456e9c5bf3792f979ca6e9b6877c7`: адаптивный перенос только информационного QLabel вниз вправо при узком окне с возвратом в первый ряд при расширении. Агрегат SUM и старые кнопки неизменны. Тест окна `1100→1600→1100` и фильтров включён в existing GUI smoke.
-- Windows regression `37803969976` SUCCESS, wording SUCCESS; новый Drive ZIP `1XQ83iShKwVZapAxyhlp5neDIP5_Flu6I`, 46 772 444 байта, SHA-256 `c86caa20d0c7939997e15bd1d04bcbc741da34a92b8014238327a45139a63041`, проверка CRC PASS. Прежний `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5` — FAILED/SUPERSEDED (сохранён).
-- **Ожидается только повторная ручная QA исправленной сборки; не объединять с main до PASS.** Затем clean promotion и post-merge CI, после чего перейти по дорожной карте.
+- Ручная QA исходного UI-076: 5/6 PASS, шестой пункт FAIL по двум скриншотам: QLabel `Всего баллов: 500` и статистические фильтры обрезались на минимальной ширине 1100 px. Не считать UI-076 принятым.
+- В том же `candidate/p04-h-ui076-total-points`, PR #50 (draft), head `cbc0056daba456e9c5bf3792f979ca6e9b6877c7`, добавлен адаптивный перенос ТОЛЬКО QLabel на правую вторую строку при нехватке места; на широкой форме он возвращается справа первой строки. Десять фильтров, сумма `sm_points`, запрос/схема БД и обработчики без изменений.
+- GUI smoke теперь измеряет геометрию и полноту подписей при `1100 → 1600 → 1100`; Windows CI `37803969976` SUCCESS; wording SUCCESS. Новый артефакт GitHub `11562825039`, ZIP SHA-256 `c86caa20d0c7939997e15bd1d04bcbc741da34a92b8014238327a45139a63041`, CRC PASS, Drive ID `1XQ83iShKwVZapAxyhlp5neDIP5_Flu6I`. Старый Drive QA ZIP `1sRuOo4CX5ANiLBfnUMDSvCcWIvrlmKq5` оставлен как failed/superseded.
+- **Status = AUTOMATED PASS / AWAITING USER MANUAL RETEST / NOT MERGED.** Current main остаётся принятым UI-028, официальный релиз, версия 1.0.8, 15 миграций и схема 19 без изменений. Следующий пункт дорожной карты заблокирован до отдельного пользовательского PASS и технического закрытия.
 
-## UI-076 — layout на строке кнопок / AUTOMATED PASS / AWAITING MANUAL QA — 2026-10-08
+## UI-076 — новый макет по замечаниям пользователя, ждёт ручного подтверждения — 2026-10-08
 
-- Пользователь не принял UX второго кандидата (счётчик сдвигался в третью строку при узком окне). Третий кандидат PR #50 head `9608b6c557953797779e95dfb0a08806600f5330`: счётчик **всегда на одном уровне** с `Правила сортировки`, `Копировать URL списка`, `Открыть предпросмотр списка`; правый край выравнивается с `Не кооп` на предыдущем ряду через реальную геометрию Qt. Сумма/фильтры/архив не изменены. Промежуточный off-by-spacing FAIL 9px исправлен, Windows CI `37808003241` SUCCESS.
-- Новый QA ZIP [Drive](https://drive.google.com/file/d/1DMqTUTMv4slMcFiXMnx7sdAYFNDi38h8/view), SHA-256 `30ba79754efc53feafac86412184daea4f796f8d8735fff9ddf4a712a82a42bf`, CRC PASS, 46 785 061 байт. Два прежних ZIP historical/superseded. **Ожидать ручной PASS; UI-076 пока NOT MERGED**.
-- **P06** — отдельно от UI-076 уменьшить минимальный размер окна ниже текущих 1100×700 и добавить горизонтальную прокрутку. Не вносить в UI-076 и проверить новый anchor badge в рамках P06 с горизонтальной прокруткой на меньших ширинах.
+- Пользователь показал два скриншота узкого/широкого окна: второй фикс устранил усечение, но QLabel `Всего баллов: N` уезжал на отдельную промежуточную строку при сужении. Утверждён целевой макет: счётчик в строке трёх кнопок сортировки/URL/предпросмотра, правый край точно под правым краем `Не кооп`, без изменения расположения десяти фильтров.
+- Actual code branch `candidate/p04-h-ui076-total-points`, head `9608b6c557953797779e95dfb0a08806600f5330`, draft PR #50. Новый `sorting_actions` QLabel + геометрический Qt anchor, не меняет SQL/DB schema, данные или UI-state. Скриншоты повторной ручной приёмки ожидаются.
+- Windows CI `37808003241` SUCCESS, wording exact head SUCCESS. Новый QA ZIP `1DMqTUTMv4slMcFiXMnx7sdAYFNDi38h8`, GitHub artifact `11564056115`, SHA-256 `30ba79754efc53feafac86412184daea4f796f8d8735fff9ddf4a712a82a42bf`, 46 785 061 bytes, CRC PASS. Предыдущие 2 UI-076 ZIP superseded. UI-076 **NOT MERGED / AWAITING USER MANUAL QA**.
+- **P06 future** уменьшение минимального размера и горизонтальная прокрутка подтверждено пользователем, при выполнении отдельно проверить выравнивание счётчика на ширинах ниже 1100. Сейчас не менять размер окна, масштабирование, таблицу и существующую прокрутку.
 
-## UI-076 — stable position 2 / new QA candidate pending acceptance — 2026-10-08
+## UI-076 — stable placement candidate (место 2), ручная QA ожидается — 2026-10-08
 
-- Пользователь выявил горизонтальное дёргание QLabel при перетаскивании границы окна из-за dynamic resize spacer. Исправление **не переносит позицию вручную**: QLabel стоит в `sorting_actions` непосредственно после третьей кнопки `Открыть предпросмотр списка` (вариант 2). Предыдущие `QSpacerItem`, `showEvent/resizeEvent`, выравнивание по `Не кооп` удалены как источник jitter. `Очистить список` и скрытые `В архив`/`Восстановить` не затронуты.
-- GitHub [draft PR #50](https://github.com/ALL-EX-E/InOneLine/pull/50) head `220adcc78778a43265a855045bf694a5e5d75d03`. Windows regression `37810486613` SUCCESS (7 widths incl. 1100/1600); wording SUCCESS. Новый [Drive QA ZIP](https://drive.google.com/file/d/1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA/view), SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`, 46 769 147 bytes, CRC PASS. Другие три UI-076 ZIP superseded/historical.
-- **UI-076 не принят и не merged; ожидается ручная QA именно 4-го кандидата.** Затем clean promotion + exact post-merge Windows CI.
-- Напоминание: **P06** остаётся отдельной утверждённой задачей уменьшить минимум окна ниже 1100 и добавить горизонтальную прокрутку. UI-076 не содержит P06.
+- По новым скриншотам прошлое выравнивание относительно «Не кооп» дрожало при resize из-за QHBox spacer mutation. Пользователь предложил места 1 или 2, указал на скрытые action-кнопки и уезжающее `Очистить список` при выборе места 1. Для минимального стабильного scope выбран вариант **2**: QLabel в существующей сортировочной строке сразу после `Открыть предпросмотр списка`, обычный Qt spacing; удалены `QSpacerItem`, собственный `resizeEvent/showEvent` и геометрические пересчёты. Скрытые кнопки/очистка списка не изменены.
+- Code candidate `candidate/p04-h-ui076-total-points` head `220adcc78778a43265a855045bf694a5e5d75d03`, PR #50 OPEN/DRAFT. GUI Windows test 7 последовательных ширин и отсутствие горизонтального jitter; Windows run `37810486613` SUCCESS, wording SUCCESS. БД/агрегат и фильтры без изменений.
+- Новый QA ZIP `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`, GitHub artifact `11564293733`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`; local ZIP CRC PASS, one installer. Три предыдущих UI-076 кандидата superseded, не заменяются/не удаляются.
+- **UI-076 AWAITING USER QA / NOT MERGED.** Main retains accepted UI-028, App version 1.0.8, schema 19, 15 migrations, installed accepted release unchanged. Future P06 (smaller minimum + horizontal scroll) separate.
 
 
 ## UI-076 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-08
 
-- Ручной PASS пользователя: «Всё работает. Идём дальше» для кандидата со стабильной позицией 2 — счётчик сразу после «Открыть предпросмотр списка», без пересчёта геометрии при resize.
-- QA ZIP `11564293733` / Drive `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`.
-- Clean promotion PR #55 merged as `5d8ee1e2d7fb7be57246ff332cf603dc970b54fc`; exact candidate blobs are present. Original candidate PR #50 closed without merge.
-- Pre-merge Windows `37814527293` + wording `37814527185`/`37814518804`; exact post-merge Windows `37814970241` + wording `37814970284` — all **SUCCESS**.
-- **P04/UI-076 CLOSED.** Version 1.0.8, schema 19, 15 migrations, published release and rollback unchanged.
-- Следующий пункт очереди: **P05 — Public file export + removal Настройки → Экспорт**. Перед runtime-изменением требуется fresh scope review exact CURRENT и отдельное явное одобрение пользователя.
+- Пользователь вручную принял стабильное размещение счётчика после «Открыть предпросмотр списка»: «Всё работает. Идём дальше».
+- QA package: `InOneLine_UI_076_STABLE_POSITION_2_CANDIDATE_1.0.8_WINDOWS_QA.zip`, artifact `11564293733`, 46 769 147 bytes, SHA-256 `18ae42c5e2544c62dfbd646d22828150823623d88ed49bb35ee6d4600b50189b`; Drive file `1Ohsul5NaTtGP7J_TCKMytBuY-E8N22dA`.
+- Clean promotion PR [#55](https://github.com/ALL-EX-E/InOneLine/pull/55), merge commit `5d8ee1e2d7fb7be57246ff332cf603dc970b54fc); original candidate PR #50 закрыт без merge. Candidate QA bytes не пересобирались и не заменялись после ручной проверки.
+- Точные runtime blobs в `main`: `streaming_manager/db/games.py` `3d14e9df676dbefbad80e4942d8e8d267eb7f0dc`; `streaming_manager/views/games.py` `f6ca072489e30b99ac7f28859669910a0edc94ce`; `tools/gui_regression_smoke.py` `669e32f4961b865550aafa9f35fbf71dbca92f5c`.
+- Pre-merge Windows regression `37814527293` and wording gates `37814527185` / `37814518804` — **SUCCESS**. Exact post-merge Windows regression `37814970241` and wording gate `37814970284` — **SUCCESS**.
+- UI-076 **CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS**. App/release version `1.0.8`, SQLite schema `19`, migrations `15`, official release and rollback remain unchanged.
+- Следующий пункт утверждённой очереди — **P05: Public file export + removal Настройки → Экспорт**. Сначала fresh scope review exact CURRENT; runtime changes ждут отдельного явного пользовательского одобрения.
 
 
 ## P05 — свежий review exact CURRENT завершён; ожидает batch approval — 2026-10-08
 
-- Review проведён по `main` `eb123eb99d9913db2d6ee2694471dc99f8b9d569`. Runtime P05 не менялся.
-- Объём UI-088/UI-089/UI-090 подтверждён: перенос трёх existing file-export actions на `Публичный список`; отдельное пояснение snapshot vs auto-update XLSX mirror; удаление legacy compatible-export controls и внутренней вкладки `Настройки → Экспорт`.
-- Existing public exporters/data contract и `/api/public` сохраняются; старый импорт `Название|Баллы` остаётся совместимым. Regression gate должен проверять новые кнопки/отсутствие дублей, четыре оставшиеся вкладки настроек и сохранность зеркала/импорта.
-- **READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Код не менять до отдельного прямого одобрения пользователя.
+- Exact CURRENT: `main` at `eb123eb99d9913db2d6ee2694471dc99f8b9d569`; app 1.0.8, SQLite schema 19, 15 migrations. Runtime/UI P05 не менялись.
+- P05 объединяет ранее одобренные решения UI-088/UI-089/UI-090: перенести единственные файловые кнопки CSV/JSON/Excel на `Публичный список` в отдельный блок `Экспорт списка`; объяснить, что это одноразовый снимок, в отличие от продолжающегося XLSX-зеркала; удалить совместимый pipe-export UI и вкладку `Настройки → Экспорт`.
+- Уже существуют `PublicTab.export_csv/export_json/export_xlsx` и общий backend `streaming_manager.exporters`; они используют полный `db.public_games()` dataset (без archived и `auction_only=1`, в каноническом порядке) и не добавляют `СТАРТ/ТЕКУЩАЯ`. Эти семантики и отдельный auto-update workflow `Публичная таблица` сохраняются. `/api/public` остаётся без нового UI-входа.
+- В `SettingsTab` сейчас пять внутренних вкладок, включая `Экспорт`; там же находятся три Public file actions и legacy `Экспорт CSV` / `Копировать список`. `tools/gui_regression_smoke.py` жёстко проверяет старые пять вкладок и пока не проверяет перемещённый блок: gate следует обновить, проверить единственные кнопки на Public, отсутствие legacy controls/Export tab, сохранность XLSX mirror и импорта старого headerless `Название|Баллы`.
+- Review note: текущий Settings save helper автоматически нормализует расширение файла; существующий Public helper этого не делает. При переносе сохранить корректный суффикс CSV/JSON/XLSX, одновременно переиспользуя существующие `PublicTab.export_*` и exporters.
+- `AuctionTab.legacy_export_page` в `streaming_manager/views/auction.py` создаётся, но не добавляется в `auction_tabs` (там остаются только `Лоты` и `Проведение`). Его callbacks используют legacy pipe helpers; после удаления Settings Export провести exact caller audit и удалять эту недоступную страницу/helper только если tests, imports и другие callers не требуют их. Импортёр в `streaming_manager/db/services.py::import_csv` сохраняет pipe import compatibility.
+- **Статус: FRESH REVIEW COMPLETE / READY AFTER BATCH APPROVAL / NOT IMPLEMENTED.** Требуется отдельное прямое пользовательское одобрение начала P05; до него runtime не менять.
 
-## P05 status update — 2026-10-09
+## P05 status — 2026-10-09
 
 - Пользователь подтвердил: «Работает. Записывай и идём дальше». Initial manual PASS относится к Public CSV/JSON/Excel actions, обоим XLSX mirror flows, удалённому Settings Export UI и исчезновению пустого прямоугольника на `Аукцион`.
 - Проверенный кандидат: `9eb8aae28a2d85709e4090dce4cb12badc4b6607`; QA ZIP `InOneLine_P05_AUCTION_HOST_FIX_CANDIDATE_1.0.8_WINDOWS_QA.zip`, Drive ID `1TV2hvEz4-uVpk3ax07r9kCfnsmKQcz_y`, 46,762,701 bytes, SHA-256 `1d6df043f106d9656d4476d3cac77376d485cc4a87230a2c2ac076d48909060e`.
@@ -461,6 +757,96 @@ Release cadence считает **только принятые CURRENT/released 
 - Clean promotion PR #66 reused the exact 15 candidate blobs from main `aae15c30ebd69b79d87bf3aeaf5a58a701e27884`; merged as `e9a8919357eeb4cb182e847ef115058e6c253f58`. Candidate PR #65 closed without merge.
 - Pre-merge Regression Foundation `37936833848` and publication wording gate `37936833837`: **SUCCESS**. Exact post-merge Regression Foundation `37937370459` and wording gate `37937370714`: **SUCCESS**.
 - **P06 = CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS.** App 1.0.8, schema 19, migrations 15, published release and rollback remain unchanged. Next roadmap package: **P07 — position policy + XLSX derived position**.
+
+
+## P07 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- User confirmed manual candidate PASS: «Работает. Идём дальше» after focused Shared XLSX and position-policy QA. Original functional, 2560×1440/compact layouts and both Auction presentation scenarios were accepted earlier.
+- Exact accepted artifact: GitHub Windows QA `11627206204`, 46,789,798 bytes, SHA-256 `0556c9d5a1bd00cb11f9bd1190243f17570e7622a18875133a6841198e5c4de9`; same ZIP at [Drive](https://drive.google.com/file/d/1CMX8uX5BNsMYxG8DKf5cAoQDlv573_12/view). Candidate runtime validated on Windows `37952905531` and documentation-only follow-up `37953728981`, both **SUCCESS**.
+- Clean promotion PR [#70](https://github.com/ALL-EX-E/InOneLine/pull/70) copied **exactly 13 Git source/test blob SHAs** from the user-tested candidate without recompilation or code changes. Premerge Windows run `37954975909` and wording `37954975953`: **SUCCESS**. Merge commit `f3d78a5b78862e78807c09694a3655fab800ee52`. Independent postmerge Git blob verification: **13/13 identical** to candidate. Exact postmerge Windows `37955458936` and wording `37955458951`: **SUCCESS**. Superseded candidate PR #68 closed **without merge**; rejected PR #69 also remains closed without merge.
+- P07 behavior delivered: main/public one calculated current position; Auction/Auction Lots overlay adapt one vs start/current columns and preserve elimination progress between rounds; Shared and Public XLSX calculated position projection, legacy Shared read compatibility and safe external edit preservation; wide/narrow header/filter polish. P05 one-off exports unchanged. No runtime version/schema/migration/RNG/auction business semantics change.
+- **P07 CLOSED. P08 (BUG-005/UI-039) is next for fresh exact-CURRENT source review**, then one isolated candidate and manual QA. No P08 runtime change included in P07 clean promotion. APP_VERSION 1.0.8; SQLite schema 19 / 15 migrations; published installer/rollback remain unchanged.
+
+
+## P08 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- User's exact manual PASS: «Всё работает. Записывай и продолжаем делать дальше» for P08 candidate. Source QA ZIP `InOneLine_P08_MEDIA_DEDUP_AVAILABILITY_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Drive](https://drive.google.com/file/d/1Bs7VyDhOkazRVXiaqOdxFZ0YiE8R3UZg/view), artifact `11628691932`, 46,781,334 bytes, SHA-256 `05a7fd822c6f2f145e150948cd18088c9d92988e8d65ccc2a09e7479a6a1fd9d`.
+- Clean promotion PR [#72](https://github.com/ALL-EX-E/InOneLine/pull/72) copied **exactly four tested Git source/test blob SHAs**, excluding draft documentation, from P08 candidate PR #71 without source edits or artifact rebuild. Premerge Windows `37958764542` = SUCCESS; publication wording `37958764547` = SUCCESS. Merged as `4f92b80d33b1220835896d662a12224d99f91af2`. Independent `main` comparison = **4/4 exact blobs**. Postmerge Windows `37959168279` = SUCCESS; wording `37959168295` = SUCCESS. Draft PR #71 closed without merge.
+- Delivered BUG-005/UI-039: shared case-insensitive media identity in both main/Auction Lots background selectors, no duplicate managed/external file rows, external→managed promotion preserving media ID, coordinated available-only selectors, removal of obsolete manual repair action, safe missing-file selection reset. Existing D26 media sync extended to managed overlay backgrounds; missing external references remain registered. Video-copy race guarded. All media/user state outside this approved category unchanged.
+- **P08 CLOSED.** APP_VERSION 1.0.8; SQLite schema 19 / 15 migrations, published release and rollback unchanged. Next: **P09 Stream/OBS structural cleanup**, starting as isolated UI-033 OBS help text, then UI-034–UI-043 according to existing ledger; each scoped substep needs its own Windows/manual gate.
+
+
+## P09 / UI-033 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-09
+
+- User manually tested and confirmed «Всё работает. Идём дальше». Accepted exact Windows QA ZIP: `InOneLine_P09_UI033_OBS_HELP_CANDIDATE_1.0.8_WINDOWS_QA.zip`; [Drive](https://drive.google.com/file/d/1m47jnKVKcV5SUTJlWhk5KjgvG7gDDL8L/view), artifact `11630113395`, 46,790,077 bytes, SHA-256 `9d6239a8915bd5e30e62e24eefa918a4773dad1dc9f41b45a321b4c20d4741bb`.
+- Clean accepted two-blob promotion PR [#74](https://github.com/ALL-EX-E/InOneLine/pull/74), using exact Git blobs from tested code candidate PR #73. Premerge Windows `37965769207` + wording `37965769301`: **SUCCESS**; merge `b580b7067000df035944d68889405e5c0cdcb18a`; `main` blob verification **2/2 identical**; postmerge Windows `37966164330` + wording `37966164142`: **SUCCESS**. Draft PR #73 closed without merge.
+- UI-033 improved Russian-language help and audio/OBS Browser Source advice only. No audio engine, overlay, settings, code navigation, app version or schema changes. **UI-033 CLOSED. P09 package remains IN PROGRESS**; next isolated substep UI-034 moves existing title typography controls immediately below Current Game while retaining the same three keys and shared save action.
+
+
+## P09 / UI-034 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- User manual PASS for tested UI-034 package: «Работает. Записывай и идём дальше». Exact Windows QA ZIP `InOneLine_P09_UI034_TITLE_FONT_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Drive](https://drive.google.com/file/d/11AiWZcBq6xgJ4UNdfGawuWnja1noUblE/view), GitHub artifact `11633138736`, 46,795,736 bytes, SHA-256 `8e824d53e2f5b4d2734299fc360c65f5f3589cab155e6666d24f7dd6113d282d`.
+- Clean exact two-source/test-blob promotion [PR #76](https://github.com/ALL-EX-E/InOneLine/pull/76) from draft candidate PR #75 without source code changes. Premerge Windows `38026996499` SUCCESS, wording `38026996429` SUCCESS. Merge `030e95c1c6255c598be177b01eb389ed46d27aa1`; 2/2 Git blob SHAs verified identical in main to manually tested candidate. Postmerge Windows `38027189063` SUCCESS; wording `38027189010` SUCCESS. Candidate PR #75 closed without merge.
+- UI-034 delivered the *existing* `title` font controls directly below current game selection, preserving all six typography registries and `overlay_font_title_*` keys, color picker/pipette and existing StreamTab.save bulk persistence, no new handlers or runtime overlay/data changes.
+- **P09/UI-034 CLOSED. P09 package IN PROGRESS.** Next isolated accepted task UI-035: place all informational block UI controls together, preserve live overlay layout rules and existing settings keys. APP_VERSION 1.0.8, schema 19 / 15 migrations unchanged.
+
+
+## P09 / UI-035 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- User reported manual Windows acceptance: «Работает. Записывай и идём дальше.» Exact accepted QA ZIP `InOneLine_P09_UI035_INFO_PANEL_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Drive](https://drive.google.com/file/d/1t1ITj_MnODe5tGFZy9VcYd7NgFCeTEl3/view), GitHub artifact `11660757645` (46,781,067 bytes), SHA-256 `0c4314e71438dfe5ed014da70a87125e0ffe45190811dbe3d022498dd64958d6`.
+- Clean exact-two-blob promotion via [PR #78](https://github.com/ALL-EX-E/InOneLine/pull/78), from PR #77 without source edits or candidate docs; premerge Windows `38028691707` SUCCESS and wording `38028691712` SUCCESS. Merge `601959832ff7cfce524cd5a469e32cb9e20418dc`; 2/2 source/test Git blobs verified identical in `main`; postmerge Windows `38028878671` SUCCESS and wording `38028878636` SUCCESS. Draft candidate PR #77 closed without merge.
+- Delivered one thematic `Информационный блок` with existing text, show checkbox, position, glow frame color and original info typography grouped together. Disabled info preserves text and hides dependent controls; exact keys and `StreamTab.save()` unchanged; OBS browser geometry/audio unchanged. App 1.0.8, schema 19 / 15 migrations unchanged.
+- **P09/UI-035 CLOSED / P09 IN PROGRESS.** Next approved isolated substep **UI-036**: local Save buttons after each currently independent main-overlay settings group, all calling the same existing `StreamTab.save()` and preserving single bulk save. Specialized timer/music/player saves remain untouched.
+
+
+## P09 / UI-036 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- User manually accepted tested UI-036 QA: «Работает. Записывай и идём дальше». Exact ZIP `InOneLine_P09_UI036_LOCAL_SAVE_CANDIDATE_1.0.8_WINDOWS_QA.zip` in [Google Drive](https://drive.google.com/file/d/1g0Wsr8-6--Dm-bWMUCq6Ny0cA8iqnHSL/view), artifact `11661550875`, 46,790,281 bytes, SHA-256 `dc9949033e7556fbd0791bce8702cb7549e7f10dc275eec4aae28332447b4403`.
+- Clean exact two-blob promotion [PR #80](https://github.com/ALL-EX-E/InOneLine/pull/80), approved candidate draft PR #79 closed unmerged. Premerge Windows `38030015962` SUCCESS; wording `38030015938` SUCCESS. Merge `131d9d61b03acf71d537de8ccd99c082e913b743`; both Git blobs verified identical in `main` to tested candidate. Postmerge Windows `38030194087` SUCCESS and wording `38030194086` SUCCESS.
+- Six identical primary `Сохранить` actions after existing main-overlay settings groups (current game, info, format, background, appearance, typography) use existing single `StreamTab.save()` atomic/bulk settings writes. Old duplicate bottom Save removed. Specialized widget save handlers unchanged, no new settings, audio or geometry changes.
+- **UI-036 CLOSED / P09 still IN PROGRESS.** Next isolated UI-037: place existing Format and game-frame glow/color+pipette within thematic `Игровое окно` group; reuse existing widgets, `stream_format` and `overlay_frame_game_color` keys, existing local save, preserve game-frame layout and transparency. No migration or app version change.
+
+
+## P09 / UI-037 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- User manual Windows PASS on accepted candidate: «Работает. Записывай и идём дальше». Exact QA ZIP `InOneLine_P09_UI037_GAME_WINDOW_CANDIDATE_1.0.8_WINDOWS_QA.zip` on [Google Drive](https://drive.google.com/file/d/1kWhib640aahnxYxdEWgINS7b-_iot8FV/view); artifact `11661672998`, 46,785,146 bytes, SHA256 `17415f51867984b78cc8f093f97b645882f6d5458aaaa3f5bb9cd0ac54e430da`.
+- Exact two-Git-blob promotion [PR #82](https://github.com/ALL-EX-E/InOneLine/pull/82), candidate PR #81 closed unmerged. Windows premerge `38031399579` SUCCESS, publication wording `38031399548` SUCCESS. Main merge `5e7fac15977480e846aba544b47064f99f4b1a8f`; 2/2 exact Git blobs verified. Windows postmerge `38031591029` SUCCESS, wording `38031591043` SUCCESS.
+- Existing Game Window format and frame color/pipette now grouped under `Игровое окно`. Previous geometry, opacity, browser output and persistence unchanged, shared section Save unchanged, version 1.0.8/schema 19/migrations 15 unchanged. **UI-037 CLOSED**.
+
+## P09 / UI-038 — CLOSED / ALREADY DELIVERED, VERIFIED / NO REDUNDANT PATCH — 2026-10-10
+
+- Ledger requested preserving `Фон оверлея` elements and adding its local Save. Source inspection on the **manually accepted and merged UI-037 main** verifies original asset selector, add-background action including managed/external mode, source, status, stretch/contain/cover/center and help text all live together in one unchanged `Фон оверлея` block.
+- `add_main_save("background")` was already delivered and manually accepted with UI-036, all six main-overlay save buttons sharing the existing `StreamTab.save()` atomic/bulk persistence. P08 completed shared media-dedup and availability semantics (BUG-005/UI-039), including removed `Восстановить ссылку` button and safe missing-file fallback; P08 was manually accepted and postmerge Windows passed.
+- Thus **UI-038 fulfilled without new code, new installer or additional user QA**: it is already covered by existing user-accepted builds and regressions. **UI-039 and BUG-005 were CLOSED in P08**. Next genuinely unimplemented substep **UI-040** groups Webcam settings and retains the approved relative order Webcam → List → Info; not to change overlay runtime geometry/placement.
+
+## P09 / UI-040 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
+
+- Пользователь подтвердил весь manual checklist: «Всё работает. Принимаю, записываем и идём дальше.» (2026-10-10 15:48:50 +07 / 08:48:50 UTC). Проверены общий порядок Веб-камера → Список → Информационный блок, положение и цвет рамки веб-камеры, пипетка, скрытие зависимых настроек, сохранение/перезапуск и OBS-предпросмотр.
+- Exact accepted QA ZIP: `InOneLine_P09_UI040_WEBCAM_ORDER_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Google Drive](https://drive.google.com/file/d/1fCc3LRnLtbiy8INBT1o0ysSs4V8KmOjc/view); GitHub artifact `11663095396`, 46,784,637 bytes, SHA-256 `ac221638e017f46e2afea4454c1dcfebdd19ee3cfd5e87466576d67ef4ec7433`. Tested source/test commit `7460dd9fb5d2de10cb3d6fbf833ac864681f714b`; accepted Windows run `38031932881` SUCCESS. Manual acceptance recorded on candidate as `5e1cb8c4bfb48e1b7b69741ebf6db8f859635475`.
+- Clean promotion [PR #84](https://github.com/ALL-EX-E/InOneLine/pull/84) copied only the exact two accepted Git blobs, without source changes or replacing the user-tested installer: `streaming_manager/views/stream.py` = `5c557a91f80a6c75818ee2dcf34d6e911152561b`; `tools/gui_regression_smoke.py` = `dbd512c5830ce1745106808c6092f73994b244c5`. Promotion head `590022e5128ed81a7c5da484b73446fc1cf80bfd`; premerge Windows `38039319109` and wording `38039319011` / `38039316918` SUCCESS.
+- Main merge `1d9a906aefc9984cd36439798c200a722c9581b6`: independent Git-tree readback confirms **2/2 exact accepted blobs**. Exact postmerge Windows [38039495072](https://github.com/ALL-EX-E/InOneLine/actions/runs/38039495072) and wording `38039495077`: **SUCCESS**. Original draft candidate PR #83 is superseded by #84 and closed without merge.
+- Existing webcam checkbox, position selector, frame color/pipette and shared local Save now form one `Веб-камера` block. Conditional visibility and stored values preserved; sidebar settings order Webcam → List → Information accepted. Overlay runtime geometry, data, routes, settings keys and specialized saves unchanged.
+- **UI-040 CLOSED; P09 IN PROGRESS.** Next approved isolated step **UI-041**: consolidate existing List show/position/frame, Top-1/2/3/list typography, standalone list URL/preview actions and shared local Save into one `Список` group. App 1.0.8 / SQLite schema 19 / 15 migrations; published release and rollback unchanged.
+
+## P09 / UI-041 — WINDOWS CANDIDATE PASS / AWAITING MANUAL QA / NOT MERGED — 2026-10-10
+
+- After user acceptance and exact postmerge closure of UI-040, implemented the already approved UI-041 scope in isolated `candidate/p09-ui041-list-group` from canonical `main` `241aa29acd887e24fdff6149740238b20efcf644`. Draft [PR #85](https://github.com/ALL-EX-E/InOneLine/pull/85); code/test head `eedb5c60b467515a7e542df6ad6b59fdc3f25b88`. Only two source/test files changed: `streaming_manager/views/stream.py` blob `e3ef5d3b81d573fd48021af4702edaf9813e54aa`; `tools/gui_regression_smoke.py` blob `a2b17c0fe8dca378250b97448b54108623b8d3c6`. Local vs GitHub hashes identical.
+- Existing List show/position/frame color+pipette, four typography rows, standalone copy/preview actions and one shared bulk Save are grouped together under `Список`. Checkbox `Показывать на оверлее` and labelled `Положение списка`; obsolete generic typography block/save removed. Current six main-overlay thematic Save buttons retain the original bulk handler. Webcam → List → Information order preserved. Embedded-list disable hides position/frame/typography without discarding values or disabling separate `/list-overlay` actions; handlers, keys and browser routes reused.
+- Real Qt/SQLite TDD: new helper failed on exact base (old switch label), then PASS on candidate. All distinct list font sizes/colors, frame/side/show values persist through shared Save and refresh; standalone clipboard/preview callbacks work while embedded list is disabled. Existing P09 regression checks PASS locally. Native main-window visual probes at widths 520/1100/2560 confirm accessible moved actions and adaptive typography rows. Compileall/diff check PASS; AST scope audit: only constructor and existing conditional-visibility helper changed, all 55 other StreamTab methods unchanged.
+- Independent read-only Superpowers code review: no Critical/Important/actionable Minor findings; independent fresh-DB helper PASS and exact-base expected failure confirmed. Linux offscreen full suite hits the same unrelated P06 compact-tab font-fitting baseline failure on accepted UI-040 and candidate; this does not replace the canonical Windows gate.
+- Full Windows [Regression Foundation 38040034301](https://github.com/ALL-EX-E/InOneLine/actions/runs/38040034301) **SUCCESS**, exact head `eedb5c60b467515a7e542df6ad6b59fdc3f25b88`: native GUI including `P09_UI041_LIST_GROUP_SHARED_SETTINGS_AND_STANDALONE_ACTIONS=PASS`, DB/backup/legacy/media/source/integrity, frozen startup/browser sources, installer build and silent installed startup all PASS. Wording runs `38040034325` (PR) and `38040032265` (push) SUCCESS.
+- Manual QA archive: `InOneLine_P09_UI041_LIST_GROUP_CANDIDATE_1.0.8_WINDOWS_QA.zip`, [Google Drive](https://drive.google.com/file/d/1XrswFhp9s0bVE_NOhiwWcse2QUPD_dTR/view), folder `Обзор_UI_1.0.8`. GitHub artifact `11665466642`; **46,790,609 bytes**, SHA-256 **`7e1938624027ffbff97d7769b62759c1887cc780ee6f56879da84fddae3402c4`**. Downloaded bytes independently match GitHub size/digest; ZIP CRC PASS; exactly one `InOneLine_Setup_1.0.8.exe`. Drive readback confirms name, same size and expected QA folder. This exact ZIP is the manual-test package.
+- **UI-041 AWAITING USER MANUAL QA / NOT MERGED.** Main runtime remains accepted UI-040; P09 IN PROGRESS. Next isolated step after UI-041 acceptance/clean promotion/postmerge PASS: **UI-042**, distribute actual OBS URLs/actions and server status into their appropriate sections. App 1.0.8 / schema 19 / 15 migrations, official release and rollback unchanged.
+
+Полный ручной checklist UI-041 (весь список проверяется одной сборкой):
+1. Закрыть программу, установить проверенный QA installer и открыть Стрим / OBS; пользовательские данные сохранены.
+2. Порядок Веб-камера → Список → Информационный блок; в Список находятся переключатель, положение, рамка, Top-1/2/3/прокручиваемая часть, две list-only кнопки и одна Сохранить. Отдельного Шрифты оверлея больше нет.
+3. Авто/Справа/Слева после Сохранить управляют встроенным списком главного оверлея; авто продолжает следовать за стороной веб-камеры.
+4. Цвет рамки через диалог и пипетку сохраняется; рамка корректна в главном и отдельном списке.
+5. Для Top-1, Top-2, Top-3 и Прокручиваемого списка проверить семейство, размер/шаговые кнопки, цвет/пипетку; после Сохранить изменения видны в обоих OBS-вариантах. Для прокручиваемой части нужен список минимум из четырёх игр.
+6. Выключить Показывать на оверлее и сохранить: положение/рамка/шрифты скрываются, встроенный список исчезает; две кнопки отдельного списка продолжают работать, копируется /list-overlay и открывается отдельный список.
+7. Снова включить переключатель: выбранные положение, рамка и все шрифты возвращаются. После сохранения и перезапуска значения и состояние переключателя сохраняются.
+8. Обычный, минимальный и широкий размеры: все controls и обе list-only кнопки доступны через существующую прокрутку; порядок и соседние блоки не нарушены.
 
 
 ## P09 / UI-041 — CLOSED / MANUALLY ACCEPTED / MERGED / POST-MERGE PASS — 2026-10-10
@@ -539,29 +925,6 @@ Release cadence считает **только принятые CURRENT/released 
 - **UI-043 CLOSED; P09 CLOSED.** UI-033–UI-043 accepted and closed, including UI-038 satisfied by UI-036/P08. Next already approved isolated step **P10 / GLOBAL-OBS-VISIBILITY-001**: common persisted show-mode and preview override for all seven existing standalone Browser Sources; retain Music's accepted event behavior, use the approved wheel-context predicate, and preserve local operator/business/audio state. Subsequent UI-045/UI-046/UI-049/UI-055 presentation/audio-help work follows separate candidate acceptance. UI-044 remains superseded by UI-090. App **1.0.8 / schema19 / 15 migrations**; official release/rollback unchanged.
 
 
-## P10 / GLOBAL-OBS-VISIBILITY-001 — WINDOWS QA CANDIDATE / AWAITING MANUAL ACCEPTANCE — 2026-10-10
-
-- Current accepted main product remains **P09/UI-043 CLOSED**; P10 implementation is isolated in draft [PR #91](https://github.com/ALL-EX-E/InOneLine/pull/91), branch `candidate/p10-obs-show-mode`, current code/test head `ea6d4b226c0358152af74ad71c36dbf87c254c3c`. **P10 NOT MANUALLY ACCEPTED / NOT MERGED.**
-- Scope: common persisted show-mode + preview override for all seven OBS Browser Sources. Five widgets: hidden/always; Music: hidden/track-change/always; Wheel: hidden/context/always; Rules: legacy hide setting fallback until first authoritative Save. Hidden normal sources retain data/poll/audio/business state, preview always remains visible, no new event/spin generation. App **1.0.8 / schema 19 / 15 migrations** unchanged; other P10 presentation steps remain later.
-- Initial candidate Windows regression `38052563999` failed in a real-browser smoke because normal and preview Chromium top-level windows were fully overlapping and the occluded normal page failed to receive a subsequent visibility update. Test-only fix [`ea6d4b2`](https://github.com/ALL-EX-E/InOneLine/commit/ea6d4b226c0358152af74ad71c36dbf87c254c3c) places both Browser Source views side by side and checks SQLite + live `/api/data` after Save; runtime/renderer source not modified in this follow-up.
-- **Native Windows [Regression Foundation 38053426418](https://github.com/ALL-EX-E/InOneLine/actions/runs/38053426418) SUCCESS** on exact code/test head, including existing GUI/DB/media/backup/source, seven real Chromium Browser Source normal/preview/live-Save tests, Music event lifecycle, frozen app startup, installer and silent installed startup. **Wording [38053426395](https://github.com/ALL-EX-E/InOneLine/actions/runs/38053426395) SUCCESS**.
-- QA artifact `11670167588`: `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.zip`, **46,780,274 bytes**, SHA-256 `da5446f3e9f99b2d912e5f43e7e736f4c087d9f8ff3dad8e8c154c0b9c8880a0`. Local digest and ZIP CRC verified, one `InOneLine_Setup_1.0.8.exe` (47,640,258 bytes inside ZIP). Uploaded to [Google Drive](https://drive.google.com/file/d/10O-pBZewlyaQxyuM8yCokEXqhLU2SfcJ/view?usp=drivesdk) in `Обзор_UI_1.0.8`; Drive metadata title/size/folder readback PASS.
-- Complete user manual QA checklist is preserved in draft PR #91. After user confirms all checks, promote **only exact accepted source/test blobs** through a clean isolated PR and run fresh pre/postmerge Windows/wording gates. **Do not merge, change baseline or start remaining P10 work before explicit user acceptance.**
-
-
-## P10 OBS VISIBILITY — USER REVIEW REFINEMENT / MANUAL QA STILL PENDING — 2026-10-10
-
-The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.zip` and draft checklists preceding this note are **superseded**, not manually accepted. User screenshots established two targeted refinements:
-
-- **Main /overlay:** remove the visible `Показ виджета` UI control; the main canvas is always visible, including with older saved `hidden` settings. Retain the visibility registry, future-reactivation flag and code; Save sets the dormant key to `always`.
-- **List:** one `Показ виджета` combobox now controls BOTH standalone `/list-overlay` and the embedded List within `/overlay`. Remove redundant `Показывать на оверлее` checkbox. Use the List mode as one authoritative shared setting, retain `overlay_list_enabled` as save-time backward-compatible mirror and old-data read fallback only until new mode Save; do not migrate schema or delete settings. Preserve position, borders, typography, save/copy/preview actions and `?preview=1` independent visibility.
-- Other five widget modes, layout/audio/business state unchanged. Six visible show-mode controls for seven Browser Sources (Main always on).
-
-**Exact candidate:** draft [PR #91](https://github.com/ALL-EX-E/InOneLine/pull/91), head `02aeebdadac862581662f732387f1837e7924d53`. [Native Windows Foundation 38056008059](https://github.com/ALL-EX-E/InOneLine/actions/runs/38056008059) **SUCCESS** including linked-list UI/SQLite/API/real Chromium, all existing regression gates, frozen executable and installed startup. [Wording 38056008057](https://github.com/ALL-EX-E/InOneLine/actions/runs/38056008057) **SUCCESS**. Artifact `11671656777`, ZIP **46,788,284 bytes**, SHA-256 `c2fa8ff8a43965919637ade3c84885295259d374ae27bf25b75affd413c7a6f8`; independent local digest and ZIP CRC PASS. **New current QA archive**: [InOneLine_P10_LINKED_LIST_WINDOWS_QA_1.0.8.zip on Google Drive](https://drive.google.com/file/d/1yMQAammU_qDYzhh64ULZgAGxk3fbNh0N/view?usp=drivesdk), title/size/parent verified.
-
-**STATE: WINDOWS-PASSED CANDIDATE, NOT USER ACCEPTED, NOT MERGED.** The updated exact manual Windows acceptance checklist is in PR #91. Do not promote or proceed beyond this isolated P10 change until user approves the manually installed current candidate.
-
-
 ## P10 / GLOBAL-OBS-VISIBILITY-001 — USER ACCEPTED / EXACT PROMOTION — 2026-10-10
 
 - **Manual Windows acceptance 2026-10-10 13:57:26 UTC / 20:57:26 Asia/Novosibirsk:** user confirmed **«Работает. Записывай и идём дальше.»** for the revised candidate after screenshots and explicit requested adjustments; all manual checks accepted.
@@ -581,6 +944,17 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Postmerge source SHA verification PASS. This **docs-only** closure PR triggers the wording gate but not Windows Regression Foundation (that workflow deliberately filters out docs-only diffs). The **exact accepted production code** passed the full native Windows gate on clean promotion PR #93 immediately before merge, and every production/test file was independently verified on `main` after merge; do not misreport docs-only CI as native Windows.
 
 
+## WORKFLOW — ChatGPT FIRST / CODEX ONLY WHEN REQUIRED — 2026-10-11
+
+User-approved permanent workflow rule (2026-10-11): **Use regular ChatGPT as the default for absolutely everything that can be done without Codex. Reserve Codex for work that genuinely requires its local desktop, repository, terminal, or GUI access.** This minimizes Codex usage limits and ensures development continues in regular ChatGPT if Codex is unavailable.
+
+- **Default in regular ChatGPT:** task analysis, roadmap/idea and acceptance documentation, source inspection and targeted GitHub code commits/PRs, GitHub Actions Windows CI and log analysis, artifact validation and uploads to the Google Drive project folder, manual QA instructions and recording user acceptance, and clean promotion to `main` only after acceptance. Also perform available static/code and CI checks here first; do not invoke Codex merely because a task involves programming.
+- **Invoke Codex only when strictly necessary:** inspection of local unuploaded files, Windows-only local reproduction, interacting with the actual installed InOneLine or OBS UI, local terminals/build/debuggers/performance tools, or problems that GitHub CI, connectors and user QA cannot resolve. Before each handoff, explain why regular ChatGPT is insufficient and provide the user a precise, limited Codex instruction. **Regular ChatGPT cannot automatically take control of or launch the user's local Codex session; the user opens/authorizes it explicitly.** Codex output should be reviewed and results recorded in GitHub before further decisions.
+- **Local arrangement:** installed user application in `A:\InOneLine` (do not modify its data without explicit approval); separately cloned source repository in `A:\InOneLine-Dev`, with candidate branch `candidate/p10-ui045-timer-media-background` for pending UI-045. Never use installed binaries as a Git source checkout, and never assume ChatGPT cloud sessions can directly read the user's `A:` drive.
+- **Safety and acceptance:** no uncontrolled pushes/merges/installs; preserve user-approved step-by-step QA. Build candidates in isolated branches; require Windows CI, deliver all user-downloadable installers/archives to Google Drive with uploaded-file verification; manually accept each change before promotion. Codex being available does not itself authorize actions on local files or user data.
+- **Current development status:** GLOBAL-OBS-VISIBILITY-001 accepted/merged; next UI-045 Timer OBS media background is technically Windows-CI-passed in unmerged draft PR #95, with first manual UI/install check confirmed; image/GIF/video/OBS and missing-source behavior still require user acceptance. Do not mark UI-045 fully accepted yet.
+
+
 ## P10/UI-045 — USER ACCEPTED, EXACT CLEAN PROMOTION — 2026-10-11
 
 - **User final manual QA:** 2026-10-11 11:31:13 UTC («все настройки сохраняются. Идём дальше.»). Previous independent checks: UI labels/mode/appearance; GIF playback; MP4 muted loop with timer/audio unaffected; fixed single-Save MP4 copy race; external original-file first Save; disappearing/restored external file while browser remains open; saved background/font modes/other widgets preserved after app restart. **UI-045 ACCEPTED**.
@@ -596,77 +970,81 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Exact clean promotion branch `promotion/p10-ui046-accepted-clean-20261011` from up-to-date `main`; only two exact accepted blobs `streaming_manager/views/stream.py` + `tools/gui_regression_smoke.py`, plus three canonical project documents; **no audio routing, API, database, schema, migrations, or OBS web runtime modifications**. Fresh native Windows + wording gate required before main merge. Verify both accepted blobs after merge. Close draft #97 without merging stale history.
 - Next isolated accepted roadmap candidate **P10/UI-049**: short context-sensitive Music tab `Как выводится звук в OBS?` help button only when mode `Через OBS`; simple existing dialog style; route/audio unchanged; no permanent large explanatory text. Codex reserved for local-only work.
 
-## P10/UI-049 — USER MANUALLY ACCEPTED; promotion gate — 2026-10-11
+## P10/UI-049 — USER ACCEPTED; exact clean promotion — 2026-10-11
 
-- Final revised Music OBS audio-help dialog and its contextual visibility are accepted: user at 2026-10-11 14:46:25 UTC: «Теперь всё понятно. Продолжаем.» Previous confusing wording was rejected; latest ordered narrative is approved.
-- Exact tested head `b7f3f8c1ffd4f17a5a55059f0789fa7c34134c4a` ([candidate draft PR #99](https://github.com/ALL-EX-E/InOneLine/pull/99)); final [Drive Windows QA ZIP](https://drive.google.com/file/d/1q-C7mBtgy-Rdt4fnarJ32r3T6RgFf7rZ/view?usp=drivesdk), SHA256 `440aa9526ccb3ddbfcdd98a58491c889d3f3e045a3bc5b0619ada6fe8b00a16d`; Windows [38147021385](https://github.com/ALL-EX-E/InOneLine/actions/runs/38147021385) and wording [38147021357](https://github.com/ALL-EX-E/InOneLine/actions/runs/38147021357) PASS.
-- Only `streaming_manager/views/music.py` plus `tools/gui_regression_smoke.py` accepted implementation/test content may be promoted with these three canonical docs; no underlying audio routing, persistence, version 1.0.8, schema 19, 15 named migrations changed. Require fresh Windows/wording on exact promotion and verified merge.
-- Next isolated P10 item: `UI-055` — Auction contextual button `Как выводится звук в OBS?` only if Auction music output is `Через OBS`; hidden for `В приложении`; reuse the same accepted clear step-by-step help structure as UI-049. No duplicate subsystem, no routing change.
+- Manual acceptance: 2026-10-11 14:46:25 UTC, user: «Теперь всё понятно. Продолжаем.» after installing the final revised help-copy candidate. Earlier manual checks confirmed correct context-sensitive button/modal visibility; two previous wording variants were rejected as unclear. This final wording is explicitly accepted.
+- Candidate source/test exact HEAD: `b7f3f8c1ffd4f17a5a55059f0789fa7c34134c4a`; original unmerged draft [PR #99](https://github.com/ALL-EX-E/InOneLine/pull/99). Exactly two approved runtime/test files: `streaming_manager/views/music.py` and `tools/gui_regression_smoke.py`. Do not merge the full candidate branch/history; clean promotion copies the two exact blob SHAs from the tested commit.
+- Tested ZIP: [InOneLine_P10_UI049_AUDIO_HELP_CLEAR_FLOW_1.0.8_WINDOWS_QA.zip](https://drive.google.com/file/d/1q-C7mBtgy-Rdt4fnarJ32r3T6RgFf7rZ/view?usp=drivesdk), SHA256 `440aa9526ccb3ddbfcdd98a58491c889d3f3e045a3bc5b0619ada6fe8b00a16d`. Native Windows [38147021385](https://github.com/ALL-EX-E/InOneLine/actions/runs/38147021385) SUCCESS and publication wording [38147021357](https://github.com/ALL-EX-E/InOneLine/actions/runs/38147021357) SUCCESS.
+- The accepted help explains in order: InOneLine Music output via OBS Browser Source; where the OBS Browser Source's `Управление аудио через OBS` checkbox is; OFF routes to OBS Browser Page/Windows mixer; ON exposes separate OBS mixer source for recording/streaming; local audio requires `Мониторинг и вывод`. Show the help button only for OBS output. No changes to audio routing, controller, music playback, OBS web sources, database/version/schema/migrations.
+- Clean exact-file promotion from accepted main is staged separately and requires fresh Windows/wording premerge checks and postmerge accepted-blob readback. The user-approved next isolated item after verified promotion is **P10/UI-055**, matching contextual OBS audio help on the Auction tab using existing dialog/policy; no new audio/backend.
 
-## P10/UI-055 — MANUAL QA PASS; clean promotion gate — 2026-10-11
+## P10/UI-055 — FINAL USER ACCEPTANCE; exact source promotion — 2026-10-11
 
-- User explicitly accepted UI-055 2026-10-11 15:07:19 UTC («Принимаю. Идём дальше.»). It is the **last scheduled P10 feature** following completed GLOBAL-OBS-VISIBILITY-001, UI-045, UI-046 and UI-049. No reopened functionality from P10 is intended.
-- Exact tested candidate `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae`, original [draft PR #101](https://github.com/ALL-EX-E/InOneLine/pull/101); [Drive installer ZIP](https://drive.google.com/file/d/1_Qy9m4ADeQcOuYJiSk4RvyZSEogi7XkL/view?usp=drivesdk); SHA256 `bd23176acce32b7f9072c96531f81cac46643afc2679e413bb50f8d0fcdcc5ed`. Windows `38149238542` and wording `38149238539`: SUCCESS.
-- Clean promotion copies exactly accepted `auction.py` + `gui_regression_smoke.py` blobs and updates canonical docs; **P10 can be marked CLOSED only after promotion CI and postmerge blob verification**.
-- **NEXT P11**: `UI-048` and `UI-060` Rules composite template + editor/OBS formatting consolidation. Implement in isolated small steps only; no duplicate independent Rules preset/overlay-settings system, use already existing templates, current routes and visibility/preview policy, preserve active-auction rule changes and persistence compatibility. Start with exact current-source audit and a separately reviewable low-risk step.
+- User manual acceptance **2026-10-11 15:07:19 UTC**, «Принимаю. Идём дальше.» for the installed Auction/Wheel OBS-audio help candidate. Final **UI-055 ACCEPTED**. UI-049 remains independently accepted and already merged as [PR #100](https://github.com/ALL-EX-E/InOneLine/pull/100).
+- Candidate [draft PR #101](https://github.com/ALL-EX-E/InOneLine/pull/101), tested exact HEAD `3138aeba94cfcc5d1fb1686cbcefc2a45d3988ae`. Verified QA ZIP [Google Drive](https://drive.google.com/file/d/1_Qy9m4ADeQcOuYJiSk4RvyZSEogi7XkL/view?usp=drivesdk), 46,800,086 bytes, SHA256 `bd23176acce32b7f9072c96531f81cac46643afc2679e413bb50f8d0fcdcc5ed`. Exact candidate native Windows [38149238542](https://github.com/ALL-EX-E/InOneLine/actions/runs/38149238542) SUCCESS; publication wording [38149238539](https://github.com/ALL-EX-E/InOneLine/actions/runs/38149238539) SUCCESS.
+- Exact accepted blobs only: `streaming_manager/views/auction.py` = `928a25e6161f6a839b93b8668989df43e6dbbd2b`; `tools/gui_regression_smoke.py` = `7c824b46a187b925db8d4fa8d8c77fe7b5198c2f`. User-approved UI: contextual help visible only for Auction/Wheel Timer Browser Source; accepted ordered OBS-checkbox/mixer/monitoring explanation; original warning about disabling invisible Browser Sources preserved inside dialog; no permanent long hint. No modification to audio routing, timer, settings/db, version 1.0.8, schema 19 or 15 migrations.
+- Promote those exact blobs on latest accepted main in a **clean new PR**, plus three canonical documentation files only; fresh native Windows + wording SUCCESS required before merge. Verify 2/2 source/test blobs on main afterward; close unmerged draft #101. Following roadmap package **P11 — composite Rules editor/overlay** (`UI-048`/`UI-060`); break into small independently QA-verified increments, preserve current Rules runtime while designing.
 
-## P10 CLOSED; P11-A first isolated step — 2026-10-11
+## P10 COMPLETE — UI-055 merged and verified; P11-A candidate — 2026-10-11
 
-- **P10 DONE:** all approved P10 work (GLOBAL-OBS-VISIBILITY-001, UI-045, UI-046, UI-049, UI-055) manually accepted, exact clean promotions merged. Final UI-055 [PR #102](https://github.com/ALL-EX-E/InOneLine/pull/102) main `7ae552135af67bd42922590c71b03910aa48742a` after native Windows promotion `38150150271` and wording `38150150233` PASS; 2/2 exact source/test Git blobs re-fetched and verified. Original draft #101 closed unmerged.
-- **CURRENT NEXT PACKAGE P11 — Rules composite editor/overlay (UI-048/UI-060).** The first deliberately small step is P11-A — remove Undo, Redo, Highlight and the second pipette from WYSIWYG Rules editor, preserve everything else including saved HTML with legacy highlight and OBS/state. Source/test isolated [draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103), not yet accepted or merged.
-- Subsequent P11 increments remain separately gated: move Rules URL/copy/preview to editor; composite template+save/activate state; integrate OBS appearance and preview without a second style-library, DB backend or duplicating widget visibility policy; preserve session snapshots/sanitizer and live active-template semantics.
+- Final user-accepted UI-055 [PR #102](https://github.com/ALL-EX-E/InOneLine/pull/102) **MERGED** into main as `7ae552135af67bd42922590c71b03910aa48742a`. On exact promotion head `6318405b213f9596a892e11328392c3f3f03dee8`, native Windows [38150150271](https://github.com/ALL-EX-E/InOneLine/actions/runs/38150150271) and wording [38150150233](https://github.com/ALL-EX-E/InOneLine/actions/runs/38150150233) **SUCCESS**. After merge, fetched source `streaming_manager/views/auction.py` and regression `tools/gui_regression_smoke.py`; **2/2 exact Git blob SHA** match user-installed Windows candidate. Original unmerged draft [#101](https://github.com/ALL-EX-E/InOneLine/pull/101) CLOSED WITHOUT MERGE.
+- P10 package (GLOBAL-OBS-VISIBILITY-001, UI-045, UI-046, UI-049, UI-055) is **CLOSED, manually accepted, merged**. App remains **1.0.8 / schema 19 / 15 migrations**.
+- Next P11, step **P11-A/UI-060 Rules text-format toolbar removal**, is in isolated [draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103). Remove obsolete Undo/Redo/Highlight/highlight pipette only, preserve legacy highlight formatting in stored HTML; no template/back-end/schema changes. **NOT USER ACCEPTED; DO NOT MERGE** until Windows CI, user QA and clean promotion.
 
-## P11-A/UI-060 — USER ACCEPTED with FIX1, clean promotion — 2026-10-11
+## P11-A/UI-060 — USER ACCEPTED; clean promotion — 2026-10-11
 
-- User 2026-10-11 16:51:15 UTC «Всё работает. Идём дальше.» explicitly accepts P11-A after the compact eyedropper FIX1; tested candidate 7bd153c7723f28493593f8c3eeb1e48ff1b923fc (draft PR #103). Windows 38155498542 and wording 38155498539 SUCCESS; QA ZIP SHA256 ed6cb4b7de1cff8f187085e580de9997f23c39e62361da915ab2930841eb5e6a.
-- Current accepted scope: remove Undo/Redo/highlight controls only, preserve legacy highlight markup, use shared screen pipette button. Clean promote exact rules_editor.py and gui_regression_smoke.py blobs; no DB/OBS/audio/business changes. Full P11 remains IN PROGRESS.
-- Next isolated **P11-B**: move existing Rules URL and copy/actual OBS preview actions from Auction page into rules editor, reuse existing route and handlers. Do not alter composite template persistence, rules snapshot, Save/Close semantics, visibility show-mode or appearance in same candidate. Separate later changes cover obsolete Show Rules removal and full composite editor.
+- User manual acceptance 2026-10-11 16:51:15 UTC: «Всё работает. Идём дальше.» after installing the FIX1 candidate. Earlier review 15:35:28 UTC accepted functional toolbar but requested compact color picker as in Stream/OBS. **P11-A accepted with FIX1 only**.
+- Exact tested candidate SHA: 7bd153c7723f28493593f8c3eeb1e48ff1b923fc, [draft PR #103](https://github.com/ALL-EX-E/InOneLine/pull/103). Native Windows [38155498542](https://github.com/ALL-EX-E/InOneLine/actions/runs/38155498542) and wording [38155498539](https://github.com/ALL-EX-E/InOneLine/actions/runs/38155498539) SUCCESS. Windows artifact 11708412957, InOneLine_P11A_RULES_EYEDROPPER_FIX1_1.0.8_WINDOWS_QA.zip, 46,794,376 bytes, SHA256 ed6cb4b7de1cff8f187085e580de9997f23c39e62361da915ab2930841eb5e6a; ZIP integrity and exact enclosed installer verified.
+- Accepted blobs: streaming_manager/views/rules_editor.py = 296eb93b0fee6b21216a2a9bad83b04c1d674641; tools/gui_regression_smoke.py = 90011b91411909fe2cff1e4e4c3543c07dbbfff0. Removed obsolete Undo/Redo/Highlight/highlight-pipette, preserved stored legacy highlight HTML, and reused shared make_screen_color_picker_button() for foreground picker; no changes to Rules storage, OBS routes, DB schema/version, playback or auction state.
+- Clean promotion copies exactly two tested blobs atop current accepted main, updates only three canonical docs, and requires fresh Windows/wording CI plus exact 2/2 postmerge SHA verification. Close original draft PR #103 without merging. Next isolated P11-B: relocate existing rules URL/copy and OBS preview actions from Auction page into Rules editor with zero new routes or duplicated backend; composite settings remain later.
 
-## P11-B — ACCEPTED FIX1; clean promotion gate — 2026-10-12
+## P11-B/UI-060 — USER ACCEPTED; exact clean promotion — 2026-10-12
 
-- User confirms original relocated URL/copy/OBS preview worked 2026-10-11 17:17:20 UTC; follow-up minimum-width badge/Create overlap fixed in new candidate. Final acceptance 2026-10-12 04:47:04 UTC («Всё работает. Идём дальше.»), exact FIX1 tested commit f009c575370ad1a4bc1ebf855f86676f1bd83a6f ([draft PR #106](https://github.com/ALL-EX-E/InOneLine/pull/106)). Windows 38159132258 and wording 38159132287 both SUCCESS, tested ZIP SHA256 68ad4cc84e0aa60bf35a1cd7478c9389aeec0752943af827d01c4c0f03e63980.
-- P11-B scope is UI relocation of existing Rules URL and OBS preview to editor plus fixing template-selector overlap with unchanged template operations; three accepted exact source/test blobs on clean latest main, version/schema/audio rules unchanged. P11 overall IN PROGRESS.
-- Next isolated P11-C candidate: inspect and remove approved redundant Auction Show Rules button, preserve original session/preview semantics for real Rules overlay and existing editor; avoid unreviewed changes to template activation, composite appearance or storage. New Windows/manual gate for that separate change.
+- User 2026-10-11 17:17:20 UTC confirmed functional Rules URL/copy/OBS preview after installing P11-B; screenshot flagged template-selection row collision at minimum size. Fixed in same candidate FIX1 by separating template combo from original Active badge and action buttons. Final explicit manual acceptance 2026-10-12 04:47:04 UTC: «Всё работает. Идём дальше.»
+- Exact user-accepted FIX1 candidate head f009c575370ad1a4bc1ebf855f86676f1bd83a6f in [draft PR #106](https://github.com/ALL-EX-E/InOneLine/pull/106). Native Windows [38159132258](https://github.com/ALL-EX-E/InOneLine/actions/runs/38159132258) SUCCESS; wording [38159132287](https://github.com/ALL-EX-E/InOneLine/actions/runs/38159132287) SUCCESS. Tested QA ZIP [Drive](https://drive.google.com/file/d/1GjhljLeS0EzTIEppN63oXGV9Vl51BjpE/view?usp=drivesdk), 46,801,670 bytes, SHA256 68ad4cc84e0aa60bf35a1cd7478c9389aeec0752943af827d01c4c0f03e63980.
+- Exactly THREE accepted blob SHAs: streaming_manager/views/auction.py = bfd24ca8f6105343b6a1f251840bb22929d67d03; streaming_manager/views/rules_editor.py = 2e82c4dd78e9c4b3e926524c934221877291c74f; tools/gui_regression_smoke.py = f650a2a0301349051f042f56fab1a0fde54cac1e. Removes duplicate Rules URL and OBS Preview buttons from Auction page and shows/selects/copies original OBS Rules URL inside editor, retains /rules-overlay?preview=1. Selector moved to separate row above existing template actions; geometric regression at 760x560, 1050x760, 760x560. Saved templates, old Show Rules action, audio/OBS route, schema 19, migrations 15, app 1.0.8 unchanged.
+- Manual acceptance recorded. Promote exact three source/test blobs on current main with canonical docs through a new PR; require native Windows + wording SUCCESS for promotion HEAD and 3/3 postmerge Git blob re-read. Close original draft PR #106 without merging its history. Next P11-C: remove legacy Auction page Show Rules button from agreed redesign only after audit of its preview/dependencies; composite Rules editor work remains separate.
 
-## P11-C — user accepted; clean promotion before P11-D — 2026-10-12
+## P11-C — user accepted removal of old Rules text preview — 2026-10-12
 
-- User 2026-10-12 05:03:36 UTC: «Всё работает. Идём дальше.» Accepted exact candidate 143f3429e4f5234fa2ee9dd2f1ec72f90fae8f5f (draft PR #108); native Windows 38205668098 PASS, wording 38205668019 PASS; QA ZIP SHA256 51db4676f11f56760c969c12464c964acef74a6880b7afdaf2bd2d70c9ae465c.
-- P11-C removes duplicate Show Rules button and orphan read-only popup, preserving Rules editable text, templates, existing OBS Browser Source and session snapshots. Exact three accepted blobs plus three canonical docs; clean promotion and postmerge gates apply before closing P11-C. P11 overall still in progress.
-- Next P11-D incremental composite editor design: inspect current Rules source/store, current renderer and approved overlay layout. Do not introduce duplicate template/persistence machinery or change on-air auction state as part of an unreviewed refactor. Continue with an isolated small Windows-testable step.
+- Manual acceptance at 2026-10-12 05:03:36 UTC: «Всё работает. Идём дальше.» Exact candidate head 143f3429e4f5234fa2ee9dd2f1ec72f90fae8f5f in [draft PR #108](https://github.com/ALL-EX-E/InOneLine/pull/108). Native Windows [38205668098](https://github.com/ALL-EX-E/InOneLine/actions/runs/38205668098) SUCCESS; wording [38205668019](https://github.com/ALL-EX-E/InOneLine/actions/runs/38205668019) SUCCESS. Final [Drive QA ZIP](https://drive.google.com/file/d/14BkDWt_lQ3IoAwazTmcQQDZTNZ_t-WoW/view?usp=drivesdk), 46,804,540 bytes, SHA256 51db4676f11f56760c969c12464c964acef74a6880b7afdaf2bd2d70c9ae465c.
+- Removed duplicated Auction page Show Rules button and obsolete preview callback and read-only popup; retained the full editable WYSIWYG Rules text and true browser rules overlay /rules-overlay?preview=1. No changes to audio, DB, schema 19, 15 migrations, app version 1.0.8 or Rules template/session state.
+- Three exact accepted blobs: streaming_manager/views/auction.py = 908404b5ae24e5116a1b80e7f1cf4f65cfccac40; streaming_manager/views/rules_editor.py = 952b12ad713cced84d5809a71f4e4887d41abd92; tools/gui_regression_smoke.py = d615f6e5b5f231223f21c7cd2d75d61e2c0fce30.
+- Clean exact-file promotion of these three blobs plus three canonical documents to latest accepted main requires fresh Windows CI, wording and 3/3 blob postmerge verification. Close candidate draft #108 unmerged. Next P11-D: audit the existing composite Rules template and OBS appearance/snapshot renderer before a small independently verifiable next UI step.
 
-## P11-C CLOSED; P11-D first active-template visual step — 2026-10-12
+## P11-C MERGED; P11-D candidate in review — 2026-10-12
 
-- P11-C accepted/merged via [PR #109](https://github.com/ALL-EX-E/InOneLine/pull/109) as c352ad1b27612354bd7b05f3dcf3aaaebade5c4f, fresh native Windows 38206473290 and wording 38206473275 SUCCESS; exact 3/3 code/test SHA readback. Candidate draft #108 closed without merge.
-- P11-D isolated candidate [draft PR #110](https://github.com/ALL-EX-E/InOneLine/pull/110): active Rules selector visual cleanup, green active item, no star/badge, hide inapplicable Make Active and Delete buttons. This step makes NO changes to currently active template selection in DB, create-template behavior, Save/Close, session snapshot or overlay. Await Windows CI, final QA ZIP, explicit manual user approval. Subsequent P11 substeps handle remaining composite template semantics and OBS appearance separately.
+- User-accepted [P11-C clean promotion PR #109](https://github.com/ALL-EX-E/InOneLine/pull/109) was merged into main as c352ad1b27612354bd7b05f3dcf3aaaebade5c4f. Native Windows promotion [38206473290](https://github.com/ALL-EX-E/InOneLine/actions/runs/38206473290) and wording [38206473275](https://github.com/ALL-EX-E/InOneLine/actions/runs/38206473275) SUCCESS. Verified postmerge exact Git blobs for auction.py, rules_editor.py, gui_regression_smoke.py, 3/3 match the user-tested candidate. Original draft [#108](https://github.com/ALL-EX-E/InOneLine/pull/108) CLOSED WITHOUT MERGE. P11-C is DONE.
+- Next separately gated [draft PR #110](https://github.com/ALL-EX-E/InOneLine/pull/110), P11-D: visually mark active Rules template green, remove redundant star and status badge, hide Make Active when active and Delete when the last template, reuse original state callbacks. No template persistence, creation/activation, WYSIWYG, OBS runtime, DB schema or app version changes. P11-D is NOT USER ACCEPTED and must not be merged before Windows and manual QA.
 
-## P11-D — user accepted green active-template selector; P11-E next — 2026-10-12
+## P11-D/UI-060 — manual PASS; clean promotion gate — 2026-10-12
 
-- Explicit Windows manual PASS 2026-10-12 05:23:24 UTC. Exact tested draft PR #110 HEAD 14c12b8c6f5367f00f3e3cf2e6c35204617a1be7. Native Windows 38206882328 PASS, wording 38206882336 PASS; installed ZIP SHA256 0708044632d523eae51bf692ea9f7bcb1307b9306bff4c1874ca898149b6be74.
-- P11-D implements only approved active-template indication: green selector/option, no star or redundant Active badge, context visibility of Make Active/Delete buttons. Save, Create (still activates newly created templates), templates DB, open auction session, overlay and schema untouched. Two exact candidate source/test blobs require fresh promotion gates and identity check before marking code DONE. P11 overall IN PROGRESS.
-- Next P11-E in separate, small candidate: modify existing create-template handler to pass make_active=False without introducing a new DB/store subsystem; keep active template and on-air session intact, new inactive template editable and saved, and existing Activate action available. Recheck Windows GUI and DB behavior; never combine this step with Save button or styling/template schema changes.
+- User 2026-10-12 05:23:24 UTC: «Всё работает. Идём дальше.» This explicitly accepts the installed P11-D active-template visual candidate. Exact user-tested HEAD 14c12b8c6f5367f00f3e3cf2e6c35204617a1be7 in [draft PR #110](https://github.com/ALL-EX-E/InOneLine/pull/110). Windows native [38206882328](https://github.com/ALL-EX-E/InOneLine/actions/runs/38206882328) SUCCESS and wording [38206882336](https://github.com/ALL-EX-E/InOneLine/actions/runs/38206882336) SUCCESS. Verified installer [Drive ZIP](https://drive.google.com/file/d/1Z7sri4UYTC8uyYaRQkI5dLoIx528GIV9/view?usp=drivesdk), 46,801,211 bytes, SHA256 0708044632d523eae51bf692ea9f7bcb1307b9306bff4c1874ca898149b6be74.
+- Exact accepted Git blobs: streaming_manager/views/rules_editor.py = 954138d6bcb489f280f499b5d22dc62ac636b655; tools/gui_regression_smoke.py = 2b94c49933b0a20c4fe0f2036f6e8315519de8ab. Active Rules template is marked green in selector and selected field; star and badge removed; existing Make Active hidden when active, Delete hidden when last. No changes to create/save/activate mechanism, session rules snapshot, OBS rendering, storage, app 1.0.8, schema 19 or migrations 15.
+- Clean promote exactly these two blobs plus three canonical docs onto accepted main, fresh native Windows and wording gates then 2/2 postmerge blob check; close the superseded draft #110 WITHOUT MERGE. Next isolated P11-E: new template should be created inactive; verify DB creation API and live auction behavior before modifying the sole call site.
 
-## P11-D completed; P11-E ready for manual QA — 2026-10-12
+## P11-D CLOSED; P11-E Windows QA available — 2026-10-12
 
-- P11-D clean accepted [PR #112](https://github.com/ALL-EX-E/InOneLine/pull/112), main 792845b98597de1dda977eee2dd1788b7a3dc370, native promotion Windows 38207833716 PASS, wording 38207833690 PASS, exact 2/2 accepted code/test SHA match. Draft #110 closed unmerged.
-- P11-E draft [PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact tested ccff76a175b838fda4b30b03637d8269942dd2ea. Native Windows 38208259058 and wording 38208259062 PASS. QA ZIP Drive file 1TwN91I4824oHoAXrMqrrFbLQsbmVwEak, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339. Implement new templates initially inactive via current DB API; preserve current active/on-air rules, old Save/Close behavior.
-- User manual QA is the next gate. After acceptance, exact-file clean promotion. Following P11 increments: Save without closing editor with existing dirty-guard prompts and no changes to template activation semantics; composite OBS appearance later. P11 overall IN PROGRESS.
+- User-accepted P11-D was clean-promoted via [PR #112](https://github.com/ALL-EX-E/InOneLine/pull/112) to main SHA 792845b98597de1dda977eee2dd1788b7a3dc370. Fresh native Windows promotion 38207833716 SUCCESS, wording 38207833690 SUCCESS; 2/2 accepted runtime/test Git blobs exactly match installed candidate. Superseded draft PR #110 CLOSED WITHOUT MERGE. P11-D DONE.
+- Next P11-E candidate [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), exact HEAD ccff76a175b838fda4b30b03637d8269942dd2ea, full native Windows [38208259058](https://github.com/ALL-EX-E/InOneLine/actions/runs/38208259058) SUCCESS and wording [38208259062](https://github.com/ALL-EX-E/InOneLine/actions/runs/38208259062) SUCCESS. [Verified Drive QA ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk) 46,789,610 bytes, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
+- P11-E only changes the existing Rules create-template handler argument to make_active=False. Separate temporary DB GUI regression verifies that inactive draft is editable/savable, active template and content unchanged, and explicit activation still works. NO schema, audio, OBS, runtime session or Save/Close semantics change. P11-E **AWAITING USER MANUAL QA; DO NOT MERGE**.
 
-## P11-E — user accepted; P11-F next — 2026-10-12
+## P11-E — user accepted; exact promotion gate — 2026-10-12
 
-- User accepted installed P11-E at 06:07:44 UTC («Всё работает. Идём дальше.»). Exact candidate ccff76a175b838fda4b30b03637d8269942dd2ea (draft PR #113), Windows 38208259058 SUCCESS, wording 38208259062 SUCCESS, accepted ZIP SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
-- P11-E creates inactive Rules template via existing create_rule_template(make_active=False), preserves previously active template and on-air settings. Exact two runtime/test blobs to promote cleanly with 3 canonical docs; fresh Windows gate and postmerge identity required. P11 overall IN PROGRESS.
-- Next separate P11-F: Save current Rules text without closing editor; reuse existing _save_current, keep Close/dirty guard and activation as before. Test save/reedit/save and correct current active/inactive template persistence. Composite editor/OBS appearance later.
+- User manual PASS at 2026-10-12 06:07:44 UTC: «Всё работает. Идём дальше.» Accepted candidate [draft PR #113](https://github.com/ALL-EX-E/InOneLine/pull/113), HEAD ccff76a175b838fda4b30b03637d8269942dd2ea; native Windows run 38208259058 and publication wording 38208259062 SUCCESS. [User-tested ZIP](https://drive.google.com/file/d/1TwN91I4824oHoAXrMqrrFbLQsbmVwEak/view?usp=drivesdk), 46,789,610 bytes, SHA256 23a00bdfe9a2995efac65def103bc52d194659ee0c543fd88f53cf16edbf7339.
+- Exactly accepted source/test Git blobs: streaming_manager/views/rules_editor.py 8fa790e0db60138640dc78f277f5c4c128853cb3; tools/gui_regression_smoke.py ca22851b165810dce24c64d4f8859cd75600cc15. The Rules editor calls existing DB create method with make_active=False, maintaining active Rules and session snapshots, while new template can be edited/saved and explicitly activated. No DB schema, OBS/audio, Save/Close or version change.
+- Clean promotion includes only these two exact blobs and three canonical docs, requiring fresh native Windows and wording CI, plus exact 2/2 Git blob readback on main; close old draft #113 without merging. Next P11-F is Save rules without closing the editor, leveraging existing _save_current without duplicating storage.
 
-## P11-E CLOSED; P11-F Windows QA ready — 2026-10-12
+## P11-E verified closure and P11-F QA — 2026-10-12
 
-- P11-E exact accepted source/test merged via PR #115 as a9de5694269cb34ce7537f4c52bed3e14567ec05. Promotion Windows 38211201717 and wording 38211201786 PASS; source/test Git blob readback 2/2 identical, old draft #113 closed without merge. P11-E DONE.
-- P11-F separate draft PR #116: existing Rules Save persists without closing editor, Close dirty guard unchanged. Full native Windows 38211698235 and wording 38211698257 PASS; verified QA ZIP on [Drive](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view?usp=drivesdk). This candidate remains UNACCEPTED pending user manual QA. No other P11 work merges until this gate.
+- Accepted P11-E was promoted via [PR #115](https://github.com/ALL-EX-E/InOneLine/pull/115), merged as `a9de5694269cb34ce7537f4c52bed3e14567ec05`. Fresh Windows [38211201717](https://github.com/ALL-EX-E/InOneLine/actions/runs/38211201717) and wording 38211201786 SUCCESS; exact accepted source/test blob identities 2/2 VERIFIED on main. Draft PR #113 CLOSED UNMERGED. P11-E DONE.
+- Next isolated P11-F [draft PR #116](https://github.com/ALL-EX-E/InOneLine/pull/116) saves Rules without closing; full Windows [38211698235](https://github.com/ALL-EX-E/InOneLine/actions/runs/38211698235), wording 38211698257 SUCCESS. [QA ZIP](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view?usp=drivesdk) validated, checksum 7658eb2306ad35c277f3dcbe8122ac0bdff64b57fd2cfa9d9235904f10b3bd60. **Manual user acceptance pending; no merge**.
 
-## P11-F — manual user PASS; promote exact tested code — 2026-10-12
+## P11-F — USER ACCEPTED; exact clean promotion gate — 2026-10-12
 
-- Explicit user acceptance 2026-10-12 06:50:32 UTC: «Всё работает. Идём дальше.» for P11-F. Draft candidate [#116](https://github.com/ALL-EX-E/InOneLine/pull/116), tested HEAD 753862c25c648ba22602e574a355d4560ba6ce8c; native Windows 38211698235 PASS, wording 38211698257 PASS; verified [Windows installer ZIP](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view), SHA256 7658eb2306ad35c277f3dcbe8122ac0bdff64b57fd2cfa9d9235904f10b3bd60.
-- Only two accepted source/test blobs: Rules editor 7695fd7a4be491a3fe38588fad03cba4e1b2f4cd, GUI regression ab2348791ce938c713c7bd4bb535cd7a27ebc2fb. Save updates text and keeps Rules editor open; Close/dirty confirmation unchanged, state and OBS semantics retained.
-- **User QA PASS; clean promotion pending**: fresh Windows and wording CI on clean branch, merge once successful and verify 2/2 blob SHAs, close original draft #116 unmerged. Subsequent isolated P11 work: inspect/plan composite template+appearance and OBS rendering without altering save/activation or introducing parallel settings.
+- User manually confirmed installed P11-F: «Всё работает. Идём дальше.» at 2026-10-12 06:50:32 UTC. Source candidate [draft PR #116](https://github.com/ALL-EX-E/InOneLine/pull/116), exact tested HEAD 753862c25c648ba22602e574a355d4560ba6ce8c; Windows native 38211698235 SUCCESS, wording 38211698257 SUCCESS. [Verified Drive ZIP](https://drive.google.com/file/d/1cI94I7yt7tHBZMZwtE2AGrrYq9etIxMT/view), 46,786,164 bytes, SHA256 7658eb2306ad35c277f3dcbe8122ac0bdff64b57fd2cfa9d9235904f10b3bd60.
+- Exact tested blobs: `streaming_manager/views/rules_editor.py` = `7695fd7a4be491a3fe38588fad03cba4e1b2f4cd`; `tools/gui_regression_smoke.py` = `ab2348791ce938c713c7bd4bb535cd7a27ebc2fb`. Save persists current Rules text without closing existing editor, keeps dirty/Close confirmation, inactive draft state, OBS and auction/session logic. No new DB/schema, version or audio changes.
+- **USER ACCEPTED**; clean promotion of exact 2 blobs plus these three canonical docs onto latest main with fresh native Windows Regression Foundation and wording gates is pending. After both PASS, merge with head SHA lease, independently verify exact 2/2 blobs on main and close superseded draft #116 WITHOUT MERGE. Next P11 substep must be isolated and approved independently; composite Rules OBS appearance/template consolidation remains outstanding.
 
 ## P11-F VERIFIED CLOSED; next P11-G save-as choice — 2026-10-12
 
@@ -975,12 +1353,12 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - **P13-B/UI-062 первая часть — draft [#188](https://github.com/ALL-EX-E/InOneLine/pull/188), QA PENDING.** Точно две файлообласти: `auction.py` и `gui_regression_smoke.py`, source candidate `e2a7d04d1c233a10da2543c5aa6072a7674e25a3`. Перемещение единственного имеющегося локального wheel_panel из нижней третьей колонки рядом с lot-table/Ставки/История в верхнюю область рядом со способом победителя; колесо сохраняет текущую conditional visibility. Нижний content layout остаётся ровно `Список лотов + Ставки/История`. Не создавать второй Wheel или OBS renderer, не менять звук, RNG, session, победителя, время. Существующие wheel soundtrack controls остаются при panel до отдельного UI-071.
 - UI-062 поднятие общего timer block, UI-071 перенос **существующих** двух наборов soundtrack controls и UI-073 визуальная унификация — следующие отдельные QA steps после принятия текущего; **P16/UI-072** минимум wheel 1 секунда остаётся запланированным, сейчас 3 секунды.
 
-## P13-B FIX1 принят и чисто объединён; следующий P13-C/UI-071 (17 октября 2026)
+## P13-B FIX1 закрыт; следующий P13-C/UI-071 — 17 октября 2026
 
-- Пользователь явно подтвердил установленную проверочную Windows-сборку P13-B FIX1: «Всё отлично. Всё работает. Идём дальше.» (2026-10-17 05:05:21 UTC). Принята **исправленная** компоновка: слева выбор метода, под ним единственное локальное колесо и OBS-действия; справа единый таймер; при узком окне вертикальное размещение колонок и горизонтальная неразрывная группа «Громкость / ▲ / ▼». Прежний P13-B без FIX1 не принят.
-- Проверенная исходная QA-ветка `candidate/p13b-upper-local-wheel-20261016` HEAD `ec63fbe66d2d8ff3d2a449d4388a439d33ff9773`, Windows Regression Foundation [39004329318](https://github.com/ALL-EX-E/InOneLine/actions/runs/39004329318) SUCCESS (31/31), wording [39004329310](https://github.com/ALL-EX-E/InOneLine/actions/runs/39004329310) SUCCESS. Проверочный архив `InOneLine_P13B_FIX1_WHEEL_LEFT_TIMER_RIGHT_1.0.8_WINDOWS_QA.zip`: https://drive.google.com/file/d/1d9jiVbvs5eYhb5_gchaZbN5w3DIHI6G_/view; 46 823 566 байт, SHA256 `51a6582a1fea62b141bba58900b8c5c0ec18f64414df83d0cfb1e4edf9c57862`.
-- Clean promotion [PR #190](https://github.com/ALL-EX-E/InOneLine/pull/190), HEAD `381c4635ddc58c6f77a1ebfc980296b4d6f313a4`. Fresh native Windows Regression Foundation [39005058988](https://github.com/ALL-EX-E/InOneLine/actions/runs/39005058988) SUCCESS, Publication wording [39005058984](https://github.com/ALL-EX-E/InOneLine/actions/runs/39005058984) SUCCESS. Squash main `f8a59ecb242876a02879cc1ca82a4bac786db2c4`; все 3/3 source/test blob SHA независимо совпали после merge. Исходный draft [#188](https://github.com/ALL-EX-E/InOneLine/pull/188) **закрыт БЕЗ объединения**.
-- **Следующий отдельный P13-C/UI-071:** перенести оригинальный `wheel_soundtrack_widget` из области локального колеса в существующий `timer_widget`, где уже расположен `auction_soundtrack_widget`; контекстно показывать один из этих двух сохранённых наборов выбора media/status/volume/mute. Использовать существующие UI/state/audio-методы и существующий общий OBS audio route. Не создавать третью копию настроек, второй таймер или менять audio ownership/spin/winner/RNG/database. UI-073 визуальная унификация и P16/UI-072 минимум Wheel 1 секунда остаются будущими отдельными шагами.
+- 2026-10-17 05:05:21 UTC: установленный P13-B FIX1 принят пользователем «Всё отлично. Всё работает. Идём дальше.». Исправленная двухколоночная компоновка: method+wheel слева, общий timer справа, compact stack; кнопки ▲/▼ всегда в горизонтальном ряду с объёмом.
+- Exact accepted QA HEAD `ec63fbe66d2d8ff3d2a449d4388a439d33ff9773`, QA https://drive.google.com/file/d/1d9jiVbvs5eYhb5_gchaZbN5w3DIHI6G_/view, 46 823 566 bytes; native Windows [39004329318](https://github.com/ALL-EX-E/InOneLine/actions/runs/39004329318) PASS (31/31).
+- Clean promotion [#190](https://github.com/ALL-EX-E/InOneLine/pull/190), fresh Windows [39005058988](https://github.com/ALL-EX-E/InOneLine/actions/runs/39005058988) SUCCESS, wording [39005058984](https://github.com/ALL-EX-E/InOneLine/actions/runs/39005058984) SUCCESS; squash main `f8a59ecb242876a02879cc1ca82a4bac786db2c4`; exact 3/3 Git blobs совпали. Исходный QA draft [#188](https://github.com/ALL-EX-E/InOneLine/pull/188) closed WITHOUT MERGE.
+- Next P13-C/UI-071 only: move existing wheel soundtrack controls from wheel panel into shared timer and preserve contextual auction/wheel visibility, selections, imports, volume/mute, audio routing and state. No timer-duration/RNG/winner changes; UI-073/P16 separate.
 
 ## P13-C/UI-071 Windows QA готова; ручная приёмка ожидается (17 октября 2026)
 
@@ -1208,12 +1586,9 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - Existing wheel lead-in/re-entry guard must remain: once an authoritative saved spin is in `winner_selected` with prepared `wheel_spin_id`, repeated `Крутить` does not reroll RNG or alter audio start/verification/tickets; while remote worker is in flight no second request may start. Dedicated mocked/deterministic Qt/SQLite regression does not call external RNG or require API key.
 - **P16-E candidate unaccepted** until full native Windows CI, installable QA ZIP on canonical Drive and user installed-app manual check. It does not change RNG selection, saved winner, ticket, animation duration, UI layout, schema, OBS/audio backend or full-auction stop behavior. The harder general AUCTION-TIMER-REVIEW-003 main-auction/overtime preparation and authoritative source-time boundary remain future separate scopes; do not claim P16 closed.
 
-## P16-E accepted and merged; P16-F / AUCTION-TIMER-REVIEW-003 isolated candidate — 2026-10-18
+## P16-E accepted / P16-F countdown preparation candidate — 2026-10-18
 
-- User accepted P16-E with **five of five** installed Windows checks. Exact-tree promotion [PR #242](https://github.com/ALL-EX-E/InOneLine/pull/242), main merge `fff2907c85b8c3a235f7b77a50f11b4003da4fa1`; prior QA draft #241 remains unmerged. No public release.
-- Next approved P16-F implements the saved 2026-10-07 AUCTION-TIMER-REVIEW-003 contract for **initial Max Amount and tie-overtime only**: 1200ms technical preparation is outside configured duration, then one persisted `timer_phase_starts_at` boundary drives Qt, OBS and existing auction soundtrack start. Wheel retains its already accepted distinct `wheel_started_at`/RNG semantics.
-- An isolated forward-only **schema-21** named migration adds nullable `auction_sessions.timer_phase_starts_at`: NULL keeps older sessions' immediate clock; `started_at`/created audit and source-time routing remain untouched. Prestart +/−, reset, S2 extension, pause/resume and delayed/stale audio callbacks must respect the stored phase without creating a second timer. Do not merge into another P16 task.
-- Draft candidate `codex/p16f-timer-preparation-boundary` requires native Windows SQLite/Qt/OBS/audio regression, schema/backup migration checks, exact installable QA ZIP on canonical Drive and explicit user installed-app PASS. Not accepted/merged/released. P17 Auction Settings waits for this P16 gate.
+P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged into main at `fff2907c85b8c3a235f7b77a50f11b4003da4fa1`; initial PR candidate #241 not merged. Candidate branch `codex/p16f-timer-preparation-boundary` targets approved AUCTION-TIMER-REVIEW-003: preserve 1200ms initial Max Amount and tie-overtime lead-in outside actual duration, share one persisted phase boundary for local/OBS timer plus existing soundtrack, protect pause/resume, adjustments, auto-extension and cancellation without touching wheel RNG. Named nullable schema-21 migration is additive; old records retain immediate countdown. This P16-F branch is **NOT MANUALLY ACCEPTED / NOT MERGED** until full native Windows regression, QA installer handoff and manual confirmation; no public release.
 
 ## P16-F USER ACCEPTED / CLEAN MERGED; P17-A UI-083 isolated QA candidate — 2026-10-18
 
@@ -1221,165 +1596,120 @@ The previously archived `InOneLine_P10_OBS_SHOW_MODE_CANDIDATE_1.0.8_WINDOWS_QA.
 - P17-A is the smallest still-open UI-083 presentation/copy-only scope in `Настройки → Аукцион`: rename visible extension cause `Внешнее пожертвование` to `Внешнее поступление`, name center-image fallback `Логотип InOneLine`, and correct the false `локальная PNG-копия` wording to the actual managed original-compatible supported format with GIF/WebP animation. Preserve all S2 backend reason IDs, saved thresholds/durations, center media setting, actual local/OBS behavior and save callbacks.
 - Verified CURRENT already implements UI-072 1s wheel default validation and UI-083 immediate choice/import/fallback save via `_save_wheel_center_selection_immediately`; do not duplicate, reimplement or alter them. Native Settings regression protects new texts and preserved persisted defaults/external-extend key. **P17-A unaccepted / draft Windows QA**, requires CI SUCCESS, exact ZIP and user manual PASS before promotion; do not merge or replace public release.
 
-## P18-E accepted; current next P18-F/UI-084 integration wording and local time — 2026-10-18
+## CURRENT checkpoint — P18-E accepted / P18-F QA (2026-10-18)
 
-P18 / UI-084 A–D have user acceptance and clean merges: PR #248, #250, #252, #254. User explicitly accepted **P18-E (RANDOM.ORG saved/unsaved key state), Windows 5/5 PASS**. QA [PR #255](https://github.com/ALL-EX-E/InOneLine/pull/255) stays draft; the byte-identical [accepted PR #256](https://github.com/ALL-EX-E/InOneLine/pull/256) merged as `1656d40ec6f48d3bbfdf838de31b341d2b3a5813`, source tree `4a942b298f44e40d49fc62c734277e9e756cc01f`. Native Windows and wording gates passed for both QA and promotion. The QA ZIP is [archived on Drive](https://drive.google.com/file/d/1GQZUR6KQJ55lXkvVJcANDVuT3ukokd8O/view). No official release.
+- Current accepted source on `main`: **`1656d40ec6f48d3bbfdf838de31b341d2b3a5813`**. Product version remains **1.0.8**, and no new public release was published. Earlier top-of-file release/baseline entries are historical, not a claim that development stopped at P17-A.
+- P17-A / UI-083 accepted as exact-tree PR #246. P18 / UI-084 prior scopes A–D accepted as PR #248 (disabled health check), #250 (contextual provider actions), #252 (Twitch reward eligibility), #254 (Twitch unsaved draft / partial sync safety).
+- **P18-E / UI-084 ACCEPTED:** user on 2026-10-18 confirmed all manual Windows QA works. Frozen QA PR #255 commit `e12ba52f590a8f6380b4be4b091b0de2f664826a`, exact tree `4a942b298f44e40d49fc62c734277e9e756cc01f`. QA Windows #39139252203 SUCCESS, wording #39139252200 SUCCESS; ZIP [on Google Drive](https://drive.google.com/file/d/1GQZUR6KQJ55lXkvVJcANDVuT3ukokd8O/view) SHA256 `9d26a63900caa5001985b859501c5185fdd84c203486e14f1f7ec3389c60f698`. Exact-tree clean [PR #256](https://github.com/ALL-EX-E/InOneLine/pull/256), Windows promotion #39143626759 SUCCESS, wording #39143626774 SUCCESS, merged `1656d40ec6f48d3bbfdf838de31b341d2b3a5813`. Draft QA #255 remains unmerged; no release.
+- **Next independent scope P18-F / UI-084**: Russian visible provider text and shared local timestamps in `Настройки → Интеграции`, [DRAFT PR #257](https://github.com/ALL-EX-E/InOneLine/pull/257). Not yet manually accepted or merged; review CI, archive QA Windows installer, then give all five manual checks at once. No changes to auth, adapter APIs, schema or UTC persistence.
+- Remaining UI-084 details (including redundant empty-provider label) must be checked separately; do not infer whole UI-084 closure from P18-E or P18-F. UI-085 conversion follows the accepted dependency plan.
 
-**CURRENT selected next scope:** P18-F / UI-084 visible provider copy and dates — isolate card-only Russian descriptions and reuse the existing shared local date-time formatter; preserve all provider/backend status, UTC data, protected credentials, reward draft and action semantics. QA branch `codex/p18f-integration-copy-local-time-qa`, [draft PR #257](https://github.com/ALL-EX-E/InOneLine/pull/257). **NOT manually accepted; NOT merged.** Require successful full native Windows CI, verified QA ZIP and user manual QA. Then reconcile remaining UI-084 card cleanup and proceed to UI-085 Conversion, without automatically broadening P18-F.
+## Current project checkpoint — P18-F accepted, P18-G draft QA (2026-10-19 Asia/Novosibirsk)
 
-## P18-F accepted; P18-G / UI-084 redundant provider empty-state label is next — 2026-10-19
+- Product version **1.0.8** unchanged. Latest accepted `main` source: merge `5580f4b0461b218c2d6826e506477840d11853e0` from [P18-F accepted PR #259](https://github.com/ALL-EX-E/InOneLine/pull/259). User explicitly confirmed installed Windows P18-F checks work; five checks accepted on 2026-10-19 local date (2026-10-18 UTC). **P18-F ACCEPTED.**
+- Frozen [P18-F QA draft PR #257](https://github.com/ALL-EX-E/InOneLine/pull/257), tested HEAD `e8c249e2159b5613442663d73de36c194c73aef5`, QA Windows #39144325303 SUCCESS, wording #39144325294 SUCCESS. ZIP [Google Drive](https://drive.google.com/file/d/1BEifhb1nTA87kK5pPjqyzebUgy6Isf7E/view), ZIP SHA256 `66dc4e11cef6c5da2661be519e77e8bdafe0105d9c9ba643ca2ab9f90c342f46`, 46,840,163 bytes; installed user PASS. Exact four tested file blobs promoted in clean PR #259, fresh Windows #39151350471 SUCCESS and wording #39151350483 SUCCESS. QA PR #257 intentionally remains unmerged; no public release.
+- **Next isolated P18-G / UI-084 #11** removes the unreachable provider empty-state label only, without changing card visibility or service lifecycle. [Draft QA PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260), not accepted, not merged. Requires full Windows/wording success, exact Windows installer ZIP archived to Drive and manual Windows 5/5 before promotion.
+- After P18-G acceptance and final UI-084 reconciliation, proceed to P19 / UI-085 Conversion per approved ordering. No automatic broadening of current scope.
 
-User reported P18-F Windows QA **all five checks PASS**. Exact tested four-file promotion [PR #259](https://github.com/ALL-EX-E/InOneLine/pull/259) merged `5580f4b0461b218c2d6826e506477840d11853e0`. Full fresh Windows regression #39151350471 SUCCESS; wording #39151350483 SUCCESS. Frozen earlier candidate [PR #257](https://github.com/ALL-EX-E/InOneLine/pull/257) stays draft/unmerged. No public release or version bump.
+## CURRENT: P18-G accepted; P19-A / UI-085 first independent QA — 2026-10-19
 
-Next **P18-G / UI-084 #11**: old `integration_empty_label` is dead/redundant because provider cards exist even when unconfigured. Remove only the redundant line/visibility call, keep provider cards discoverable, preserve state-aware action semantics. [QA PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260) DRAFT / NOT ACCEPTED; needs full Windows tests, installer archive on Drive and user manual acceptance before exact-tree merge. After UI-084 closes, P19 / UI-085 Conversion remains next dependency group.
+- Version remains 1.0.8; no new public release.
+- User installed the P18-G build and explicitly confirmed all five Windows tests work (2026-10-18 18:19 UTC, 2026-10-19 local). Frozen QA [PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260) source HEAD `b92a934f52e5e5ff69846d5390970078074946c3`, tree `63ccee0d6b14c0f99d5e830c87ebd161742cd818`. QA Windows Regression #39152204517 SUCCESS; wording #39152204535 SUCCESS. ZIP archived on [Google Drive](https://drive.google.com/file/d/1CEDoOOIq-_LR5r64ETxVPNlITWUNkX-R/view), 46,861,297 bytes SHA256 `fb6fa7357f19f8623632d328d76b67295f8798856fffe0a0792a253efc612bd1`.
+- **P18-G ACCEPTED AND IN MAIN**: exact-four-tested-blobs promotion [PR #262](https://github.com/ALL-EX-E/InOneLine/pull/262), native Windows #39153752761 SUCCESS, wording #39153752741 SUCCESS, merged as `54ab80dfeebd33fc627f28743fb46f90617f9283`. The original QA draft #260 remains unmerged. Accepted UI-084 packages P18-A through P18-G complete; keep provider semantics/credentials/UTC/history unchanged.
+- Next work is approved **P19 / UI-085 `Настройки → Конвертация`**. Start with isolated P19-A (heading `Курсы конвертации`; existing `Сохранить курсы` directly after rate editors) in [draft PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263). No atomic save, pending event, source-time, rejection or historical credit changes in P19-A. **DRAFT, NOT MANUALLY ACCEPTED**, needs Windows CI, exact installer ZIP on Drive and user Windows acceptance. Then P19-B atomic persistence and subsequent UI-085 tasks one by one.
 
-## P18-G / UI-084 accepted; P19-A / UI-085 Conversion UI is next — 2026-10-19
+## CURRENT P19-A accepted / P19-B isolated atomic conversion QA — 2026-10-19
 
-P18-G was manually accepted after installed Windows checks; the redundant unreachable `Подключённых сервисов пока нет.` QLabel was deleted without altering provider cards/state. Exact four-blob [promotion PR #262](https://github.com/ALL-EX-E/InOneLine/pull/262) merged `54ab80dfeebd33fc627f28743fb46f90617f9283` after fresh Windows #39153752761 and wording #39153752741 SUCCESS. Frozen source [QA PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260), QA Windows #39152204517 and wording #39152204535 SUCCESS, ZIP [Google Drive](https://drive.google.com/file/d/1CEDoOOIq-_LR5r64ETxVPNlITWUNkX-R/view). No public release.
+- Version 1.0.8 unchanged; no official release. User manually installed and accepted all five P19-A / UI-085 layout QA scenarios: `Настройки → Конвертация` heading `Курсы конвертации` and existing `Сохранить курсы` button directly under the rate rows.
+- P19-A frozen [QA PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263): tested commit `b1adad467878fe3009a2472e3770c561af495b5c`, native Windows Regression Foundation #39154698137 SUCCESS, Publication wording #39154697973 SUCCESS. [Google Drive ZIP](https://drive.google.com/file/d/1AF5RajahtuDl5FZ5fU0L_UxqWICJkBjj/view): 46,854,173 bytes, SHA-256 `07cfe478828702e6ac1e88686b14bf062d9ce29e80b1c99e0d4580ef2776dc9f`; installer SHA-256 `bdac4ad403e5c2ddff501356778b5810f3eb8b4b41c4fb1531546380d9b790ef`.
+- **P19-A ACCEPTED / merged `main`** via [exact-four-Git-blob promotion PR #265](https://github.com/ALL-EX-E/InOneLine/pull/265), fresh Windows #39156588945 SUCCESS and wording #39156589003 SUCCESS, merge commit `333adeca80bcc37b0e5d7c0b2704e30bae4c2a9a`. Frozen QA PR #263 remains draft/unmerged, no release.
+- **Current next P19-B / UI-085**: atomic all-or-nothing conversion-rate saving, including prevalidation and single DB transaction for settings, unit metadata, audit and pending/external event statuses, no automatic credit. [Draft QA PR #266](https://github.com/ALL-EX-E/InOneLine/pull/266); **not user accepted / not merged**. Require full native Windows CI, Drive QA archive, five-step manual Windows QA before exact-tested-blobs promotion. Next P19-C handles unknown-rate pending target/title independently, not in P19-B.
 
-**NEXT:** P19-A / UI-085 smallest visual improvement in `Настройки → Конвертация`, per already-approved UI-085 items #1 and #2: heading `Валюты` → `Курсы конвертации` and move existing `Сохранить курсы` immediately after dynamic rate rows. Keep rate saving backend exactly as-is; P19-B atomic all-row transaction and unknown-rate pending corrections are separate later scopes. [Draft PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263), NOT accepted or merged; full native Windows regression, verified QA installer and explicit manual QA required.
+## CURRENT — P19-B accepted; P19-C isolated Windows QA (2026-10-19)
 
-## UI-085 Conversion: P19-A layout accepted; P19-B atomic saving next — 2026-10-19
+- Version 1.0.8 unchanged; **no public release**. User explicitly reported installed P19-B manual Windows QA all working (five scenarios PASS). P19-B is atomic rate prevalidation and a single SQLite transaction for settings, unit metadata, audit and pending + external event status, no automatic credit.
+- Frozen [QA PR #266](https://github.com/ALL-EX-E/InOneLine/pull/266), commit `a47835faba55a5f7252e5cd078f436d99a05d762`, native Windows #39157744940 SUCCESS, Publication wording #39157745085 SUCCESS. QA ZIP [Drive](https://drive.google.com/file/d/1g3LjRFt0SZnIz4EIGk_rJiHAeMAOUh2a/view), 46,849,064 bytes, SHA256 `5e3ba5f4e87068e311f3eee20873b3242c0a4c2d33a0e861c0bb3e18389141df`.
+- **P19-B accepted and in `main`:** exact-five-tested-blob [PR #268](https://github.com/ALL-EX-E/InOneLine/pull/268), promotion Windows #39201152469 SUCCESS, wording #39201152479 SUCCESS, merge `76e36770b5a20cd09f1822be145dbe2e8a5a181f`. Original QA #266 intentionally not merged.
+- Next **P19-C / UI-085 pending new-title fallback and safe manual Apply**: [draft PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269), not yet accepted or merged. Correct title recovered from `external_events.payload_json.normalized.lot_title` if `game_id` intentionally NULL; no auto-creation/credit. Full native Windows CI + Drive QA ZIP and explicit user acceptance required. Do not combine with UI-086 auction correction-phase or UI-085 event-time/rejection features.
 
-P19-A manually accepted by user after installed Windows QA and merged as `333adeca80bcc37b0e5d7c0b2704e30bae4c2a9a` through [PR #265](https://github.com/ALL-EX-E/InOneLine/pull/265). Source QA [PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263), native Windows #39154698137 SUCCESS, wording #39154697973 SUCCESS; promotion Windows #39156588945 SUCCESS, wording #39156589003 SUCCESS. ZIP archived on Google Drive, no version bump or release.
+## CURRENT — P19-C user accepted; P19-D local time QA isolated (2026-10-19)
 
-**NEXT P19-B / UI-085 #3:** validation of all current rate editors before any mutation, then one existing SQLite transaction to persist rates + pending statuses + audit. Preserve empty RUB = 1, other empty = unconfigured, no automatic points credit. [Draft PR #266](https://github.com/ALL-EX-E/InOneLine/pull/266) is not yet accepted/merged. Needs full Windows regression, archived installer SHA256 and user manual QA. Later P19-C + remaining UI-085 items (pending target/title, local time, reject action, draft preservation, unknown-unit handling) remain separate, preserving UI-086 auction boundaries.
+- User installed P19-C Windows QA and explicitly reported «Всё работает. Идём дальше.» on 2026-10-19; all five requested manual checks accepted. Frozen source QA [PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269), head `5928632a2aa23f30b52b65128f07f0148c0b2622`, native Windows #39201965942 SUCCESS and wording #39201965930 SUCCESS. Exact ZIP [Google Drive](https://drive.google.com/file/d/17f2H4dJ5oROOQbUY8JOrHKt3VjFnqSZt/view), 46,848,349 bytes, SHA256 `c7b19dddeeaf3099f388c5c81e994630d31252294608e79dc5bbf805a6f3c553`.
+- **P19-C ACCEPTED by user.** Clean five tested blob promotion [PR #271](https://github.com/ALL-EX-E/InOneLine/pull/271), head `b32472bfc1db4154339b880e8eb89160be10e24e` based on latest `main` while preserving documentation; fresh Windows #39213736634 and wording #39213736637 SUCCESS; merged into `main` as `09de164370193a77f538de1b7038d4abaa2b56b3`. QA draft #269 remains unmerged. No public release/version bump.
+- **Selected next P19-D / UI-085 #5**: `Настройки → Конвертация → Ожидают применения` gets local `Время` of authoritative `external_events.created_at` (immutable UTC stored) and concise row provenance tooltip. Isolated [draft PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272), new native Qt/SQLite test and Windows/wording checks; no schema, backend credit, event routing or auction change. No P19-D manual acceptance or release. Next P19-E is separate reject action.
 
-## UI-085: P19-B accepted; P19-C pending usable-title event next (2026-10-19)
+## CURRENT — P19-D user accepted, P19-E explicit No Apply QA (2026-10-19)
 
-User accepted the installed P19-B QA (5/5 PASS). QA PR #266, Windows #39157744940 and wording #39157745085 SUCCESS; QA ZIP [Drive](https://drive.google.com/file/d/1g3LjRFt0SZnIz4EIGk_rJiHAeMAOUh2a/view). Accepted exact-five-blob PR #268 merged `76e36770b5a20cd09f1822be145dbe2e8a5a181f` after fresh Windows #39201152469 and wording #39201152479 SUCCESS; no release.
+- User installed P19-D Windows QA and explicitly confirmed «Всё работает. Идём дальше.» on 2026-10-19. Frozen [QA draft PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272), commit `f00d7404fbed8c00592533c5f64c0fdff8a35fd5`, native Windows [#39214485331](https://github.com/ALL-EX-E/InOneLine/actions/runs/39214485331) SUCCESS, wording #39214485363 SUCCESS. [Drive QA ZIP](https://drive.google.com/file/d/1abPwAqdUCfQyJHHjZjdYg1NtTjdeR7jS/view), 46,851,713 bytes SHA256 `23eb935d46a1558c37803401b558294d8cc2e62c3aa394bce3f7a35a7a1e17a9`. **P19-D manually accepted.** Exact-six-tested-blobs [promotion PR #274](https://github.com/ALL-EX-E/InOneLine/pull/274), head `cfd0d3591371f89d66ab6d50d9f10b485b359e32`. Fresh Windows [#39219909356](https://github.com/ALL-EX-E/InOneLine/actions/runs/39219909356) and wording #39219909154 SUCCESS; merged into main as `19a0d5bc2c6d44d30cd98c750f426bc92dc9a276`. QA draft #272 remains unmerged.
+- **CURRENT P19-E / UI-085 #6**: operator action «Не применять» next to «Применить» with confirmation, final no-credit `pending_conversions.status=cancelled`, `external_events.processing_status=cancelled` within one transaction and detailed change-log audit; keep raw event and dedup, no schema or real donation required for synthetic QA. [Draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275), native Qt/SQLite test and Windows+wording workflow, manual five-point QA. **Not accepted, not merged**; requires verified QA ZIP in Google Drive and user signoff. No official release, version 1.0.8 unchanged.
 
-**NEXT P19-C / UI-085 #4:** display authoritative saved normalized title for unknown-rate external event with intentionally absent `game_id`; unlock manual Apply only when existing backend prerequisites allow it, preserving source-auction session constraints and creating/crediting the permanent game only on explicit Apply. [QA PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269) DRAFT / NOT ACCEPTED / NOT MERGED. Full native Windows regression, archived QA installer and user manual QA gate required. Next P19-D covers event-time column, P19-E explicit reject and following UI-085 drafts separately, never widen P19-C into UI-086.
+## CURRENT — P19-E accepted; P19-F rate drafts isolated QA (2026-10-19)
 
-## UI-085 — P19-C user acceptance; P19-D local event time QA (2026-10-19)
+- User installed P19-E Windows QA and explicitly reported «Всё работает. Идём дальше.» on 2026-10-19. Frozen QA [draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275) head `d80b5da3509adc46bf25ded89567c489734f8daa`: Windows #39221047242 SUCCESS (five P19-E native Qt/SQLite scenarios and full installer/OBS/regressions), wording #39221047310 SUCCESS. [Drive ZIP](https://drive.google.com/file/d/1Zd_tmp5UpScFY5IYASf006pdgce4eLno/view), 46,854,366 bytes, SHA256 `fcc554a6586bfa0a8a0014d189485d0e14e10f844c2bcba87a05dde7c606b809`. **P19-E manually accepted.** Exact-six-tested-blob clean [promotion PR #277](https://github.com/ALL-EX-E/InOneLine/pull/277) head `56745a1de2fd92f40e247bf5ca33bcd82d89b9cb`, fresh Windows #39223217704 and wording #39223217838 SUCCESS; merged into main as `811789f47a6593d518ba413244a8505c0376777e`. QA draft #275 remains unmerged. No public release.
+- **CURRENT P19-F / UI-085 #7**: in-memory retention of unsaved conversion-rate text across connected adapter/capability set rebuild, hidden service-unit draft reinstated on reconnect. Nothing persisted without explicit Save. [Draft QA PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278), five native Qt tests and five user QA checks. Not user accepted/not merged; need full Windows CI, wording gate, Drive installer and manual Windows acceptance. Following P19-F: UI-085 #7.1 unknown-unit handling, then UI-086 phase separately.
 
-P19-C/unknown-rate new-title pending Apply passed five installed Windows manual scenarios on 2026-10-19. Frozen QA [PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269) `5928632` and ZIP [Google Drive](https://drive.google.com/file/d/17f2H4dJ5oROOQbUY8JOrHKt3VjFnqSZt/view) SHA256 `c7b19dddeeaf3099f388c5c81e994630d31252294608e79dc5bbf805a6f3c553` were verified; automatic native Windows and wording gates SUCCESS. User acceptance recorded. The exact-five-blob accepted-source [promotion PR #271](https://github.com/ALL-EX-E/InOneLine/pull/271) passed fresh Windows #39213736634 and wording #39213736637, merged as `09de164370193a77f538de1b7038d4abaa2b56b3` without merging unaccepted source QA draft. No official release.
+## CURRENT — P19-F user accepted; P19-G unknown unit QA (2026-10-19)
 
-**Current next P19-D / UI-085 #5:** add local `Время` column and concise source/contributor/provider event ID/target/source-auction tooltip to active pending conversions, using UTC `external_events.created_at` only as read source and shared formatter from UI-084. Preserve backend and DB timestamps unmodified. Independent [draft PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272), Windows regression and manual QA required before acceptance. P19-E explicit `Не применять` is later; drafts, unknown-unit handling and UI-086 auction correction remain separate.
+- User installed P19-F Windows QA and confirmed «Всё работает. Идём дальше.» 2026-10-19. Frozen [QA draft PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278) head `a4a25743a13f06868686247129ce38f73978ab4f`, native Windows #39223611623 SUCCESS and wording #39223611578 SUCCESS. [Drive QA ZIP](https://drive.google.com/file/d/1WF6WBJN7_JFBzrZGy9rkMil79bZEqcpz/view) 46,851,512 bytes SHA256 `e0f89126140e5ebf310f628cef8144e331f2616e4ba9f195782905db1180d481`. **P19-F manually accepted.** Clean exact-four-blob [promotion PR #280](https://github.com/ALL-EX-E/InOneLine/pull/280), head `d3a4cb6e2e6a5d7a8f554c32a31e92a8163bb7e7`, fresh Windows #39228013720 and wording #39228013948 SUCCESS; merged into main as `73e8da4dbea67b0dd4e13028465d71c3f744892a`. Source QA draft stays unmerged. Version 1.0.8/no release.
+- **CURRENT P19-G / UI-085 #7.1:** accepted unknown currency and service unit must appear as corresponding rate editor and pending external event. Backend atomic unit+pending already exists; ensure unadvertised dynamic service unit visible while originating integration connected, hidden on disconnect without deleting stored rate/pending. Synchronize rate-editor refresh with queue; retain P19-F drafts, no automatic credit. [Draft PR #281](https://github.com/ALL-EX-E/InOneLine/pull/281), five new Windows Qt/SQLite smoke cases and five manual QA checks. Not accepted/merged; needs Windows+wording, verified Drive QA ZIP and explicit user manual PASS. UI-086 source-time auction correction separate afterward.
 
-## UI-085 P19-D accepted, P19-E no-credit rejection is isolated QA — 2026-10-19
+## CURRENT — P19-G user accepted; P20-A UI-086 first result gate QA (2026-10-19)
 
-P19-D event-local-time column/provenance tooltip accepted after installed Windows manual QA «Всё работает. Идём дальше.» Frozen [QA PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272) head `f00d7404`, full Windows #39214485331 and wording #39214485363 SUCCESS; [QA Drive ZIP](https://drive.google.com/file/d/1abPwAqdUCfQyJHHjZjdYg1NtTjdeR7jS/view) 46,851,713 bytes SHA256 `23eb935d46a1558c37803401b558294d8cc2e62c3aa394bce3f7a35a7a1e17a9`. Clean exact-six Git blob promotion [PR #274](https://github.com/ALL-EX-E/InOneLine/pull/274) passed fresh Windows #39219909356 and wording #39219909154; merged as `19a0d5bc2c6d44d30cd98c750f426bc92dc9a276`. The source QA draft #272 remains unmerged and no public release was issued.
+- User installed P19-G Windows QA and confirmed «Всё работает. Идём дальше.» 2026-10-19. Frozen [QA draft PR #281](https://github.com/ALL-EX-E/InOneLine/pull/281) head `f9e462fddd6e066b7d53088414068dc7c121077f`, native Windows #39228580943 and wording #39228580927 SUCCESS. [Google Drive QA ZIP](https://drive.google.com/file/d/1001bWh7W079YIRohOyF-K6PpfE4_FvtO/view), 46,862,313 bytes sha256 `3a9e5ffc892ddd08a10bbc1cc4b20d1fe7207ae2cbc8861ae5ba8950b2cb6fe6`. **P19-G manually accepted.** Clean exact-five-blob [promotion PR #283](https://github.com/ALL-EX-E/InOneLine/pull/283), head `7d1eb5b911535baf49218c1313e1a575d29b4701`, fresh Windows #39231437209 and wording #39231437189 SUCCESS; merged into main as `96914c129f6abe7318598466476884c9f420f1a0`. Source QA draft stays unmerged; no release.
+- **CURRENT P20-A / UI-086 #1:** warning/count for unresolved conversion events scoped to active source-auction id and guard confirmation/tie-wheel in DB transaction and UI. [Draft PR #284](https://github.com/ALL-EX-E/InOneLine/pull/284), new Windows Qt/SQLite tests, five manual QA scenarios in docs/P20_A_UI086_AUCTION_PENDING_RESULT_GATE_QA.md. **No post-00:00 late source-time apply or full wheel freeze/cancel warning yet** — separate follow-up. P20-A not accepted/merged; verify Windows+wording/Drive/manual PASS before promotion.
 
-**Next current P19-E/UI-085 #6:** explicit «Не применять» terminal cancellation, atomic pending/external status and provenance audit, no retroactive credit, no game/auction mutations, preserved provider dedup and raw event, no DB schema change. Separate [draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275), five native tests plus previous P19-B/C/D and full Windows, five user-manual QA checks. No manual acceptance yet. Next after P19-E: rate-editor draft preservation, unknown units then UI-086 auction phase work separately.
+## CURRENT — P20-A user accepted; P20-B late source-auction correction QA (2026-10-19)
 
-## UI-085 P19-E accepted; P19-F draft-preservation QA (2026-10-19)
-
-User accepted installed P19-E / No Apply Windows QA («Всё работает. Идём дальше.»). Frozen [source draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275), head `d80b5da3`, native Windows #39221047242 and wording #39221047310 SUCCESS; [Drive QA ZIP](https://drive.google.com/file/d/1Zd_tmp5UpScFY5IYASf006pdgce4eLno/view) 46,854,366 bytes sha256 `fcc554a6586bfa0a8a0014d189485d0e14e10f844c2bcba87a05dde7c606b809`. **P19-E user ACCEPTED**, clean exact-six-blob [promotion PR #277](https://github.com/ALL-EX-E/InOneLine/pull/277) passed fresh Windows #39223217704 and wording #39223217838 SUCCESS; merged as `811789f47a6593d518ba413244a8505c0376777e`. QA draft #275 remains unmerged. Version 1.0.8, no public release.
-
-**Next isolated P19-F / UI-085 #7**: retain UI-only unsaved conversion editor text through adapter capability signature changes/disconnect/reconnect, including hidden service-specific fields. The existing atomic Save remains sole SQLite writer; hidden drafts remain in RAM, lost on closing the app (documented). [Draft PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278), five native Qt regressions and manual QA. P19-F not accepted/merged. Later separate unknown-unit UI behavior (7.1), then UI-086.
-
-## UI-085 P19-F manually accepted; P19-G unknown units isolated QA — 2026-10-19
-
-User installed/accepted P19-F conversion rate draft retention: «Всё работает. Идём дальше.» Frozen source [QA draft PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278) commit `a4a25743`, full native Windows #39223611623, publication wording #39223611578 SUCCESS. [QA ZIP on Drive](https://drive.google.com/file/d/1WF6WBJN7_JFBzrZGy9rkMil79bZEqcpz/view) 46,851,512 bytes sha256 `e0f89126140e5ebf310f628cef8144e331f2616e4ba9f195782905db1180d481`. P19-F user accepted; exact-four-tested-blobs [promotion PR #280](https://github.com/ALL-EX-E/InOneLine/pull/280) passed fresh Windows #39228013720 and wording #39228013948 SUCCESS; merged as `73e8da4dbea67b0dd4e13028465d71c3f744892a`. No official release or version bump.
-
-**Current next P19-G / UI-085 #7.1**: unknown unit is a registered conversion unit AND a particular pending event, linked by source unit. New accepted currency already becomes visible and pending transactionally; previously unadvertised service-specific unit stayed hidden in rate editors despite a connected originating provider. Show registered service unit while its own provider is enabled+connected, hide without deleting rate/pending on disconnect; synchronize queue/editor presentation and preserve unsaved P19-F draft. [Draft PR #281](https://github.com/ALL-EX-E/InOneLine/pull/281), five Qt/SQLite tests + full Windows + five manual cases; no retroactive/automatic point credit. Next separate UI-086 pending auction gate. P19-G not accepted/merged.
-
-## UI-085 P19-G manually accepted; UI-086 P20-A isolated QA — 2026-10-19
-
-P19-G unknown currency/service unit visible in conversion editors + corresponding pending events accepted after installed Windows manual QA «Всё работает. Идём дальше.». Frozen [QA draft #281](https://github.com/ALL-EX-E/InOneLine/pull/281) head `f9e462f`, native Windows #39228580943 and wording #39228580927 SUCCESS; [Drive QA ZIP](https://drive.google.com/file/d/1001bWh7W079YIRohOyF-K6PpfE4_FvtO/view), 46,862,313 bytes sha256 `3a9e5ffc892ddd08a10bbc1cc4b20d1fe7207ae2cbc8861ae5ba8950b2cb6fe6`. **P19-G user ACCEPTED.** Clean exact 5 tested Git blob [promotion PR #283](https://github.com/ALL-EX-E/InOneLine/pull/283) passed fresh Windows #39231437209 and wording #39231437189 SUCCESS; merged as `96914c129f6abe7318598466476884c9f420f1a0`; source QA draft unmerged. No release/version bump.
-
-**NEXT P20-A / UI-086 first isolated step:** warning with session-specific unresolved source-auction event count on «Аукцион → Проведение»; disable winner confirmation and tie-wheel if unresolved; matching transactional backend guards; explicit operator «Применить»/«Не применять». [QA draft PR #284](https://github.com/ALL-EX-E/InOneLine/pull/284) Windows suite and five manual checks. Timers continue, stop unchanged; late post-00:00 source-time application, all-wheel freeze and stop warning are future independent UI-086 stages. P20-A not accepted/merged.
-
-## UI-086 — P20-A user accepted; P20-B post-00:00 existing source lot QA — 2026-10-19
-
-P20-A unresolved source-auction pending warning and transactional winner/tie-wheel gate **manually accepted** after installed Windows QA («Всё работает. Идём дальше.»). Frozen [draft #284](https://github.com/ALL-EX-E/InOneLine/pull/284), head `0dfb53bc`, native Windows #39232192391 and wording #39232192409 SUCCESS, [Drive ZIP](https://drive.google.com/file/d/1JZDfulWYyzHeiV_zGWg1Sq1l39CavY5t/view) 46,855,004 bytes sha256 `28d97d9e13a8aaab142ed327bd7a23246a07dc8dd4efcc4e6b6c895619a60e60`. Clean exact-six Git blobs [promotion #286](https://github.com/ALL-EX-E/InOneLine/pull/286) fresh Windows #39238302234 and wording #39238302222 SUCCESS; merged as `cd38520c7d4f63154f918a87f446195c08b036d9`. No public release.
-
-**NEXT P20-B:** post-00:00 late explicit Apply to existing source-auction Max Amount entry in provisional winner/tie state. Recompute full leader/tie and bid totals in source session, timer stays expired, closed-history unmodified and no newly opened session assigned. [QA draft #287](https://github.com/ALL-EX-E/InOneLine/pull/287), Windows suite and 5 manual cases. Still deliberately excludes brand-new title-only source lot after expiry and all weighted-wheel freeze paths: later P20-C+, no claims UI-086 complete.
-
-
-## UI-086 — P20-B FIX1 accepted; P20-C title-only source lot QA — 2026-10-19
-
-P20-B late original-source Max Amount existing-lot correction received original manual 5/5 PASS; promotion #289 was held for a deleted-lot historical tombstone defect. FIX1 tested [draft #290](https://github.com/ALL-EX-E/InOneLine/pull/290), Windows #39255128139/wording #39255128196 SUCCESS, [Drive ZIP](https://drive.google.com/file/d/1BqHs1a3jCvgkvP3pnnttMCY3IB28bWYU/view), SHA256 `1a6fe758c4a9fc514beb5d83f5fdb939e0467af8612b12e40be58a719a939a19`. User confirmed installed FIX1 «Всё работает. Идём дальше.»; exact tested six-blob [promotion #291](https://github.com/ALL-EX-E/InOneLine/pull/291) independently verified, fresh Windows #39258152397 and wording #39258152356 SUCCESS, merged as `785051caabea80cc9b43c298a74e701f9b43c95e`. QA drafts #287/#289/#290 remain unmerged; no public release.
-
-**CURRENT NEXT P20-C:** one isolated explicit pending conversion from before 00:00, stored source-auction ID and previously missing new title-only lot, joins its original still-provisional Max Amount source auction after 00:00. Reuse existing permanent game by title or create temporary auction-only game, recalc provisional winner/tie, never restart timer, preserve deleted-lot tombstones and closed history; exactly-once, no new session capture. [Draft #292](https://github.com/ALL-EX-E/InOneLine/pull/292) with native SQLite and manual checklist; awaiting Windows+wording/Drive/manual user PASS. Following stages: genuinely new after-expiry external events to permanent list, weighted-wheel frozen composition and stop/cancel warning — separately, not included here.
+- User installed P20-A Windows QA and confirmed «Всё работает. Идём дальше.» on 2026-10-19. Frozen [QA draft PR #284](https://github.com/ALL-EX-E/InOneLine/pull/284), head `0dfb53bc0494f39400ee9d01e54fddb82ba374e3`; full native Windows #39232192391 and wording #39232192409 SUCCESS. [Google Drive ZIP](https://drive.google.com/file/d/1JZDfulWYyzHeiV_zGWg1Sq1l39CavY5t/view) 46,855,004 bytes SHA256 `28d97d9e13a8aaab142ed327bd7a23246a07dc8dd4efcc4e6b6c895619a60e60`. **P20-A manually accepted.** Exact-six-blob clean [promotion PR #286](https://github.com/ALL-EX-E/InOneLine/pull/286), head `2a7019ac0f5f74ab55af08af831cb9c679aa7792`, fresh Windows #39238302234 and wording #39238302222 SUCCESS; merged into main as `cd38520c7d4f63154f918a87f446195c08b036d9`. QA source draft remains unmerged. Version 1.0.8, no public release.
+- **CURRENT P20-B / UI-086 stage 2:** explicit application of an unknown-rate pending event after timer expiry to an **existing lot** of its exact original Max Amount session while preliminary winner/tie. In one SQLite transaction, credit, audit and recompute provisional winner/tie without timer restart; protect confirmed history and never capture newer auction. [QA draft PR #287](https://github.com/ALL-EX-E/InOneLine/pull/287), 5 native SQLite cases, 5 user manual checks in docs/P20_B_UI086_EXPIRED_SOURCE_AUCTION_CORRECTION_QA.md. Missing title-only source lot and general weighted-wheel freeze are **separate next steps**; P20-B not user accepted/merged and requires Windows+wording/verified Drive ZIP/manual PASS.
 
 
-## UI-086 — P20-K accepted, merged and postmerge CI passed (2026-10-20)
+## CURRENT — P20-B FIX1 manually accepted/merged; P20-C title-only source-auction QA — 2026-10-19
 
-- **P20-C through P20-J accepted:** clean promoted PRs [#294](https://github.com/ALL-EX-E/InOneLine/pull/294), [#296](https://github.com/ALL-EX-E/InOneLine/pull/296), [#298](https://github.com/ALL-EX-E/InOneLine/pull/298), [#300](https://github.com/ALL-EX-E/InOneLine/pull/300), [#302](https://github.com/ALL-EX-E/InOneLine/pull/302), [#304](https://github.com/ALL-EX-E/InOneLine/pull/304), [#306](https://github.com/ALL-EX-E/InOneLine/pull/306), [#308](https://github.com/ALL-EX-E/InOneLine/pull/308). Earlier "CURRENT NEXT P20-C" text is superseded by this dated section.
-- **P20-K / UI-086 MANUALLY ACCEPTED (2026-10-20)** after installing Windows QA: user replied «Всё работает. Идём дальше.» UX refinement of P20-J: rename action beside Add/Decrease/Delete, modal current and new title, mandatory second Yes/No prompt defaulting to No; existing database guards unchanged. Original frozen [QA draft #309](https://github.com/ALL-EX-E/InOneLine/pull/309) HEAD e15260249ff267ddc8b036ef5f2fffbcf07b5400, native Windows [#39439006072](https://github.com/ALL-EX-E/InOneLine/actions/runs/39439006072) SUCCESS (57 steps), wording [#39439005918](https://github.com/ALL-EX-E/InOneLine/actions/runs/39439005918) SUCCESS. Exact installed [Google Drive ZIP](https://drive.google.com/file/d/1uenw3XC3DdBuq_Ch4lzONH78qGGi4rkE/view), 46,869,658 bytes, SHA-256 7c1173b0bd96f3778b234a7bc4a2f9234abe1cd14599324eff8105fd10bd949f.
-- **P20-K exact five-blob promotion [PR #310](https://github.com/ALL-EX-E/InOneLine/pull/310) MERGED** to main as a966bd5ed82bafaf2e52df063473617dae0faff3. All five final main blobs match frozen QA #309. Independent promotion [Windows #39445343843](https://github.com/ALL-EX-E/InOneLine/actions/runs/39445343843) SUCCESS and [wording #39445344246](https://github.com/ALL-EX-E/InOneLine/actions/runs/39445344246) SUCCESS. Independent exact-merge-commit [Windows postmerge #39450342381](https://github.com/ALL-EX-E/InOneLine/actions/runs/39450342381) SUCCESS (57/57) and [wording postmerge #39450342684](https://github.com/ALL-EX-E/InOneLine/actions/runs/39450342684) SUCCESS. Original QA draft #309 remains unmerged. Version/schema 1.0.8 unchanged; no public release.
-- **ROADMAP CORRECTION (2026-10-20):** Former speculative `NEXT P20-L` permanent-lot rename entry was an assistant inference, not a user-approved next step. The user explicitly challenged it: «Зачем переименовывать постоянные лоты я не понимаю?» Do NOT schedule permanent-lot rename merely because P20-J/K intentionally excluded it. Existing main-list and permanent-lot behavior stays unchanged.
-- **NEXT UI-086 unresolved approved safety scope for review:** a *source-auction pending-event-aware warning before `Остановить аукцион` / cancel*, originally preserved for later in P20-A and still outside P20-D and P20-K. Current `AuctionActionMixin.cancel_auction` confirms cancellation without specifically mentioning unresolved `pending_conversions` for its session, and `Database.cancel_auction` does not apply the source pending result gate. Review this existing accepted requirement and precise cancellation policy (including no silent event deletion or auto-credit) before designing a separate isolated candidate. Also reconcile remaining Max Amount → Wheel freeze edge cases against accepted P20-A/P20-D boundaries. Do not assume any of this is implemented; retain native Windows CI, verified QA installer and user manual acceptance process.
+- Original P20-B post-00:00 pending application into existing original Max Amount lot [draft #287](https://github.com/ALL-EX-E/InOneLine/pull/287) passed user's five installed Windows checks, but promotion #289 was **blocked** by a deleted temporary-lot tombstone defect; source drafts #287/#289 remain unmerged. Native P20-B FIX1 [QA draft #290](https://github.com/ALL-EX-E/InOneLine/pull/290) head `c5fafa992c55b7a1ff8a6f5ea5d89cbe1b85a5a2` fixes reactivation/TypeError; native Windows #39255128139 and wording #39255128196 SUCCESS. [Verified Drive FIX1 ZIP](https://drive.google.com/file/d/1BqHs1a3jCvgkvP3pnnttMCY3IB28bWYU/view) 46,848,255 bytes SHA256 `1a6fe758c4a9fc514beb5d83f5fdb939e0467af8612b12e40be58a719a939a19`. User installed FIX1 and stated «Всё работает. Идём дальше.» 2026-10-19. **P20-B FIX1 USER ACCEPTED.** Exact-six-blob promotion [#291](https://github.com/ALL-EX-E/InOneLine/pull/291), QA-matching Git tree `0bc7c0cad6c1f8aee1d9c30150d5bf63a1c99417`, fresh Windows #39258152397 and wording #39258152356 SUCCESS; merged to main as `785051caabea80cc9b43c298a74e701f9b43c95e`. No public release/version/schema change.
+- **CURRENT P20-C / UI-086 stage 3:** saved new title-only pending event from an original Max Amount before 00:00 can explicitly create/reuse a missing lot in that same still-provisional source session after expiry. Deleted history, confirmed sessions, time and dedup guarded. [Draft QA #292](https://github.com/ALL-EX-E/InOneLine/pull/292), docs/P20_C_UI086_POST_EXPIRY_NEW_TITLE_QA.md, tools/auction_pending_post_expiry_new_title_smoke.py. NOT ACCEPTED/MERGED; require full native Windows, wording, verified Drive QA installer and separate installed user approval. New events actually arriving after expiry, wheel freeze and stop warning are separate future tasks.
 
+## CURRENT 21 октября 2026 — P22-A пользователь принял, P22-B/UI-080 QA ожидает проверки
 
-## UI-086 / P20-L accepted, merged and postmerge PASS — 2026-10-20
+- Пользователь установил и принял P22-A/UI-066: «Всё работает. Идём дальше.» QA draft PR #317 HEAD 196baaf366f47e43df43b1431a6dfd55d449164b; native Windows #39551436778 SUCCESS, wording #39551436954 SUCCESS; Drive ZIP ID 1a7G2qmRvad_HQHzTLEA48Zv2VI4geHaG SHA256 37582d5743798214151650c9417cf6d486a7ac80017198e23c654a27908dcab2.
+- Exact five source blobs promoted by PR #318 MERGED as c653f9352f5502b525a3d5878af8e0089def38f5, Git tree 8f117089a2f21cdc51de6f7aadbf8523999e59f2; Windows promotion #39555136569 SUCCESS, wording #39555136439 SUCCESS. Postmerge wording #39556274452 SUCCESS; postmerge Windows #39556274411 requires confirmed completion.
+- NEXT P22-B/UI-080 #1: remove only non-useful history sorting by generated auction names, retain chronological newest/oldest. Clean draft QA PR #320 HEAD 4f2d541e1de345c2f13d8dbd60901e2e9b37f205, 5 files, documentation docs/P22_B_UI080_HISTORY_SORT_QA.md. Windows #39556393378 pending full result, wording #39556393273 SUCCESS. Do not promote or release until installer ZIP/Drive and user manual QA; earlier staging PR #319 closed unmerged.
+- No other UI-080/UI-081 change; version 1.0.8/schema 19/migrations 15 unchanged, no official release. This note supersedes historical older CURRENT/P22-A-awaiting lines.
 
-- **Manual Windows QA accepted:** user: «Всё проверил. Всё работает. Записывай и идём дальше.» Accepted **P20-L** is strictly the previously approved UI-086 warning when «Остановить аукцион» is pressed while that source auction has pending conversion events. The count is session-scoped, the existing Yes/No (default No) is unchanged, and cancel does not implicitly Apply/No Apply or rewrite history. No other business logic, permanent-lot rename, schema/version, or public release.
-- Frozen source [draft QA PR #311](https://github.com/ALL-EX-E/InOneLine/pull/311) HEAD `f35471b194b39cd98982f4bed28272df423ccb58`, source native Windows [Regression Foundation #39467746451](https://github.com/ALL-EX-E/InOneLine/actions/runs/39467746451) **SUCCESS**, [publication wording #39467746436](https://github.com/ALL-EX-E/InOneLine/actions/runs/39467746436) **SUCCESS**. Archived installed [P20-L Google Drive QA ZIP](https://drive.google.com/file/d/1kNb1SRAfAHf0ewva_V-W0OadHT7ExaNz/view?usp=drivesdk), file name `InOneLine_P20L_CANCEL_PENDING_WARNING_1.0.8_WINDOWS_QA.zip`, size 46,871,265 bytes, artifact SHA-256 `accd5ce658a59aad3bef65a3ac1a303d378484940392799ef846977645f207f1`.
-- **Clean exact four-blob promotion [PR #312](https://github.com/ALL-EX-E/InOneLine/pull/312) MERGED** into `main` at `75a37dd6c90f8645e860fe5d4debdaaee3454af6`. Four canonical files have exact identical Git blob SHAs in frozen QA and merged `main`: regression workflow, P20-L QA documentation, auction cancel action, native warning smoke. Independent promotion [Windows #39471166727](https://github.com/ALL-EX-E/InOneLine/actions/runs/39471166727) **SUCCESS** and [wording #39471166495](https://github.com/ALL-EX-E/InOneLine/actions/runs/39471166495) **SUCCESS**. Independent **postmerge `main`** [Windows #39472598414](https://github.com/ALL-EX-E/InOneLine/actions/runs/39472598414) **SUCCESS** (full native Qt/SQLite, OBS/Chromium, installer+silent startup) and [wording #39472598483](https://github.com/ALL-EX-E/InOneLine/actions/runs/39472598483) **SUCCESS**. Original QA PR #311 stays draft/unmerged.
-- Earlier «NEXT UI-086 stop warning» note is now **completed**; do not reimplement it. Before declaring the whole UI-086 complete, reconcile already approved Max Amount → Wheel pending freeze / original source-time and post-00:00 incoming-event cases against exact current 1.0.8; reuse the accepted guards instead of introducing a parallel one.
-- **Next user-approved review-batch item is P21 / UI-087** (see the original authoritative `docs/ACTIVE_REVIEW_LEDGER.md`): ordinary blank-text external events *during a running auction* create separate, sequential per-session temporary `Без текста N` lots; existing nonempty title rules stay unchanged, unknown-rate events remain pending and bound to that specific placeholder until explicit Apply. The rule requires per-session numbering to restart from 1 and never reuse earlier numbers after rename/delete. Before implementation, verify this against the current global game-title duplicate policy, permanent-list promotion, and historic source identity; do not invent a title-collision policy or extra features without explicit user agreement if a genuine conflict is found.
+## CURRENT 2026-10-21 — P22-A postmerge PASSED; P22-B QA installer archived, manual QA next
 
+- P22-A (`c653f9352f5502b525a3d5878af8e0089def38f5`) clean exact-five-blob merge and independent `main` Windows #39556274411 **SUCCESS**, postmerge wording #39556274452 **SUCCESS**. Explicit manual acceptance previously recorded; P22-A complete.
+- P22-B/UI-080 #1: QA draft PR #320 exact head `4f2d541e1de345c2f13d8dbd60901e2e9b37f205`; native Windows Regression Foundation #39556393378 **SUCCESS**, wording #39556393273 **SUCCESS**. GitHub Actions artifact `12325279706`, ZIP SHA256 `35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788`, 46,878,373 bytes, CRC PASS; sole `InOneLine_Setup_1.0.8.exe` 47,738,494 bytes. Exact same archive uploaded to [Google Drive](https://drive.google.com/file/d/1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7/view?usp=drivesdk), under `Обзор_UI_1.0.8`.
+- **P22-B AWAITS USER MANUAL INSTALLED WINDOWS QA; DO NOT MERGE.** Change is only removing name_asc/name_desc History sorts, keeping chronological sort and all period/search/summary/history views. Subsequent UI-080/081 separate. Product 1.0.8 schema19 migrations15 no new public release.
 
-## UI-086 / P20-M accepted and closed — 2026-10-20
+## CURRENT P22-B UI-080 — date sorting accepted, actual mode path QA pending, 2026-10-21
 
-- **MANUALLY ACCEPTED:** the user installed the P20-M 1.0.8 Windows QA and replied «Всё проверил. Всё работает. Записывай и идём дальше.» This is **only** the original approved UI-086 quick button «Перейти к конвертации» displayed beside the source-session pending warning on Аукцион → Проведение. The button navigates to the existing Настройки → Конвертация → Ожидают применения; the warning disappears when no unresolved source events remain. No automatic apply/reject, duplicate data path, version/schema change or public release.
-- Frozen Windows [QA source draft PR #313](https://github.com/ALL-EX-E/InOneLine/pull/313) HEAD `1118c8af91b316d09c5e19150db6e8954178c52e`, QA native Windows [#39475325841](https://github.com/ALL-EX-E/InOneLine/actions/runs/39475325841) **SUCCESS** and wording [#39475326058](https://github.com/ALL-EX-E/InOneLine/actions/runs/39475326058) **SUCCESS**. Verified [QA ZIP on Google Drive](https://drive.google.com/file/d/12RInrtvi9QvPLK1LK0r1zC7119oQkpPc/view?usp=drivesdk): `InOneLine_P20M_CONVERSION_JUMP_1.0.8_WINDOWS_QA.zip`, 46,880,788 bytes, SHA256 `79bcf2a28268451d536fe27632bf6c4fc599c995e6bbcf794aeb0738cec07158`.
-- **Promotion [PR #314](https://github.com/ALL-EX-E/InOneLine/pull/314) MERGED** into `main` commit `5aa9fb45c9e0545c8e21d10162dea8d1de7bfc7e`. Exactly six Git blobs checked as identical to frozen QA: regression workflow, P20-M documentation, AuctionTab, AuctionStateMixin, MainWindow conversion routing, native Qt regression tests. Promotion independent [Windows #39479304038](https://github.com/ALL-EX-E/InOneLine/actions/runs/39479304038) **SUCCESS** and [wording #39479304028](https://github.com/ALL-EX-E/InOneLine/actions/runs/39479304028) **SUCCESS**. Independent postmerge `main` [Windows #39480970902](https://github.com/ALL-EX-E/InOneLine/actions/runs/39480970902) **SUCCESS** (full Qt/SQLite, OBS/Chromium, installer+silent start) and [wording #39480971182](https://github.com/ALL-EX-E/InOneLine/actions/runs/39480971182) **SUCCESS**. QA source PR #313 remains draft/unmerged.
-- **NEXT AUTHORIZED P21 / UI-087 — REVIEW BEFORE CODE:** accepted target in `docs/ACTIVE_REVIEW_LEDGER.md`: a new independent session-scoped temporary `Без текста N` lot for every accepted empty-message integration event while an auction is running; ordinal restarts at 1 per session, must never reuse within session after rename/delete; unknown-rate events remain bound/pending until explicit manual Apply. **Concrete unapproved collision-policy dependency:** current `_add_or_increment_auction_lot_conn` searches *all games by normalized title* and may attach a prior auction's already-persisted `Без текста 1` instead of creating the new session's independent lot; after completed/cancelled auctions these placeholders become persistent games, so the collision recurs naturally. A narrowly scoped new rule bypassing title reuse for these special placeholders (while retaining event/game IDs, no silent merge or cross-session credit) is required to satisfy approved behavior, but changing cross-session title matching was not separately approved. Report the risk and seek the user's explicit authorization before writing P21 code. No P21 branch or QA is accepted or merged.
+- User installed and accepted P22-B step 1: «Всё работает. Принимаю. Идём дальше.» Accepted QA source PR #320 HEAD 4f2d541e1de345c2f13d8dbd60901e2e9b37f205, Windows #39556393378 SUCCESS, wording #39556393273 SUCCESS; archived Drive ZIP https://drive.google.com/file/d/1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7/view with SHA256 35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788.
+- Exact five blob promotion PR #322 **MERGED** as 484f96b683817830866078c2c360103995313c91 (main tree 9147c5442ef66f97f49474fd2ad45e81f0e6ebc1); promotion native Windows #39560434630 SUCCESS and wording #39560434903 SUCCESS. Postmerge Windows #39561723413 result pending, wording #39561723411 SUCCESS.
+- CURRENT next step UI-080 #2: actual winner-selection path in completed History, only read existing audit and immutable spin evidence; matching column and General mode display. QA draft PR #323 HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, six files, docs/P22_B_UI080_HISTORY_MODE_QA.md and new native Qt/SQLite smoke. CI Windows #39561894563, wording #39561894590 started; not yet manually QA'd, NOT MERGED. No UI-080 #3/#4 or UI-081 implementation.
+- Product 1.0.8, SQLite schema19/migrations15, no new public release. This latest direct user acceptance supersedes prior tails saying P22-B #1 awaiting review.
 
+## CURRENT — P22-B UI-080 #2 готов для ручной Windows QA (2026-10-21)
 
-## P21-A / UI-087 accepted — exact promotion and main postmerge PASS — 2026-10-21
+- Previous UI-080 #1 accepted and merged PR #322 at 484f96b683817830866078c2c360103995313c91, independent postmerge Windows #39561723413 SUCCESS.
+- Current UI-080 #2 actual completed-auction mode-path frozen QA PR #323 HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, Windows #39561894563 SUCCESS, wording #39561894590 SUCCESS. Artifact 12328247607, SHA256 f0d616adfb550f24ab761c2cc11a9339f3dbd11d8d0aecc5cd75f1b72b758bcf, size 46,883,664 bytes, CRC PASS, one installer 47,743,630 bytes. Verified Drive https://drive.google.com/file/d/18QV9TYspT6Qu7TVLv4UAqWD0tTLXJoRA/view?usp=drivesdk.
+- AWAITS USER MANUAL WINDOWS QA; DO NOT MERGE candidate until separate user acceptance. Source scope: History table РЕЖИМ and Общие → Режим derive executed mode path from existing change_log and verification snapshots, no DB writes/schema changes. UI-080 #3 and #4 and UI-081 excluded. App 1.0.8 schema19/migrations15 unchanged, no official release.
 
-- **MANUAL WINDOWS QA ACCEPTED:** пользователь: «Всё работает. Принимаю. Делаем следующий пункт.» Реализованы `Без текста 1..N` для каждого принятого пустого сообщения во время running auction, монотонные номера source-session даже после изменения/удаления, исходный пустой message сохраняется в event, B3 dedup; известный курс — existing immediate credit, неизвестный курс — visible placeholder + source-bound pending до explicit Apply/Не применять.
-- Уточнение пользователя **2026-10-21**: **никаких новых специальных правил совпадения имён между аукционами; оператор сам переименовывает прошлые служебные лоты**. Старое предложение bypass глобального title-match отменено. Новая сессия начинает `Без текста 1`, а сохранённый пользовательский `Без текста 1` может совпасть и быть повторно выбран по действующим правилам. Никакого автоматического suffix/unique title/auto-rename.
-- Исходный [QA draft #315](https://github.com/ALL-EX-E/InOneLine/pull/315) HEAD `bf7cbbbdec50806b9a29fdaaba8fd4e34189e362` (оставлен draft/unmerged). Exact installed [QA Google Drive ZIP](https://drive.google.com/file/d/1YD4-cnzY2ylFZe2hhykgBL_eUOrwcl8N/view?usp=drivesdk), 46,880,094 bytes, SHA256 `d2da2c90120e477e7014c220eef581704d8485c1353d89e89911bfce48fbec81`. Native Windows [#39548124332](https://github.com/ALL-EX-E/InOneLine/actions/runs/39548124332) **SUCCESS 59/59**; wording [#39548124215](https://github.com/ALL-EX-E/InOneLine/actions/runs/39548124215) **SUCCESS**.
-- **Accepted clean exact four-blob promotion [PR #316](https://github.com/ALL-EX-E/InOneLine/pull/316) MERGED** to main `5462dae8443588e939d5974d2aacf8572ea66ebb`. All four resulting main Git blob SHAs identical to frozen QA for CI workflow, P21-A QA doc, `streaming_manager/db/services.py`, and native P21-A smoke. Independent promotion Windows [#39550217653](https://github.com/ALL-EX-E/InOneLine/actions/runs/39550217653) **SUCCESS** and wording [#39550217665](https://github.com/ALL-EX-E/InOneLine/actions/runs/39550217665) **SUCCESS**.
-- Postmerge main Windows run [#39551266378](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551266378): attempt 1 failed only in pre-existing timing-sensitive **P16-C one-second wheel Qt test**, with an elapsed-time assertion (not the P21-A logic). Same job rerun **SUCCESS** with **unchanged main SHA and zero additional code changes**, including P21-A, OBS/Chromium, installer and silent startup. Postmerge wording [#39551266334](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551266334) **SUCCESS**.
-- **P21-A CLOSED**; version **1.0.8**, schema and migrations, official release unchanged. Earlier ROADMAP note calling global title-match protection a needed approval is superseded by the user's direct 2026-10-21 decision.
+## CURRENT 2026-10-21 — UI-080 #3 manually accepted and merged; #4 awaits QA
 
-## P22-A / UI-066 — source-integrations outcomes in global Journal: isolated QA awaiting manual acceptance — 2026-10-21
+- User accepted UI-080 #3 conditional `Проверка результата` tab after installed native Windows QA. Source QA draft PR #328 HEAD `41950fbcaa86dd7b61c583c50a807f3ab4c85fbe`, Windows #39566107985 SUCCESS; SHA256 `2d783ccf70fc40889a527e35df31141304439074c4c66b203b5999792ad6435c` archived on Google Drive `1cUCkJDTGdNYKvHQURTaL34RRyKlFYzgk`.
+- Exact four blob promotion PR #329 MERGED as `a197678b280b5ab43178ee27e6c0594aad89b4db`, Git tree `973ff1149336a4557de7cfcad8d32fad240a4b56`, promotion Windows #39569787817 SUCCESS. Independent postmerge Windows #39571202957 still requires completed result.
+- Next UI-080 #4 read-only History audit event formatting: clean draft PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f` exactly five files. New native Windows #39572146701 IN PROGRESS after corrected QA expectations (older initial run #39571331574 failed only narrow UI-080 audit smoke). No installed QA release/Drive archive yet and NOT manually accepted. Do not merge until full Windows PASS, artifact CRC/SHA256, Drive, manual user PASS. Staging PR #330 closed unmerged. UI-081 not started.
+- Product 1.0.8/schema19/migrations15 no public release. This supersedes old appended tails claiming UI-080 #3 unaccepted.
 
-- Next original approved P22 package is **UI-066 global integration transparency**, then separate approved **UI-080 Auction History** and **UI-081 Journal style/other row translations**. **UI-088/089/090 were already manually accepted and implemented in P05 on 2026-10-09**; do not redo them.
-- [QA draft PR #317](https://github.com/ALL-EX-E/InOneLine/pull/317) HEAD `196baaf366f47e43df43b1431a6dfd55d449164b`, five files. First bounded UI-066 slice: readable source/sender/original amount/lot/points/auction vs persistent route and readable reasons for pending/inapplicable/refused integration events in the existing `change_log` Journal, using `external_events.payload_json` read-only join and no second event data store. UI-081 theme changes not included; no new integration service or accounting logic.
-- Native Windows [#39551436778](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551436778) **SUCCESS**, wording [#39551436954](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551436954) **SUCCESS**. QA installer [Google Drive ZIP](https://drive.google.com/file/d/1a7G2qmRvad_HQHzTLEA48Zv2VI4geHaG/view?usp=drivesdk), 46,886,220 bytes, SHA256 `37582d5743798214151650c9417cf6d486a7ac80017198e23c654a27908dcab2`, sole `InOneLine_Setup_1.0.8.exe` 47,746,175 bytes, ZIP CRC PASS, Drive metadata verified.
-- **P22-A NOT YET MANUALLY ACCEPTED / DO NOT MERGE**: user installs and checks global Journal; only then clean exact-five-blob promotion, Windows CI, postmerge CI. Version 1.0.8, no public release.
+## CURRENT — 2026-10-21: UI-080 #3 accepted/merged, #4 Windows QA ready for manual review
 
-## P22-A / UI-066 вручную принят; P22-B / UI-080 — следующий отдельный QA (21 октября 2026)
+- UI-080 #3 clean promotion PR #329 merged main `a197678b280b5ab43178ee27e6c0594aad89b4db`. Postmerge native Windows #39571202957 **SUCCESS**, wording SUCCESS. Previous user manual QA PASS is authoritative.
+- UI-080 #4 read-only History event Russian presentation: QA draft PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f`, exactly 5 files, native Windows #39572146701 **SUCCESS**, wording **SUCCESS**. GitHub Actions artifact ID `12331854696`, ZIP 46,888,231 bytes, SHA256 `c5e0205bb9b434ac102736bd8025aff96aba4e1995d15c969db3d2428e756620`, independently downloaded and CRC PASS; sole `InOneLine_Setup_1.0.8.exe` member 47,748,166 bytes. Verified Drive archive https://drive.google.com/file/d/1c0WlwR7EzlDkvCKlrY7m932xLUVibqot/view?usp=drivesdk.
+- **Next: user manual installed Windows QA of #4. DO NOT MERGE PR #331 BEFORE EXPLICIT PASS.** Known actual audit actions formatted, no rewritten change_log, no fake future events or DB changes. UI-081 not started. Product 1.0.8, schema19, no official release.
 
-- User acceptance: «Всё работает. Идём дальше.» после установленной P22-A Windows QA. Это решение supersedes старое «awaiting manual acceptance».
-- Frozen P22-A QA draft [#317](https://github.com/ALL-EX-E/InOneLine/pull/317) HEAD 196baaf366f47e43df43b1431a6dfd55d449164b; QA Windows [#39551436778](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551436778) SUCCESS, wording [#39551436954](https://github.com/ALL-EX-E/InOneLine/actions/runs/39551436954) SUCCESS. [QA ZIP on Drive](https://drive.google.com/file/d/1a7G2qmRvad_HQHzTLEA48Zv2VI4geHaG/view), SHA256 37582d5743798214151650c9417cf6d486a7ac80017198e23c654a27908dcab2.
-- P22-A clean exact-five-blob promotion [#318](https://github.com/ALL-EX-E/InOneLine/pull/318) MERGED to main c653f9352f5502b525a3d5878af8e0089def38f5; main Git tree 8f117089a2f21cdc51de6f7aadbf8523999e59f2 equals the tested promotion tree. Promotion [Windows #39555136569](https://github.com/ALL-EX-E/InOneLine/actions/runs/39555136569) SUCCESS and [wording #39555136439](https://github.com/ALL-EX-E/InOneLine/actions/runs/39555136439) SUCCESS. [Postmerge wording #39556274452](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556274452) SUCCESS; [postmerge Windows #39556274411](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556274411) still requires completion check.
-- Next approved small scope P22-B/UI-080 #1: убрать сортировки завершённой истории аукционов по автоматически генерируемым именам, оставить только новые→старые / старые→новые. Дальнейшие UI-080 фактический режим, conditional verification и события, а также UI-081 — отдельные пункты.
-- Clean P22-B [draft QA PR #320](https://github.com/ALL-EX-E/InOneLine/pull/320) HEAD 4f2d541e1de345c2f13d8dbd60901e2e9b37f205, ровно 5 файлов поверх принятой main, узкие изменения Qt/SQL, smoke и Windows workflow. [QA Windows #39556393378](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556393378) требуется SUCCESS, [wording #39556393273](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556393273) SUCCESS. После успешного CI необходимы verified Actions ZIP/Drive + manual installed user QA. P22-B NOT MANUALLY ACCEPTED / DO NOT MERGE. Промежуточный PR #319 закрыт без merge.
-- Product version 1.0.8, schema 19, 15 migrations and official release unchanged.
+## CURRENT 2026-10-21 — UI-080 #4 user PASS; UI-081 #1 shared dark table style staging
 
-## P22-A postmerge SUCCESS; P22-B/UI-080 #1 Windows QA готов к ручной приёмке — 2026-10-21
-
-- P22-A independent postmerge `main` native [Windows #39556274411](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556274411) **SUCCESS**, unchanged commit `c653f9352f5502b525a3d5878af8e0089def38f5`; Publication wording [#39556274452](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556274452) **SUCCESS**. P22-A source closed/accepted; no release.
-- P22-B first UI-080 slice: original [draft QA PR #320](https://github.com/ALL-EX-E/InOneLine/pull/320), unchanged HEAD `4f2d541e1de345c2f13d8dbd60901e2e9b37f205`, native [Windows #39556393378](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556393378) **SUCCESS** including native sorting smoke, Qt, browser/OBS, Inno Setup, silent installed startup; Publication wording [#39556393273](https://github.com/ALL-EX-E/InOneLine/actions/runs/39556393273) **SUCCESS**.
-- Exact Actions artifact ID `12325279706` digest `sha256:35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788`; independently downloaded ZIP `46,878,373` bytes, local SHA-256 matches, CRC PASS. Contains exactly one installer `InOneLine_Setup_1.0.8.exe`, `47,738,494` bytes. Archived [Google Drive QA ZIP](https://drive.google.com/file/d/1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7/view?usp=drivesdk) under `Кандидаты_проверки/Обзор_UI_1.0.8`, Drive size and parent verified. File name `InOneLine_P22B_UI080_HISTORY_SORT_1.0.8_WINDOWS_QA.zip`.
-- **P22-B SOURCE QA ONLY / NOT MANUALLY ACCEPTED / NOT MERGED:** next action is user-installed six-step Windows verification from `docs/P22_B_UI080_HISTORY_SORT_QA.md`. After explicit manual PASS, promote exact tested source Git blobs in a separate clean PR and verify native promotion and postmerge Windows. Only date-sort choice removed; other UI-080/UI-081 steps remain future. Version/schema/official release unchanged.
-
-## P22-B UI-080 stage 1 accepted; stage 2 actual mode QA — 2026-10-21
-
-- Direct user manual Windows acceptance of P22-B/UI-080 #1 date-only sorting: «Всё работает. Принимаю. Идём дальше.» It supersedes previous 'not accepted / not merged' lines above.
-- Exact original QA draft PR #320 HEAD **4f2d541e1de345c2f13d8dbd60901e2e9b37f205**, Windows #39556393378 SUCCESS, wording #39556393273 SUCCESS. Verified Drive installer ZIP id 1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7, sha256 35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788.
-- Clean exact-five-source-blob promotion PR #322 merged in main as 484f96b683817830866078c2c360103995313c91, tree 9147c5442ef66f97f49474fd2ad45e81f0e6ebc1. Promotion Windows #39560434630 SUCCESS, wording #39560434903 SUCCESS. Postmerge independent Windows #39561723413 requires completed result, wording #39561723411 SUCCESS.
-- Next approved P22-B UI-080 **stage 2 of four**: display actual historical winner-selection path, same in table РЕЖИМ and Общие → Режим, from existing session/audit/immutable wheel verification facts. Specifically direct standard/elimination, Max Amount, Max→tie wheel after actual spin, and actual format transitions between spin rounds. Do not treat only selected/unspun format as executed or rewrite immutable data.
-- Isolated QA draft PR #323 HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, six files; tests tools/completed_auction_history_mode_path_smoke.py and docs/P22_B_UI080_HISTORY_MODE_QA.md. Native Windows #39561894563 running, wording #39561894590 running; CI + exact installer SHA256/CRC and Drive upload + explicit user manual Windows QA are required before any promotion. **STAGE 2 NOT ACCEPTED / DO NOT MERGE**.
-- UI-080 stage 3 conditional verification tab, stage 4 expanded audit formatting, UI-081 Journal style are separate later steps. No schema, release or nominal version bump (1.0.8).
-
-## P22-B / UI-080 #2 — Windows QA готов к ручной проверке (21 октября 2026)
-
-- P22-B/UI-080 #1 (сортировка Истории по дате): принят пользователем, точные проверенные исходники перенесены PR #322 в main 484f96b683817830866078c2c360103995313c91. Postmerge Windows https://github.com/ALL-EX-E/InOneLine/actions/runs/39561723413 SUCCESS; wording SUCCESS.
-- P22-B/UI-080 #2 (фактический путь определения победителя в Истории): isolated QA draft https://github.com/ALL-EX-E/InOneLine/pull/323, unchanged HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, ровно 6 файлов. Native Windows https://github.com/ALL-EX-E/InOneLine/actions/runs/39561894563 SUCCESS, включая новый Qt/SQLite mode-path regression, Chromium/OBS, Inno Setup и запуск установленной программы. Publication wording https://github.com/ALL-EX-E/InOneLine/actions/runs/39561894590 SUCCESS.
-- Frozen Actions artifact 12328247607, ZIP 46,883,664 bytes SHA256 f0d616adfb550f24ab761c2cc11a9339f3dbd11d8d0aecc5cd75f1b72b758bcf, local SHA256 identical, ZIP CRC PASS, one InOneLine_Setup_1.0.8.exe 47,743,630 bytes. Uploaded to verified Google Drive candidate folder: https://drive.google.com/file/d/18QV9TYspT6Qu7TVLv4UAqWD0tTLXJoRA/view?usp=drivesdk.
-- **UI-080 #2 НЕ принят и НЕ объединён.** Следующий шаг — ручная Windows-проверка из docs/P22_B_UI080_HISTORY_MODE_QA.md (все 6 пунктов). После явной приёмки — перенос точно проверенных Git blobs в main, Windows CI и postmerge CI. UI-080 #3/#4, UI-081, schema/version/release отдельно; номинальная версия остаётся 1.0.8.
-
-## UI-080 #3 — вручную принят, UI-080 #4 — отдельный QA (21 октября 2026)
-
-- Пользователь проверил установленную UI-080 #3 Windows-сборку и явно принял: «Всё работает. Принимаю. Идём дальше.» Source QA PR #328 HEAD `41950fbcaa86dd7b61c583c50a807f3ab4c85fbe`, native Windows #39566107985 SUCCESS, wording #39566107946 SUCCESS; проверенный ZIP Google Drive https://drive.google.com/file/d/1cUCkJDTGdNYKvHQURTaL34RRyKlFYzgk/view, SHA256 `2d783ccf70fc40889a527e35df31141304439074c4c66b203b5999792ad6435c`.
-- Exactly four tested Git blobs promoted as PR #329 MERGED to main `a197678b280b5ab43178ee27e6c0594aad89b4db`, Git tree `973ff1149336a4557de7cfcad8d32fad240a4b56`. Fresh promotion Windows #39569787817 SUCCESS, wording SUCCESS. Independent main postmerge Windows #39571202957 must still be verified to completion; current in progress.
-- Next approved UI-080 step #4: readable existing `История аукционов → События` from original `change_log`. No new auditing/storage: actual persisted post-00:00 deltas/rename/merge/exclusion/source-pending lot, status recalculation, existing stop/replay/wheel. Keep old actions and raw audit authoritative. Unknown/unimplemented future absolute-lot, survivor, freeze or UI-065/067 actions must NOT be invented retroactively.
-- Clean QA draft PR #331, head `3123b4108e47bf1014d132d9566486fdc2dfff8f`, five files, native Windows #39572146701 IN PROGRESS after fixing two QA expectation issues on failed prior run #39571331574. New run needs SUCCESS, then exact ZIP SHA256/CRC + upload to Drive and user installed manual QA. **UI-080 #4 NOT ACCEPTED / DO NOT MERGE**. Previous staging PR #330 closed UNMERGED. Next UI-081 is separate.
-- 1.0.8, schema 19, 15 migrations, no public release.
-
-## UI-080 #4 — проверенная Windows QA сборка на Drive; требуется ручная приёмка (21 октября 2026)
-
-- Состояние UI-080 #3: пользователь принял, main `a197678b280b5ab43178ee27e6c0594aad89b4db`, independent main postmerge Windows #39571202957 **SUCCESS** и wording SUCCESS.
-- Следующий утверждённый UI-080 #4 — только русские read-only события «Истории аукционов». Clean source QA draft [PR #331](https://github.com/ALL-EX-E/InOneLine/pull/331), frozen HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f`, five files. Первоначальная проверка #39571331574 обнаружила две ошибки тестовых ожиданий (слово `Лот` в произвольном переименовании и типографский знак минуса), исправлены. Повторный native Windows Regression Foundation [#39572146701](https://github.com/ALL-EX-E/InOneLine/actions/runs/39572146701) **SUCCESS**, Publication wording **SUCCESS**, включая source-attribution и actual event smoke, GUI, real OBS/Chromium, Inno Setup и silent startup.
-- Frozen GitHub Actions artifact ID `12331854696`, ZIP 46,888,231 bytes, source SHA256 `c5e0205bb9b434ac102736bd8025aff96aba4e1995d15c969db3d2428e756620`. Независимо скачанный ZIP имеет тот же SHA256; ZIP CRC **PASS**, единственный member `InOneLine_Setup_1.0.8.exe` 47,748,166 bytes. Проверенная загрузка [Google Drive QA ZIP](https://drive.google.com/file/d/1c0WlwR7EzlDkvCKlrY7m932xLUVibqot/view?usp=drivesdk) в папку `Кандидаты_проверки/Обзор_UI_1.0.8`, title/size/parent ID повторно сверены.
-- **UI-080 #4 ЕЩЁ НЕ ПРИНЯТ / PR #331 НЕ СЛИВАТЬ**. Следующий шаг — отдельная ручная Windows-проверка по `docs/P22_B_UI080_HISTORY_EVENTS_QA.md`. Только после явного PASS продвигать ровно проверенные source Git blobs в main с новым Windows и postmerge regression. No public release; version 1.0.8, schema 19, migrations unchanged. Следующий большой независимый UI-081 после отдельной приёмки UI-080 #4.
+- User explicitly accepted installed UI-080 #4 History event presentation Windows QA. Accepted source PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f`, Windows #39572146701 SUCCESS, Drive ZIP https://drive.google.com/file/d/1T7Fw1Jjp8S49jpkO7j1c_nmBWMznsTM1/view, size 46,888,231 bytes SHA256 `c5e0205bb9b434ac102736bd8025aff96aba4e1995d15c969db3d2428e756620` CRC PASS. Exact five-blob promotion PR #333 head `183d981decc742087c6b7d58b19b0735bf4ffc95` Windows #39584107278 SUCCESS, then MERGED to main as `ae1480dc5cba33c0f161c5151369d40f8fc810b1`, tree `d44371dfa20f442c8e8b3021b9129c2b341a4c06`. Independent postmerge main Windows #39585455015 **SUCCESS**, wording SUCCESS. UI-080 #4 completely accepted and independently checked.
+- Next strictly ledger-approved UI-081 #1 is only shared dark QTableView+QTableWidget style in APP_STYLE, retaining alternating rows. Clean QA draft PR #336 HEAD `36b650f8bb7229ec674758fa583e3aff04c7f6e9` based on accepted main, exactly 4 UI-081 #1 files and exact QA checklist `docs/P23_A_UI081_DARK_TABLE_QA.md`. Git tree identical to closed-unmerged staging PR #334. Native Windows #39585563054 running, wording SUCCESS; after native Windows pass exact installer ZIP CRC/SHA256 + Drive required, then user manual acceptance. No UI-081 #2 copy or #3 formatting in #1.
+- Product 1.0.8 schema19 migrations15 unchanged, no release. Latest notes supersede historical stale status sections.
