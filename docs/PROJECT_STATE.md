@@ -1414,3 +1414,9 @@ P20-B late original-source Max Amount existing-lot correction received original 
 
 - UI-081 #1 manually accepted and merged main PR #338 `2db21f39b6d3d1b0855faf0308725e2012aa16fe`. Promotion native Windows #39589888769 SUCCESS, **main postmerge native Windows #39591353841 SUCCESS**, Publication wording SUCCESS.
 - UI-081 #2 clean draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f`, QA Windows #39591490607 running, dedicated new description Qt smoke PASS and wording SUCCESS, no installer ZIP/Drive/user acceptance yet. One exact replacement of obsolete Journal description; four-file scope incl smoke, CI and QA doc. UI-081 #3 deliberately not started. Do not merge QA PR before user accepts.
+
+## CURRENT 2026-10-21 — UI-081 #2 QA ZIP on Drive, awaiting user's manual six checks
+
+- UI-081 #1 accepted and merged main `2db21f39b6d3d1b0855faf0308725e2012aa16fe`, independent main postmerge Windows #39591353841 **SUCCESS**.
+- UI-081 #2 clean exact four-file source QA draft PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f`, Windows #39591490607 **SUCCESS**, wording SUCCESS, full native Qt smoke and installed Windows executable. Actions artifact `12342194135`, ZIP 46,884,802 bytes, SHA256 `20380fe15146cd2685879e103e1bc7ad7a2cda4005a6961d32aea1e611e68aad`, separately downloaded SHA+CRC PASS, single installer 47,744,741 bytes. Independently verified Google Drive https://drive.google.com/file/d/1viEw0Imlz2JHMPCajqLOlyHHCCjRmDvL/view?usp=drivesdk in `Обзор_UI_1.0.8`.
+- Next user step: install UI-081 #2 QA ZIP and run six checks in `docs/P23_B_UI081_JOURNAL_DESCRIPTION_QA.md`. **NOT YET USER ACCEPTED, PR #341 NOT MERGED.** Only one Journal description label changed, not UI-081 #3 formatting. After explicit PASS, clean exact-tested blob promotion and independent Windows. App 1.0.8/schema19/migrations15, no public release.
