@@ -51,8 +51,8 @@ class RussianJournalPresentationSmoke(unittest.TestCase):
             event("auction_bid", "post_expiry_add",
                   {"game_id": 3, "sm_points": 70},
                   {"game_id": 3, "added_sm_points": 15, "sm_points": 85}),
-            event("setting", "update", {"key": "test_nonsecret", "value": "1"},
-                  {"key": "test_nonsecret", "value": "2"}),
+            event("setting", "update", {"key": "test_volume", "value": "1"},
+                  {"key": "test_volume", "value": "2"}),
             event("setting", "update", {"key": "test_api_key", "value": "legacy_secret"},
                   {"key": "test_api_key", "value": "new_secret"}),
             event("integration_event", "apply", None, {
@@ -90,7 +90,7 @@ class RussianJournalPresentationSmoke(unittest.TestCase):
     def test_settings_secret_redaction_and_readable_values(self):
         rows = self.tab._load_rows()["rows"]
         self.assertEqual(rows[3][1], "Настройка")
-        self.assertIn("test_nonsecret: 1 → 2", rows[3][4])
+        self.assertIn("test_volume: 1 → 2", rows[3][4])
         self.assertIn("[СКРЫТО]", rows[4][4])
         self.assertNotIn("legacy_secret", rows[4][4])
         self.assertNotIn("new_secret", rows[4][4])
@@ -109,7 +109,7 @@ class RussianJournalPresentationSmoke(unittest.TestCase):
     def test_raw_search_and_original_row_scope(self):
         self.assertEqual(len(self.tab._load_rows("post_expiry_add")["rows"]), 1)
         self.assertEqual(len(self.tab._load_rows("БАЛЛЫ ПОСЛЕ 00:00")["rows"]), 1)
-        self.assertEqual(len(self.tab._load_rows("test_nonsecret")["rows"]), 1)
+        self.assertEqual(len(self.tab._load_rows("test_volume")["rows"]), 1)
         self.assertEqual(self.db.limits[-1], None)
         self.tab._load_rows("")
         self.assertEqual(self.db.limits[-1], 500)
