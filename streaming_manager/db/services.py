@@ -118,13 +118,22 @@ class ServicesMixin:
         window.  Search may pass ``None`` so filtering can cover the complete
         journal without silently ignoring older matches.
         """
+        # UI-066/P22-A: the same authoritative change_log remains the
+        # journal.  Read only the source-event payload for integration entries
+        # using its existing primary key, without adding a second log, new
+        # persistence or N+1 lookups in the Qt formatting worker.
+        source_query = (
+            "SELECT cl.*, ee.payload_json AS external_payload_json "
+            "FROM change_log AS cl "
+            "LEFT JOIN external_events AS ee ON "
+            "(cl.entity_type='integration_event' AND cl.entity_id=ee.id) "
+            "ORDER BY cl.id DESC"
+        )
         with self.connect() as conn:
             if limit is None:
-                return conn.execute(
-                    "SELECT * FROM change_log ORDER BY id DESC"
-                ).fetchall()
+                return conn.execute(source_query).fetchall()
             return conn.execute(
-                "SELECT * FROM change_log ORDER BY id DESC LIMIT ?",
+                source_query + " LIMIT ?",
                 (max(0, int(limit)),),
             ).fetchall()
 

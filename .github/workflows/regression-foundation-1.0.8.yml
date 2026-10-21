@@ -389,6 +389,14 @@ jobs:
           python tools/integration_blank_message_auction_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P21-A blank-message integration regression failed" }
 
+      - name: P22-A UI-066 global integration Journal outcomes
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/integration_journal_visibility_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P22-A integration Journal visibility regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:

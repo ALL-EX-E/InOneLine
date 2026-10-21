@@ -148,6 +148,101 @@ class LogTab(QWidget):
             return "Да" if value else "Нет"
         return "" if value is None else str(value)
 
+    _INTEGRATION_REASONS = {
+        "target_game_archived": "Лот находится в архиве",
+        "target_game_missing": "Целевой лот не найден",
+        "temporary_lot_not_running": "Временный лот недоступен вне запущенного аукциона",
+        "source_auction_not_running": "Исходный аукцион уже не принимает ставки",
+        "missing_target": "Название лота не указано",
+        "non_positive_credit": "Нет положительного количества баллов для начисления",
+    }
+
+    @staticmethod
+    def _integration_event_details(row, before: dict, after: dict) -> str:
+        """Readable global intake in the existing authoritative audit journal.
+
+        Never interpolate the raw provider JSON or arbitrary credential fields:
+        use only the normalized, already-sanitized event properties.
+        """
+        try:
+            raw = row["external_payload_json"]
+        except (KeyError, IndexError):
+            raw = None
+        try:
+            payload = json.loads(raw) if raw else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            payload = {}
+        normalized = payload.get("normalized", {}) if isinstance(payload, dict) else {}
+        if not isinstance(normalized, dict):
+            normalized = {}
+        metadata = payload.get("provider_metadata", {}) if isinstance(payload, dict) else {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        source = str(
+            after.get("source") or before.get("source")
+            or normalized.get("service_key") or ""
+        ).strip()
+        source = {"twitch": "Twitch", "donationalerts": "DonationAlerts"}.get(
+            source.casefold(), source or "Интеграция"
+        )
+        sender = str(
+            normalized.get("contributor") or metadata.get("user_name")
+            or metadata.get("user_login") or ""
+        ).strip() or "Аноним"
+        title = str(
+            after.get("lot_title") or before.get("lot_title")
+            or normalized.get("generated_blank_title")
+            or normalized.get("lot_title") or ""
+        ).strip() or "Не указан"
+        amount = str(
+            after.get("source_amount_text")
+            or normalized.get("source_amount_text") or ""
+        ).strip()
+        unit = str(
+            after.get("source_unit") or normalized.get("source_unit") or ""
+        ).strip()
+        original = f"{amount} {unit}".strip()
+        event_id = str(
+            after.get("external_event_id") or before.get("external_event_id")
+            or normalized.get("external_event_id") or ""
+        ).strip()
+
+        action = str(row["action"])
+        summary = [source, sender]
+        if original:
+            summary.append(original)
+        summary.append(f"Лот: {title}")
+
+        if action in {"apply", "apply_pending"}:
+            points = after.get("credited_sm_points")
+            if points is not None:
+                summary.append(f"НАЧИСЛЕНО: {format_points(int(points))} баллов")
+            else:
+                summary.append("НАЧИСЛЕНО")
+            auction_id = after.get("auction_id")
+            summary.append(
+                f"В аукцион #{auction_id}" if auction_id is not None
+                else "В основной список"
+            )
+        elif action in {"awaiting_rate", "queue"}:
+            summary.append("ОЖИДАЕТ КОНВЕРТАЦИИ")
+            summary.append("Баллы не начислены до ручного применения")
+        elif action == "reject_pending":
+            summary.append("НЕ ПРИМЕНЕНО")
+            summary.append("Оператор отклонил начисление")
+        elif action == "inapplicable":
+            summary.append("НЕ НАЧИСЛЕНО")
+            reason = str(after.get("reason") or "")
+            if reason:
+                summary.append(LogTab._INTEGRATION_REASONS.get(reason, f"Причина: {reason}"))
+        else:
+            summary.append(str(action).replace("_", " ").strip())
+
+        if event_id:
+            summary.append(f"Событие: {event_id}")
+        return " · ".join(summary)
+
     def _details(self, row) -> str:
         before = {}
         after = {}
@@ -156,6 +251,13 @@ class LogTab(QWidget):
             after = json.loads(row["after_json"]) if row["after_json"] else {}
         except Exception:
             return row["after_json"] or row["before_json"] or ""
+
+        if row["entity_type"] == "integration_event":
+            return self._integration_event_details(
+                row,
+                before if isinstance(before, dict) else {},
+                after if isinstance(after, dict) else {},
+            )
 
         if row["entity_type"] == "auction_lot":
             title = after.get("title") or before.get("title") or ""
@@ -207,11 +309,21 @@ class LogTab(QWidget):
                 "add": "ДОБАВЛЕНИЕ",
                 "decrease": "УМЕНЬШЕНИЕ",
             }.get(row["action"], row["action"].upper())
+            if row["entity_type"] == "integration_event":
+                action = {
+                    "apply": "НАЧИСЛЕНО",
+                    "apply_pending": "НАЧИСЛЕНО",
+                    "awaiting_rate": "ОЖИДАЕТ КУРСА",
+                    "queue": "ОЖИДАЕТ ПРИМЕНЕНИЯ",
+                    "inapplicable": "НЕ НАЧИСЛЕНО",
+                    "reject_pending": "НЕ ПРИМЕНЕНО",
+                }.get(str(row["action"]), action)
             display_row = (
                 display_datetime_local(row["created_at"]),
                 {
                     "game": "Игра",
                     "auction_lot": "Лот аукциона",
+                    "integration_event": "Интеграция",
                 }.get(row["entity_type"], row["entity_type"]),
                 "" if row["entity_id"] is None else str(row["entity_id"]),
                 action,
