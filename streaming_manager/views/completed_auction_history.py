@@ -209,6 +209,9 @@ class CompletedAuctionHistoryTab(QWidget):
         verification_layout.addLayout(verification_buttons)
         verification_layout.addStretch(1)
         self.details_tabs.addTab(self.verification_page, "Проверка результата")
+        self.details_tabs.setTabVisible(
+            self.details_tabs.indexOf(self.verification_page), False
+        )
         self._verification_snapshot: dict | None = None
         self._verification_snapshots: list[dict] = []
 
@@ -336,6 +339,9 @@ class CompletedAuctionHistoryTab(QWidget):
             label.setText("—")
         self.lots_table.setRowCount(0)
         self.events.clear()
+        self.details_tabs.setTabVisible(
+            self.details_tabs.indexOf(self.verification_page), False
+        )
         self._clear_verification_details()
 
     def _clear_verification_details(self):
@@ -578,4 +584,17 @@ class CompletedAuctionHistoryTab(QWidget):
             item.setToolTip(f"Точное время: {formatted['exact_time']}\nchange_log ID: {formatted['event_id']}")
             self.events.addItem(item)
 
-        self._load_verification_details(auction_id)
+        # UI-080 #3: a mode/selected wheel alone is not a completed spin.
+        # Use the same existing audit and immutable spin facts as History #2.
+        evidence = data.get("mode_evidence") or {}
+        visible = bool(evidence.get("spins")) or any(
+            isinstance(event, dict) and event.get("action") == "wheel"
+            for event in evidence.get("events") or []
+        )
+        self.details_tabs.setTabVisible(
+            self.details_tabs.indexOf(self.verification_page), visible
+        )
+        if visible:
+            self._load_verification_details(auction_id)
+        else:
+            self._clear_verification_details()

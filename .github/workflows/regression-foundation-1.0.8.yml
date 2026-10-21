@@ -413,6 +413,14 @@ jobs:
           python tools/completed_auction_history_mode_path_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P22-B history mode path regression failed" }
 
+      - name: P22-B UI-080 conditional verification tab for real spins
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/completed_auction_history_verification_visibility_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P22-B History conditional verification tab regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
