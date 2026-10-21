@@ -13,6 +13,9 @@ from ..app_paths import AppPaths
 from ..constants import COOP_LABELS, STATUS_LABELS
 from ..database import Database, display_date, display_datetime_local, format_points
 from ..diagnostic_logs import append_performance_trace
+from ..db.services import _setting_key_is_secret
+from .auction_history import format_auction_history_event
+from .auction_bets import format_integration_bet_event
 from ..workers import FunctionWorker
 
 
@@ -77,6 +80,37 @@ class LogTab(QWidget):
         "review": "Отзыв",
         "archived": "Архив",
     }
+
+    ENTITY_LABELS = {
+        "game": "Игра",
+        "games": "Список игр",
+        "auction_lot": "Лот аукциона",
+        "auction_bid": "Ставка",
+        "auction_session": "Аукцион",
+        "setting": "Настройка",
+        "integration_event": "Интеграция",
+        "external_conversion": "Конвертация",
+        "shared_xlsx": "Общий Excel",
+    }
+    ACTION_LABELS = {
+        "create": "СОЗДАНИЕ",
+        "update": "ИЗМЕНЕНИЕ",
+        "delete": "УДАЛЕНИЕ",
+        "delete_all": "ОЧИСТКА СПИСКА",
+        "add": "ДОБАВЛЕНИЕ",
+        "decrease": "УМЕНЬШЕНИЕ",
+        "apply": "ПРИМЕНЕНО",
+        "queue": "ОЖИДАЕТ ПРИМЕНЕНИЯ",
+    }
+    INTEGRATION_ACTION_LABELS = {
+        "apply": "НАЧИСЛЕНО",
+        "apply_pending": "НАЧИСЛЕНО",
+        "awaiting_rate": "ОЖИДАЕТ КУРСА",
+        "queue": "ОЖИДАЕТ ПРИМЕНЕНИЯ",
+        "inapplicable": "НЕ НАЧИСЛЕНО",
+        "reject_pending": "НЕ ПРИМЕНЕНО",
+    }
+    AUCTION_ENTITIES = frozenset({"auction_session", "auction_lot", "auction_bid"})
 
     def __init__(self, db: Database):
         super().__init__()
@@ -210,9 +244,28 @@ class LogTab(QWidget):
 
         action = str(row["action"])
         summary = [source, sender]
-        if original:
-            summary.append(original)
-        summary.append(f"Лот: {title}")
+        # Reuse the existing accepted-bet formatter only when the recorded
+        # audit event contains enough information for an accurate amount.
+        rendered_bet = ""
+        if action in {"apply", "apply_pending"} and original and after.get("credited_sm_points") is not None:
+            try:
+                rendered_bet = format_integration_bet_event({
+                    "created_at": row["created_at"],
+                    "source": source,
+                    "contributor": sender,
+                    "title": title,
+                    "source_amount_text": amount,
+                    "source_unit": unit,
+                    "credited_sm_points": after["credited_sm_points"],
+                })["text"].partition("\n")[2]
+            except (TypeError, ValueError, OverflowError):
+                rendered_bet = ""
+        if rendered_bet:
+            summary.append(rendered_bet)
+        else:
+            if original:
+                summary.append(original)
+            summary.append(f"Лот: {title}")
 
         if action in {"apply", "apply_pending"}:
             points = after.get("credited_sm_points")
@@ -252,12 +305,46 @@ class LogTab(QWidget):
         except Exception:
             return row["after_json"] or row["before_json"] or ""
 
+        before = before if isinstance(before, dict) else {}
+        after = after if isinstance(after, dict) else {}
+
         if row["entity_type"] == "integration_event":
-            return self._integration_event_details(
-                row,
-                before if isinstance(before, dict) else {},
-                after if isinstance(after, dict) else {},
+            return self._integration_event_details(row, before, after)
+
+        if row["entity_type"] == "setting":
+            key = str(after.get("key") or before.get("key") or "").strip()
+            if not key:
+                return "Настройка изменена"
+            # Reuse the existing database secret-key rule, including legacy
+            # unredacted audit rows. No credentials in operator presentation.
+            if _setting_key_is_secret(key):
+                return f"{key}: [СКРЫТО]"
+            old, new = before.get("value"), after.get("value")
+            old_text = "—" if old is None else str(old)
+            new_text = "—" if new is None else str(new)
+            return (
+                f"{key}: {old_text} → {new_text}"
+                if old != new else f"{key}: {new_text}"
             )
+
+        if row["entity_type"] == "external_conversion":
+            # Read only normalized, documented event keys; never print a raw
+            # external payload (which may have provider-specific fields).
+            record = after or before
+            labels = (
+                ("source", "Источник"),
+                ("source_amount_text", "Сумма"),
+                ("source_unit", "Единица"),
+                ("game_id", "ID игры"),
+                ("auction_id", "Аукцион"),
+                ("status", "Статус"),
+            )
+            parts = [
+                f"{label}: {record[key]}"
+                for key, label in labels
+                if record.get(key) not in (None, "")
+            ]
+            return "; ".join(parts) or "Событие конвертации"
 
         if row["entity_type"] == "auction_lot":
             title = after.get("title") or before.get("title") or ""
@@ -289,52 +376,72 @@ class LogTab(QWidget):
                     )
         return f"{title}: " + "; ".join(changes) if changes else title
 
+    def _auction_presentation(self, row) -> tuple[str, str]:
+        """Reuse the authoritative History read-only formatter, not a copy."""
+        try:
+            before = json.loads(row["before_json"]) if row["before_json"] else {}
+            after = json.loads(row["after_json"]) if row["after_json"] else {}
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return str(row["action"]).upper(), self._details(row)
+        before = before if isinstance(before, dict) else {}
+        after = after if isinstance(after, dict) else {}
+        entity = str(row["entity_type"])
+        title = str(
+            after.get("title") or before.get("title")
+            or after.get("new_title") or before.get("old_title") or ""
+        ).strip()
+        if not title and entity == "auction_bid":
+            game_id = after.get("game_id", before.get("game_id"))
+            if game_id is not None:
+                title = f"Лот #{game_id}"
+        event = {
+            "id": row["id"] if "id" in row.keys() else None,
+            "created_at": row["created_at"],
+            "entity_type": entity,
+            "action": row["action"],
+            "title": title,
+            "game_id": after.get("game_id", before.get("game_id")),
+            "before": before,
+            "after": after,
+        }
+        presentation = format_auction_history_event(event)
+        action = presentation["kind"]
+        details = presentation["text"].partition("\n")[2]
+        if action == str(row["action"]).upper() and not title:
+            details = self._details(row)
+        return action, details or self._details(row)
+
     def _load_rows(self, search_text: str = ""):
         query = search_text.strip().casefold()
 
         db_started = time.perf_counter()
-        # Empty search keeps the existing fast 500-row journal window.  A real
-        # search reads the complete journal in the worker so an older matching
-        # event is not hidden merely because it fell outside that window.
+        # Keep the accepted 500-row fast window and full audit search.
         rows = self.db.list_log(limit=None if query else 500)
         db_seconds = time.perf_counter() - db_started
 
         format_started = time.perf_counter()
         formatted: list[tuple[str, str, str, str, str]] = []
         for row in rows:
-            action = {
-                "create": "СОЗДАНИЕ",
-                "update": "ИЗМЕНЕНИЕ",
-                "delete": "УДАЛЕНИЕ",
-                "add": "ДОБАВЛЕНИЕ",
-                "decrease": "УМЕНЬШЕНИЕ",
-            }.get(row["action"], row["action"].upper())
-            if row["entity_type"] == "integration_event":
-                action = {
-                    "apply": "НАЧИСЛЕНО",
-                    "apply_pending": "НАЧИСЛЕНО",
-                    "awaiting_rate": "ОЖИДАЕТ КУРСА",
-                    "queue": "ОЖИДАЕТ ПРИМЕНЕНИЯ",
-                    "inapplicable": "НЕ НАЧИСЛЕНО",
-                    "reject_pending": "НЕ ПРИМЕНЕНО",
-                }.get(str(row["action"]), action)
+            entity_type = str(row["entity_type"] or "")
+            action_code = str(row["action"] or "")
+            action = self.ACTION_LABELS.get(action_code, action_code.upper())
+            if entity_type == "integration_event":
+                action = self.INTEGRATION_ACTION_LABELS.get(action_code, action)
+            if entity_type in self.AUCTION_ENTITIES:
+                action, details = self._auction_presentation(row)
+            else:
+                details = self._details(row)
             display_row = (
                 display_datetime_local(row["created_at"]),
-                {
-                    "game": "Игра",
-                    "auction_lot": "Лот аукциона",
-                    "integration_event": "Интеграция",
-                }.get(row["entity_type"], row["entity_type"]),
+                self.ENTITY_LABELS.get(entity_type, entity_type),
                 "" if row["entity_id"] is None else str(row["entity_id"]),
                 action,
-                self._details(row),
+                details,
             )
 
             if query:
-                # Search both what the operator actually sees and the raw
-                # stored fields.  This makes Russian UI labels, formatted
-                # details, English technical actions (e.g. ``delete``), IDs
-                # and JSON event content all searchable with one field.
+                # Search both operator-facing and ORIGINAL technical fields,
+                # including English action, entity/ID and JSON stored in DB.
                 raw_values = (
                     row["entity_type"],
                     row["entity_id"],
