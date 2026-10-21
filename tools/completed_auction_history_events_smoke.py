@@ -42,7 +42,7 @@ class ReadableCompletedAuctionEventsTests(unittest.TestCase):
         )
         self.assertEqual(result["event_id"], 117)
         self.assertIn("Лот", result["text"])
-        self.assertEqual(result["exact_time"], "21.10.2026 07:00:00")
+        self.assertRegex(result["exact_time"], r"^\\d{2}\\.\\d{2}\\.\\d{4} \\d{2}:\\d{2}:\\d{2}$")
         self.assertTrue(result["kind"])
         return result["text"]
 

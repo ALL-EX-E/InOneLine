@@ -246,11 +246,6 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
                 f"{_points(before.get('sm_points'))} баллов; "
                 "игра и её баллы сохранены"
             )
-        elif action == "post_expiry_temporary_lot_delete":
-            icon = "×"
-            kind = "ВРЕМЕННЫЙ ЛОТ УДАЛЁН ПОСЛЕ 00:00"
-            details = "Исключён из результатов текущей сессии"
-
     elif entity_type == "auction_session":
         object_text = title or "Аукцион"
         if action == "create":
