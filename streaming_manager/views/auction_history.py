@@ -167,6 +167,22 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
             decreased = after.get("decreased_sm_points")
             total = after.get("sm_points")
             details = f"−{_points(decreased)} баллов → {_points(total)}"
+        elif action == "post_expiry_add":
+            icon = "+"
+            kind = "БАЛЛЫ ПОСЛЕ 00:00"
+            details = (
+                f"+{_points(after.get('added_sm_points'))} баллов; "
+                f"итог: {_points(after.get('sm_points'))}; "
+                "таймер не перезапущен"
+            )
+        elif action == "post_expiry_decrease":
+            icon = "−"
+            kind = "УМЕНЬШЕНИЕ ПОСЛЕ 00:00"
+            details = (
+                f"−{_points(after.get('decreased_sm_points'))} баллов; "
+                f"итог: {_points(after.get('sm_points'))}; "
+                "таймер не перезапущен"
+            )
 
     elif entity_type == "auction_lot":
         if action == "create":
@@ -189,7 +205,47 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
             icon = "×"
             kind = "ЛОТ УДАЛЁН"
             details = "Удалён из текущего аукциона"
-
+        elif action in {"post_expiry_create", "post_expiry_merge"}:
+            icon = "+" if action == "post_expiry_create" else "⇄"
+            kind = (
+                "НОВЫЙ ЛОТ ПОСЛЕ 00:00"
+                if action == "post_expiry_create"
+                else "ЛОТ ОБЪЕДИНЁН ПОСЛЕ 00:00"
+            )
+            details = (
+                f"Добавлено: +{_points(after.get('added_sm_points'))} баллов; "
+                "таймер не перезапущен"
+            )
+            if action == "post_expiry_merge":
+                details += "; объединено с существующим лотом"
+        elif action == "post_expiry_title_lot":
+            icon = "+"
+            kind = "ЛОТ ИЗ ОЖИДАЮЩЕГО ПОСТУПЛЕНИЯ"
+            details = (
+                "Создан временный лот"
+                if after.get("temporary")
+                else "Использован существующий лот"
+            )
+        elif action == "post_expiry_temporary_rename":
+            icon = "⇄"
+            kind = "ЛОТ ПЕРЕИМЕНОВАН"
+            old_title = str(before.get("old_title") or "—")
+            new_title = str(after.get("new_title") or "—")
+            object_text = new_title
+            details = (
+                f"«{old_title}» → «{new_title}»; "
+                f"баллы сохранены: {_points(after.get('sm_points'))}; "
+                "таймер не перезапущен"
+            )
+        elif action == "post_expiry_permanent_exclude":
+            icon = "×"
+            kind = "ПОСТОЯННЫЙ ЛОТ ИСКЛЮЧЁН"
+            object_text = str(before.get("title") or title or "Лот")
+            details = (
+                f"Итог на момент исключения: "
+                f"{_points(before.get('sm_points'))} баллов; "
+                "игра и её баллы сохранены"
+            )
     elif entity_type == "auction_session":
         object_text = title or "Аукцион"
         if action == "create":
@@ -281,7 +337,24 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
                 )
             else:
                 kind = "ПОБЕДИТЕЛЬ КОЛЕСА"
-                details = "Победитель выбран"
+                details = (
+                    f"Раунд {int(after.get('spin_index') or 1)}; "
+                    "победитель выбран"
+                )
+        elif action == "wheel_spin_stopped":
+            icon = "■"
+            kind = "ВРАЩЕНИЕ ОСТАНОВЛЕНО"
+            details = (
+                "Текущая анимация остановлена; "
+                "сохранённый результат не подтверждён"
+            )
+        elif action == "wheel_spin_replayed":
+            icon = "↺"
+            kind = "ВРАЩЕНИЕ ПОВТОРЕНО"
+            details = (
+                "Повтор анимации сохранённого результата "
+                "без нового определения победителя"
+            )
         elif action == "wheel_format":
             icon = "⇄"
             kind = "ФОРМАТ КОЛЕСА"
@@ -293,10 +366,52 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
         elif action == "elimination_archive":
             icon = "→"
             kind = "ЛОТ ВЫБЫЛ"
+            remaining = int(after.get("remaining_lots") or 0)
             details = (
                 "Отправлен в архив; осталось активных лотов: "
-                f"{int(after.get('remaining_lots') or 0)}"
+                f"{remaining}"
             )
+            if remaining == 0:
+                details += "; аукцион завершён без победителя"
+        elif action in {
+            "post_expiry_manual_bid",
+            "post_expiry_manual_decrease",
+            "post_expiry_manual_lot",
+            "post_expiry_pending_correction",
+            "post_expiry_permanent_lot_exclude",
+            "post_expiry_temporary_lot_delete",
+        }:
+            icon = "±"
+            labels = {
+                "post_expiry_manual_bid": "ПЕРЕСЧЁТ ПОСЛЕ ДОБАВЛЕНИЯ БАЛЛОВ",
+                "post_expiry_manual_decrease": "ПЕРЕСЧЁТ ПОСЛЕ УМЕНЬШЕНИЯ БАЛЛОВ",
+                "post_expiry_manual_lot": "ПЕРЕСЧЁТ ПОСЛЕ ИЗМЕНЕНИЯ ЛОТА",
+                "post_expiry_pending_correction": "УЧТЕНО ОЖИДАВШЕЕ ПОСТУПЛЕНИЕ",
+                "post_expiry_permanent_lot_exclude": "ПЕРЕСЧЁТ ПОСЛЕ ИСКЛЮЧЕНИЯ ЛОТА",
+                "post_expiry_temporary_lot_delete": "ПЕРЕСЧЁТ ПОСЛЕ УДАЛЕНИЯ ЛОТА",
+            }
+            kind = labels[action]
+            status_names = {
+                "winner_selected": "определён лидер",
+                "tie_break_required": "ничья",
+                "awaiting_wheel": "ожидается колесо",
+                "finished_no_winner": "без победителя",
+                "confirmed": "результат подтверждён",
+            }
+            status = str(after.get("status") or "")
+            parts = []
+            if status:
+                parts.append(status_names.get(status, status))
+            target = after.get("target_game_id")
+            if target is None:
+                target = after.get("excluded_game_id", after.get("removed_game_id"))
+            if target is not None:
+                parts.append(f"ID лота: {target}")
+            credited = after.get("credited_sm_points")
+            if credited is not None:
+                parts.append(f"изменение: {int(credited):+d} баллов")
+            parts.append("без перезапуска таймера")
+            details = "; ".join(parts)
         elif action == "confirm_winner":
             icon = "✓"
             kind = "ПОБЕДИТЕЛЬ ПОДТВЕРЖДЁН"
@@ -305,6 +420,9 @@ def format_auction_history_event(event: dict[str, Any]) -> dict[str, Any]:
             icon = "×"
             kind = "АУКЦИОН ОТМЕНЁН"
             details = "Сессия завершена без подтверждённого победителя"
+            promoted = after.get("promoted_temporary_lots")
+            if isinstance(promoted, list) and promoted:
+                details += f"; временных лотов сохранено: {len(promoted)}"
 
     first_line = f"{icon}  {kind}  ·  {short_time}"
     second_parts = [part for part in (object_text, details) if part]

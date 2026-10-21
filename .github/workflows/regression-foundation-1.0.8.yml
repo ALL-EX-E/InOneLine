@@ -421,6 +421,14 @@ jobs:
           python tools/completed_auction_history_verification_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P22-B History conditional verification tab regression failed" }
 
+      - name: UI-080 History post-expiry readable audit events
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/completed_auction_history_events_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "UI-080 History audit event presentation regression failed" }
+
       - name: Native GUI regression core
         shell: pwsh
         env:
