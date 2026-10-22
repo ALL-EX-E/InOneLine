@@ -725,3 +725,10 @@ This section records the latest accepted review target while preserving all hist
 
 - Earlier Issue #4 labels in this historical inventory ('eligible for fresh review / not selected') described the pre-2026-10-22 state only and are superseded **for current status** by this accepted completion. Preserve original user decisions and old versions in source history.
 - **Global Multi-File Import / Issue #4: IMPLEMENTED / ACCEPTED / POSTMERGE WIN-CI PASS.** Next retained future item D40 manual D26 music/soundtrack ordering remains unimplemented and needs a new explicit approval before designing/editing it. D34/D41 remain later. No D26 legacy Auction playlist/Loop-One contract restored.
+
+
+## 2026-10-22 — explicit next-scope choice after Global Multi-File Import
+
+- **D40 — manual music library order: DEFERRED BY USER / NOT CANCELLED / NOT IMPLEMENTED.** Прямое решение пропустить D40 пока что; текущая модель D26/D43 остаётся неизменной.
+- **D34 — Tourniquet adapter: SELECTED FOR FRESH FEASIBILITY REVIEW, NOT CODE.** Перед реализацией подтвердить доступный актуальный официальный API, доставку донатов, подтверждение оплаты, идентификаторы событий и защиту от дублей, авторизацию и секреты, валюты, конвертацию, ограничения и риск. Сервис https://tourniquet.app/ доступен, исторический анонс API есть в https://t.me/tourniquetApp, но публично проверенного текущего технического контракта недостаточно.
+- Сохранённый порядок после D34: D41 и ранее зафиксированные направления; ни одно не стартует автоматически. ACTIVE_REVIEW_LEDGER/FINAL GATE завершён; никакого изменения runtime и публикации на этом документальном этапе.
