@@ -140,6 +140,7 @@ class StreamTab(QWidget):
         self.api = api
         self.thread_pool = QThreadPool.globalInstance()
         self._background_copy_worker: FunctionWorker | None = None
+        self._background_import_batch: dict | None = None
         self._background_copy_target = "main"
         # A Save pressed while a timer video is copying must apply the newly
         # imported asset, not the previously selected GIF/image.
@@ -1674,6 +1675,12 @@ class StreamTab(QWidget):
         """The one shared importer also serves the Rules editor without side effects."""
         if target not in {"main", "auction_lots", "timer", "rules"}:
             raise ValueError(f"Неизвестный виджет фона: {target}")
+        # The existing selector is still singular. A batch adds all files to
+        # the shared D26 library, but commits only its last successful asset.
+        batch = self._background_import_batch
+        if batch is not None and batch["target"] == target:
+            batch["last_id"] = int(asset_id)
+            return
         self._refresh_background_library(asset_id if target == "main" else None)
         self._refresh_auction_lots_background_library(
             asset_id if target == "auction_lots" else None
@@ -1754,6 +1761,10 @@ class StreamTab(QWidget):
         self._background_video_copy_succeeded = True
 
     def _background_video_copy_failed(self, exc):
+        batch = self._background_import_batch
+        if batch is not None:
+            batch["errors"].append(f'{batch["current"]}: {exc}')
+            return
         QMessageBox.critical(
             self,
             "Ошибка копирования фона",
@@ -1763,11 +1774,15 @@ class StreamTab(QWidget):
         )
 
     def _background_video_copy_finished(self):
+        batch = self._background_import_batch
         apply_pending_timer_save = (
             self._background_copy_target == "timer"
             and self._timer_save_waiting_for_video_copy
             and self._background_video_copy_succeeded
         )
+        if batch is not None and self._background_copy_target == "timer":
+            # Preserve a Save requested during *any* video in the batch.
+            batch["save_waiting"] |= self._timer_save_waiting_for_video_copy
         self._timer_save_waiting_for_video_copy = False
         self._background_video_copy_succeeded = False
         self._background_copy_worker = None
@@ -1778,7 +1793,9 @@ class StreamTab(QWidget):
         self.timer_choose_background_btn.setText("Добавить фон…")
         self._update_auction_lots_background_enabled_state()
         self._update_timer_background_enabled_state()
-        if apply_pending_timer_save:
+        if batch is not None:
+            self._continue_background_import_batch()
+        elif apply_pending_timer_save:
             self._save_timer_overlay_settings()
 
     def _start_background_video_copy(
@@ -1814,12 +1831,21 @@ class StreamTab(QWidget):
         self.thread_pool.start(worker)
 
     def _choose_background_storage_mode(
-        self, source: Path, dialog_parent: QWidget | None = None,
+        self, source: Path | list[Path], dialog_parent: QWidget | None = None,
     ) -> str | None:
         dialog = QMessageBox(dialog_parent or self)
         dialog.setWindowTitle("Как использовать фон?")
         dialog.setIcon(QMessageBox.Icon.Question)
-        dialog.setText(f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?")
+        if isinstance(source, list):
+            preview = "\n".join(f"• {path.name}" for path in source[:8])
+            if len(source) > 8:
+                preview += f"\n• … и ещё {len(source) - 8}"
+            selected = f"Выбрано файлов: {len(source)}\n\n{preview}"
+        else:
+            selected = f"Выбран файл:\n{source}"
+        dialog.setText(
+            selected + "\n\nКак In one line должен использовать выбранные файлы?"
+        )
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в отдельной папке "
             "data\\overlay_backgrounds. «Использовать исходный файл» сохранит ссылку "
@@ -1865,7 +1891,7 @@ class StreamTab(QWidget):
         dialog_parent: QWidget | None = None,
         on_imported: Callable[[int], None] | None = None,
     ):
-        if self._background_copy_worker is not None:
+        if self._background_copy_worker is not None or self._background_import_batch is not None:
             return
         owner = dialog_parent or self
         rules_only = selection_target == "rules"
@@ -1880,38 +1906,103 @@ class StreamTab(QWidget):
             "Изображения (*.png *.jpg *.jpeg *.webp);;"
             "GIF (*.gif);;Видео (*.mp4 *.webm);;Все файлы (*.*)"
         )
-        path, _ = QFileDialog.getOpenFileName(
-            owner, "Выберите фон оверлея", "", file_filter,
+        paths, _ = QFileDialog.getOpenFileNames(
+            owner, "Выберите фоны оверлея", "", file_filter,
         )
-        if not path:
-            return
-        source = Path(path)
-        if source.suffix.lower() not in extensions:
-            QMessageBox.warning(
-                owner, "Неподдерживаемый формат",
-                "Для правил пока поддерживаются PNG, JPG, JPEG и WEBP."
-                if rules_only else
-                "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
-            )
-            return
-        if not source.is_file():
-            QMessageBox.critical(owner, "Ошибка", "Выбранный файл не найден.")
+        if not paths:
             return
 
-        storage_mode = self._choose_background_storage_mode(
-            source, dialog_parent=owner,
-        )
-        if storage_mode is None:
+        # Preserve the original one-file validation and confirmation paths.
+        if len(paths) == 1:
+            source = Path(paths[0])
+            if source.suffix.lower() not in extensions:
+                QMessageBox.warning(
+                    owner, "Неподдерживаемый формат",
+                    "Для правил пока поддерживаются PNG, JPG, JPEG и WEBP."
+                    if rules_only else
+                    "Поддерживаются PNG, JPG, JPEG, WEBP, GIF, MP4 и WEBM.",
+                )
+                return
+            if not source.is_file():
+                QMessageBox.critical(owner, "Ошибка", "Выбранный файл не найден.")
+                return
+            mode = self._choose_background_storage_mode(source, dialog_parent=owner)
+            if mode is None:
+                return
+            try:
+                self._apply_background_import(
+                    source, mode, selection_target,
+                    on_imported=on_imported, dialog_parent=owner,
+                )
+            except (OSError, ValueError) as exc:
+                QMessageBox.critical(
+                    owner, "Ошибка выбора фона",
+                    f"Не удалось подготовить выбранный фон:\n{exc}",
+                )
             return
-        try:
-            self._apply_background_import(
-                source, storage_mode, selection_target,
-                on_imported=on_imported, dialog_parent=owner,
+
+        sources: list[Path] = []
+        errors: list[str] = []
+        for path in paths:
+            source = Path(path)
+            if source.suffix.lower() not in extensions:
+                errors.append(f"{source.name}: неподдерживаемый формат")
+            elif not source.is_file():
+                errors.append(f"{source.name}: файл не найден")
+            else:
+                sources.append(source)
+        if not sources:
+            QMessageBox.warning(
+                owner, "Добавление фонов",
+                "Не найдено ни одного поддерживаемого файла.\n"
+                + "\n".join(errors[:10]),
             )
-        except (OSError, ValueError) as exc:
-            QMessageBox.critical(
-                owner, "Ошибка выбора фона",
-                f"Не удалось подготовить выбранный фон:\n{exc}",
+            return
+        mode = self._choose_background_storage_mode(sources, dialog_parent=owner)
+        if mode is None:
+            return
+        self._background_import_batch = {
+            "pending": sources, "current": "", "mode": mode,
+            "target": selection_target, "owner": owner,
+            "on_imported": on_imported, "last_id": None, "errors": errors,
+            "save_waiting": False,
+        }
+        self._continue_background_import_batch()
+
+    def _continue_background_import_batch(self) -> None:
+        batch = self._background_import_batch
+        if batch is None or self._background_copy_worker is not None:
+            return
+        while batch["pending"]:
+            source = batch["pending"].pop(0)
+            batch["current"] = source.name
+            try:
+                # Only the already accepted shared D26 importer owns media
+                # registration and the async video-copy worker.
+                self._apply_background_import(
+                    source, batch["mode"], batch["target"],
+                    dialog_parent=batch["owner"],
+                )
+            except (OSError, ValueError) as exc:
+                batch["errors"].append(f"{source.name}: {exc}")
+            if self._background_copy_worker is not None:
+                return
+        self._background_import_batch = None
+        if batch["last_id"] is not None:
+            self._select_imported_background(
+                batch["target"], batch["last_id"],
+                on_imported=batch["on_imported"],
+            )
+            if batch["save_waiting"]:
+                self._save_timer_overlay_settings()
+        elif batch["save_waiting"]:
+            batch["errors"].append("Изменения фона таймера не сохранены.")
+        if batch["errors"]:
+            errors = batch["errors"]
+            QMessageBox.warning(
+                batch["owner"], "Добавление фонов",
+                "Не удалось добавить:\n" + "\n".join(errors[:10])
+                + ("\n…" if len(errors) > 10 else ""),
             )
 
     def _apply_background_import(
