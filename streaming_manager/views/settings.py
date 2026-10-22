@@ -177,6 +177,7 @@ class SettingsTab(QWidget):
         self._full_restore_worker = None
         self._integration_worker = None
         self._wheel_center_image_worker = None
+        self._wheel_center_file_batch = None
         self._wheel_center_selection_revision = 0
         self.wheel_center_icons_dir = managed_media_directory(
             self.db.path.parent, MEDIA_CATEGORY_WHEEL_CENTER_ICONS
@@ -1102,17 +1103,44 @@ class SettingsTab(QWidget):
         self.thread_pool.start(worker)
 
     def _import_wheel_center_image_file(self) -> None:
-        if self._wheel_center_image_worker is not None:
+        if self._wheel_center_image_worker is not None or self._wheel_center_file_batch is not None:
             return
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Выберите изображение центра колеса",
+            "Добавить изображения центра колеса",
             "",
             "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)",
         )
-        if not path:
+        if not paths:
             return
-        self._start_wheel_center_import(self._prepare_wheel_center_local, path)
+        # Sequentially reuse the accepted single-file worker and content-hash
+        # deduplication. Keep just one decoded image in memory at a time.
+        self._wheel_center_file_batch = {
+            "pending": list(paths), "current": "", "last_id": None, "errors": [],
+        }
+        self._continue_wheel_center_file_batch()
+
+    def _continue_wheel_center_file_batch(self) -> None:
+        batch = self._wheel_center_file_batch
+        if batch is None:
+            return
+        if batch["pending"]:
+            source = batch["pending"].pop(0)
+            batch["current"] = Path(source).name
+            self._start_wheel_center_import(self._prepare_wheel_center_local, source)
+            return
+        self._wheel_center_file_batch = None
+        self._set_wheel_center_import_busy(False)
+        if batch["last_id"] is not None:
+            self._refresh_wheel_center_image_library(batch["last_id"])
+            self._save_wheel_center_selection_immediately()
+            self.wheel_center_image_source.clear()
+        if batch["errors"]:
+            QMessageBox.warning(
+                self, "Добавление изображений",
+                "Не удалось добавить:\n" + "\n".join(batch["errors"][:10])
+                + ("\n…" if len(batch["errors"]) > 10 else ""),
+            )
 
     def _import_wheel_center_image_url(self) -> None:
         source = self.wheel_center_image_source.text().strip()
@@ -1124,8 +1152,12 @@ class SettingsTab(QWidget):
         self._start_wheel_center_import(self._prepare_wheel_center_remote, source)
 
     def _wheel_center_image_import_ready(self, result: dict) -> None:
+        batch = self._wheel_center_file_batch
         try:
             asset = store_prepared_center_image(self.db, result)
+            if batch is not None:
+                batch["last_id"] = int(asset.id)
+                return
             self._refresh_wheel_center_image_library(asset.id)
             self._save_wheel_center_selection_immediately()
             self.wheel_center_image_source.clear()
@@ -1133,6 +1165,12 @@ class SettingsTab(QWidget):
             self._wheel_center_image_import_failed(exc)
 
     def _wheel_center_image_import_failed(self, exc) -> None:
+        if self._wheel_center_file_batch is not None:
+            batch = self._wheel_center_file_batch
+            batch["errors"].append(
+                f'{batch["current"]}: {sanitize_diagnostic_text(str(exc))}'
+            )
+            return
         QMessageBox.critical(
             self,
             "Изображение центра",
@@ -1141,7 +1179,10 @@ class SettingsTab(QWidget):
 
     def _wheel_center_image_import_finished(self) -> None:
         self._wheel_center_image_worker = None
-        self._set_wheel_center_import_busy(False)
+        if self._wheel_center_file_batch is not None:
+            self._continue_wheel_center_file_batch()
+        else:
+            self._set_wheel_center_import_busy(False)
 
     def _connected_conversion_units(self) -> list[ConversionUnit]:
         try:
