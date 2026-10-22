@@ -732,3 +732,11 @@ This section records the latest accepted review target while preserving all hist
 - **D40 — manual music library order: DEFERRED BY USER / NOT CANCELLED / NOT IMPLEMENTED.** Прямое решение пропустить D40 пока что; текущая модель D26/D43 остаётся неизменной.
 - **D34 — Tourniquet adapter: SELECTED FOR FRESH FEASIBILITY REVIEW, NOT CODE.** Перед реализацией подтвердить доступный актуальный официальный API, доставку донатов, подтверждение оплаты, идентификаторы событий и защиту от дублей, авторизацию и секреты, валюты, конвертацию, ограничения и риск. Сервис https://tourniquet.app/ доступен, исторический анонс API есть в https://t.me/tourniquetApp, но публично проверенного текущего технического контракта недостаточно.
 - Сохранённый порядок после D34: D41 и ранее зафиксированные направления; ни одно не стартует автоматически. ACTIVE_REVIEW_LEDGER/FINAL GATE завершён; никакого изменения runtime и публикации на этом документальном этапе.
+
+
+## 2026-10-22 — D34 explicitly deferred; next retained D41
+
+- D40 — **DEFERRED BY USER**; manual music order remains retained and unimplemented.
+- D34 — **DEFERRED BY USER / NOT CANCELLED**; official API feasibility and integration are no longer the current task. Preserve original research requirements for a later separately approved return.
+- D41 — **NEXT FOR USER REVIEW, NOT AUTHORIZED FOR CODE**: existing retained scope is multi-platform chat aggregation plus standalone OBS chat overlay; actual providers, event ingestion, sorting/filtering/moderation, privacy and UI settings require fresh review. Ordinary chat does not change auction/bets/lots/points/winner, and existing B1/B2 connection model takes precedence.
+- No changes to accepted product/runtime/releases.
