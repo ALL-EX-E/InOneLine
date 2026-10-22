@@ -82,6 +82,9 @@ def main() -> None:
     assert "git diff --name-status" in workflow
     assert 'if ($status -ne "A")' in workflow
     assert "gh release view" in workflow
+    assert '$tagProbeExit = $LASTEXITCODE' in workflow
+    assert '$tagProbeExit -ne 2' in workflow
+    assert '$global:LASTEXITCODE = 0' in workflow
     assert "git ls-remote --exit-code --tags" in workflow
     assert "release_publication.py stage" in workflow
     assert "release_publication.py verify-dir" in workflow

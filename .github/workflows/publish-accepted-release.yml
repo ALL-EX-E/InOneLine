@@ -102,8 +102,14 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw "$tag already has a GitHub Release; refusing to overwrite" }
 
           git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
-          if ($LASTEXITCODE -eq 0) { throw "$tag already exists; refusing to overwrite" }
+          $tagProbeExit = $LASTEXITCODE
+          if ($tagProbeExit -eq 0) { throw "$tag already exists; refusing to overwrite" }
+          if ($tagProbeExit -ne 2) { throw "Cannot reliably check existing tag (exit=$tagProbeExit)" }
 
+          # A missing tag is the EXPECTED result (git ls-remote --exit-code = 2).
+          # PowerShell preserves the external process exit code across Write-Host;
+          # clear it explicitly or the whole successful guard step exits with 2.
+          $global:LASTEXITCODE = 0
           Write-Host "PUBLICATION_TARGET_GUARD=PASS"
 
       - name: Download exact accepted artifact
