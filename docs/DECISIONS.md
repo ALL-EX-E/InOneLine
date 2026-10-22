@@ -415,3 +415,8 @@ The full tab-by-tab UI/function review is complete. Runtime remains exact CURREN
 - Clicking empty space in the main list explicitly clears both selection and current row; current action-state logic handles the resulting no-selection state.
 - Enter search and `focus_game()` remain explicit selection commands.
 - Candidate head `f3740181a9f161c3c56965d075a2d3c2ae3d0762`, PR #29. Regression `37654068727` and wording `37654069253` succeeded. Await user manual QA before promotion.
+
+
+## 2026-10-22 — нейтральная публичная терминология
+
+Новые публичные описания InOneLine: «аукцион», «лот», «запись», «ставка/баллы», «результат», «история» вместо привязки к одной предметной области. **Поддержка произвольных категорий лотов = ACCEPTED AS POSSIBLE, NOT IMPLEMENTED.** См. `docs/FUTURE_GENERAL_AUCTIONS.md`. Перед реализацией нужен отдельный approval. Не менять runtime, данные, legacy названия или исторические сведения ради перепозиционирования.

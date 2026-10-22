@@ -81,3 +81,8 @@ Do not recreate old publication requests for already published releases. Their f
 - Git history of the retired release-specific workflows.
 
 A historical release may contain later asset maintenance that differs from the original one-off workflow's embedded checksum. The GitHub Release itself plus canonical project documentation are the current public record; retired workflow constants are historical implementation detail.
+
+
+## 1.0.8 FINAL GATE: сборка единого accepted bundle без пересборки EXE
+
+Изначальный принятый Actions artifact #12360903842 содержит только один `InOneLine_Setup_1.0.8.exe`, тогда как `tools/release_publication.py` требует минимум два assets. **Нельзя** дублировать путь или ослаблять проверки. Подготовительный workflow `prepare-final-gate-release-bundle.yml` при добавлении одного immutable preparation request копирует EXE из принятого артефакта с повторной проверкой SHA-256 и добавляет `git archive` SOURCE, сформированный только из Git-tracked файлов commit, без пересборки программы. Результат — один Actions artifact с двумя файлами и собственными SHA-256 для штатного неизменного `publish-accepted-release.yml`.

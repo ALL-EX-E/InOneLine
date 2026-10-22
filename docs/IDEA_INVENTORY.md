@@ -708,3 +708,8 @@ This section records the latest accepted review target while preserving all hist
 
 - **UI-028 = IMPLEMENTED / MANUALLY ACCEPTED 5/5 / POST-MERGE PASS**. Удалена лишняя кнопка «Найти» в Публичном списке; поиск при вводе, Enter и синхронизация сохранены. PR #48 merged `974515f8065c8aa11e9b244d9b4841d346259a64`; exact post-merge Windows regression `37796011497` и wording `37796011272` SUCCESS.
 - **UI-076 остаётся следующей отдельной задачей**: информационная сумма баллов на вкладке «Список», без нового SQL-запроса, Public/API/OBS.
+
+
+## 2026-10-22 — нейтральная публичная терминология
+
+Новые публичные описания InOneLine: «аукцион», «лот», «запись», «ставка/баллы», «результат», «история» вместо привязки к одной предметной области. **Поддержка произвольных категорий лотов = ACCEPTED AS POSSIBLE, NOT IMPLEMENTED.** См. `docs/FUTURE_GENERAL_AUCTIONS.md`. Перед реализацией нужен отдельный approval. Не менять runtime, данные, legacy названия или исторические сведения ради перепозиционирования.
