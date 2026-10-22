@@ -1,0 +1,93 @@
+name: Prepare exact accepted 1.0.8 FINAL GATE release bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/release/preparations/*.json"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package-accepted-bytes:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Require one new immutable release preparation request
+        id: request
+        shell: pwsh
+        run: |
+          $changes = @(git diff --name-status "${{ github.event.before }}" "${{ github.sha }}" -- ".github/release/preparations/*.json")
+          if ($LASTEXITCODE -ne 0 -or $changes.Count -ne 1) { throw "Expected exactly one new release preparation request" }
+          $parts = $changes[0] -split "`t"
+          if ($parts.Count -lt 2 -or $parts[0] -ne "A") { throw "Preparation request must be newly added and immutable" }
+          $requestPath = $parts[-1]
+          if ($requestPath -notmatch '^\.github/release/preparations/[A-Za-z0-9._-]+\.json$') { throw "Invalid preparation request path" }
+          if (!(Test-Path $requestPath)) { throw "Missing preparation request" }
+          $request = Get-Content $requestPath -Raw | ConvertFrom-Json
+          if ($request.schema -ne 1 -or $request.accepted_artifact_id -ne 12360903842) { throw "Unaccepted artifact ID" }
+          if ($request.accepted_qa_commit -ne "a9f23e527cf3b6dd9620adf99edc17f8ee853e72") { throw "Accepted QA commit mismatch" }
+          if ($request.installer_sha256 -ne "318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04") { throw "Accepted EXE checksum mismatch" }
+          if ($request.source_name -ne "InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip") { throw "Unexpected SOURCE asset name" }
+          Write-Host "PREPARATION_REQUEST=PASS"
+
+      - name: Assert accepted runtime is completely unchanged
+        shell: pwsh
+        run: |
+          git cat-file -e "a9f23e527cf3b6dd9620adf99edc17f8ee853e72^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw "Accepted FINAL GATE QA commit not available" }
+          git diff --quiet "a9f23e527cf3b6dd9620adf99edc17f8ee853e72" HEAD -- app.py streaming_manager installer requirements.txt requirements-build-lock.txt assets data tools
+          if ($LASTEXITCODE -ne 0) { throw "Runtime/build source changed since accepted FINAL GATE" }
+          Write-Host "ACCEPTED_RUNTIME_UNCHANGED=PASS"
+
+      - name: Download frozen accepted installer from original QA artifact
+        shell: pwsh
+        run: |
+          $uri = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/actions/artifacts/12360903842/zip"
+          curl.exe -L -f -H "Authorization: Bearer $env:GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" $uri -o accepted-artifact.zip
+          if ($LASTEXITCODE -ne 0) { throw "Accepted artifact download failed" }
+          Expand-Archive accepted-artifact.zip -DestinationPath accepted -Force
+          $files = @(Get-ChildItem accepted -Recurse -File)
+          if ($files.Count -ne 1 -or $files[0].Name -ne "InOneLine_Setup_1.0.8.exe") { throw "Original accepted artifact has unexpected contents" }
+          if ($files[0].Length -ne 47745396) { throw "Original accepted EXE size changed" }
+          $hash = (Get-FileHash $files[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne "318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04") { throw "Original accepted EXE SHA256 changed" }
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Copy-Item $files[0].FullName "release-assets/InOneLine_Setup_1.0.8.exe"
+          $copied = (Get-FileHash "release-assets/InOneLine_Setup_1.0.8.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($copied -ne $hash) { throw "Accepted installer bytes altered while copying" }
+          Write-Host "ORIGINAL_ACCEPTED_INSTALLER_EXACT_SHA256=$hash"
+
+      - name: Create and validate Git-tracked source snapshot
+        shell: pwsh
+        run: |
+          python tools/create_source_snapshot.py release-assets/InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip --ref HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Failed to create Git-tracked source snapshot" }
+          python -c "import zipfile; z=zipfile.ZipFile('release-assets/InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip'); assert z.testzip() is None; names=z.namelist(); assert 'README.md' in names and 'RELEASE_NOTES_1.0.8_FINAL_GATE_2026-10-22.md' in names; assert not any(x.startswith('.github/') for x in names); print('RELEASE_SOURCE_ZIP_CRC=PASS')"
+          if ($LASTEXITCODE -ne 0) { throw "Source integrity or contents failed" }
+          $src = (Get-FileHash "release-assets/InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "FINAL_GATE_RELEASE_SOURCE_SHA256=$src"
+          Write-Host "FINAL_GATE_RELEASE_SOURCE_BYTES=$((Get-Item 'release-assets/InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip').Length)"
+
+      - name: Preserve two-file accepted release bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: InOneLine_1.0.8_FINAL_GATE_RELEASE_BUNDLE_20261022
+          path: |
+            release-assets/InOneLine_Setup_1.0.8.exe
+            release-assets/InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip
+          if-no-files-found: error
+          retention-days: 7
