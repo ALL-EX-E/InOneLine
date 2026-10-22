@@ -111,13 +111,13 @@ def main() -> int:
             # Cancel and invalid GIF fail closed, do not create a row or touch
             # selected/stored settings. Animated sources come in a later K8.
             with patch.object(QFileDialog, "getOpenFileNames",
-                              return_value=("", "")):
+                              return_value=([], "")):
                 editor.rules_obs_media_add.click()
             unsupported = root / "not-yet-supported.gif"
             unsupported.write_bytes(b"GIF89a")
             with (
                 patch.object(QFileDialog, "getOpenFileNames",
-                             return_value=(str(unsupported), "Все файлы")),
+                             return_value=([str(unsupported)], "Все файлы")),
                 patch.object(QMessageBox, "warning") as warning,
             ):
                 editor.rules_obs_media_add.click()
