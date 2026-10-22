@@ -157,6 +157,9 @@ jobs:
         shell: pwsh
         run: |
           python tools/rules_editor_import_shared_media_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "P11-K8B existing Rules import regression failed" }
+          python tools/issue4_backgrounds_multifile_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Issue #4/B multi-file backgrounds Qt regression failed" }
 
       - name: P11-K8C animated Rules media in native Qt editor
         shell: pwsh
