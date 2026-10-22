@@ -149,8 +149,15 @@ class AuctionPreparationTests(unittest.TestCase):
             datetime.fromisoformat(session["started_at"]),
             datetime.fromisoformat(session["timer_phase_starts_at"]),
         )
-        # Advance the shared logical clock past 1,200 ms. Do not rely on
-        # QTest.qWait(1350): Qt setup/runner delays are not bounded by it.
+        # Keep a real native Qt event-loop interval (as in the original smoke),
+        # but do not use elapsed runner wall time as the logical countdown clock.
+        wait_started = time.perf_counter()
+        QTest.qWait(1350)
+        print(
+            f"P16_F_NATIVE_QT_EVENT_LOOP_WAIT_MS="
+            f"{(time.perf_counter() - wait_started) * 1000:.3f}",
+            flush=True,
+        )
         self.advance_clock(1350)
         remaining = self.db.auction_remaining_milliseconds(sid)
         self.assertAlmostEqual(remaining, 7850, delta=1)
