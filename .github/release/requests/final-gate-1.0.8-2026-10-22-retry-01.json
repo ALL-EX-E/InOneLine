@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "release_tag": "v1.0.8-final-gate-2026-10-22",
+  "release_title": "InOneLine 1.0.8 — FINAL GATE (2026-10-22)",
+  "release_notes": "RELEASE_NOTES_1.0.8_FINAL_GATE_2026-10-22.md",
+  "accepted_artifact_id": 12406595428,
+  "accepted_target_commit": "2440ff4e974c6a1f96ad03a05152bd867d8553cc",
+  "assets": [
+    {
+      "artifact_path": "InOneLine_Setup_1.0.8.exe",
+      "release_name": "InOneLine_1.0.8_FINAL_GATE_2026-10-22.exe",
+      "sha256": "318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04"
+    },
+    {
+      "artifact_path": "InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip",
+      "release_name": "InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip",
+      "sha256": "52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f"
+    }
+  ]
+}
