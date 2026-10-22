@@ -1856,3 +1856,12 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 
 - **Issue #4 = IMPLEMENTED / USER MANUAL ACCEPTED / THREE EXACT PROMOTIONS / INDEPENDENT MAIN CI PASS / READY TO CLOSE.** Each accepted step A/B/C was reviewed separately. Historical pre-approval snapshots in earlier sections remain unchanged.
 - Retained next development-order item after Issue #4: **D40 manual custom soundtrack/music library order**, then D34 Tourniquet, D41 multichat, historical YouTube integration candidate, D38, Public Web, D27, D7. D40 is a **separately retained future scope requiring fresh current review and explicit approval**, not an automatic feature. Deferred D22/Issue #5, QA findings and possible general-category auctions are not silently added to the queue.
+
+
+## 2026-10-22 — решение пользователя: D40 отложен, следующий пункт D34
+
+- После завершения Global Multi-File Import / Issue #4 пользователь прямо решил: ручной порядок музыки D40 **пока отложить** и **перейти к следующему пункту** принятой очереди. D40 не отменён, не выполнен и не разрешён к реализации; в текущей очереди его пропускаем.
+- **CURRENT NEXT = D34 / Tourniquet donation adapter, этап предварительной проверки (feasibility/current-contract review)**. Это не разрешение писать интеграционный runtime до подтверждения действующего API и проверки рисков.
+- Свежий внешний контроль: официальный https://tourniquet.app/ доступен и заявляет донаты в криптовалюте; официальный канал https://t.me/tourniquetApp сообщал о первой версии API, первоначально доступной ограниченному кругу пользователей. Текущие публичные спецификации авторизации, типов/ID событий, realtime/polling/webhook, статусов подтверждения платежей, валют и повторной доставки **не подтверждены**. Не выдавать объявление об API за проверенный интеграционный контракт.
+- Перед любым кодом D34: проверить действующие provider API и условия доступа, безопасность платёжных событий/секретов, валюты/криптоактивы, ограничения/надёжность; затем сопоставить с существующими B1/B2/B3 IntegrationManager, protected credentials, dedup, conversion/pending, session attribution и журналом. Не создавать второй backend и не менять аукцион без отдельного утверждения.
+- После D34 в сохранённой цепочке остаются D41, older YouTube candidate, D38, Public Web, D27, D7. Другие отложенные пункты не переводятся в работу автоматически. Публичный FINAL GATE 1.0.8 и схема БД не меняются.
