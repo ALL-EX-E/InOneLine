@@ -64,8 +64,8 @@ def main() -> int:
             # Original shared managed/external choice, including source-file
             # reference, works inside modal Rules editor rather than Stream.
             with (
-                patch.object(QFileDialog, "getOpenFileName",
-                             return_value=(str(source), "Изображения")) as picker,
+                patch.object(QFileDialog, "getOpenFileNames",
+                             return_value=([str(source)], "Изображения")) as picker,
                 patch.object(stream, "_choose_background_storage_mode",
                              return_value=MEDIA_STORAGE_EXTERNAL) as storage,
             ):
@@ -90,8 +90,8 @@ def main() -> int:
             # promotes the external row without duplicating it or changing
             # any other widget's saved media settings.
             with (
-                patch.object(QFileDialog, "getOpenFileName",
-                             return_value=(str(source), "Изображения")),
+                patch.object(QFileDialog, "getOpenFileNames",
+                             return_value=([str(source)], "Изображения")),
                 patch.object(stream, "_choose_background_storage_mode",
                              return_value=MEDIA_STORAGE_MANAGED),
                 patch.object(QMessageBox, "information"),
@@ -110,13 +110,13 @@ def main() -> int:
 
             # Cancel and invalid GIF fail closed, do not create a row or touch
             # selected/stored settings. Animated sources come in a later K8.
-            with patch.object(QFileDialog, "getOpenFileName",
+            with patch.object(QFileDialog, "getOpenFileNames",
                               return_value=("", "")):
                 editor.rules_obs_media_add.click()
             unsupported = root / "not-yet-supported.gif"
             unsupported.write_bytes(b"GIF89a")
             with (
-                patch.object(QFileDialog, "getOpenFileName",
+                patch.object(QFileDialog, "getOpenFileNames",
                              return_value=(str(unsupported), "Все файлы")),
                 patch.object(QMessageBox, "warning") as warning,
             ):
