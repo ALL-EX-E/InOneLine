@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import math
 import sys
+import time
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -26,12 +27,30 @@ def milliseconds_between(start, finish):
             datetime.fromisoformat(str(start))).total_seconds() * 1000.0
 
 
+class _ControlledUTCDateTime(datetime):
+    """Test-only wall clock for the 1,200 ms lead-in across DB, Qt and OBS.
+
+    The native Qt window still renders and processes real events; only the
+    application's date comparisons are frozen so slow Windows runners cannot
+    accidentally move a pre-start assertion into the live countdown phase.
+    """
+
+    instant = datetime.now(timezone.utc)
+
+    @classmethod
+    def now(cls, tz=None):
+        if tz is None:
+            return cls.instant.astimezone().replace(tzinfo=None)
+        return cls.instant.astimezone(tz)
+
+
 class AuctionPreparationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self):
+        qt_setup_start = time.perf_counter()
         self.temp = TemporaryDirectory(ignore_cleanup_errors=True)
         self.paths = AppPaths.from_root(self.temp.name)
         self.paths.ensure_runtime_dirs()
@@ -49,6 +68,25 @@ class AuctionPreparationTests(unittest.TestCase):
         )
         self.critical.start()
 
+        # Start the controlled clock AFTER real Qt setup. Patch each consumer
+        # rather than Python's global datetime, preserving all other tests.
+        self.qt_setup_ms = (time.perf_counter() - qt_setup_start) * 1000.0
+        self.clock = _ControlledUTCDateTime
+        self.clock.instant = datetime.now(timezone.utc)
+        for target in (
+            "streaming_manager.db.auction_session.datetime",
+            "streaming_manager.db.services.datetime",
+            "streaming_manager.views.auction_parts.state.datetime",
+            "streaming_manager.views.auction_parts.audio.datetime",
+        ):
+            clock_patch = patch(target, self.clock)
+            clock_patch.start()
+            self.addCleanup(clock_patch.stop)
+        print(f"P16_F_QT_SETUP_REAL_MS={self.qt_setup_ms:.3f}", flush=True)
+
+    def advance_clock(self, milliseconds):
+        self.clock.instant += timedelta(milliseconds=milliseconds)
+
     def tearDown(self):
         self.critical.stop()
         self.window.thread_pool.waitForDone(5000)
@@ -59,12 +97,22 @@ class AuctionPreparationTests(unittest.TestCase):
         self.temp.cleanup()
 
     def start_main(self, duration_ms=8000):
+        before_create = time.perf_counter()
         sid = self.db.create_auction_session(
             "max_amount", math.ceil(duration_ms / 1000),
             duration_ms=duration_ms, wheel_duration_ms=13000,
         )
+        before_refresh = time.perf_counter()
         self.tab._active_auction_id = sid
         self.tab.refresh()
+        after_refresh = time.perf_counter()
+        print(
+            "P16_F_REAL_SETUP_DIAGNOSTICS "
+            f"qt_ms={self.qt_setup_ms:.3f} "
+            f"db_create_ms={(before_refresh - before_create) * 1000:.3f} "
+            f"qt_refresh_ms={(after_refresh - before_refresh) * 1000:.3f}",
+            flush=True,
+        )
         return sid
 
     def assert_pending_duration(self, sid, expected_ms):
@@ -72,7 +120,8 @@ class AuctionPreparationTests(unittest.TestCase):
         start = session["timer_phase_starts_at"]
         self.assertIsNotNone(start)
         self.assertGreater(
-            (datetime.fromisoformat(start) - datetime.now(timezone.utc)).total_seconds(), 0
+            (datetime.fromisoformat(start) - self.clock.now(timezone.utc)).total_seconds(),
+            0,
         )
         self.assertAlmostEqual(
             milliseconds_between(start, session["deadline_at"]), expected_ms, delta=1
@@ -100,10 +149,17 @@ class AuctionPreparationTests(unittest.TestCase):
             datetime.fromisoformat(session["started_at"]),
             datetime.fromisoformat(session["timer_phase_starts_at"]),
         )
-        QTest.qWait(1350)
+        # Advance the shared logical clock past 1,200 ms. Do not rely on
+        # QTest.qWait(1350): Qt setup/runner delays are not bounded by it.
+        self.advance_clock(1350)
         remaining = self.db.auction_remaining_milliseconds(sid)
-        self.assertLess(remaining, 8000)
-        self.assertGreater(remaining, 7600)
+        self.assertAlmostEqual(remaining, 7850, delta=1)
+        self.tab.refresh()
+        self.assertAlmostEqual(self.tab._timer_display_remaining_ms(), remaining, delta=1)
+        obs = self.db.current_timer_payload({"mode": "max_amount"})
+        self.assertFalse(obs["preparing"])
+        self.assertEqual(obs["preparation_remaining_ms"], 0)
+        self.assertAlmostEqual(obs["remaining_ms"], remaining, delta=1)
 
     def test_adjust_reset_and_s2_extension_cannot_restart_preparation(self):
         sid = self.start_main(5000)
@@ -123,6 +179,9 @@ class AuctionPreparationTests(unittest.TestCase):
         self.assertEqual(paused["status"], "paused")
         self.assertEqual(paused["remaining_ms"], 7000)
         self.assertIsNone(paused["deadline_at"])
+        # Resume at a genuinely later logical instant; a new full lead-in
+        # must be scheduled even if no real wall time elapsed in the runner.
+        self.advance_clock(250)
         self.db.resume_auction(sid)
         resumed = self.assert_pending_duration(sid, 7000)
         self.assertNotEqual(old["timer_phase_starts_at"], resumed["timer_phase_starts_at"])
@@ -137,18 +196,24 @@ class AuctionPreparationTests(unittest.TestCase):
 
     def test_legacy_null_boundary_retains_immediate_countdown(self):
         sid = self.start_main(8000)
+        # Use the same logical UTC instant as the other consumers instead of
+        # SQLite's independent wall clock. NULL must bypass preparation.
+        deadline = (
+            self.clock.now(timezone.utc) + timedelta(seconds=8)
+        ).isoformat(timespec="microseconds")
         with self.db.connect() as conn:
             conn.execute(
                 "UPDATE auction_sessions SET timer_phase_starts_at=NULL, "
-                "deadline_at=strftime('%Y-%m-%dT%H:%M:%f+00:00','now','+8 seconds') "
-                "WHERE id=?",
-                (sid,),
+                "deadline_at=? WHERE id=?",
+                (deadline, sid),
             )
         self.tab.refresh()
         payload = self.db.current_timer_payload({"mode": "max_amount"})
         self.assertFalse(payload["preparing"])
         self.assertEqual(payload["preparation_remaining_ms"], 0)
-        self.assertLessEqual(self.tab._timer_display_remaining_ms(), 8000)
+        self.assertEqual(self.db.auction_remaining_milliseconds(sid), 8000)
+        self.assertEqual(self.tab._timer_display_remaining_ms(), 8000)
+        self.assertEqual(payload["remaining_ms"], 8000)
 
     def test_soundtrack_is_prepared_paused_until_same_phase_start(self):
         sid = self.start_main(9000)
