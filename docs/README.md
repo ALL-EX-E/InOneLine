@@ -41,3 +41,8 @@
 ## Дальнейшее развитие
 
 - [Возможные предметно-независимые аукционы](./FUTURE_GENERAL_AUCTIONS.md) — идея, а не реализованная функция.
+
+## Актуальный официальный выпуск
+
+- [InOneLine 1.0.8 FINAL GATE (2026-10-22)](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22) — принятый публичный выпуск, точные SHA-256 installer/source assets в корневом [SHA256SUMS.txt](../SHA256SUMS.txt).
+- [Release notes](../RELEASE_NOTES_1.0.8_FINAL_GATE_2026-10-22.md) — изменения и подтверждённые проверки текущей версии; предыдущие выпуски сохранены как история.

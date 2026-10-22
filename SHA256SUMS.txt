@@ -1,3 +1,9 @@
+# InOneLine 1.0.8 FINAL GATE — CURRENT official published release 2026-10-22
+# https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22
+318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04  InOneLine_1.0.8_FINAL_GATE_2026-10-22.exe
+52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f  InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip
+
+# Historical previous 1.0.8 releases; preserved unchanged below
 # InOneLine 1.0.8 checksums
 
 # Current accepted 1.0.8 maintenance baseline — v1.0.8-maintenance-2026-10-01

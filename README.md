@@ -4,6 +4,10 @@
 
 ## Скачать
 
+**Актуальный принятый выпуск:** [InOneLine 1.0.8 FINAL GATE — 22 октября 2026](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22).
+
+**[Скачать Windows-установщик](https://github.com/ALL-EX-E/InOneLine/releases/download/v1.0.8-final-gate-2026-10-22/InOneLine_1.0.8_FINAL_GATE_2026-10-22.exe)** — 47 745 396 байт, SHA-256: `318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04`.
+
 Официальные проверенные версии публикуются на [GitHub Releases](../../releases). Для установки не нужны Python или среда разработки. При предупреждении Windows о неподписанном приложении сначала проверьте источник и SHA-256, не отключайте защиту.
 
 ## Возможности 1.0.8
