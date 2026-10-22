@@ -209,6 +209,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._wheel_center_picker: WheelCenterPickerDialog | None = None
         self._wheel_center_catalog_worker = None
         self._wheel_center_import_worker = None
+        self._wheel_center_picker_file_batch = None
         self._wheel_center_catalog_cache: list[EmoteCatalogItem] | None = None
         self._timer_context = "auction"
         self._default_auction_duration_ms = (
@@ -1753,20 +1754,46 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._apply_wheel_center_asset(int(asset_id))
 
     def _wheel_center_picker_upload(self) -> None:
-        if self._wheel_center_import_worker is not None:
+        if self._wheel_center_import_worker is not None or self._wheel_center_picker_file_batch is not None:
             return
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Выберите изображение центра колеса",
+            "Добавить изображения центра колеса",
             "",
             "Изображения (*.png *.jpg *.jpeg *.webp *.gif);;Все файлы (*.*)",
         )
-        if not path:
+        if not paths:
             return
-        self._start_wheel_center_picker_import(
-            prepare_local_center_image,
-            path,
-        )
+        self._wheel_center_picker_file_batch = {
+            "pending": list(paths), "current": "", "last_id": None, "errors": [],
+        }
+        self._continue_wheel_center_picker_file_batch()
+
+    def _continue_wheel_center_picker_file_batch(self) -> None:
+        batch = self._wheel_center_picker_file_batch
+        if batch is None:
+            return
+        if batch["pending"]:
+            source = batch["pending"].pop(0)
+            batch["current"] = Path(source).name
+            self._start_wheel_center_picker_import(prepare_local_center_image, source)
+            return
+        self._wheel_center_picker_file_batch = None
+        if batch["last_id"] is not None:
+            self._apply_wheel_center_asset(batch["last_id"])
+        else:
+            dialog = self._wheel_center_picker
+            if dialog is not None:
+                try:
+                    dialog.set_busy(False)
+                except RuntimeError:
+                    pass
+        if batch["errors"]:
+            QMessageBox.warning(
+                self, "Добавление изображений",
+                "Не удалось добавить:\n" + "\n".join(batch["errors"][:10])
+                + ("\n…" if len(batch["errors"]) > 10 else ""),
+            )
 
     def _wheel_center_picker_remote_selected(self, item) -> None:
         if self._wheel_center_import_worker is not None:
@@ -1810,9 +1837,16 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         except Exception as exc:
             self._wheel_center_picker_import_failed(exc)
             return
+        if self._wheel_center_picker_file_batch is not None:
+            self._wheel_center_picker_file_batch["last_id"] = int(asset.id)
+            return
         self._apply_wheel_center_asset(int(asset.id))
 
     def _wheel_center_picker_import_failed(self, exc) -> None:
+        if self._wheel_center_picker_file_batch is not None:
+            batch = self._wheel_center_picker_file_batch
+            batch["errors"].append(f'{batch["current"]}: {str(exc)}')
+            return
         dialog = self._wheel_center_picker
         if dialog is not None:
             try:
@@ -1828,6 +1862,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def _wheel_center_picker_import_finished(self) -> None:
         self._wheel_center_import_worker = None
+        if self._wheel_center_picker_file_batch is not None:
+            self._continue_wheel_center_picker_file_batch()
 
     def refresh_auction_settings(self) -> None:
         """Reload persisted auction defaults without changing a live session."""
