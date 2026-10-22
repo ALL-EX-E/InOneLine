@@ -58,6 +58,7 @@ class AuctionAudioMixin:
         self.wheel_audio = ApplicationAudioEngine(self)
         self.wheel_audio.playbackError.connect(self._wheel_audio_error)
         self._wheel_soundtrack_copy_worker: FunctionWorker | None = None
+        self._soundtrack_import_batch: dict | None = None
         self._wheel_audio_runtime_error = ""
         self.soundtrack_dir = managed_media_directory(
             self.db.path.parent,
@@ -403,6 +404,10 @@ class AuctionAudioMixin:
 
     def _adopt_wheel_soundtrack_asset(self, asset_id: int) -> None:
         asset_id = int(asset_id)
+        batch = self._soundtrack_import_batch
+        if batch is not None and batch["target"] == "wheel":
+            batch["last_id"] = asset_id
+            return
         self.db.set_setting(WHEEL_SOUNDTRACK_MEDIA_ID_KEY, str(asset_id))
         self._refresh_shared_soundtrack_catalogs(wheel_selected=asset_id)
         self._force_select_soundtrack_asset(
@@ -417,6 +422,10 @@ class AuctionAudioMixin:
 
     def _adopt_auction_soundtrack_asset(self, asset_id: int) -> None:
         asset_id = int(asset_id)
+        batch = self._soundtrack_import_batch
+        if batch is not None and batch["target"] == "auction":
+            batch["last_id"] = asset_id
+            return
         self.db.set_setting(AUCTION_SOUNDTRACK_MEDIA_ID_KEY, str(asset_id))
         self._refresh_shared_soundtrack_catalogs(auction_selected=asset_id)
         self._force_select_soundtrack_asset(
@@ -610,13 +619,95 @@ class AuctionAudioMixin:
         self._sync_audio_owner_with_session(session, spin_running=spin_running)
         self._refresh_browser_audio_snapshot()
 
-    def _choose_wheel_soundtrack_storage_mode(self, source: Path) -> str | None:
+    @staticmethod
+    def _soundtrack_storage_prompt(source: Path | list[Path]) -> str:
+        if isinstance(source, list):
+            names = "\n".join(f"• {path.name}" for path in source[:8])
+            if len(source) > 8:
+                names += f"\n• … и ещё {len(source) - 8}"
+            subject = f"Выбрано файлов: {len(source)}\n\n{names}"
+        else:
+            # Preserve the exact accepted single-file dialog wording.
+            return f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?"
+        return subject + "\n\nКак In one line должен использовать выбранные файлы?"
+
+    def _start_soundtrack_import_batch(self, target: str, paths: list[str]) -> None:
+        """Queue only accepted individual imports and defer live audio selection."""
+        if self._soundtrack_import_batch is not None:
+            return
+        if target not in {"wheel", "auction"}:
+            raise ValueError("Неизвестный soundtrack")
+        sources: list[Path] = []
+        errors: list[str] = []
+        allowed = supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK)
+        for path in paths:
+            source = Path(path)
+            if source.suffix.lower() not in allowed:
+                errors.append(f"{source.name}: неподдерживаемый формат")
+            elif not source.is_file():
+                errors.append(f"{source.name}: файл не найден")
+            else:
+                sources.append(source)
+        if not sources:
+            QMessageBox.warning(
+                self, "Добавление soundtrack",
+                "Не найдено поддерживаемых аудиофайлов.\n"
+                + "\n".join(errors[:10]),
+            )
+            return
+        storage_selector = (
+            self._choose_wheel_soundtrack_storage_mode
+            if target == "wheel" else self._choose_auction_soundtrack_storage_mode
+        )
+        mode = storage_selector(sources)
+        if mode is None:
+            return
+        self._soundtrack_import_batch = {
+            "target": target, "mode": mode, "pending": sources,
+            "current": "", "last_id": None, "errors": errors,
+        }
+        self._continue_soundtrack_import_batch()
+
+    def _continue_soundtrack_import_batch(self) -> None:
+        batch = self._soundtrack_import_batch
+        if batch is None:
+            return
+        if (self._wheel_soundtrack_copy_worker is not None
+                or self._auction_soundtrack_copy_worker is not None):
+            return
+        import_one = (
+            self._import_wheel_soundtrack_one
+            if batch["target"] == "wheel" else self._import_auction_soundtrack_one
+        )
+        while batch["pending"]:
+            source = batch["pending"].pop(0)
+            batch["current"] = source.name
+            try:
+                import_one(source, batch["mode"])
+            except (OSError, ValueError) as exc:
+                batch["errors"].append(f"{source.name}: {exc}")
+            if (self._wheel_soundtrack_copy_worker is not None
+                    or self._auction_soundtrack_copy_worker is not None):
+                return
+        self._soundtrack_import_batch = None
+        if batch["last_id"] is not None:
+            if batch["target"] == "wheel":
+                self._adopt_wheel_soundtrack_asset(batch["last_id"])
+            else:
+                self._adopt_auction_soundtrack_asset(batch["last_id"])
+        if batch["errors"]:
+            errors = batch["errors"]
+            QMessageBox.warning(
+                self, "Добавление soundtrack",
+                "Не удалось добавить:\n" + "\n".join(errors[:10])
+                + ("\n…" if len(errors) > 10 else ""),
+            )
+
+    def _choose_wheel_soundtrack_storage_mode(self, source: Path | list[Path]) -> str | None:
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Как использовать soundtrack?")
         dialog.setIcon(QMessageBox.Icon.Question)
-        dialog.setText(
-            f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?"
-        )
+        dialog.setText(self._soundtrack_storage_prompt(source))
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в отдельной папке "
             "data\\soundtrack. «Использовать исходный файл» сохранит ссылку "
@@ -704,6 +795,10 @@ class AuctionAudioMixin:
         self._adopt_wheel_soundtrack_asset(asset.id)
 
     def _wheel_soundtrack_copy_failed(self, exc) -> None:
+        batch = self._soundtrack_import_batch
+        if batch is not None and batch["target"] == "wheel":
+            batch["errors"].append(f'{batch["current"]}: {exc}')
+            return
         QMessageBox.critical(
             self,
             "Ошибка копирования soundtrack",
@@ -714,19 +809,28 @@ class AuctionAudioMixin:
         self._wheel_soundtrack_copy_worker = None
         self.add_wheel_soundtrack_btn.setEnabled(True)
         self.add_wheel_soundtrack_btn.setText("Добавить soundtrack…")
+        if self._soundtrack_import_batch is not None:
+            self._continue_soundtrack_import_batch()
 
     def _import_wheel_soundtrack(self) -> None:
-        if self._wheel_soundtrack_copy_worker is not None:
+        if (self._soundtrack_import_batch is not None
+                or self._wheel_soundtrack_copy_worker is not None
+                or self._auction_soundtrack_copy_worker is not None):
             return
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Выберите soundtrack колеса",
-            "",
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Выберите soundtrack колеса", "",
             "Аудио (*.mp3 *.wav *.ogg);;Все файлы (*.*)",
         )
-        if not path:
+        if not paths:
             return
-        source = Path(path)
+        if len(paths) == 1:
+            self._import_wheel_soundtrack_one(Path(paths[0]))
+        else:
+            self._start_soundtrack_import_batch("wheel", paths)
+
+    def _import_wheel_soundtrack_one(
+        self, source: Path, storage_mode: str | None = None,
+    ) -> None:
         if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK):
             QMessageBox.warning(
                 self,
@@ -739,7 +843,8 @@ class AuctionAudioMixin:
             return
 
         self.soundtrack_dir.mkdir(parents=True, exist_ok=True)
-        storage_mode = self._choose_wheel_soundtrack_storage_mode(source)
+        if storage_mode is None:
+            storage_mode = self._choose_wheel_soundtrack_storage_mode(source)
         if storage_mode is None:
             return
         if storage_mode == MEDIA_STORAGE_EXTERNAL:
@@ -771,6 +876,7 @@ class AuctionAudioMixin:
             self._adopt_wheel_soundtrack_asset(asset.id)
             return
         self._start_wheel_soundtrack_copy(source, target)
+
 
     def _build_auction_soundtrack_controls(self) -> QWidget:
         panel = QWidget()
@@ -995,13 +1101,11 @@ class AuctionAudioMixin:
         self._sync_audio_owner_with_session(session)
         self._refresh_browser_audio_snapshot()
 
-    def _choose_auction_soundtrack_storage_mode(self, source: Path) -> str | None:
+    def _choose_auction_soundtrack_storage_mode(self, source: Path | list[Path]) -> str | None:
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Как использовать soundtrack?")
         dialog.setIcon(QMessageBox.Icon.Question)
-        dialog.setText(
-            f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?"
-        )
+        dialog.setText(self._soundtrack_storage_prompt(source))
         dialog.setInformativeText(
             "«Копировать в программу» создаст управляемую копию в папке "
             "data\\soundtrack. «Использовать исходный файл» сохранит ссылку на "
@@ -1055,6 +1159,10 @@ class AuctionAudioMixin:
         self._adopt_auction_soundtrack_asset(asset.id)
 
     def _auction_soundtrack_copy_failed(self, exc) -> None:
+        batch = self._soundtrack_import_batch
+        if batch is not None and batch["target"] == "auction":
+            batch["errors"].append(f'{batch["current"]}: {exc}')
+            return
         QMessageBox.critical(
             self,
             "Ошибка копирования soundtrack",
@@ -1065,19 +1173,28 @@ class AuctionAudioMixin:
         self._auction_soundtrack_copy_worker = None
         self.add_auction_soundtrack_btn.setEnabled(True)
         self.add_auction_soundtrack_btn.setText("Добавить soundtrack…")
+        if self._soundtrack_import_batch is not None:
+            self._continue_soundtrack_import_batch()
 
     def _import_auction_soundtrack(self) -> None:
-        if self._auction_soundtrack_copy_worker is not None:
+        if (self._soundtrack_import_batch is not None
+                or self._wheel_soundtrack_copy_worker is not None
+                or self._auction_soundtrack_copy_worker is not None):
             return
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Выберите музыку аукциона",
-            "",
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Выберите музыку аукциона", "",
             "Аудио (*.mp3 *.wav *.ogg);;Все файлы (*.*)",
         )
-        if not path:
+        if not paths:
             return
-        source = Path(path)
+        if len(paths) == 1:
+            self._import_auction_soundtrack_one(Path(paths[0]))
+        else:
+            self._start_soundtrack_import_batch("auction", paths)
+
+    def _import_auction_soundtrack_one(
+        self, source: Path, storage_mode: str | None = None,
+    ) -> None:
         if source.suffix.lower() not in supported_media_extensions(MEDIA_CATEGORY_SOUNDTRACK):
             QMessageBox.warning(
                 self,
@@ -1090,7 +1207,8 @@ class AuctionAudioMixin:
             return
 
         self.auction_music_dir.mkdir(parents=True, exist_ok=True)
-        storage_mode = self._choose_auction_soundtrack_storage_mode(source)
+        if storage_mode is None:
+            storage_mode = self._choose_auction_soundtrack_storage_mode(source)
         if storage_mode is None:
             return
         if storage_mode == MEDIA_STORAGE_EXTERNAL:
@@ -1119,6 +1237,7 @@ class AuctionAudioMixin:
             self._adopt_auction_soundtrack_asset(asset.id)
             return
         self._start_auction_soundtrack_copy(source, target)
+
 
     def _resolved_auction_soundtrack_playlist(self) -> tuple[list[Path], list[int], int]:
         selected = self._selected_auction_soundtrack_asset()
