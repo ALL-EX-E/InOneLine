@@ -627,7 +627,8 @@ class AuctionAudioMixin:
                 names += f"\n• … и ещё {len(source) - 8}"
             subject = f"Выбрано файлов: {len(source)}\n\n{names}"
         else:
-            subject = f"Выбран файл:\n{source}"
+            # Preserve the exact accepted single-file dialog wording.
+            return f"Выбран файл:\n{source}\n\nКак In one line должен его использовать?"
         return subject + "\n\nКак In one line должен использовать выбранные файлы?"
 
     def _start_soundtrack_import_batch(self, target: str, paths: list[str]) -> None:
