@@ -52,8 +52,6 @@
 
 Перенесено из `IDEA_INVENTORY.md` с сохранением первоначальных D-идентификаторов и условий; статусы D34/D40 уточнены последним решением выше. Некоторые записи **ACCEPTED AS POSSIBLE** означают только признание идеи возможной, а не разрешение на код.
 
-- **D7 whole-snapshot cryptographic hardening boundary** — **USER-ACCEPTED / POST-COMPLETION ONLY**: MAIN relies on immutable app snapshot + existing Random.org+ signed authenticity where applicable + deterministic replay/read-only History. A same-database SHA-256 alone is explicitly **not** considered meaningful protection against intentional tampering. Whole-snapshot signing, protected key management, external hash publication/notarization or independent off-app verification require a separate future security design. A separate public Internet-hosted verification page is likewise **not implied by MAIN**; localhost remains the default serving boundary, while LAN/public sharing requires its own separately approved D38/Public-Web/security design.
-
 - **D1 — double timer / elapsed count-up** — **ACCEPTED AS POSSIBLE / DEFERRED**; текущий single timer сохраняется.
 
 - **D2 — закрепить/открепить лот** — **ACCEPTED AS POSSIBLE / DEFERRED**.
@@ -117,8 +115,6 @@
 - **D40 — manual custom soundtrack/music library order** — **RETAINED POST-COMPLETION / NOT IMPLEMENTED**; D26 currently has Alphabetical/Shuffle, no manual playlist-order editor. Это отдельный future scope поверх current D26 media/audio state и **не означает восстановление superseded pre-D26 Auction playlist/Loop-One contract**.
 
 - **D41 — cross-platform chat aggregation + separate OBS chat overlay** — **USER IDEA / POST-COMPLETION**. Twitch/YouTube/VK/other supported chat providers; ordinary chat does not mutate auction/points/lots/leader/timer/wheel/winner and is distinct from D15 AI-bot. Reuse B1/B2 auth/service adapters rather than a second connection manager; verify each platform's chat capability/API immediately before implementation. Exact cross-chat ordering, author fields, badges/emotes, moderation/filtering, history/persistence, styling and OBS presentation contract are **NOT YET APPROVED** and must be designed only when D41 is explicitly reopened.
-
-- **D1–D43 are accounted for; there is no actual D44 item.**
 
 **Выведены из будущей очереди как уже исполненные:** D19 (части center-image/UI-079 проверены в закрытом P15), D21, D26, D42 (прошёл закрытый UI-review), D43. **Нельзя восстанавливать как новую задачу:** D4, D6, D8, D14, D15, D39. D5 обозначает только ещё не выполненную advanced analytics, а не повторение core History. Названия D44 в инвентаре нет: не придумывать его.
 
