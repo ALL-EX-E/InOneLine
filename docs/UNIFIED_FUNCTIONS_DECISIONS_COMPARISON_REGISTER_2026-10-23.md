@@ -103,10 +103,31 @@
 | [PASS13 FINAL 27.09](https://drive.google.com/file/d/14vJ-WyZAXohgZZki8NpGetamJFrBF1Ut/view) | Subsequent 1.0.2–1.0.8 decisions; release audit 22.10 | PASS13 `14/25`, scope `next D22` и старые QA-1.0.2-* **не использовать как CURRENT** |
 | [Reconciliation PASS10 27.09](https://docs.google.com/document/d/1_k-dFW6FxAfHvdnT2Emb1HdTxGDuD25DGESWu32Y9dk/edit) | Найдено отсутствие прямого InOneLine approval | D15 AI-бот Twitch — внешняя идея, не утверждённая функция проекта; прежняя 0.1.0 multistream-атрибуция недостоверна |
 | [C1 Policy 27.09](https://docs.google.com/document/d/1CId4Dziop2eO_2CWIKFe-uVV243TcHC5CHLgTJJbV1c/edit) | Считались только реально принятые CURRENT/released versions | 14/25 и затем 15/25 — **исторические позиции счётчика**, а не нынешняя команда планировать релиз `1.0.4` |
-| [Maintenance A9 accepted](https://docs.google.com/document/d/1PRA1o5pY0dZQ6XFqF2f9oXFfnuKt_3tZorVg39sJcn8/edit) | A9 installer/HKCU accepted, источник 02.10 | Maintenance A9 **не равен** Product A9 или раннему August A9; отвергнутый первый A9 candidate не считать принятым |
+| [Maintenance A9 accepted](https://docs.google.com/document/d/1PRA1o5pY0dZQ6XFqF2f9oXFfnuKt_3tZorVg39sJcn8/edit) | A9 installer/HKCU accepted, источник 02.10 | Maintenance A9 **не равен** Product A8 либо раннему August A9; отвергнутый первый A9 candidate не считать принятым |
 | [PUBLICATION_REFERENCE_NAMING_RULE](https://docs.google.com/document/d/10eyu6wFBRdRU1gx4xNAkmKRnL5afwGplm8_lkbYnOxI/edit) | Публичный wording gate и текущие принятые публикационные правила | Внешние референсы сохранять в историческом исследовании, **не** использовать как рекламную номенклатуру новых функций |
 
-**Итог второго прохода:** зафиксированы первичные подтверждения статусов в 17 сопоставительных строках (включая FINAL GATE и Issue #4), проверены ревизионные метаданные восьми исходных документов и разобраны восемь архивных коррекций. Оставшиеся источники не заявлены как полностью прочитанные. Следующие проходы должны добавлять точные связи, но не порождать новые параллельные реестры.
+**Итог второго прохода:** зафиксированы первичные подтверждения статусов в 15 сопоставительных строках (включая FINAL GATE и Issue #4), проверены ревизионные метаданные восьми исходных документов и разобраны восемь архивных коррекций. Оставшиеся источники не заявлены как полностью прочитанные. Следующие проходы должны добавлять точные связи, но не порождать новые параллельные реестры.
+
+
+
+## 2.4. Проверка пяти крупных накопительных архивов на забытые нумерованные требования
+
+Дополнительно прочитаны **полученные текстовые представления** пяти больших файлов из Drive-архива: [PROJECT_HISTORY_AND_ROADMAP_CURRENT](https://drive.google.com/file/d/1WyJOx4u5tnEtAd00mQEgOr7onwBRErdR/view), [APPROVED_FUTURE_IMPLEMENTATION_ORDER_CURRENT](https://drive.google.com/file/d/1g-AuJLSWz96QIHNo4KQoHWxWgTHRlbCS/view), [MASTER_CURRENT_ROADMAP](https://drive.google.com/file/d/1bMqUdz8ZqW3a8EjZ6ADhPXtDj4AcayJU/view), [WORKFLOW_RULES_CURRENT](https://drive.google.com/file/d/1ZV7K3ViyPY4YmUU8Fyu13YhZn4u0O69g/view) и [CHANGELOG_CURRENT](https://drive.google.com/file/d/1qB6_taNGG7vs1jE9ce0NRcYqlOntpMkV/view).
+
+Контроль проведён в двух разных границах:
+
+1. **По номерам идей/обязательств:** извлечены упоминания идентификаторов серий `D`, `W`, `B`, `S`, `F`, `H`, `E` из трёх крупных файлов (история, очередь, правила). В текущих `IDEA_INVENTORY` + `UNIFIED_FUTURE_WORK_AND_RULES` найдено соответствие **всем обнаруженным идентификаторам, кроме старого `H7`** — он встречается как исторический alias `D7/H7` в предложении о **перекрытом** `REVIEW LATER` для проверки победителя. Это **не доказательство потерянного требования** и не будущая задача.
+2. **По смысловым отрицательным решениям:** в накопительных текстах обнаружены и перепроверены старые `REJECTED / NOT CURRENT` кандидаты, отклонённые Video Requests и отдельная Wheel-вкладка, отменённый W1 shortcut, условный B6, архитектурное закрытие standalone OBS, а также отменённая ранняя ошибочная приёмка A7. Эти утверждения нельзя механически вернуть в backlog.
+
+| Архив | Извлечено символов текста | Наблюдение |
+|---|---:|---|
+| PROJECT_HISTORY_AND_ROADMAP_CURRENT | 1 073 853 | В старых хронологических блоках остаются `NEXT / REVIEW LATER`, но финальные корректировки помечают их `HISTORICAL / SUPERSEDED` |
+| APPROVED_FUTURE_IMPLEMENTATION_ORDER_CURRENT | 786 665 | Единственный extra-код `H7` — исторический alias перекрытого D7, не новая идея |
+| MASTER_CURRENT_ROADMAP | 44 602 | Содержит исторически устаревшие споры о C1 cadence, D15 и D39; более поздние решения имеют приоритет |
+| WORKFLOW_RULES_CURRENT | 441 782 | Содержит ранние отклонённые Windows-кандидаты и устаревшие правила; не заменяет актуальный GitHub `WORKFLOW.md` |
+| CHANGELOG_CURRENT | 632 012 | Ранние rejected candidate версии сохранены как история, но не означают текущую приёмку |
+
+**Граница доказательства:** механическая проверка покрытия нумерованных `D/W/B/S/F/H/E` IDs **не** доказывает отсутствие ненумерованных пунктов или полноту всех байтов каждого файла/версии. Для этого следующий проход должен разбирать смысловые блоки и поздние прямые решения; найденные поправки вносятся здесь с исходными ссылками.
 
 
 ## 3. Функции в текущем исходном коде
