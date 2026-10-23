@@ -9,14 +9,14 @@
 - `LEG-####` — служебный ID старого пункта, а не новая функция. Исторические группы A1–A12 (August Stabilization), Product A1–A8 и Maintenance A1–A10 — разные пространства имён.
 - Дубли похожих функций допускают связь N:M; не объединять по одному названию. При неточном источнике помечать `NEEDS REVIEW`, не изобретать авторизацию.
 - Этот файл не является разрешением реализовывать новые пункты. Работать строго по актуальным [UNIFIED_FUTURE_WORK_AND_RULES](https://github.com/ALL-EX-E/InOneLine/blob/main/docs/UNIFIED_FUTURE_WORK_AND_RULES.md) и [ACTIVE_REVIEW_LEDGER](https://github.com/ALL-EX-E/InOneLine/blob/main/docs/ACTIVE_REVIEW_LEDGER.md) с отдельным выбором пользователя, в том числе при исправлениях.
-- **Ограничение полноты:** при сборке проверены актуальные основные документы GitHub и архивный каталог Google Drive; не все старые чаты 1–64, 161 архивный текст, все ревизии и все вложения ZIP прочитаны непосредственно в этом проходе. Утверждать абсолютную исчерпываемость пока нельзя.
+- **Ограничение полноты:** при сборке проверены актуальные основные документы GitHub и архивный каталог Google Drive; все 161 архивных текстовых файла из каталога успешно получены, но их построчная смысловая реконструкция не закрыта; не все старые чаты 1–64, все ревизии и все вложения ZIP независимо проверены. Утверждать абсолютную исчерпываемость пока нельзя.
 
 ## 1. Контрольные числа и источники
 
 - **265** текущих кодовых функций по **18** разделам в [CURRENT_FUNCTIONS_CODE_BASELINE](https://github.com/ALL-EX-E/InOneLine/blob/main/docs/CURRENT_FUNCTIONS_CODE_BASELINE_2026-10-23.md). Для каждого доступны более подробное поведение, условия и исходные строки кода.
 - **377** верхнеуровневых исторических записей с документированным статусом из [IDEA_INVENTORY](https://github.com/ALL-EX-E/InOneLine/blob/main/docs/IDEA_INVENTORY.md). Они могут пересекаться с текущими функциями.
 - **165** датированных заголовков реализации и QA из [ACTIVE_REVIEW_LEDGER](https://github.com/ALL-EX-E/InOneLine/blob/main/docs/ACTIVE_REVIEW_LEDGER.md), это эпизоды, не новые функции.
-- **161** архивный текстовый материал каталогизирован из [индекса Google Drive](https://docs.google.com/document/d/1636eBj2_k78mk7ySNjYp3_a5OoDRm5pPZVzgUO71oz0/edit). Индексация не равна контент-аудиту.
+- **161** архивный текстовый материал извлечён и каталогизирован из [индекса Google Drive](https://docs.google.com/document/d/1636eBj2_k78mk7ySNjYp3_a5OoDRm5pPZVzgUO71oz0/edit). Получение текста не равно полному семантическому аудиту.
 
 ## 2. Текущая рабочая граница
 
@@ -533,6 +533,61 @@
 - Текущие 161 текстовых представлений доступны для сравнения. Однако механический просмотр и нормализация всех пунктов, включая ненумерованные требования и промежуточные редакции, **не равны** простой проверке доступности. На данный момент эти проверки остаются открытыми, а недоступные старые содержимые фиксируются как **source access limitation** вместо придуманного результата.
 
 **Обязательное следствие:** если старый `CURRENT`, `NEXT`, `PASS` или `REJECTED` из архива расходится с новейшим прямым решением и exact-current кодом/QA, считать его историческим до отдельной проверки. Данные об отказах 403 не являются доказательством отсутствия идеи.
+
+
+
+## 2.6. Архивный проход: все 161 текстовых файла открыты; инвентаризация Google Docs revision metadata
+
+**23.10.2026:** по исходному каталогу [Google Drive/Текстовый лог](https://docs.google.com/document/d/1636eBj2_k78mk7ySNjYp3_a5OoDRm5pPZVzgUO71oz0/edit) последовательно запрошены **все 161/161** текстовые документа/архивные версии (индексы 0–160, результаты чтения успешны). Среди них находятся десятки повторных `PROJECT_STATE_UPDATE`, `WORKFLOW_RULES`, `PROJECT_HISTORY_AND_ROADMAP` и `CHANGELOG` snapshots. Каждая доступна в развернутом текстовом представлении. Сам факт успешного получения **не** свидетельствует о полной самостоятельной семантической вычитке каждого предложения и каждой утраченной редакции.
+
+Среди этих 161 архивных текстов обнаружены **42 native Google Docs**, для которых дополнительно считана метаистория `list_file_revisions`. Google вернул **210 доступных revision-записей** в сумме, включая текущую: это не количество независимо обработанных документальных изменений, и не все эти редакции были экспортированы. Наибольшее число редакций **54** у раннего `StreamingManager_PROJECT_STATE_CURRENT_0.3.42`; 28 у `ACTIVE_REVIEW_LEDGER` и 11 у старого review виджетов. В старом 0.3.42 дополнительно прочитаны выборочные ревизии 1, 47, 130, 170, 214 (показаны исторические этапы принятия и разработки), а экспорт ревизии 236 вернул **Google HTTP 429**, поэтому этот конкретный снимок повторно не считался. Текущая версия этого документа ранее была успешно извлечена в общем архивном проходе.
+
+| № | Имя Google Docs | Drive ID | Ревизий, возвращённых Google |
+|---:|---|---|---:|
+| 1 | ACTIVE_REVIEW_LEDGER | `1IfPbZVrOS7V0_kT1Ct2xCi8Y7uKrK1C1zi-hoR_ZBvE` | 28 |
+| 2 | ROADMAP_RECONCILIATION_2026-10-02 | `1N_d_DrigEKQ2xOM44uJJ407JX1xFJOR5DTaPISfji3M` | 9 |
+| 3 | USER_IDEA_INVENTORY_2026-10-02 | `1RvtF2vfvJj8B2eiqdV2_Bw9uo3NEku_227e6he86F5Q` | 7 |
+| 4 | PROJECT_STATE_UPDATE_1.0.8_A9_ACCEPTED_2026-10-02 | `1PRA1o5pY0dZQ6XFqF2f9oXFfnuKt_3tZorVg39sJcn8` | 2 |
+| 5 | POST_D26_PATCH_BACKLOG_2026-09-30 | `1s1t1MERKYGX1PJESqBMOBP39h7nugpA9YMN8824scTY` | 2 |
+| 6 | PUBLICATION_REFERENCE_NAMING_RULE_2026-09-28 | `10eyu6wFBRdRU1gx4xNAkmKRnL5afwGplm8_lkbYnOxI` | 2 |
+| 7 | C1_POLICY_AND_1.0.2_RELEASE_2026-09-28 | `1CId4Dziop2eO_2CWIKFe-uVV243TcHC5CHLgTJJbV1c` | 3 |
+| 8 | RECONCILIATION_PASS10_2026-09-27 | `1_k-dFW6FxAfHvdnT2Emb1HdTxGDuD25DGESWu32Y9dk` | 2 |
+| 9 | RECONCILIATION_PASS9_2026-09-27 | `1EdjxTTRIozsVqukyaH5mHPWLX-2w4h0W6TdUQ_f_w8o` | 2 |
+| 10 | RECONCILIATION_PASS8_2026-09-27 | `1QL_SAEaCoHc58iX_s7nmWs4tkiRxtBYbfSpsBI17_mo` | 2 |
+| 11 | RECONCILIATION_PASS7_2026-09-27 | `1Mt70QpYYyDOzKDk-WH_PVaIcVvLlF7iFbBErsHLQ6cc` | 2 |
+| 12 | RECONCILIATION_PASS4 | `1T-NFHDXu8jDphzz4dREoVmqa72lMFTo-xw__NZcyAME` | 3 |
+| 13 | PROJECT_STATE_UPDATE_1.0.5_D43_RELEASED_2026-09-29 | `1sdnIVs19sXetyBK8FEzMNzXUaVJZgQPYgruiNbT7bz4` | 2 |
+| 14 | StreamingManager_PROJECT_STATE_CURRENT_0.3.53_2026-09-02 | `1DKqxg6lTpPBogGUvo3MIeZ5yydOBABJpJWea80gA7fo` | 2 |
+| 15 | StreamingManager_PROJECT_STATE_CURRENT_0.3.52_2026-09-02 | `18Qsp9YvWcD8cVSvXVgxjsUO58ali449dypzcM7w92UM` | 2 |
+| 16 | StreamingManager_PROJECT_STATE_CURRENT_0.3.51_2026-09-02 | `13-94qzgwOth4WnehbMtLBTS3FHtvPwsssujS2JFw2gI` | 2 |
+| 17 | StreamingManager_PROJECT_STATE_CURRENT_0.3.50_2026-09-02 | `13OKQjvCgNn2wVVq9Q0C5-MKmQVEUh5pqKEgRWuPkUYk` | 2 |
+| 18 | StreamingManager_PROJECT_STATE_CURRENT_0.3.49_2026-09-02 | `1aplB7Esf-Unpsljpl3g6Dh3uiMMVBNqbZdKo9AaAucs` | 2 |
+| 19 | StreamingManager_PROJECT_STATE_CURRENT_0.3.48_2026-09-02 | `1QD0OKtXDkXXj-Hb5Q3sEYBjYssY_lbQ5F55w70lhv4I` | 3 |
+| 20 | StreamingManager_PROJECT_STATE_CURRENT_0.3.47_2026-09-02 | `1RoOyaOks0XMB7h7i6xDhXV2jjlKOwdHfALT7bbtiRf8` | 2 |
+| 21 | StreamingManager_PROJECT_STATE_CURRENT_0.3.46_2026-09-02 | `1ZEwj5qxnq7KExvUjjLv23N6rvkyroAEDjgn05wVKvcU` | 2 |
+| 22 | StreamingManager_PROJECT_STATE_CURRENT_0.3.45_2026-09-02 | `1ysCDhMWYHFEJCl7k7MCnvcxZRqMx9yPRhACZBaK0UpI` | 2 |
+| 23 | StreamingManager_PROJECT_STATE_CURRENT_0.3.44_2026-09-02 | `1ylImWFxjBbWzrPGoNcxvlxZCL02EaFswNe5KIcbO_Ww` | 2 |
+| 24 | StreamingManager_PROJECT_STATE_CURRENT_0.3.43_2026-09-02 | `1VxLc6R3eZ7hQLT_vXPkxhFA91SY-kbS_wQvzsakjgGI` | 2 |
+| 25 | StreamingManager_PROJECT_STATE_CURRENT_0.3.42_2026-09-02 | `1CM2xifGbdq1qqDc53X0YmpWf0tbcCg987RVjOKcrdIA` | 54 |
+| 26 | InOneLine_PROJECT_STATE_CURRENT_0.3.67_2026-09-03 | `1mZj6km6Eo6Jdz3el0mlBtQjqyTzKfJTA_TdnTpzhiGI` | 3 |
+| 27 | InOneLine_PROJECT_STATE_CURRENT_0.3.68_2026-09-03 | `1A4U-Rb56ofPi3VFj8qwK4MpkSecc2R6RjGQ-E2icWxE` | 3 |
+| 28 | InOneLine_PROJECT_STATE_CURRENT_0.3.66_2026-09-03 | `1JVUh8CIYUJW9pruLgUQM872Led1tpwIkzWF5YpqL0kU` | 2 |
+| 29 | InOneLine_PROJECT_STATE_CURRENT_0.3.65_2026-09-03 | `1d1iFycg7PJh-WxYfzrKx2Li0zX6DAuYUXtAQzRK1lgM` | 3 |
+| 30 | InOneLine_PROJECT_STATE_CURRENT_0.3.63_2026-09-03 | `1B3pbjms0Ww6CknPZiwJgcmXBKPgE0DrTZ20IcNEG1R0` | 3 |
+| 31 | InOneLine_PROJECT_STATE_CURRENT_0.3.62_2026-09-03 | `1R67BOLUWG0R38SyQ-joVBLnqRd9eIYTaKYlrAKIUFU0` | 2 |
+| 32 | InOneLine_PROJECT_STATE_CURRENT_0.3.61_2026-09-02 | `1-s1UJY_qDdx3gghJJjByCCJAfS67lEGBFlpH7qcKSNA` | 2 |
+| 33 | InOneLine_PROJECT_STATE_CURRENT_0.3.60_2026-09-02 | `1M1Q8Ahv6XBFAiViNWTTrnnn7VcY0XnIFnmZC0ukETpo` | 5 |
+| 34 | StreamingManager_PROJECT_STATE_CURRENT_0.3.57_2026-09-02 | `1uL9Y3izWjrlRPPlF6Ll--9ppOfBttEdPB235dQLdApw` | 3 |
+| 35 | StreamingManager_PROJECT_STATE_CURRENT_0.3.56_2026-09-02 | `1P5k3W2_74S-RBVTBAiGmV6U1SFs-2Xo133ZalR6pNk4` | 3 |
+| 36 | StreamingManager_PROJECT_STATE_CURRENT_0.3.55_2026-09-02 | `10P5e1rbv_2VKHOQWsEYfQtVHOfmdW3EpqDB8cNrDIgo` | 2 |
+| 37 | StreamingManager_PROJECT_STATE_CURRENT_0.3.54_2026-09-02 | `16cnx5O1VCBPFMnijwn7atpnucbHxmDBr0aimOJo238Y` | 2 |
+| 38 | FULL_PROJECT_HISTORY_DEDUP_AUDIT_2026-08-29 | `1xkdEIbDHKg5sIhvIdVpif7-gVZ9YYIjKDPZ1Q_WfQMQ` | 7 |
+| 39 | POINTAUC_WINNER_VERIFICATION_PAGE_REVIEW_2026-08-30 | `11x6kSyxt26T3jLxVcVTfYV3PllUTP5R_pBqlH58yFTw` | 3 |
+| 40 | POINTAUC_HISTORY_PAGE_REVIEW_2026-08-25 | `1acCouFybLmGU87_ZmdhqHVcEWLZVPSYlCkAFDcK3L-4` | 6 |
+| 41 | POINTAUC_WIDGETS_PAGE_REVIEW_2026-08-28 | `1lykjF5ZpY5dRhQbkTSJM-nCSMUENtEgt0IdKszCcc7s` | 11 |
+| 42 | POINTAUC_SETTINGS_PAGE_REVIEW_2026-08-26 | `1Xo_5ybRmAz28P2luFX4OK5Rl4gmRhK0ZcLdNdtbPtPI` | 7 |
+
+**Открытые этапы:** адресный смысловой анализ ранних изменений 0.3.42, сравнение непроверенных отдельных ревизий и проверка оставшихся ненумерованных требований. Не заявлять, что были заново прочитаны все 210 ревизий. Уже доказанные более поздние отмены/приёмки продолжают иметь приоритет над этими промежуточными версиями.
 
 
 ## 3. Функции в текущем исходном коде
@@ -2336,7 +2391,7 @@ Detailed reconciliation trail: `docs/history/ROADMAP_RECONCILIATION_2026-10-02.m
 
 1. Сопоставить `LEG-####` ↔ `CORE/LIST/PUB/MUS/AUC/WHL/AUD/RUL/HIST/JRN/OBS/CENTER/BACKUP/INT/CONV/API` по фактическому поведению, сохранить возможные отношения N:M и прежние идентификаторы.
 2. Для каждой конкретной функции отличить кодовую реализацию от ручного PASS, записать связанный PR, issue, QA gate и commit, а также поздний принятый либо отменивший приказ.
-3. Добрать архивные текстовые источники и исторические ревизии Drive, а затем отмечать доказанные новые/утраченные требования **в этом документе**, не открывая новую параллельную рабочую дорожную карту.
+3. Продолжить смысловую хронологическую сверку архивных текстов и непроверенных исторических ревизий Drive, а затем отмечать доказанные новые/утраченные требования **в этом документе**, не открывая новую параллельную рабочую дорожную карту.
 4. Не учитывать сторонний референс как пользовательское решение, если отсутствует отдельное прямое согласование. Не публиковать секреты и личные сведения из приватного архива.
 5. Перед следующей реализацией применить точный `ACTIVE_REVIEW_LEDGER`, `WORKFLOW.md`, `DECISIONS.md` и текущий код; любое изменение runtime только после выбора и согласования пользователя.
 
