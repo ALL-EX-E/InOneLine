@@ -86,6 +86,7 @@ class LocalApiServer:
         self._auction_lots_state_provider = None
         self._music_player_state_provider = None
         self._music_player_cover_provider = None
+        self._multichat_state_provider = None
 
     @property
     def running(self) -> bool:
@@ -134,6 +135,19 @@ class LocalApiServer:
         except Exception:
             return None
 
+    def set_multichat_state_provider(self, provider) -> None:
+        self._multichat_state_provider = provider
+
+    def multichat_state(self, *, for_obs: bool = True) -> dict:
+        provider = self._multichat_state_provider
+        if provider is None:
+            return {"messages": [], "show_time": True}
+        try:
+            state = provider(for_obs=for_obs)
+        except Exception:
+            return {"messages": [], "show_time": True}
+        return dict(state) if isinstance(state, dict) else {"messages": [], "show_time": True}
+
     def start(self) -> None:
         if self.running:
             return
@@ -153,6 +167,7 @@ class LocalApiServer:
         auction_lots_overlay_path = (
             Path(__file__).resolve().parent / "web" / "auction_lots_overlay.html"
         )
+        multichat_overlay_path = Path(__file__).resolve().parent / "web" / "multichat_overlay.html"
         obs_visibility_js = (
             Path(__file__).resolve().parent / "web" / "obs_visibility.js"
         ).read_text(encoding="utf-8")
@@ -182,6 +197,9 @@ class LocalApiServer:
         )
         auction_lots_overlay_html = _inject_overlay_version_handshake(
             auction_lots_overlay_path.read_text(encoding="utf-8"), APP_VERSION
+        )
+        multichat_overlay_html = _inject_overlay_version_handshake(
+            multichat_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
         data_root = db.path.parent
         background_dir = managed_media_directory(
@@ -547,6 +565,14 @@ class LocalApiServer:
                             + "</pre>",
                             status=500,
                         )
+                    return
+
+                if path in ("/multichat-overlay", "/obs-multichat"):
+                    self._send_text(multichat_overlay_html)
+                    return
+
+                if path == "/api/multichat":
+                    self._send_json(api_server.multichat_state(for_obs=True), pretty=pretty)
                     return
 
                 if path in (
