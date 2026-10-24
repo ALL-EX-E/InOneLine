@@ -14,18 +14,18 @@ from tools.create_source_snapshot import create_source_snapshot
 
 
 def tracked_source_files() -> set[str]:
-    result = subprocess.run(
-        ["git", "ls-tree", "-r", "--name-only", "HEAD"],
+    # -z returns unquoted UTF-8 paths even when core.quotePath is enabled on
+    # the Windows runner; text-mode ls-tree escapes non-ASCII path names and
+    # creates false mismatches against zipfile's actual Unicode names.
+    raw = subprocess.check_output(
+        ["git", "ls-tree", "-rz", "--name-only", "HEAD"],
         cwd=PROJECT_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
     )
     return {
-        line.strip().replace("\\", "/")
-        for line in result.stdout.splitlines()
-        if line.strip() and not line.strip().replace("\\", "/").startswith(".github/")
+        name
+        for item in raw.split(b"\0")
+        if item and (name := item.decode("utf-8").replace("\\", "/"))
+        and not name.startswith(".github/")
     }
 
 
