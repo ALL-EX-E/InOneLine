@@ -522,9 +522,11 @@ class MainWindow(QMainWindow):
         if compact != self._main_tabs_compact:
             self._main_tabs_compact = compact
             tab_bar.setExpanding(compact)
-            self.tabs.setIconSize(QSize(14, 14) if compact else QSize(18, 18))
+            # Nine workspaces must still fit the approved 520px minimum.
+            # Touch only compact tab chrome; wide tab sizes remain unchanged.
+            self.tabs.setIconSize(QSize(12, 12) if compact else QSize(18, 18))
             tab_bar.setStyleSheet(
-                "QTabBar::tab { padding: 4px 3px; }" if compact else ""
+                "QTabBar::tab { padding: 4px 0px; }" if compact else ""
             )
             for index in range(self.tabs.count()):
                 scroll = self.tabs.widget(index)
