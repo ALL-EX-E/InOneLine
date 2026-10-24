@@ -90,17 +90,19 @@ class MultichatState:
         delay: float | None = None,
         show_time: bool | None = None,
     ) -> None:
+        # Validate the entire change before mutating any field: an invalid
+        # delay must never leave a partly-applied message limit behind.
+        new_limit = self._valid_limit(limit) if limit is not None else None
+        new_delay = self._valid_delay(delay) if delay is not None else None
         with self._lock:
-            if limit is not None:
-                new_limit = self._valid_limit(limit)
-                if new_limit != self._limit:
-                    self._operator = deque(self._operator, maxlen=new_limit)
-                    self._obs = deque(self._obs, maxlen=new_limit)
-                    self._limit = new_limit
-                    self._seen_capacity = max(4096, new_limit * 4)
-                    self._trim_seen()
-            if delay is not None:
-                self._delay = self._valid_delay(delay)
+            if new_limit is not None and new_limit != self._limit:
+                self._operator = deque(self._operator, maxlen=new_limit)
+                self._obs = deque(self._obs, maxlen=new_limit)
+                self._limit = new_limit
+                self._seen_capacity = max(4096, new_limit * 4)
+                self._trim_seen()
+            if new_delay is not None:
+                self._delay = new_delay
             if show_time is not None:
                 self._show_time = bool(show_time)
             self._flush_ready(self._clock())
