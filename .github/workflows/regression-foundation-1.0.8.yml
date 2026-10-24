@@ -74,9 +74,9 @@ jobs:
       - name: D41-01 chat RAM, Qt and local OBS HTTP smoke
         shell: pwsh
         run: |
-          python tools/multichat_core_smoke.py
+          python -m tools.multichat_core_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-01 chat core failed" }
-          python tools/multichat_windows_smoke.py
+          python -m tools.multichat_windows_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-01 Qt/HTTP failed" }
 
       - name: GitHub Actions version regression
