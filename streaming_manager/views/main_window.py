@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
 
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
         self.multichat_state = MultichatState()
+        self.twitch_eventsub_runtime.chat_state = self.multichat_state
         self.api.set_multichat_state_provider(self.multichat_state.snapshot)
         try:
             self.api.start()
@@ -268,7 +269,10 @@ class MainWindow(QMainWindow):
         self._add_main_tab(self.public_tab, "Публичный список", QStyle.SP_DirLinkIcon)
         self._add_main_tab(self.music_tab, "Музыка", QStyle.SP_MediaVolume)
         self._add_main_tab(self.auction_tab, "Аукцион", QStyle.SP_DialogApplyButton)
-        self.multichat_tab = MultichatTab(db, self.multichat_state, self.api)
+        self.multichat_tab = MultichatTab(
+            db, self.multichat_state, self.api,
+            twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
+        )
         self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
         self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
