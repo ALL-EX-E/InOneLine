@@ -31,6 +31,13 @@ TWITCH_SERVICE_KEY = "twitch"
 TWITCH_DISPLAY_NAME = "Twitch"
 TWITCH_REQUIRED_SCOPE = "channel:read:redemptions"
 TWITCH_MANAGE_SCOPE = "channel:manage:redemptions"
+TWITCH_CHAT_READ_SCOPE = "user:read:chat"
+TWITCH_CHAT_EVENT_TYPES = (
+    "channel.chat.message",
+    "channel.chat.message_delete",
+    "channel.chat.clear_user_messages",
+    "channel.chat.clear",
+)
 TWITCH_CHANNEL_POINTS_UNIT = "TWITCH_CHANNEL_POINTS"
 TWITCH_CHANNEL_POINTS_LABEL = "Twitch Channel Points"
 TWITCH_CHANNEL_POINTS_EVENT_TYPE = "twitch_channel_points_redemption"
@@ -398,6 +405,26 @@ class TwitchApiClient:
             headers=self._api_headers(client_id, access),
         )
 
+    def create_chat_subscription(
+        self, client_id: str, access: str, *, session_id: str,
+        broadcaster_id: str, chatter_id: str, event_type: str,
+    ) -> dict:
+        if event_type not in TWITCH_CHAT_EVENT_TYPES:
+            raise ValueError("Unsupported Twitch chat EventSub subscription")
+        return self._request_json(
+            "POST", TWITCH_EVENTSUB_SUBSCRIPTIONS_URL,
+            json_body={
+                "type": event_type,
+                "version": "1",
+                "condition": {
+                    "broadcaster_user_id": str(broadcaster_id),
+                    "user_id": str(chatter_id),
+                },
+                "transport": {"method": "websocket", "session_id": str(session_id)},
+            },
+            headers=self._api_headers(client_id, access),
+        )
+
 
 class TwitchAdapter(IntegrationAdapter):
     service_key = TWITCH_SERVICE_KEY
@@ -712,13 +739,24 @@ class TwitchAdapter(IntegrationAdapter):
         credential, validation = self._validate_with_refresh(context, client_id, credential)
         return self._profile_and_capability(context, client_id, credential, validation)
 
+    def _desired_scopes(self, context, *, manage: bool = False) -> tuple[str, ...]:
+        # Reauthorization replaces the old Twitch grant. Preserve reward
+        # management alongside the new chat read permission.
+        current = context.provider_config.get("granted_scopes") or []
+        allowed = {TWITCH_REQUIRED_SCOPE, TWITCH_MANAGE_SCOPE, TWITCH_CHAT_READ_SCOPE}
+        retained = set(current) & allowed if isinstance(current, (list, tuple)) else set()
+        retained.update((TWITCH_REQUIRED_SCOPE, TWITCH_CHAT_READ_SCOPE))
+        if manage:
+            retained.add(TWITCH_MANAGE_SCOPE)
+        return tuple(sorted(retained))
+
     def _device_flow(
         self,
         context,
         scopes: tuple[str, ...] | None = None,
     ) -> IntegrationOperationResult:
         client_id = self._client_id(context)
-        requested_scopes = tuple(scopes or self.required_scopes)
+        requested_scopes = tuple(scopes or self._desired_scopes(context))
         self._cancel_authorization.clear()
         try:
             payload = self.client.start_device_authorization(client_id, requested_scopes)
@@ -792,11 +830,11 @@ class TwitchAdapter(IntegrationAdapter):
         return self._check(context)
 
     def reconnect(self, context) -> IntegrationOperationResult:
-        return self._device_flow(context)
+        return self._device_flow(context, self._desired_scopes(context))
 
     def reconnect_for_channel_points(self, context) -> IntegrationOperationResult:
         """Force a fresh public grant that retains the B4 management scope."""
-        return self._device_flow(context, (TWITCH_MANAGE_SCOPE,))
+        return self._device_flow(context, self._desired_scopes(context, manage=True))
 
     def ensure_manage_scope(self, context) -> IntegrationOperationResult:
         """Upgrade the public grant only when B4 needs reward management."""
@@ -819,7 +857,7 @@ class TwitchAdapter(IntegrationAdapter):
                     )
             except IntegrationAuthRequired:
                 pass
-        return self._device_flow(context, (TWITCH_MANAGE_SCOPE,))
+        return self._device_flow(context, self._desired_scopes(context, manage=True))
 
     def _managed_snapshot(self, context) -> dict:
         client_id = self._client_id(context)
@@ -846,6 +884,39 @@ class TwitchAdapter(IntegrationAdapter):
 
     def eventsub_snapshot(self, context) -> dict:
         return self._managed_snapshot(context)
+
+
+    def chat_snapshot(self, context) -> dict:
+        """Validate the *actual* token before subscribing to chat."""
+        client_id = self._client_id(context)
+        credential = TwitchCredential.from_json(context.credential)
+        credential, validation = self._validate_with_refresh(context, client_id, credential)
+        scopes = set(validation.get("scopes") or ())
+        if TWITCH_CHAT_READ_SCOPE not in scopes:
+            raise IntegrationAuthRequired(
+                "Для Twitch-чата требуется повторная авторизация в «Интеграциях» "
+                "с разрешением user:read:chat."
+            )
+        user_id = str(validation.get("user_id") or "").strip()
+        if not user_id:
+            raise IntegrationAuthRequired("Twitch не подтвердил пользователя для чтения чата.")
+        expected = str(context.provider_config.get("twitch_user_id") or "").strip()
+        if expected and user_id != expected:
+            raise IntegrationAuthRequired("Twitch-аккаунт изменился; требуется переподключение.")
+        return {"client_id": client_id, "access": credential.access,
+                "broadcaster_id": user_id, "chatter_id": user_id}
+
+    def create_chat_eventsub_subscription(self, context, session_id: str, event_type: str) -> dict:
+        snap = self.chat_snapshot(context)
+        try:
+            return self.client.create_chat_subscription(
+                snap["client_id"], snap["access"],
+                session_id=str(session_id), broadcaster_id=snap["broadcaster_id"],
+                chatter_id=snap["chatter_id"], event_type=str(event_type),
+            )
+        except TwitchHttpError as exc:
+            self._map_http_error(exc)
+            raise AssertionError("unreachable")
 
     def list_manageable_rewards(self, context) -> list[dict]:
         snap = self._managed_snapshot(context)
