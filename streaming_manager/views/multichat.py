@@ -7,6 +7,8 @@ from math import isfinite
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QTextCursor
+from .common import make_wide_step_control
+
 from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QCheckBox, QFormLayout, QFrame, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox,
@@ -65,7 +67,11 @@ class MultichatTab(QWidget):
         self.show_time.setChecked(db.get_setting("multichat_show_time", "1") == "1")
         self.show_time.toggled.connect(self._on_time)
         form.addRow("Задержка (сек.)", self.delay)
-        form.addRow("Лимит сообщений", self.limit)
+        form.addRow("Лимит сообщений", make_wide_step_control(
+            self.limit,
+            up_tooltip="Увеличить лимит сообщений",
+            down_tooltip="Уменьшить лимит сообщений",
+        ))
         form.addRow(self.show_time)
         settings.addWidget(general)
         connections = QGroupBox("Подключения и OBS")
