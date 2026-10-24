@@ -655,6 +655,13 @@ jobs:
             if ($music -notmatch "createAnalyser" -or $music -notmatch "marquee") {
               throw "Installed D26 Music Player overlay regression"
             }
+            $chatPayload = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/api/multichat" -TimeoutSec 3).Content
+            if ($chatPayload -notmatch '"messages":\[\]') { throw "Installed D41 empty chat RAM endpoint missing" }
+            $chatOverlay = (Invoke-WebRequest -Uri "http://127.0.0.1:8765/multichat-overlay" -TimeoutSec 3).Content
+            if ($chatOverlay -notmatch "/api/multichat" -or $chatOverlay -notmatch "textContent") {
+              throw "Installed D41 OBS overlay missing or unsafe"
+            }
+            Write-Host "INSTALLED_D41_CHAT_HTTP_OBS=PASS"
             Write-Host "SILENT_INSTALL_STARTUP_REGRESSION=PASS"
           } finally {
             if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force }
