@@ -2553,6 +2553,7 @@ def main() -> int:
             "Аукцион",
             "История аукционов",
             "Журнал",
+            "Мультичат",
             "Стрим / OBS",
             "Настройки",
         ]
@@ -2921,6 +2922,7 @@ def main() -> int:
             "Аукцион",
             "История аукционов",
             "Журнал",
+            "Мультичат",
             "Стрим / OBS",
             "Настройки",
         ]
@@ -2938,6 +2940,7 @@ def main() -> int:
             window.auction_tab,
             window.completed_history_tab,
             window.log_tab,
+            window.multichat_tab,
             window.stream_tab,
             window.settings_tab,
         )
@@ -3052,7 +3055,7 @@ def main() -> int:
 
         # Compact tabs retain readable short captions and distinct accent colors.
         expected_compact_titles = [
-            "Спис", "Публ", "Муз", "Аук", "Ист", "Жур", "OBS", "Наст",
+            "Спис", "Публ", "Муз", "Аук", "Ист", "Жур", "Чат", "OBS", "Наст",
         ]
         if not window._main_tabs_compact:
             raise AssertionError("P06 minimum-width tab strip did not compact")
