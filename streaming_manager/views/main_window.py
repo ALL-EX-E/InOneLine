@@ -268,10 +268,10 @@ class MainWindow(QMainWindow):
         self._add_main_tab(self.public_tab, "Публичный список", QStyle.SP_DirLinkIcon)
         self._add_main_tab(self.music_tab, "Музыка", QStyle.SP_MediaVolume)
         self._add_main_tab(self.auction_tab, "Аукцион", QStyle.SP_DialogApplyButton)
-        self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
-        self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self.multichat_tab = MultichatTab(db, self.multichat_state, self.api)
         self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
+        self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
         self._add_main_tab(self.settings_tab, "Настройки", QStyle.SP_FileDialogContentsView)
         self._main_tab_pages = {
