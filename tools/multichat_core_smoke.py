@@ -120,6 +120,61 @@ class MultichatCoreTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MultichatState(limit=x)
 
+    def test_invalid_multi_setting_change_is_atomic(self):
+        before = self.state.snapshot()
+        with self.assertRaises(ValueError):
+            self.state.configure(limit=10, delay=float("nan"))
+        after = self.state.snapshot()
+        self.assertEqual(before["limit"], after["limit"])
+        self.assertEqual(before["delay"], after["delay"])
+
+    def test_existing_message_not_repeated_on_time_toggle(self):
+        self.state.ingest(msg())
+        self.state.configure(show_time=False)
+        self.state.configure(show_time=True)
+        self.assertEqual(self.ids(), ["1"])
+        self.assertEqual(self.ids(obs=True), ["1"])
+
+    def test_extension_of_delay_keeps_existing_pending(self):
+        self.state.configure(delay=2)
+        self.state.ingest(msg())
+        self.clock.advance(1)
+        self.state.configure(delay=5)
+        self.clock.advance(2)
+        self.assertEqual(self.ids(), [])
+        self.clock.advance(2)
+        self.assertEqual(self.ids(), ["1"])
+
+    def test_delay_buffer_uses_receipt_fallback(self):
+        self.state.configure(delay=2)
+        self.state.ingest(msg(identifier="first", sent=None))
+        self.clock.advance(0.1)
+        self.state.ingest(msg(identifier="second", sent=None))
+        self.clock.advance(2)
+        self.assertEqual(self.ids(), ["first", "second"])
+
+    def test_late_delivery_is_not_inserted_backwards(self):
+        self.state.configure(delay=2)
+        self.state.ingest(msg(identifier="first", sent=100))
+        self.clock.advance(2)
+        self.assertEqual(self.ids(), ["first"])
+        self.state.ingest(msg(identifier="late", sent=10))
+        self.clock.advance(2)
+        self.assertEqual(self.ids(), ["first", "late"])
+
+    def test_empty_state_both_views(self):
+        self.assertEqual(self.ids(), [])
+        self.assertEqual(self.ids(obs=True), [])
+        self.assertEqual(self.state.snapshot()["overflow_count"], 0)
+
+    def test_source_change_does_not_affect_other_platform(self):
+        self.state.configure(delay=4)
+        self.state.ingest(msg(platform="youtube", identifier="y"))
+        self.state.ingest(msg(platform="twitch", identifier="t"))
+        self.state.change_source("twitch")
+        self.clock.advance(4)
+        self.assertEqual(self.ids(), ["y"])
+
     def test_pending_is_bounded_when_delay_is_huge(self):
         self.state.configure(limit=10, delay=1000000)
         for i in range(25):
