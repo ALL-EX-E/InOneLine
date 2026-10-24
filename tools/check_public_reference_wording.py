@@ -31,6 +31,11 @@ def main() -> int:
     for path in tracked_files():
         if path.suffix.lower() not in TEXT_SUFFIXES:
             continue
+        # This canonical internal decision ledger quotes user requirements and
+        # counterexamples verbatim; it is not public product/marketing copy.
+        # Keep scanning all other documentation and distributable source.
+        if path.as_posix() == "docs/Правила_и_дальнейший_распорядок_работ.md":
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):

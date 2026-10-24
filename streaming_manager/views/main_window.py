@@ -20,6 +20,7 @@ from ..api_server import LocalApiServer
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
 from ..music_player import MusicPlayerController
+from ..multichat import MultichatState
 from ..ui_settings import open_ui_settings
 from ..backup_restore import read_and_clear_restore_result
 from ..constants import APP_NAME, APP_VERSION, DEFAULT_API_HOST
@@ -34,6 +35,7 @@ from .common import APP_STYLE, autosize_compact_columns_once, reflow_narrow_rows
 from .games import GamesTab
 from .public import PublicTab
 from .stream import StreamTab
+from .multichat import MultichatTab
 from .music import MusicTab
 from .auction import AuctionTab
 from .completed_auction_history import CompletedAuctionHistoryTab
@@ -60,6 +62,7 @@ _COMPACT_TAB_LABELS = {
     "История аукционов": "Ист",
     "Журнал": "Жур",
     "Стрим / OBS": "OBS",
+    "Мультичат": "Чат",
     "Настройки": "Наст",
 }
 _TAB_ICON_COLORS = {
@@ -70,6 +73,7 @@ _TAB_ICON_COLORS = {
     "История аукционов": "#E5C454",
     "Журнал": "#59B8C9",
     "Стрим / OBS": "#EA6F78",
+    "Мультичат": "#21D3BD",
     "Настройки": "#87A9FF",
 }
 
@@ -120,6 +124,8 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(APP_STYLE)
 
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
+        self.multichat_state = MultichatState()
+        self.api.set_multichat_state_provider(self.multichat_state.snapshot)
         try:
             self.api.start()
         except OSError:
@@ -262,6 +268,8 @@ class MainWindow(QMainWindow):
         self._add_main_tab(self.public_tab, "Публичный список", QStyle.SP_DirLinkIcon)
         self._add_main_tab(self.music_tab, "Музыка", QStyle.SP_MediaVolume)
         self._add_main_tab(self.auction_tab, "Аукцион", QStyle.SP_DialogApplyButton)
+        self.multichat_tab = MultichatTab(db, self.multichat_state, self.api)
+        self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
         self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
@@ -274,6 +282,7 @@ class MainWindow(QMainWindow):
             "auction_history": self.completed_history_tab,
             "log": self.log_tab,
             "stream": self.stream_tab,
+            "multichat": self.multichat_tab,
             "settings": self.settings_tab,
         }
         self._main_tab_key_by_page = {
@@ -513,9 +522,11 @@ class MainWindow(QMainWindow):
         if compact != self._main_tabs_compact:
             self._main_tabs_compact = compact
             tab_bar.setExpanding(compact)
-            self.tabs.setIconSize(QSize(14, 14) if compact else QSize(18, 18))
+            # Nine workspaces must still fit the approved 520px minimum.
+            # Touch only compact tab chrome; wide tab sizes remain unchanged.
+            self.tabs.setIconSize(QSize(12, 12) if compact else QSize(18, 18))
             tab_bar.setStyleSheet(
-                "QTabBar::tab { padding: 4px 3px; }" if compact else ""
+                "QTabBar::tab { padding: 4px 0px; }" if compact else ""
             )
             for index in range(self.tabs.count()):
                 scroll = self.tabs.widget(index)
@@ -930,6 +941,7 @@ class MainWindow(QMainWindow):
             self.public_tab,
             self.stream_tab,
             self.music_tab,
+            self.multichat_tab,
             self.completed_history_tab,
             self.log_tab,
         ):
