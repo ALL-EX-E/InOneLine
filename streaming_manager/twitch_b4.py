@@ -542,6 +542,8 @@ class TwitchEventSubRuntime:
         self.service = service
         self.chat_state = chat_state
         self.chat_connected = False
+        self.chat_error = ""
+        self._chat_subscription_active = False
         self._chat_source_id = ""
         self.socket_factory = socket_factory or self._default_socket_factory
         self.retry_seconds = max(0.2, float(retry_seconds))
@@ -621,6 +623,10 @@ class TwitchEventSubRuntime:
         if not ready:
             return ("Twitch: для чтения чата требуется повторная авторизация "
                     "через «Интеграции» (user:read:chat). Награды не затрагиваются.")
+        if self.chat_error:
+            if self.chat_connected:
+                return "Twitch: чат подключён, но некоторые события модерации недоступны."
+            return "Twitch: ошибка подписки на чат; проверьте Twitch и права в «Интеграциях»."
         if self.chat_connected:
             return "Twitch: чат подключён."
         if self.last_error:
@@ -727,6 +733,8 @@ class TwitchEventSubRuntime:
             chat_source, chat_ready = self._chat_profile()
             chat_required = self.chat_state is not None and chat_ready
             if subscriptions_required:
+                self._chat_subscription_active = False
+                self.chat_error = ""
                 # First subscription is created immediately after welcome to
                 # satisfy Twitch's default 10-second unused-connection limit.
                 for reward_id in reward_ids:
@@ -736,15 +744,28 @@ class TwitchEventSubRuntime:
                         session_id,
                         reward_id,
                     )
+
                 if chat_required:
                     for event_type in TWITCH_CHAT_EVENT_TYPES:
-                        self.service.integration_manager.call_adapter(
-                            TWITCH_SERVICE_KEY,
-                            "create_chat_eventsub_subscription",
-                            session_id,
-                            event_type,
-                        )
-            self.chat_connected = bool(chat_required)
+                        try:
+                            self.service.integration_manager.call_adapter(
+                                TWITCH_SERVICE_KEY,
+                                "create_chat_eventsub_subscription",
+                                session_id,
+                                event_type,
+                            )
+                        except Exception:
+                            # A chat permission/provider failure must not stop
+                            # a working Channel Points EventSub subscription.
+                            self.chat_error = "Twitch chat subscription unavailable"
+                            if not reward_ids:
+                                raise
+                            break
+                        if event_type == "channel.chat.message":
+                            self._chat_subscription_active = True
+            self.chat_connected = bool(chat_required and self._chat_subscription_active)
+            current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+            subscribed_credential_ref = str(current_row.get("credential_ref") or "")
             self.connected = True
             self.last_error = ""
             try:
@@ -761,7 +782,10 @@ class TwitchEventSubRuntime:
                     return ""
                 current_ids = self.service.managed_reward_ids()
                 current_source, current_chat = self._chat_profile()
+                current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+                credential_ref = str(current_row.get("credential_ref") or "")
                 if (current_ids != reward_ids or current_source != chat_source
+                        or credential_ref != subscribed_credential_ref
                         or (self.chat_state is not None and current_chat) != chat_required):
                     # The shared socket's subscriptions must match both services.
                     return ""
