@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""D41 first-stage operator view; platform connections and themes follow later."""
+"""D41 operator view; Twitch status and shared OBS feed."""
 
 from datetime import datetime
 from math import isfinite
@@ -33,9 +33,10 @@ class _ChatFeed(QTextEdit):
 
 
 class MultichatTab(QWidget):
-    def __init__(self, db, state, api):
+    def __init__(self, db, state, api, *, twitch_status_provider=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
+        self.twitch_status_provider = twitch_status_provider
         self._last_render = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         self.columns.setContentsMargins(8, 8, 8, 8)
@@ -79,6 +80,11 @@ class MultichatTab(QWidget):
         self.connection_status = QLabel("Twitch и YouTube: ожидание подключения чата")
         self.connection_status.setWordWrap(True)
         connections_layout.addWidget(self.connection_status)
+        self.twitch_obs = QCheckBox("Отображать чат Twitch в OBS")
+        self.twitch_obs.setChecked(db.get_setting("multichat_twitch_obs", "1") == "1")
+        self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
+        self.twitch_obs.toggled.connect(self._on_twitch_obs)
+        connections_layout.addWidget(self.twitch_obs)
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -108,6 +114,10 @@ class MultichatTab(QWidget):
         self.refresh_timer.start()
         self.refresh()
 
+    def _on_twitch_obs(self, enabled):
+        self.state.set_obs_enabled("twitch", enabled)
+        self.db.set_setting("multichat_twitch_obs", "1" if enabled else "0")
+
     def _on_delay(self):
         try:
             seconds = float(self.delay.text().strip().replace(",", "."))
@@ -135,6 +145,14 @@ class MultichatTab(QWidget):
         self.refresh()
 
     def refresh(self):
+        if self.twitch_status_provider is not None:
+            try:
+                status = str(self.twitch_status_provider())
+            except Exception:
+                status = "Twitch: не удалось получить состояние подключения."
+            info = status + " YouTube: подключение появится в D41-03."
+            if self.connection_status.text() != info:
+                self.connection_status.setText(info)
         snapshot = self.state.snapshot()
         overflow = snapshot["overflow_count"]
         warning = ("Буфер задержки переполнен: для сохранения сообщений "
