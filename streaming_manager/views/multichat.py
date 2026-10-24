@@ -51,6 +51,7 @@ class MultichatTab(QWidget):
         general = QGroupBox("Общие настройки")
         form = QFormLayout(general)
         self.delay = QLineEdit(db.get_setting("multichat_delay", "0"))
+        self.delay.setAccessibleName("Задержка сообщений, секунд")
         self.delay.editingFinished.connect(self._on_delay)
         self.limit = QSpinBox()
         self.limit.setRange(10, 1000)
@@ -69,9 +70,13 @@ class MultichatTab(QWidget):
         settings.addWidget(general)
         connections = QGroupBox("Подключения и OBS")
         connections_layout = QVBoxLayout(connections)
-        status = QLabel("Twitch и YouTube: ожидание подключения чата")
-        status.setWordWrap(True)
-        connections_layout.addWidget(status)
+        self.connection_status = QLabel("Twitch и YouTube: ожидание подключения чата")
+        self.connection_status.setWordWrap(True)
+        connections_layout.addWidget(self.connection_status)
+        self.buffer_warning = QLabel("")
+        self.buffer_warning.setWordWrap(True)
+        self.buffer_warning.hide()
+        connections_layout.addWidget(self.buffer_warning)
         url = f"{api.base_url}/multichat-overlay"
         self.url_edit = QLineEdit(url)
         self.url_edit.setReadOnly(True)
@@ -89,6 +94,7 @@ class MultichatTab(QWidget):
         # Platform-specific appearance controls remain hidden until adapters
         # can confirm that their channels are actually connected.
         self.state.configure(limit=self.limit.value(), show_time=self.show_time.isChecked())
+        self._applied_delay = 0.0
         self._on_delay()
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(250)
@@ -103,8 +109,12 @@ class MultichatTab(QWidget):
                 raise ValueError("nonfinite")
             self.state.configure(delay=seconds)
         except (ValueError, TypeError):
-            self.delay.setToolTip("Введите неотрицательное число секунд")
+            # The previous saved value remains active; do not persist a bad
+            # draft or silently leave it looking like the current setting.
+            self.delay.setText(str(self._applied_delay))
+            self.delay.setToolTip("Исправлено: требуется неотрицательное число секунд")
             return
+        self._applied_delay = seconds
         self.delay.setToolTip("")
         self.db.set_setting("multichat_delay", str(seconds))
 
@@ -120,6 +130,13 @@ class MultichatTab(QWidget):
 
     def refresh(self):
         snapshot = self.state.snapshot()
+        overflow = snapshot["overflow_count"]
+        warning = ("Буфер задержки переполнен: для сохранения сообщений "
+                   "часть сообщений показана раньше установленного времени "
+                   f"({overflow})." if overflow else "")
+        if self.buffer_warning.text() != warning:
+            self.buffer_warning.setText(warning)
+            self.buffer_warning.setVisible(bool(warning))
         messages = snapshot["messages"]
         key = (snapshot["show_time"], tuple(
             (m["platform"], m["source_id"], m["external_id"], m["author"], m["text"])
