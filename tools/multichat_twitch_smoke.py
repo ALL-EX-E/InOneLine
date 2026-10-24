@@ -119,6 +119,28 @@ class TwitchChatSmoke(unittest.TestCase):
         self.assertEqual(len(service.calls), 1 + len(TWITCH_CHAT_EVENT_TYPES))
         self.assertEqual(state.snapshot()["messages"], [])
 
+    def test_failed_chat_subscription_does_not_stop_rewards(self):
+        service = FakeService(scopes=(TWITCH_MANAGE_SCOPE, TWITCH_CHAT_READ_SCOPE),
+                              rewards=("reward1",))
+        original_call = service.call
+        def fail_chat(*args):
+            if args[1] == "create_chat_eventsub_subscription":
+                raise RuntimeError("Provider denied chat")
+            return original_call(*args)
+        service.integration_manager.call_adapter = fail_chat
+        state = MultichatState()
+        sock = FakeSocket([welcome(), notification(
+            "channel.channel_points_custom_reward_redemption.add",
+            {"id": "redemption-2", "reward": {"id": "reward1"}},
+        ), reconnect()])
+        runtime = TwitchEventSubRuntime(service, chat_state=state, socket_factory=lambda _: sock)
+        runtime._chat_source_id = "channel1"
+        runtime._run_connection("wss://example/ws", subscriptions_required=True)
+        self.assertEqual(len(service.redemptions), 1)
+        self.assertFalse(runtime.chat_connected)
+        self.assertTrue(runtime.chat_error)
+        self.assertEqual(state.snapshot()["messages"], [])
+
     def test_deletions_and_clear_user_affect_both_feeds(self):
         service = FakeService()
         state = MultichatState()
