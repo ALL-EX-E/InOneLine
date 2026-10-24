@@ -11,7 +11,7 @@ import unittest
 import urllib.request
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QBoxLayout
+from PySide6.QtWidgets import QApplication, QAbstractSpinBox, QBoxLayout, QPushButton
 
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.app_paths import AppPaths
@@ -48,6 +48,20 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 self.app.processEvents()
                 self.assertEqual(tab.columns.direction(), QBoxLayout.TopToBottom)
                 self.assertTrue(tab.feed.isVisible())
+
+                # The already shared P06 control replaces broken native
+                # Windows spin arrows without changing limit validation.
+                self.assertEqual(tab.limit.buttonSymbols(), QAbstractSpinBox.NoButtons)
+                limit_wrapper = tab.limit.parentWidget()
+                buttons = {button.text(): button for button in limit_wrapper.findChildren(QPushButton)}
+                self.assertEqual(set(buttons), {"▲", "▼"})
+                self.assertEqual(tab.limit.value(), 100)
+                buttons["▲"].click()
+                self.assertEqual(tab.limit.value(), 101)
+                self.assertEqual(db.get_setting("multichat_limit", ""), "101")
+                buttons["▼"].click()
+                self.assertEqual(tab.limit.value(), 100)
+                self.assertEqual(db.get_setting("multichat_limit", ""), "100")
 
                 tab.resize(1200, 700)
                 self.app.processEvents()
