@@ -73,6 +73,70 @@ class Urls(unittest.TestCase):
         self.assertNotIn('click()', _BROWSER_OBSERVER)
         self.assertNotIn('localStorage', _BROWSER_OBSERVER)
 
+    def test_offline_webengine_dom_observer_reads_new_only(self):
+        """Native Qt WebEngine: a local synthetic chat, no platform network."""
+        from PySide6.QtCore import QEventLoop, QTimer, QUrl
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineScript
+
+        app = QApplication.instance() or QApplication([])
+        page = QWebEnginePage()
+        page.setVisible(True)
+        page.setAudioMuted(True)
+        script = QWebEngineScript()
+        script.setName("D41-03-test-observer")
+        script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
+        script.setWorldId(QWebEngineScript.ScriptWorldId.ApplicationWorld)
+        script.setSourceCode(_BROWSER_OBSERVER)
+        page.scripts().insert(script)
+
+        def await_ms(ms):
+            loop = QEventLoop()
+            QTimer.singleShot(ms, loop.quit)
+            loop.exec()
+
+        loaded = []
+        page.loadFinished.connect(lambda ok: loaded.append(bool(ok)))
+        page.setHtml(
+            '<!doctype html><html><body><div class="chat-line__message">'
+            '<span class="chat-author__display-name">Old</span>'
+            '<span data-a-target="chat-message-text">history</span></div></body></html>',
+            QUrl("https://www.twitch.tv"),
+        )
+        for _ in range(40):
+            if loaded:
+                break
+            await_ms(250)
+        self.assertEqual(loaded, [True], "local Qt WebEngine synthetic page could not load")
+        # The initial page and late first-rendered history are baseline only.
+        await_ms(3400)
+        page.runJavaScript(
+            'document.body.insertAdjacentHTML("beforeend", '
+            '\'<div class="chat-line__message">'
+            '<span class="chat-author__display-name">New</span>'
+            '<span data-a-target="chat-message-text">live text</span></div>\');',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(450)
+        received = []
+        page.runJavaScript(
+            "window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: received.append(value),
+        )
+        for _ in range(20):
+            if received:
+                break
+            await_ms(100)
+        self.assertTrue(received and received[0]["ready"])
+        self.assertEqual(
+            [(e["author"], e["text"]) for e in received[0]["events"]],
+            [("New", "live text")],
+        )
+        page.setUrl(QUrl("about:blank"))
+        page.deleteLater()
+        app.processEvents()
+
     def test_multiple_copies_dedupe_at_shared_state(self):
         from streaming_manager.multichat import ChatMessage
         state=MultichatState()
