@@ -164,7 +164,8 @@ class _BrowserChatPage(QObject):
         script = QWebEngineScript()
         script.setName("InOneLine-readonly-chat-observer")
         script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
-        script.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        # Keep capture helpers isolated from page scripts and extensions.
+        script.setWorldId(QWebEngineScript.ScriptWorldId.ApplicationWorld)
         script.setRunsOnSubFrames(False)
         script.setSourceCode(_BROWSER_OBSERVER)
         self.page.scripts().insert(script)
@@ -177,6 +178,7 @@ class _BrowserChatPage(QObject):
         self._generation += 1
         self._busy = False
         self._backoff = 5.0
+        self._next_retry = 0.0
         if old is not None and source is not None and old.source_id != source.source_id:
             self.owner.state.change_source(self.platform)
         elif source is None:
@@ -239,6 +241,7 @@ class _BrowserChatPage(QObject):
         self._busy = True
         self.page.runJavaScript(
             "window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
             lambda value, key=source_id, g=generation: self._received(value, key, g),
         )
 
