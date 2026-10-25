@@ -123,10 +123,17 @@ _BROWSER_OBSERVER = r"""
   }
   const deletedText = /^(?:[<\[]\s*)?(?:сообщение удалено(?: отправителем| модератором)?|сообщение было удалено(?: отправителем| модератором)?|message deleted(?: by (?:sender|author|moderator))?|message removed|this message was deleted|deleted by moderator|message retracted|сообщение отозвано)(?:\s*[>\]])?$/i;
   function deletionMarker(el, info) {
-    // YouTube can mark the renderer or a nested deleted-state element.
-    if (el.hasAttribute('is-deleted') ||
-        el.matches('.chat-line__message--deleted,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"]') ||
-        el.querySelector('[is-deleted],#deleted-state,yt-live-chat-deleted-message-renderer,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"],.chat-line__message--deleted')) return true;
+    // Verified against real YouTube Studio DOM (D41 QA 25 Oct 2026):
+    // ordinary yt-live-chat-text-message-renderer rows have a nested
+    // #deleted-state placeholder *before* deletion. Never treat its mere
+    // presence as moderation. Actual deletion sets is-deleted on the
+    // message renderer itself; the observer already watches this attribute.
+    if (yt) {
+      if (el.hasAttribute('is-deleted')) return true;
+    } else if (
+      el.matches('.chat-line__message--deleted,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"]') ||
+      el.querySelector('[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"],.chat-line__message--deleted')
+    ) return true;
     const value = messageOf(el);
     const text = (value || el.innerText || el.textContent || '').trim();
     if (info && text === info.text) return false;
