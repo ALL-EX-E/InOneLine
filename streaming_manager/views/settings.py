@@ -79,6 +79,7 @@ from ..conversion import ConversionUnit
 from ..diagnostic_logs import sanitize_diagnostic_text
 from ..integrations import IntegrationManager
 from ..twitch import TWITCH_MANAGE_SCOPE, TwitchAdapter, TwitchDeviceCode
+from ..youtube import YouTubeAdapter, YouTubeOAuthRequest
 from ..donationalerts import (
     DONATIONALERTS_REDIRECT_URI,
     DonationAlertsAdapter,
@@ -116,6 +117,8 @@ _INTEGRATION_CAPABILITY_LABELS = {
     "EventSub WebSocket": "События Twitch в реальном времени",
     "OAuth Implicit (Public desktop)": "Безопасный вход через DonationAlerts",
     "Donation history": "История пожертвований",
+    "YouTube read-only live chat": "Чтение чата YouTube",
+    "OAuth PKCE (Public desktop)": "Вход Google через браузер (PKCE)",
     "Centrifugo WebSocket": "События DonationAlerts в реальном времени",
     "RUB/USD/EUR and other DonationAlerts currencies": "Пожертвования в разных валютах",
 }
@@ -133,6 +136,7 @@ class SettingsTab(QWidget):
     wheelCenterChanged = Signal(int)
     twitch_device_code_ready = Signal(object)
     donationalerts_oauth_ready = Signal(object)
+    youtube_oauth_ready = Signal(object)
 
     def __init__(
         self,
@@ -149,6 +153,7 @@ class SettingsTab(QWidget):
         twitch_runtime_wake: Callable[[], None] | None = None,
         donationalerts_service: DonationAlertsDonationService | None = None,
         donationalerts_runtime_wake: Callable[[], None] | None = None,
+        youtube_runtime_wake: Callable[[], None] | None = None,
     ):
         super().__init__()
         self.db = db
@@ -168,6 +173,7 @@ class SettingsTab(QWidget):
         self.twitch_runtime_wake = twitch_runtime_wake or (lambda: None)
         self.donationalerts_service = donationalerts_service
         self.donationalerts_runtime_wake = donationalerts_runtime_wake or (lambda: None)
+        self.youtube_runtime_wake = youtube_runtime_wake or (lambda: None)
         self.thread_pool = QThreadPool.globalInstance()
         self._rng_worker = None
         self._rng_checked_key: str | None = None
@@ -195,12 +201,16 @@ class SettingsTab(QWidget):
         self._twitch_reward_sync_running = False
         self.twitch_device_code_ready.connect(self._show_twitch_device_code)
         self.donationalerts_oauth_ready.connect(self._show_donationalerts_oauth)
+        self.youtube_oauth_ready.connect(self._show_youtube_oauth)
         twitch_adapter = self.integration_manager.registry.get("twitch")
         if isinstance(twitch_adapter, TwitchAdapter):
             twitch_adapter.set_device_code_callback(self.twitch_device_code_ready.emit)
         donationalerts_adapter = self.integration_manager.registry.get("donationalerts")
         if isinstance(donationalerts_adapter, DonationAlertsAdapter):
             donationalerts_adapter.set_oauth_ready_callback(self.donationalerts_oauth_ready.emit)
+        youtube_adapter = self.integration_manager.registry.get('youtube')
+        if isinstance(youtube_adapter, YouTubeAdapter):
+            youtube_adapter.set_oauth_ready_callback(self.youtube_oauth_ready.emit)
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(12, 12, 12, 12)
         outer_layout.setSpacing(9)
@@ -1512,6 +1522,8 @@ class SettingsTab(QWidget):
 
             if view.service_key == "donationalerts":
                 self._build_donationalerts_connection_controls(card_layout, view)
+            if view.service_key == "youtube":
+                self._build_youtube_connection_controls(card_layout, view)
 
             for detail_text in view.details:
                 label_text = str(detail_text)
@@ -1571,6 +1583,73 @@ class SettingsTab(QWidget):
             actions.addStretch()
             card_layout.addLayout(actions)
             self.integration_cards_layout.addWidget(card)
+
+    def _build_youtube_connection_controls(self, card_layout: QVBoxLayout, view) -> None:
+        note = QLabel(
+            "Для чтения чата необходим OAuth Client ID типа «Desktop» из вашего "
+            "проекта Google Cloud с включённым YouTube Data API v3. "
+            "Это публичный идентификатор, не Client Secret. "
+            "Авторизация откроется в браузере, токены защищены средствами Windows."
+        )
+        note.setWordWrap(True)
+        note.setProperty("muted", True)
+        card_layout.addWidget(note)
+        row = self.db.get_integration_connection("youtube") or {}
+        cfg = row.get("provider_config") or {}
+        editor_row = QHBoxLayout()
+        editor_row.addWidget(QLabel("Google OAuth Client ID:"))
+        editor = QLineEdit(str(cfg.get("youtube_client_id") or ""))
+        editor.setPlaceholderText("…apps.googleusercontent.com")
+        editor.setMaxLength(250)
+        editor_row.addWidget(editor, 1)
+        save = QPushButton("Сохранить Client ID")
+        save.clicked.connect(self._save_youtube_client_id)
+        editor_row.addWidget(save)
+        self._integration_buttons.append(save)
+        self._integration_config_editors["youtube_client_id"] = editor
+        card_layout.addLayout(editor_row)
+
+    def _save_youtube_client_id(self) -> None:
+        if self._integration_worker is not None:
+            return
+        editor = self._integration_config_editors.get("youtube_client_id")
+        if editor is None:
+            return
+        client_id = editor.text().strip()
+        try:
+            YouTubeAdapter.normalize_client_id(client_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "YouTube", str(exc))
+            return
+        self._set_integration_actions_enabled(False)
+        worker = FunctionWorker(
+            lambda: self.integration_manager.call_adapter(
+                "youtube", "set_public_client_id", client_id,
+            )
+        )
+        self._integration_worker = worker
+        worker.signals.result.connect(lambda _result: self._youtube_client_id_saved())
+        worker.signals.error.connect(self._integration_action_failed)
+        worker.signals.finished.connect(self._integration_action_finished)
+        self.thread_pool.start(worker)
+
+    def _youtube_client_id_saved(self):
+        self.youtube_runtime_wake()
+        self._refresh_integrations()
+        self.integration_status_changed()
+        QMessageBox.information(
+            self, "YouTube", "Client ID сохранён. Теперь подключите Google-аккаунт."
+        )
+
+    def _show_youtube_oauth(self, request: YouTubeOAuthRequest) -> None:
+        # A queued Qt signal from a worker; tokens and PKCE verifier stay out
+        # of Qt widgets and all OBS/HTTP surfaces.
+        if not QDesktopServices.openUrl(QUrl(request.authorization_url)):
+            QMessageBox.warning(
+                self, "YouTube",
+                "Не удалось открыть браузер для входа Google. "
+                "Повторите подключение через «Интеграции»."
+            )
 
     def _build_donationalerts_connection_controls(self, card_layout: QVBoxLayout, view) -> None:
         adapter = self.integration_manager.registry.get("donationalerts")
@@ -1669,6 +1748,7 @@ class SettingsTab(QWidget):
 
     def _donationalerts_client_id_saved(self) -> None:
         self.donationalerts_runtime_wake()
+        self.youtube_runtime_wake()
         self._refresh_integrations()
         self._refresh_conversion_rate_rows()
         self.integration_status_changed()
@@ -2358,6 +2438,7 @@ class SettingsTab(QWidget):
         self._close_donationalerts_auth_dialog(success=True)
         self.twitch_runtime_wake()
         self.donationalerts_runtime_wake()
+        self.youtube_runtime_wake()
         self._refresh_integrations(preserve_twitch_draft=not discard_twitch_draft)
         self._refresh_conversion_rate_rows()
         self.integration_status_changed()
@@ -2391,6 +2472,7 @@ class SettingsTab(QWidget):
         self._close_donationalerts_auth_dialog(success=True)
         self.twitch_runtime_wake()
         self.donationalerts_runtime_wake()
+        self.youtube_runtime_wake()
         self._refresh_integrations()
         self._refresh_conversion_rate_rows()
         self.integration_status_changed()
