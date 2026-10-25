@@ -3,6 +3,7 @@ from __future__ import annotations
 """D41 operator view; independent Twitch/YouTube status and shared OBS feed."""
 
 from datetime import datetime
+import json
 from math import isfinite
 
 from PySide6.QtCore import Qt, QTimer, QUrl
@@ -11,7 +12,7 @@ from ..browser_chat import normalize_browser_chat_source
 from .common import make_wide_step_control
 
 from PySide6.QtWidgets import (
-    QApplication, QBoxLayout, QCheckBox, QFormLayout, QFrame, QGroupBox,
+    QApplication, QBoxLayout, QCheckBox, QFileDialog, QFormLayout, QFrame, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMessageBox, QComboBox, QPushButton, QScrollArea, QSpinBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
@@ -36,13 +37,15 @@ class _ChatFeed(QTextEdit):
 class MultichatTab(QWidget):
     def __init__(self, db, state, api, *, twitch_status_provider=None,
                  youtube_status_provider=None, twitch_browser_status_provider=None,
-                 browser_runtime_wake=None, twitch_runtime_wake=None):
+                 browser_runtime_wake=None, twitch_runtime_wake=None,
+                 browser_diagnostic_provider=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
         self.youtube_status_provider = youtube_status_provider
         self.twitch_browser_status_provider = twitch_browser_status_provider
         self.browser_runtime_wake = browser_runtime_wake or (lambda: None)
+        self.browser_diagnostic_provider = browser_diagnostic_provider
         self.twitch_runtime_wake = twitch_runtime_wake or (lambda: None)
         self._last_render = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
@@ -145,6 +148,11 @@ class MultichatTab(QWidget):
         actions.addWidget(copy)
         actions.addWidget(preview)
         connections_layout.addLayout(actions)
+        if self.browser_diagnostic_provider is not None:
+            self.diag_save = QPushButton("Сохранить диагностику браузерных чатов")
+            self.diag_save.setToolTip("Техническое состояние встроенных страниц, без сообщений и токенов")
+            self.diag_save.clicked.connect(self._save_browser_diagnostics)
+            connections_layout.addWidget(self.diag_save)
         settings.addWidget(connections)
         settings.addStretch()
         # Platform-specific appearance controls remain hidden until adapters
@@ -157,6 +165,27 @@ class MultichatTab(QWidget):
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
         self.refresh()
+
+    def _save_browser_diagnostics(self):
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить диагностику мультичата", "InOneLine_D41_browser_diagnostic.json",
+            "JSON (*.json)",
+        )
+        if not filename:
+            return
+        self.diag_save.setEnabled(False)
+
+        def finished(report):
+            self.diag_save.setEnabled(True)
+            try:
+                with open(filename, "w", encoding="utf-8") as handle:
+                    json.dump(report, handle, ensure_ascii=False, indent=2)
+            except OSError as exc:
+                QMessageBox.warning(self, "Диагностика", f"Не удалось записать файл: {exc}")
+                return
+            QMessageBox.information(self, "Диагностика", "Отчёт сохранён. Проверьте его перед отправкой.")
+
+        self.browser_diagnostic_provider(finished)
 
     def _update_twitch_browser_controls(self):
         active = self.twitch_reader.currentData() == "browser"
