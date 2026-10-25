@@ -245,11 +245,13 @@ _BROWSER_OBSERVER = r"""
       const old = candidates[0];
       recentTwitchRemovals.splice(recentTwitchRemovals.indexOf(old), 1);
       if (messageOf(el) === old.info.text &&
-          authorOf(el) === old.info.author) {
-        // React remounted the SAME message; link it to the same delivered ID.
+          (!authorOf(el) || authorOf(el) === old.info.author)) {
+        // React may rehydrate the same content before the author element.
+        // Identical message text in the exact same DOM slot retains its
+        // original delivered ID; a later tombstone refers to that same ID.
         delivered.set(el, old.info);
         observed.add(el);
-      } else if (!messageOf(el)) {
+      } else if (!messageOf(el) || !authorOf(el)) {
         // Placeholder still being hydrated. Wait for definitive tombstone;
         // if it stays unmodified for 10s, allow normal ingestion again.
         replacementCandidates.set(el, {info: old.info, when: now});
