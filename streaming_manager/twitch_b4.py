@@ -610,11 +610,14 @@ class TwitchEventSubRuntime:
         user_id = str(config.get("twitch_user_id") or "")
         scopes = config.get("granted_scopes") or []
         return user_id, bool(
-            user_id and isinstance(scopes, (list, tuple))
+            self.service.db.get_setting("multichat_twitch_reader", "eventsub") == "eventsub"
+            and user_id and isinstance(scopes, (list, tuple))
             and TWITCH_CHAT_READ_SCOPE in scopes
         )
 
     def chat_status(self) -> str:
+        if self.service.db.get_setting("multichat_twitch_reader", "eventsub") == "browser":
+            return "Twitch: для чтения чата выбран локальный браузер."
         if not self.service.connection_ready():
             return "Twitch: отключён. Подключение находится в разделе «Интеграции»."
         source_id, ready = self._chat_profile()
@@ -644,6 +647,8 @@ class TwitchEventSubRuntime:
             return None
 
     def _process_chat_notification(self, event_type: str, event: dict, metadata: dict) -> None:
+        if self.service.db.get_setting("multichat_twitch_reader", "eventsub") != "eventsub":
+            return
         state = self.chat_state
         if state is None:
             return
