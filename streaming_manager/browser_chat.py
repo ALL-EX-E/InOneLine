@@ -126,8 +126,10 @@ _BROWSER_OBSERVER = r"""
     // A deleted Twitch message may keep its row and replace only its text.
     // Match entire platform-provided tombstone, never a mere substring.
     const value = messageOf(el);
-    return !!(info && value !== info.text &&
-      /^(?:<\s*)?(?:сообщение удалено|message deleted|message removed|this message was deleted|deleted by moderator)(?:\s*>)?$/i.test(value));
+    const tombstone = /^(?:<\s*)?(?:сообщение удалено|message deleted|message removed|this message was deleted|deleted by moderator)(?:\s*>)?$/i.test(value);
+    // Placeholder-only rows should not appear as new ordinary messages.
+    return info ? (value !== info.text && tombstone)
+      : (tombstone && /^</.test(value));
   }
   function removeKnown(el) {
     const info = delivered.get(el);
