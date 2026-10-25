@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""D41 operator view; Twitch status and shared OBS feed."""
+"""D41 operator view; independent Twitch/YouTube status and shared OBS feed."""
 
 from datetime import datetime
 from math import isfinite
@@ -33,10 +33,16 @@ class _ChatFeed(QTextEdit):
 
 
 class MultichatTab(QWidget):
-    def __init__(self, db, state, api, *, twitch_status_provider=None):
+    def __init__(self, db, state, api, *, twitch_status_provider=None,
+                 youtube_status_provider=None, youtube_channel_provider=None,
+                 youtube_choice_provider=None, youtube_reopen=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
+        self.youtube_status_provider = youtube_status_provider
+        self.youtube_channel_provider = youtube_channel_provider
+        self.youtube_choice_provider = youtube_choice_provider
+        self.youtube_reopen = youtube_reopen
         self._last_render = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         self.columns.setContentsMargins(8, 8, 8, 8)
@@ -85,6 +91,16 @@ class MultichatTab(QWidget):
         self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
         self.twitch_obs.toggled.connect(self._on_twitch_obs)
         connections_layout.addWidget(self.twitch_obs)
+        self.youtube_obs = QCheckBox("Отображать чат YouTube в OBS")
+        self.youtube_obs.setChecked(db.get_setting("multichat_youtube_obs", "1") == "1")
+        self.state.set_obs_enabled("youtube", self.youtube_obs.isChecked())
+        self.youtube_obs.toggled.connect(self._on_youtube_obs)
+        connections_layout.addWidget(self.youtube_obs)
+        self.youtube_select = QPushButton("Выбрать трансляцию YouTube")
+        if youtube_reopen:
+            self.youtube_select.clicked.connect(youtube_reopen)
+        self.youtube_select.hide()
+        connections_layout.addWidget(self.youtube_select)
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -113,6 +129,10 @@ class MultichatTab(QWidget):
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
         self.refresh()
+
+    def _on_youtube_obs(self, enabled):
+        self.state.set_obs_enabled("youtube", enabled)
+        self.db.set_setting("multichat_youtube_obs", "1" if enabled else "0")
 
     def _on_twitch_obs(self, enabled):
         self.state.set_obs_enabled("twitch", enabled)
@@ -150,9 +170,21 @@ class MultichatTab(QWidget):
                 status = str(self.twitch_status_provider())
             except Exception:
                 status = "Twitch: не удалось получить состояние подключения."
-            info = status + " YouTube: подключение появится в D41-03."
+            if self.youtube_status_provider is not None:
+                try:
+                    yt_status = str(self.youtube_status_provider())
+                    yt_channel = str(self.youtube_channel_provider() or "") if self.youtube_channel_provider else ""
+                    if yt_channel:
+                        yt_status += f" Авторизованный канал: {yt_channel}."
+                except Exception:
+                    yt_status = "YouTube: состояние временно недоступно."
+            else:
+                yt_status = "YouTube: не подключён."
+            info = status + "\n" + yt_status
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
+            choose = bool(self.youtube_choice_provider()) if self.youtube_choice_provider else False
+            self.youtube_select.setVisible(choose)
         snapshot = self.state.snapshot()
         overflow = snapshot["overflow_count"]
         warning = ("Буфер задержки переполнен: для сохранения сообщений "
