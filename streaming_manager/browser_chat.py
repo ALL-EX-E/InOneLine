@@ -50,9 +50,10 @@ def normalize_browser_chat_source(platform: str, url: str) -> BrowserChatSource:
         if not _YOUTUBE_VIDEO.fullmatch(video):
             raise ValueError("YouTube: в адресе чата отсутствует корректный ID трансляции.")
         safe_query = urlencode({"is_popout": "1", "v": video})
-        # The public popout usually works without Google login. Studio may
-        # require the user's normal browser session in Qt WebEngine.
-        return BrowserChatSource(platform, urlunsplit(("https", hostname, "/live_chat", safe_query, "")), video, video)
+        # A Studio popout belongs to the operator's signed-in browser. Read
+        # the equivalent public chat of exactly the same video instead: this
+        # does not require copying Chrome cookies or adding Google OAuth.
+        return BrowserChatSource(platform, urlunsplit(("https", "www.youtube.com", "/live_chat", safe_query, "")), video, video)
     if platform == "twitch":
         if hostname in ("www.twitch.tv", "twitch.tv"):
             match = re.fullmatch(r"/popout/([a-zA-Z0-9_]{2,25})/chat/?", p.path, re.I)
