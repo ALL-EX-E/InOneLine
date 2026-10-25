@@ -15,7 +15,7 @@ import time
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from PySide6.QtCore import QObject, QTimer, QUrl
-from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineScript
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineScript, QWebEngineProfile
 
 from .multichat import ChatMessage, MultichatState
 
@@ -221,12 +221,10 @@ class _BrowserChatPage(QObject):
         super().__init__(owner)
         self.owner = owner
         self.platform = platform
-        self.page = QWebEnginePage(self)
-        # There is intentionally no visible window. Tell Chromium that its
-        # document itself is in a visible/active state, so the live chat isn't
-        # voluntarily throttled like a background tab (Qt Page Visibility API).
-        self.page.setVisible(True)
-        self.page.setAudioMuted(True)
+        # Each platform owns a distinct off-the-record Chromium profile.  Do
+        # not share transient page state/cookies between concurrent providers.
+        self.profile = QWebEngineProfile(self)
+        self.page: QWebEnginePage | None = None
         self.source: BrowserChatSource | None = None
         self.status = "Не настроена ссылка."
         self._generation = 0
@@ -234,16 +232,32 @@ class _BrowserChatPage(QObject):
         self._next_retry = 0.0
         self._backoff = 5.0
         self._busy = False
-        self.page.loadFinished.connect(self._loaded)
-        self.page.renderProcessTerminated.connect(self._crashed)
+        self._create_page()
+
+    def _create_page(self):
+        # A navigation can leave pending asynchronous callbacks or an obsolete
+        # isolated JavaScript world. Replacing the QWebEnginePage per selected
+        # source avoids carrying it to the next broadcast, while the profile
+        # remains independent and alive for this platform.
+        previous = self.page
+        if previous is not None:
+            previous.loadFinished.disconnect(self._loaded)
+            previous.renderProcessTerminated.disconnect(self._crashed)
+            previous.setUrl(QUrl("about:blank"))
+            previous.deleteLater()
+        page = QWebEnginePage(self.profile, self)
+        page.setVisible(True)
+        page.setAudioMuted(True)
+        page.loadFinished.connect(self._loaded)
+        page.renderProcessTerminated.connect(self._crashed)
         script = QWebEngineScript()
         script.setName("InOneLine-readonly-chat-observer")
         script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentReady)
-        # Keep capture helpers isolated from page scripts and extensions.
         script.setWorldId(QWebEngineScript.ScriptWorldId.ApplicationWorld)
         script.setRunsOnSubFrames(False)
         script.setSourceCode(_BROWSER_OBSERVER)
-        self.page.scripts().insert(script)
+        page.scripts().insert(script)
+        self.page = page
 
     def set_source(self, source: BrowserChatSource | None) -> None:
         if self.source == source:
@@ -262,6 +276,7 @@ class _BrowserChatPage(QObject):
             self.page.setUrl(QUrl("about:blank"))
             self.status = "Отключён."
         else:
+            self._create_page()
             self._load()
 
     def _load(self):
@@ -370,8 +385,13 @@ class _BrowserChatPage(QObject):
         self.source = None
         self.page.loadFinished.disconnect(self._loaded)
         self.page.renderProcessTerminated.disconnect(self._crashed)
-        self.page.setUrl(QUrl("about:blank"))
-        self.page.deleteLater()
+        if self.page is not None:
+            self.page.loadFinished.disconnect(self._loaded)
+            self.page.renderProcessTerminated.disconnect(self._crashed)
+            self.page.setUrl(QUrl("about:blank"))
+            self.page.deleteLater()
+            self.page = None
+        self.profile.deleteLater()
 
 
 class BrowserChatRuntime(QObject):
