@@ -110,6 +110,25 @@ class TwitchChatSmoke(unittest.TestCase):
         self.assertEqual({x[3] for x in service.calls}, set(TWITCH_CHAT_EVENT_TYPES))
         self.assertEqual(service.redemptions, [])
 
+    def test_browser_chat_mode_preserves_reward_subscription_without_eventsub_chat(self):
+        service = FakeService(scopes=(TWITCH_MANAGE_SCOPE, TWITCH_CHAT_READ_SCOPE),
+                              rewards=("reward1",))
+        service.chat_reader = "browser"
+        state = MultichatState()
+        sock = FakeSocket([welcome(),
+            notification("channel.chat.message", message("should-not-ingest")),
+            notification("channel.channel_points_custom_reward_redemption.add",
+                         {"id": "redemption-browser", "reward": {"id": "reward1"}}),
+            reconnect()])
+        runtime = TwitchEventSubRuntime(service, chat_state=state, socket_factory=lambda _: sock)
+        runtime._chat_source_id = "channel1"
+        runtime._run_connection("wss://example/ws", subscriptions_required=True)
+        self.assertEqual(state.snapshot()["messages"], [])
+        self.assertEqual(len(service.redemptions), 1)
+        self.assertEqual(len(service.calls), 1)
+        self.assertEqual(service.calls[0][1], "create_eventsub_subscription")
+        self.assertFalse(runtime.chat_connected)
+
     def test_channel_point_event_stays_on_original_service(self):
         service = FakeService(scopes=(TWITCH_CHAT_READ_SCOPE, TWITCH_MANAGE_SCOPE), rewards=("reward1",))
         state = MultichatState()
