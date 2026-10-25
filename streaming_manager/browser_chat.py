@@ -9,6 +9,7 @@ All Qt WebEngine objects live on the Qt GUI thread. OBS reads existing D41 RAM.
 """
 
 from dataclasses import dataclass
+import json
 import re
 import time
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
@@ -248,7 +249,7 @@ class _BrowserChatPage(QObject):
         source_id, generation = self.source.source_id, self._generation
         self._busy = True
         self.page.runJavaScript(
-            "window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null",
+            "JSON.stringify(window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null)",
             QWebEngineScript.ScriptWorldId.ApplicationWorld,
             lambda value, key=source_id, g=generation: self._received(value, key, g),
         )
@@ -259,6 +260,11 @@ class _BrowserChatPage(QObject):
             return
         self._busy = False
         self._last_reply = time.monotonic()
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (ValueError, TypeError):
+                value = None
         if not isinstance(value, dict) or not value.get("alive"):
             # Wait for a legitimate page and script to load; not a reason to
             # claim that an idle chat has disconnected.
