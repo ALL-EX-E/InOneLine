@@ -243,6 +243,12 @@ class YouTubeChatRuntime:
         row = self.db.get_integration_connection(YOUTUBE_SERVICE_KEY) or {}
         if not row.get("enabled") or row.get("status") != "connected":
             self._on_disabled()
+            reason = str(row.get("last_error") or "").lower()
+            if row.get("enabled") and ("канал" in reason or "channel" in reason):
+                self._status_update(
+                    "YouTube: не удалось определить авторизованный канал. "
+                    "Проверьте YouTube-канал и переподключите Google в «Интеграциях»."
+                )
             return 20.0
         conf = row.get("provider_config") or {}
         channel_id = str(conf.get("youtube_channel_id") or "")
