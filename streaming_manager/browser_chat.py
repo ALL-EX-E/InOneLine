@@ -152,6 +152,10 @@ class _BrowserChatPage(QObject):
         self.owner = owner
         self.platform = platform
         self.page = QWebEnginePage(self)
+        # There is intentionally no visible window. Tell Chromium that its
+        # document itself is in a visible/active state, so the live chat isn't
+        # voluntarily throttled like a background tab (Qt Page Visibility API).
+        self.page.setVisible(True)
         self.page.setAudioMuted(True)
         self.source: BrowserChatSource | None = None
         self.status = "Не настроена ссылка."
