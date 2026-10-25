@@ -20,7 +20,7 @@ class Urls(unittest.TestCase):
         )
         self.assertEqual(source.source_id, '4cC65h_Tecc')
         self.assertEqual(source.channel, '4cC65h_Tecc')
-        self.assertTrue(source.url.startswith('https://studio.youtube.com/live_chat?'))
+        self.assertTrue(source.url.startswith('https://www.youtube.com/live_chat?'))
 
     def test_youtube_regular_popout(self):
         source = normalize_browser_chat_source(
