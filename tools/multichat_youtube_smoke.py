@@ -226,6 +226,7 @@ class Urls(unittest.TestCase):
             'document.body.insertAdjacentHTML("beforeend",'
             ' \'<yt-live-chat-text-message-renderer id="yt-new">'
             '<span id="author-name">Viewer</span><span id="message">live</span>'
+            '<span id="deleted-state" hidden>Message deleted</span>'
             '</yt-live-chat-text-message-renderer>\');',
             QWebEngineScript.ScriptWorldId.MainWorld,
         )
@@ -244,8 +245,30 @@ class Urls(unittest.TestCase):
             [(event["id"], event["text"]) for event in json.loads(added[0])["events"]],
             [("yt-new", "live")],
         )
+        # Real Chrome recording: YouTube creates a normal row containing the
+        # *hidden* #deleted-state placeholder; later it can adjust the ID,
+        # and only on moderation sets is-deleted on the actual renderer.
+        # Initial delivery must precede deletion, even with that placeholder.
         page.runJavaScript(
-            'document.getElementById("yt-new").setAttribute("is-deleted", "");',
+            'document.getElementById("yt-new").id = "yt-final";',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(200)
+        same = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: same.append(value),
+        )
+        for _ in range(20):
+            if same:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(same[0])["events"], [],
+                         "Stable renderer re-ID is not a new message")
+
+        page.runJavaScript(
+            'document.getElementById("yt-final").setAttribute("is-deleted", "");',
             QWebEngineScript.ScriptWorldId.MainWorld,
         )
         await_ms(300)
