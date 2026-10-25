@@ -337,19 +337,41 @@ class Urls(unittest.TestCase):
             [(x["kind"], x["id"]) for x in json.loads(late_added[0])["events"]],
             [("message", "dom-4")],
         )
+        # Two acknowledged MainWorld DOM mutations. A Chromium timer can be
+        # throttled in a hidden page; never assume a JS setTimeout has fired.
+        removed_sync = []
         page.runJavaScript(
             """(() => {
               const nodes = document.querySelectorAll('.chat-line__message');
               nodes[nodes.length - 1].remove();
-              setTimeout(() => {
-                document.body.insertAdjacentHTML('beforeend',
-                  '<div class="chat-line__message">' +
-                  '<span data-a-target="chat-message-text">pending body</span></div>');
-              }, 150);
+              return 'removed';
             })();""",
             QWebEngineScript.ScriptWorldId.MainWorld,
+            lambda value: removed_sync.append(value),
         )
-        await_ms(500)
+        for _ in range(20):
+            if removed_sync:
+                break
+            await_ms(100)
+        self.assertEqual(removed_sync, ["removed"])
+        await_ms(150)
+        inserted_sync = []
+        page.runJavaScript(
+            """(() => {
+              document.body.insertAdjacentHTML('beforeend',
+                '<div class="chat-line__message">' +
+                '<span data-a-target="chat-message-text">pending body</span></div>');
+              return 'inserted';
+            })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+            lambda value: inserted_sync.append(value),
+        )
+        for _ in range(20):
+            if inserted_sync:
+                break
+            await_ms(100)
+        self.assertEqual(inserted_sync, ["inserted"])
+        await_ms(250)
         hydrated = []
         page.runJavaScript(
             "JSON.stringify(window.__iolBrowserChat.drain())",
