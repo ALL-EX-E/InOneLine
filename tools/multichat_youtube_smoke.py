@@ -95,6 +95,31 @@ class Urls(unittest.TestCase):
             QTimer.singleShot(ms, loop.quit)
             loop.exec()
 
+        def wait_reader_ready(label):
+            """Allow Qt Chromium's isolated script world and 3s baseline to settle."""
+            import json
+            last = None
+            for _ in range(80):
+                replies = []
+                page.runJavaScript(
+                    "JSON.stringify(window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null)",
+                    QWebEngineScript.ScriptWorldId.ApplicationWorld,
+                    lambda value: replies.append(value),
+                )
+                for _ in range(20):
+                    if replies:
+                        break
+                    await_ms(50)
+                last = replies[0] if replies else None
+                try:
+                    data = json.loads(last) if isinstance(last, str) else None
+                except ValueError:
+                    data = None
+                if isinstance(data, dict) and data.get("ready"):
+                    return
+                await_ms(150)
+            self.fail(f"{label} Qt WebEngine observer was not ready: {last!r}")
+
         loaded = []
         page.loadFinished.connect(lambda ok: loaded.append(bool(ok)))
         page.setHtml(
@@ -109,7 +134,7 @@ class Urls(unittest.TestCase):
             await_ms(250)
         self.assertEqual(loaded, [True], "local Qt WebEngine synthetic page could not load")
         # The initial page and late first-rendered history are baseline only.
-        await_ms(3400)
+        wait_reader_ready("Twitch")
         page.runJavaScript(
             'document.body.insertAdjacentHTML("beforeend", '
             '\'<div class="chat-line__message">'
@@ -196,7 +221,7 @@ class Urls(unittest.TestCase):
                 break
             await_ms(250)
         self.assertEqual(loaded, [True])
-        await_ms(3400)
+        wait_reader_ready("YouTube")
         page.runJavaScript(
             'document.body.insertAdjacentHTML("beforeend",'
             ' \'<yt-live-chat-text-message-renderer id="yt-new">'
