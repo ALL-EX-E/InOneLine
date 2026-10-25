@@ -1467,6 +1467,11 @@ class SettingsTab(QWidget):
         """Show only actions valid for the persisted provider lifecycle."""
         if view.status == "not_configured":
             return (("Подключить", "connect"),)
+        if view.service_key == "youtube" and view.status == "requires_login":
+            return (
+                ("Подключить", "connect"),
+                ("Удалить подключение", "remove_connection"),
+            )
         if not view.enabled:
             if view.status == "connected":
                 return (
