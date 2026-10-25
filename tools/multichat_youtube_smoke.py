@@ -380,8 +380,21 @@ class Urls(unittest.TestCase):
             if late_deleted:
                 break
             await_ms(100)
-        self.assertEqual(json.loads(late_deleted[0])["events"],
-                         [{"kind": "delete", "id": "dom-4"}])
+        diag = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.diagnose())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: diag.append(value),
+        )
+        for _ in range(20):
+            if diag:
+                break
+            await_ms(100)
+        self.assertEqual(
+            json.loads(late_deleted[0])["events"],
+            [{"kind": "delete", "id": "dom-4"}],
+            f"Async Twitch remount diagnostic (structural only): {diag[0] if diag else 'callback missing'}",
+        )
 
         # A literal user-authored string that resembles a tombstone must not
         # be interpreted as moderation when it is an actual message fragment.
