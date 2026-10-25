@@ -235,13 +235,22 @@ _BROWSER_OBSERVER = r"""
       if (recentTwitchRemovals.length > 50) recentTwitchRemovals.shift();
     }
     change.addedNodes.forEach(node => nodesUnder(node).forEach(el => {
-      const candidates = recentTwitchRemovals.filter(old =>
-        old.parent === change.target &&
-        old.previous === change.previousSibling &&
-        old.next === change.nextSibling && now - old.when <= 10000 &&
-        (!nativeId(el) || nativeId(el) === old.info.id) &&
-        (!authorOf(el) || authorOf(el) === old.info.author) &&
-        (!messageOf(el) || messageOf(el) === old.info.text));
+      const candidates = recentTwitchRemovals.filter(old => {
+        const age = now - old.when;
+        const exactSlot = old.previous === change.previousSibling &&
+                          old.next === change.nextSibling;
+        // A separate React remove/insert mutation can have a different
+        // sibling boundary even when the row is a faithful remount.
+        // Only allow this fallback for one recent row with EXACT original
+        // text, the same parent, and an unambiguous candidate.
+        const delayedSameText = age <= 2000 &&
+          !!messageOf(el) && messageOf(el) === old.info.text;
+        return old.parent === change.target && age <= 10000 &&
+          (exactSlot || delayedSameText) &&
+          (!nativeId(el) || nativeId(el) === old.info.id) &&
+          (!authorOf(el) || authorOf(el) === old.info.author) &&
+          (!messageOf(el) || messageOf(el) === old.info.text);
+      });
       if (candidates.length !== 1) return;
       const old = candidates[0];
       recentTwitchRemovals.splice(recentTwitchRemovals.indexOf(old), 1);
