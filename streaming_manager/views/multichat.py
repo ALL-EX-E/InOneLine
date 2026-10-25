@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""D41 operator view; Twitch status and shared OBS feed."""
+"""D41 operator Twitch chat view; shared state retained for future platforms."""
 
 from datetime import datetime
 from math import isfinite
@@ -23,7 +23,7 @@ class _ChatFeed(QTextEdit):
         self.setTextInteractionFlags(Qt.NoTextInteraction)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setPlaceholderText("Ожидание сообщений")
+        self.setPlaceholderText("Ожидание сообщений Twitch")
 
     def wheelEvent(self, event):
         event.ignore()
@@ -77,7 +77,7 @@ class MultichatTab(QWidget):
         settings.addWidget(general)
         connections = QGroupBox("Подключения и OBS")
         connections_layout = QVBoxLayout(connections)
-        self.connection_status = QLabel("Twitch и YouTube: ожидание подключения чата")
+        self.connection_status = QLabel("Twitch: ожидание подключения чата через EventSub")
         self.connection_status.setWordWrap(True)
         connections_layout.addWidget(self.connection_status)
         self.twitch_obs = QCheckBox("Отображать чат Twitch в OBS")
@@ -150,7 +150,7 @@ class MultichatTab(QWidget):
                 status = str(self.twitch_status_provider())
             except Exception:
                 status = "Twitch: не удалось получить состояние подключения."
-            info = status + " YouTube: подключение появится в D41-03."
+            info = status
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
         snapshot = self.state.snapshot()
@@ -161,7 +161,8 @@ class MultichatTab(QWidget):
         if self.buffer_warning.text() != warning:
             self.buffer_warning.setText(warning)
             self.buffer_warning.setVisible(bool(warning))
-        messages = snapshot["messages"]
+        # Keep multi-provider RAM/API contracts intact, but the current UI is Twitch-only.
+        messages = [m for m in snapshot["messages"] if m["platform"] == "twitch"]
         key = (snapshot["show_time"], tuple(
             (m["platform"], m["source_id"], m["external_id"], m["author"], m["text"])
             for m in messages
@@ -173,7 +174,7 @@ class MultichatTab(QWidget):
         for m in messages:
             value = m["sent_at"] if m["sent_at"] is not None else m["received_at"]
             stamp = datetime.fromtimestamp(value).strftime("%H:%M") if snapshot["show_time"] and value is not None else ""
-            lines.append(f"{m['platform']}  {m['author']} {stamp}  {m['text']}")
+            lines.append(f"{m['author']} {stamp}  {m['text']}".strip())
         self.feed.setPlainText("\n".join(lines))
         self.feed.moveCursor(QTextCursor.End)
 
