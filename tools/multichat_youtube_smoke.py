@@ -81,6 +81,32 @@ class YouTubeChatSmoke(unittest.TestCase):
                 broadcast("mine")]
         self.assertEqual([x["id"] for x in _broadcast_choices(rows, "channel1")], ["mine"])
 
+    def test_shared_chat_id_is_not_a_second_stream(self):
+        one = broadcast("horizontal", chat="same-chat")
+        two = broadcast("vertical", chat="same-chat")
+        self.assertEqual(
+            [x["id"] for x in _broadcast_choices([one, two], "channel1")],
+            ["horizontal"],
+        )
+
+    def test_late_response_from_old_stream_is_discarded(self):
+        api = Api(pages=[
+            {"items": [], "nextPageToken": "baseline", "pollingIntervalMillis": 1000},
+        ])
+        r, s = self.runtime(api)
+        r._cycle()
+        self.assertEqual(r._selected, "stream1")
+        r._next_discovery = time.monotonic() + 300
+        r._next_message_poll = 0
+        def late_response(access, chat_id, token):
+            r._activate({"id": "stream2", "title": "new", "live_chat_id": "new-chat"})
+            return {"items": [event("late", "must not appear")],
+                    "nextPageToken": "new", "pollingIntervalMillis": 1000}
+        api.chat_page = late_response
+        r._cycle()
+        self.assertEqual(s.snapshot()["messages"], [])
+        self.assertEqual(r._selected, "stream2")
+
     def test_first_page_skips_history_followup_delivers_new(self):
         a = Api(pages=[
             {"items": [event("old", "old")], "nextPageToken": "token1", "pollingIntervalMillis": 1000},
