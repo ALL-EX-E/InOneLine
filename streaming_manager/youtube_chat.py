@@ -102,6 +102,7 @@ class YouTubeChatRuntime:
         self._choices: list[dict] = []
         self._cancelled = False
         self._offer_open = False
+        self._explicit_selection = False
         self._previous_ended = False
         self._requires_switch_choice = False
         self._next_discovery = 0.0
@@ -144,11 +145,13 @@ class YouTubeChatRuntime:
             if not broadcast_id:
                 self._cancelled = True
                 self._offer_open = False
+                self._explicit_selection = False
                 self._status = "YouTube: выбор трансляции отменён. Откройте список вручную."
             elif any(x["id"] == broadcast_id for x in self._choices):
                 self._activate(next(x for x in self._choices if x["id"] == broadcast_id))
                 self._cancelled = False
                 self._offer_open = False
+                self._explicit_selection = False
                 self._choices = []
             else:
                 return False
@@ -160,6 +163,7 @@ class YouTubeChatRuntime:
         with self._lock:
             self._cancelled = False
             self._offer_open = False
+            self._explicit_selection = True
             self._next_discovery = 0.0
         self.wake()
 
@@ -195,6 +199,7 @@ class YouTubeChatRuntime:
             self._choices = []
             self._offer_open = False
             self._cancelled = False
+            self._explicit_selection = False
             self._previous_ended = False
             self._requires_switch_choice = False
             self._next_discovery = 0
@@ -250,6 +255,7 @@ class YouTubeChatRuntime:
                 self._choices = []
                 self._cancelled = False
                 self._offer_open = False
+                self._explicit_selection = False
                 self._requires_switch_choice = False
             self._channel_id = channel_id
             self._channel_name = channel_name
@@ -308,18 +314,20 @@ class YouTubeChatRuntime:
                                 f"YouTube: выбран эфир «{by_id[selected]['title']}».")
                 return
             if selected:
-                self._previous_ended = True
-                if active:
-                    # Another broadcast was already live at confirmed end:
-                    # manual selection required, even if only one remains.
+                if active and not self._previous_ended:
+                    # Another stream was already live at the moment we
+                    # observed the chosen stream's end (REQ-56). If there
+                    # was a gap with no active streams, REQ-57 autoselects.
                     self._requires_switch_choice = True
+                self._previous_ended = True
             if not active:
                 self._choices = []
                 self._offer_open = False
                 self._status = ("YouTube: выбранный эфир завершён; ожидание нового."
                                 if selected else "YouTube: нет активных трансляций.")
                 return
-            if len(active) == 1 and not self._cancelled and not self._requires_switch_choice:
+            if (len(active) == 1 and not self._cancelled
+                    and not self._requires_switch_choice and not self._explicit_selection):
                 self._activate(active[0])
                 self._choices = []
                 self._offer_open = False
