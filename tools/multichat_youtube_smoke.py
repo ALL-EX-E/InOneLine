@@ -120,7 +120,7 @@ class Urls(unittest.TestCase):
         await_ms(450)
         received = []
         page.runJavaScript(
-            "window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null",
+            "JSON.stringify(window.__iolBrowserChat ? window.__iolBrowserChat.drain() : null)",
             QWebEngineScript.ScriptWorldId.ApplicationWorld,
             lambda value: received.append(value),
         )
@@ -128,9 +128,11 @@ class Urls(unittest.TestCase):
             if received:
                 break
             await_ms(100)
-        self.assertTrue(received and received[0]["ready"])
+        import json
+        result = json.loads(received[0]) if received and isinstance(received[0], str) else None
+        self.assertTrue(result and result["ready"])
         self.assertEqual(
-            [(e["author"], e["text"]) for e in received[0]["events"]],
+            [(e["author"], e["text"]) for e in result["events"]],
             [("New", "live text")],
         )
         page.setUrl(QUrl("about:blank"))
