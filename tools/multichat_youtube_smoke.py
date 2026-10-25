@@ -16,10 +16,11 @@ from streaming_manager.youtube_chat import (
 
 
 def broadcast(identifier: str, channel="channel1", chat=None, title=None):
+    resolved_chat = chat if chat is not None else "chat-" + identifier
     return {
-        "id": identifier,
+        "id": identifier, "title": title or identifier, "live_chat_id": resolved_chat,
         "snippet": {"channelId": channel, "title": title or identifier,
-                    "liveChatId": chat if chat is not None else "chat-" + identifier},
+                    "liveChatId": resolved_chat},
     }
 
 
