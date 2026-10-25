@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
             db, self.multichat_state, self.api,
             twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
         )
-        self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.multichat_tab, "Чат Twitch", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
         self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
