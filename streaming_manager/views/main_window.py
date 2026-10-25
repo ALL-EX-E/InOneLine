@@ -277,6 +277,7 @@ class MainWindow(QMainWindow):
             youtube_status_provider=lambda: self.browser_chat_runtime.status("youtube"),
             twitch_browser_status_provider=lambda: self.browser_chat_runtime.status("twitch"),
             browser_runtime_wake=self.browser_chat_runtime.wake,
+            twitch_runtime_wake=self.twitch_eventsub_runtime.wake,
         )
         self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
