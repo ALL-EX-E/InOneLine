@@ -96,6 +96,7 @@ class YouTubeChatRuntime:
         self._channel_id = ""
         self._channel_name = ""
         self._selected = ""
+        self._last_source = ("", "")
         self._live_chat_id = ""
         self._page_token: str | None = None
         self._choices: list[dict] = []
@@ -171,8 +172,11 @@ class YouTubeChatRuntime:
         new_chat = item["live_chat_id"]
         # Only a proven new source clears old YouTube messages. Ordinary network
         # failures and broadcaster end never clear them.
-        if self._selected and (self._selected != new_broadcast or self._live_chat_id != new_chat):
+        old_source = self._last_source
+        new_source = (self._channel_id, new_broadcast)
+        if old_source[1] and old_source != new_source:
             self.state.change_source("youtube")
+        self._last_source = new_source
         self._selected = new_broadcast
         self._live_chat_id = new_chat
         self._page_token = None
@@ -239,6 +243,7 @@ class YouTubeChatRuntime:
         with self._lock:
             if self._channel_id and self._channel_id != channel_id:
                 self.state.change_source("youtube")
+                self._last_source = ("", "")
                 self._selected = ""
                 self._live_chat_id = ""
                 self._page_token = None
