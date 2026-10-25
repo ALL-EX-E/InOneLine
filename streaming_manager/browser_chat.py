@@ -302,10 +302,13 @@ class BrowserChatRuntime(QObject):
         super().__init__(parent)
         self.db = db
         self.state = state
-        self._readers = {
-            "youtube": _BrowserChatPage(self, "youtube"),
-            "twitch": _BrowserChatPage(self, "twitch"),
+        # Pages are expensive Chromium processes: create only for configured
+        # sources. InOneLine with no browser chat URLs retains its previous
+        # lightweight startup, and native GUI regressions use no WebEngine.
+        self._readers: dict[str, _BrowserChatPage | None] = {
+            "youtube": None, "twitch": None,
         }
+        self._source_errors: dict[str, str] = {}
         self._timer = QTimer(self)
         self._timer.setInterval(500)
         self._timer.timeout.connect(self._tick)
@@ -316,15 +319,22 @@ class BrowserChatRuntime(QObject):
 
     def stop(self):
         self._timer.stop()
-        for reader in self._readers.values():
-            reader.shutdown()
+        for platform, reader in self._readers.items():
+            if reader is not None:
+                reader.shutdown()
+            self._readers[platform] = None
 
     def status(self, platform: str) -> str:
         name = "YouTube" if platform == "youtube" else "Twitch"
-        return name + " (браузер): " + self._readers[platform].status
+        reader = self._readers[platform]
+        return name + " (браузер): " + (
+            reader.status if reader is not None
+            else self._source_errors.get(platform, "Не настроена ссылка.")
+        )
 
     def active(self, platform: str) -> bool:
-        return self._readers[platform].source is not None
+        reader = self._readers[platform]
+        return reader is not None and reader.source is not None
 
     def wake(self):
         self._tick()
@@ -339,9 +349,19 @@ class BrowserChatRuntime(QObject):
         for platform, raw in desired.items():
             try:
                 source = normalize_browser_chat_source(platform, raw) if raw else None
+                self._source_errors.pop(platform, None)
             except ValueError as exc:
-                self._readers[platform].set_source(None)
-                self._readers[platform].status = str(exc)
+                source = None
+                self._source_errors[platform] = str(exc)
+            reader = self._readers[platform]
+            if source is None:
+                if reader is not None:
+                    reader.set_source(None)
+                    reader.shutdown()
+                    self._readers[platform] = None
                 continue
-            self._readers[platform].set_source(source)
-            self._readers[platform].poll()
+            if reader is None:
+                reader = _BrowserChatPage(self, platform)
+                self._readers[platform] = reader
+            reader.set_source(source)
+            reader.poll()
