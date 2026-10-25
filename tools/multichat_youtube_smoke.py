@@ -135,9 +135,125 @@ class Urls(unittest.TestCase):
             [(e["author"], e["text"]) for e in result["events"]],
             [("New", "live text")],
         )
+        # Twitch changes a displayed message into a deletion placeholder.
+        # A normal DOM removal, e.g. because of chat virtualization, must
+        # never be treated as a moderation event.
+        page.runJavaScript(
+            'document.querySelectorAll(".chat-line__message")[1]'
+            '.querySelector("[data-a-target=chat-message-text]")'
+            '.textContent = "<сообщение удалено>";',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        deleted = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: deleted.append(value),
+        )
+        for _ in range(20):
+            if deleted:
+                break
+            await_ms(100)
+        event = json.loads(deleted[0])["events"]
+        self.assertEqual(event, [{"kind": "delete", "id": "dom-1"}])
+        page.runJavaScript(
+            'document.querySelectorAll(".chat-line__message")[1].remove();',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        unchanged = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: unchanged.append(value),
+        )
+        for _ in range(20):
+            if unchanged:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(unchanged[0])["events"], [])
+
+        # Re-load the SAME WebEngine with a YouTube hostname, so the script
+        # exercises the platform-specific is-deleted attribute path.
+        loaded.clear()
+        page.setHtml(
+            '<!doctype html><html><body><yt-live-chat-text-message-renderer id="old">'
+            '<span id="author-name">Past</span><span id="message">earlier</span>'
+            '</yt-live-chat-text-message-renderer></body></html>',
+            QUrl("https://www.youtube.com/live_chat?v=AaBbCcDd123"),
+        )
+        for _ in range(40):
+            if loaded:
+                break
+            await_ms(250)
+        self.assertEqual(loaded, [True])
+        await_ms(3400)
+        page.runJavaScript(
+            'document.body.insertAdjacentHTML("beforeend",'
+            ' \'<yt-live-chat-text-message-renderer id="yt-new">'
+            '<span id="author-name">Viewer</span><span id="message">live</span>'
+            '</yt-live-chat-text-message-renderer>\');',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        added = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: added.append(value),
+        )
+        for _ in range(20):
+            if added:
+                break
+            await_ms(100)
+        self.assertEqual(
+            [(event["id"], event["text"]) for event in json.loads(added[0])["events"]],
+            [("yt-new", "live")],
+        )
+        page.runJavaScript(
+            'document.getElementById("yt-new").setAttribute("is-deleted", "");',
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        removed = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: removed.append(value),
+        )
+        for _ in range(20):
+            if removed:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(removed[0])["events"], [{"kind": "delete", "id": "yt-new"}])
+
         page.setUrl(QUrl("about:blank"))
         page.deleteLater()
         app.processEvents()
+
+    def test_browser_deleted_event_removes_ram_and_obs(self):
+        from types import SimpleNamespace
+        from streaming_manager.browser_chat import _BrowserChatPage
+        from streaming_manager.multichat import ChatMessage
+
+        state = MultichatState(delay=0)
+        state.ingest(ChatMessage("youtube", "video", "yt-123", "Viewer", "hello"))
+        state.ingest(ChatMessage("twitch", "other", "tw-456", "Other", "keep"))
+        dummy = SimpleNamespace(
+            source=SimpleNamespace(source_id="video"),
+            _generation=5, _busy=True, _last_reply=0,
+            platform="youtube", owner=SimpleNamespace(state=state), status="",
+        )
+        _BrowserChatPage._received(
+            dummy,
+            {"alive": True, "events": [{"kind": "delete", "id": "yt-123"}]},
+            "video", 5,
+        )
+        for obs in (False, True):
+            actual = state.snapshot(for_obs=obs)["messages"]
+            self.assertEqual([(m["platform"], m["external_id"]) for m in actual],
+                             [("twitch", "tw-456")])
 
     def test_multiple_copies_dedupe_at_shared_state(self):
         from streaming_manager.multichat import ChatMessage
