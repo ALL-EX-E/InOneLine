@@ -7,11 +7,12 @@ from math import isfinite
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QTextCursor
+from ..browser_chat import normalize_browser_chat_source
 from .common import make_wide_step_control
 
 from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QCheckBox, QFormLayout, QFrame, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QSpinBox,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QComboBox, QPushButton, QScrollArea, QSpinBox,
     QTextEdit, QVBoxLayout, QWidget,
 )
 
@@ -34,15 +35,14 @@ class _ChatFeed(QTextEdit):
 
 class MultichatTab(QWidget):
     def __init__(self, db, state, api, *, twitch_status_provider=None,
-                 youtube_status_provider=None, youtube_channel_provider=None,
-                 youtube_choice_provider=None, youtube_reopen=None):
+                 youtube_status_provider=None, twitch_browser_status_provider=None,
+                 browser_runtime_wake=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
         self.youtube_status_provider = youtube_status_provider
-        self.youtube_channel_provider = youtube_channel_provider
-        self.youtube_choice_provider = youtube_choice_provider
-        self.youtube_reopen = youtube_reopen
+        self.twitch_browser_status_provider = twitch_browser_status_provider
+        self.browser_runtime_wake = browser_runtime_wake or (lambda: None)
         self._last_render = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         self.columns.setContentsMargins(8, 8, 8, 8)
@@ -96,11 +96,38 @@ class MultichatTab(QWidget):
         self.state.set_obs_enabled("youtube", self.youtube_obs.isChecked())
         self.youtube_obs.toggled.connect(self._on_youtube_obs)
         connections_layout.addWidget(self.youtube_obs)
-        self.youtube_select = QPushButton("Выбрать трансляцию YouTube")
-        if youtube_reopen:
-            self.youtube_select.clicked.connect(youtube_reopen)
-        self.youtube_select.hide()
-        connections_layout.addWidget(self.youtube_select)
+        links = QFormLayout()
+        self.youtube_url = QLineEdit(db.get_setting("multichat_youtube_browser_url", ""))
+        self.youtube_url.setPlaceholderText("HTTPS-ссылка на отдельный чат YouTube")
+        self.youtube_url.setAccessibleName("Ссылка на отдельный YouTube-чат")
+        self.youtube_apply = QPushButton("Применить ссылку YouTube")
+        self.youtube_apply.clicked.connect(lambda: self._apply_browser_url("youtube"))
+        links.addRow("Чат YouTube", self.youtube_url)
+        connections_layout.addLayout(links)
+        connections_layout.addWidget(self.youtube_apply)
+        self.twitch_reader = QComboBox()
+        self.twitch_reader.addItem("EventSub (официальный)", "eventsub")
+        self.twitch_reader.addItem("Браузерный чат", "browser")
+        active_reader = db.get_setting("multichat_twitch_reader", "eventsub")
+        self.twitch_reader.setCurrentIndex(1 if active_reader == "browser" else 0)
+        self.twitch_reader.currentIndexChanged.connect(self._switch_twitch_reader)
+        connections_layout.addWidget(QLabel("Способ чтения Twitch-чата:"))
+        connections_layout.addWidget(self.twitch_reader)
+        self.twitch_url = QLineEdit(db.get_setting("multichat_twitch_browser_url", ""))
+        self.twitch_url.setPlaceholderText("HTTPS-ссылка на отдельный чат Twitch")
+        self.twitch_url.setAccessibleName("Ссылка на отдельный Twitch-чат")
+        self.twitch_apply = QPushButton("Применить ссылку Twitch")
+        self.twitch_apply.clicked.connect(lambda: self._apply_browser_url("twitch"))
+        connections_layout.addWidget(self.twitch_url)
+        connections_layout.addWidget(self.twitch_apply)
+        note = QLabel(
+            "Twitch: используйте только один способ чтения сообщений. "
+            "При подключении браузерного способа EventSub-чат отключается, "
+            "но награды канала Twitch продолжают работать."
+        )
+        note.setWordWrap(True)
+        connections_layout.addWidget(note)
+        self._update_twitch_browser_controls()
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -129,6 +156,53 @@ class MultichatTab(QWidget):
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
         self.refresh()
+
+    def _update_twitch_browser_controls(self):
+        active = self.twitch_reader.currentData() == "browser"
+        self.twitch_url.setVisible(active)
+        self.twitch_apply.setVisible(active)
+
+    def _switch_twitch_reader(self, _index):
+        new_mode = self.twitch_reader.currentData()
+        old_mode = self.db.get_setting("multichat_twitch_reader", "eventsub")
+        if new_mode == old_mode:
+            self._update_twitch_browser_controls()
+            return
+        answer = QMessageBox.warning(
+            self, "Twitch: выбор способа чата",
+            "Одновременное чтение Twitch-чата через EventSub и браузерный источник "
+            "может дублировать сообщения. Чтобы использовать другой способ, "
+            "текущий способ получения сообщений будет отключён. "
+            "Интеграция наград Twitch останется включённой.\n\nПродолжить?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            self.twitch_reader.blockSignals(True)
+            self.twitch_reader.setCurrentIndex(1 if old_mode == "browser" else 0)
+            self.twitch_reader.blockSignals(False)
+            self._update_twitch_browser_controls()
+            return
+        self.db.set_setting("multichat_twitch_reader", new_mode)
+        # The EventSub runtime re-subscribes to CHAT only in EventSub mode;
+        # existing channel-point reward subscriptions are independent.
+        self.browser_runtime_wake()
+        if hasattr(self, "twitch_runtime_wake"):
+            self.twitch_runtime_wake()
+        self._update_twitch_browser_controls()
+
+    def _apply_browser_url(self, platform):
+        editor = self.youtube_url if platform == "youtube" else self.twitch_url
+        raw = editor.text().strip()
+        try:
+            source = normalize_browser_chat_source(platform, raw) if raw else None
+        except ValueError as exc:
+            QMessageBox.warning(self, "Ссылка на чат", str(exc))
+            return
+        key = f"multichat_{platform}_browser_url"
+        value = source.url if source is not None else ""
+        self.db.set_setting(key, value)
+        editor.setText(value)
+        self.browser_runtime_wake()
 
     def _on_youtube_obs(self, enabled):
         self.state.set_obs_enabled("youtube", enabled)
@@ -173,18 +247,20 @@ class MultichatTab(QWidget):
             if self.youtube_status_provider is not None:
                 try:
                     yt_status = str(self.youtube_status_provider())
-                    yt_channel = str(self.youtube_channel_provider() or "") if self.youtube_channel_provider else ""
-                    if yt_channel:
-                        yt_status += f" Авторизованный канал: {yt_channel}."
+
                 except Exception:
                     yt_status = "YouTube: состояние временно недоступно."
             else:
                 yt_status = "YouTube: не подключён."
+            twitch_mode = self.db.get_setting("multichat_twitch_reader", "eventsub")
+            if twitch_mode == "browser" and self.twitch_browser_status_provider:
+                try:
+                    status = str(self.twitch_browser_status_provider())
+                except Exception:
+                    status = "Twitch: браузерное подключение временно недоступно."
             info = status + "\n" + yt_status
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
-            choose = bool(self.youtube_choice_provider()) if self.youtube_choice_provider else False
-            self.youtube_select.setVisible(choose)
         snapshot = self.state.snapshot()
         overflow = snapshot["overflow_count"]
         warning = ("Буфер задержки переполнен: для сохранения сообщений "
