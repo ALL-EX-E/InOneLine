@@ -167,8 +167,9 @@ _BROWSER_OBSERVER = r"""
   }
   function removeKnown(el) {
     const native = nativeId(el);
+    const pending = !yt ? replacementCandidates.get(el) : null;
     const info = delivered.get(el) || (native ? deliveredById.get(native) : null)
-      || (!yt ? replacementCandidates.get(el) : null);
+      || (pending ? pending.info : null);
     if (!info || !deletionMarker(el, info)) return false;
     delivered.delete(el);
     if (!yt) replacementCandidates.delete(el);
@@ -288,6 +289,24 @@ _BROWSER_OBSERVER = r"""
     {childList:true,subtree:true,characterData:true,attributes:true,
      attributeFilter:['is-deleted','class','data-a-target','data-test-selector']});
   window.__iolBrowserChat = {
+    // Structural-only diagnostic: do not export author, message text,
+    // message IDs, URL/query, cookies or any page credentials.
+    diagnose() {
+      return {
+        baseline, observedCount: document.querySelectorAll(selectors).length,
+        pendingRemovals: recentTwitchRemovals.length,
+        rows: Array.from(document.querySelectorAll(selectors)).slice(-12).map(el => {
+          const linked = delivered.get(el);
+          const pending = replacementCandidates.get(el);
+          return {
+            observed: observed.has(el), linked: !!linked, pending: !!pending,
+            hasAuthor: !!authorOf(el), hasMessage: !!messageOf(el),
+            candidateDeleted: deletionMarker(el, linked || (pending && pending.info) || null),
+            nodeTextLength: (el.textContent || '').length
+          };
+        })
+      };
+    },
     drain() {
       // Reconcile only the newest 200 rows, never remove messages merely
       // because a chat UI virtualizes or scrolls its older DOM nodes.
