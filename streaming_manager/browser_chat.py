@@ -146,7 +146,13 @@ _BROWSER_OBSERVER = r"""
       // neither an external ID nor a message-text element.  Require the
       // complete, final tombstone suffix and absence of an ordinary message
       // element; user-authored messages containing these words remain valid.
-      if (el.querySelector('[data-a-target="chat-message-text"],.text-fragment')) return false;
+      const ordinaryMessage = el.querySelector('[data-a-target="chat-message-text"],.text-fragment');
+      if (ordinaryMessage) {
+        // Some Twitch builds turn the EXISTING text fragment into an exact
+        // tombstone.  Only a row we already delivered may be invalidated
+        // this way; a newly posted literal "<сообщение удалено>" is valid.
+        return !!info && value !== info.text && deletedText.test(value);
+      }
       const suffix = text.replace(/^[^\n:]{1,200}:\s*/, '');
       return deletedText.test(suffix);
     }
