@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>InOneLine — мультичат OBS</title>
+<title>InOneLine — чат Twitch (OBS)</title>
 <style>
 html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
 body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: white; }
@@ -11,8 +11,7 @@ body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: w
             flex-direction: column; justify-content: flex-end; }
 .message { box-sizing: border-box; flex-shrink: 0; padding: 4px 8px;
            background: rgba(0,0,0,.5); overflow-wrap: anywhere; }
-.source, .name { font-weight: 700; }
-.source { margin-right: 6px; }
+.name { font-weight: 700; }
 .time { opacity: .8; margin-left: 5px; }
 .text { white-space: pre-wrap; }
 </style>
@@ -35,7 +34,9 @@ body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: w
       const response = await fetch("/api/multichat", {cache: "no-store"});
       if (!response.ok) return;
       const state = await response.json();
-      const messages = Array.isArray(state.messages) ? state.messages : [];
+      // Preserve the shared API for future expansion; this OBS view is Twitch-only.
+      const messages = Array.isArray(state.messages) ?
+        state.messages.filter(message => message.platform === "twitch") : [];
       const signature = JSON.stringify([state.show_time, messages]);
       if (signature === last) return;
       last = signature;
@@ -43,7 +44,6 @@ body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: w
       for (const message of messages) {
         const row = document.createElement("div");
         row.className = "message";
-        add(row, "span", String(message.platform || ""), "source");
         add(row, "span", String(message.author || ""), "name");
         if (state.show_time) {
           const value = message.sent_at ?? message.received_at;
