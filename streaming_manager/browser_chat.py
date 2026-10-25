@@ -269,6 +269,11 @@ class _BrowserChatPage(QObject):
             if not isinstance(item, dict):
                 continue
             uid = str(item.get("id") or "")[:160]
+            if uid.startswith("dom-"):
+                # DOM-local sequence restarts at 1 after a page reload.
+                # Namespace it by page generation so new messages do not
+                # collide with the bounded RAM dedupe keys of an old page.
+                uid = f"page-{generation}-{uid}"
             author = str(item.get("author") or "")[:200]
             text = str(item.get("text") or "")[:10000]
             if not uid or not author or not text:
