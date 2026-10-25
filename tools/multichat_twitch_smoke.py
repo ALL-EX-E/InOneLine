@@ -28,10 +28,16 @@ class FakeSocket:
 
 class FakeService:
     def __init__(self, *, scopes=(TWITCH_CHAT_READ_SCOPE,), rewards=()):
-        self.db = SimpleNamespace(get_integration_connection=lambda service: {
-            "enabled": True, "status": "connected",
-            "provider_config": {"twitch_user_id": "channel1", "granted_scopes": list(scopes)},
-        })
+        self.chat_reader = "eventsub"
+        self.db = SimpleNamespace(
+            get_integration_connection=lambda service: {
+                "enabled": True, "status": "connected",
+                "provider_config": {"twitch_user_id": "channel1", "granted_scopes": list(scopes)},
+            },
+            get_setting=lambda key, default="": (
+                self.chat_reader if key == "multichat_twitch_reader" else default
+            ),
+        )
         self.calls = []
         self.rewards = tuple(rewards)
         self.redemptions = []
