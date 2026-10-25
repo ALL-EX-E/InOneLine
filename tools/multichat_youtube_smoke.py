@@ -288,6 +288,149 @@ class Urls(unittest.TestCase):
             self.assertEqual([(m["platform"], m["external_id"]) for m in actual],
                              [("twitch", "tw-456")])
 
+    def test_two_browser_pages_remain_independent_when_one_url_changes(self):
+        """Real Qt WebEngine: both sources run concurrently; URL switching is isolated."""
+        from unittest.mock import patch
+        from PySide6.QtCore import QEventLoop, QTimer, QUrl
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWebEngineCore import QWebEngineScript
+        from streaming_manager.browser_chat import _BrowserChatPage
+        from streaming_manager.multichat import ChatMessage
+
+        app = QApplication.instance() or QApplication([])
+
+        class MemorySettings:
+            def __init__(self):
+                self.values = {
+                    "multichat_youtube_browser_url":
+                        "https://www.youtube.com/live_chat?v=AaBbCcDd123",
+                    "multichat_twitch_reader": "browser",
+                    "multichat_twitch_browser_url":
+                        "https://www.twitch.tv/popout/testuser/chat?popout=",
+                }
+
+            def get_setting(self, name, default=""):
+                return self.values.get(name, default)
+
+        db = MemorySettings()
+        state = MultichatState(limit=100, delay=0)
+        runtime = BrowserChatRuntime(db, state)
+
+        def await_ms(ms):
+            loop = QEventLoop()
+            QTimer.singleShot(ms, loop.quit)
+            loop.exec()
+
+        def until(condition, label, rounds=110):
+            for _ in range(rounds):
+                runtime.wake()
+                if condition():
+                    return
+                await_ms(100)
+            self.fail(label)
+
+        def offline_load(reader):
+            # Reuse the real per-provider Qt profiles, document scripts, tick,
+            # and state. Only the external HTTP navigation is synthetic.
+            reader._generation += 1
+            reader._busy = False
+            if reader.platform == "youtube":
+                body = ('<yt-live-chat-text-message-renderer id="old">'
+                        '<span id="author-name">History</span><span id="message">past</span>'
+                        '</yt-live-chat-text-message-renderer>')
+            else:
+                body = ('<div class="chat-line__message" data-message-id="old">'
+                        '<span class="chat-author__display-name">History</span>'
+                        '<span data-a-target="chat-message-text">past</span></div>')
+            reader.page.setHtml('<html><body>' + body + '</body></html>',
+                                QUrl(reader.source.url))
+
+        def send(reader, msg_id, text):
+            if reader.platform == "youtube":
+                row = ('<yt-live-chat-text-message-renderer id="' + msg_id + '">'
+                       '<span id="author-name">ViewerYT</span><span id="message">'
+                       + text + '</span></yt-live-chat-text-message-renderer>')
+            else:
+                row = ('<div class="chat-line__message" data-message-id="' + msg_id + '">'
+                       '<span class="chat-author__display-name">ViewerTW</span>'
+                       '<span data-a-target="chat-message-text">' + text + '</span></div>')
+            import json
+            reader.page.runJavaScript(
+                "document.body.insertAdjacentHTML('beforeend', " + json.dumps(row) + ");",
+                QWebEngineScript.ScriptWorldId.MainWorld,
+            )
+
+        with patch.object(_BrowserChatPage, "_load", offline_load):
+            try:
+                runtime.start()
+                youtube = runtime._readers["youtube"]
+                twitch = runtime._readers["twitch"]
+                self.assertIsNotNone(youtube)
+                self.assertIsNotNone(twitch)
+                self.assertIsNot(youtube.profile, twitch.profile)
+                self.assertIsNot(youtube.page, twitch.page)
+
+                def ready(reader):
+                    replies = []
+                    reader.page.runJavaScript(
+                        "window.__iolBrowserChat && window.__iolBrowserChat.drain().ready",
+                        QWebEngineScript.ScriptWorldId.ApplicationWorld,
+                        lambda reply: replies.append(reply),
+                    )
+                    for _ in range(6):
+                        if replies:
+                            break
+                        await_ms(30)
+                    return replies and replies[0] is True
+
+                until(lambda: ready(youtube) and ready(twitch),
+                      "Both chat DOM observers must be ready at once", rounds=120)
+                send(youtube, "yt-1", "first-yt")
+                send(twitch, "tw-1", "first-tw")
+                until(lambda: len(state.snapshot()["messages"]) == 2,
+                      "Both platforms must deliver new messages together")
+                before = {m["platform"] for m in state.snapshot()["messages"]}
+                self.assertEqual(before, {"youtube", "twitch"})
+
+                old_yt_page = youtube.page
+                old_tw_page = twitch.page
+                db.values["multichat_youtube_browser_url"] = (
+                    "https://www.youtube.com/live_chat?v=BbCcDdEe456")
+                runtime.wake()
+                self.assertIs(runtime._readers["youtube"], youtube)
+                self.assertIs(runtime._readers["twitch"], twitch)
+                self.assertIsNot(youtube.page, old_yt_page)
+                self.assertIs(twitch.page, old_tw_page)
+                until(lambda: ready(youtube) and ready(twitch),
+                      "Replaced YouTube source and unchanged Twitch must both remain alive",
+                      rounds=120)
+                send(youtube, "yt-2", "second-yt")
+                send(twitch, "tw-2", "second-tw")
+                until(lambda: any(m["external_id"] == "yt-2" for m in state.snapshot()["messages"])
+                      and any(m["external_id"] == "tw-2" for m in state.snapshot()["messages"]),
+                      "Both chats must receive new posts after replacing one URL")
+                messages = state.snapshot()["messages"]
+                self.assertTrue(any(m["external_id"] == "tw-1" for m in messages))
+                self.assertFalse(any(m["external_id"] == "yt-1" for m in messages))
+                self.assertEqual({m["platform"] for m in messages}, {"youtube", "twitch"})
+
+                # Replacing Twitch must likewise preserve and continue YouTube.
+                old_yt_page = youtube.page
+                db.values["multichat_twitch_browser_url"] = (
+                    "https://www.twitch.tv/popout/another/chat?popout=")
+                runtime.wake()
+                self.assertIs(youtube.page, old_yt_page)
+                until(lambda: ready(youtube) and ready(twitch),
+                      "Both observers must survive Twitch source change", rounds=120)
+                send(youtube, "yt-3", "third-yt")
+                send(twitch, "tw-3", "third-tw")
+                until(lambda: any(m["external_id"] == "yt-3" for m in state.snapshot()["messages"])
+                      and any(m["external_id"] == "tw-3" for m in state.snapshot()["messages"]),
+                      "Both chats must receive after switching Twitch URL")
+            finally:
+                runtime.stop()
+                app.processEvents()
+
     def test_multiple_copies_dedupe_at_shared_state(self):
         from streaming_manager.multichat import ChatMessage
         state=MultichatState()
