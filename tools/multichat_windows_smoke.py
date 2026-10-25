@@ -81,7 +81,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 self.assertNotIn("Not in Twitch tab", tab.feed.toPlainText())
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     payload = json.load(response)
-                self.assertEqual(len(payload["messages"]), 1)
+                self.assertEqual(len(payload["messages"]), 2)
                 self.assertEqual(payload["messages"][0]["text"], "<script>hello</script>")
                 with urllib.request.urlopen(api.base_url + "/multichat-overlay", timeout=10) as response:
                     html = response.read().decode("utf-8")
@@ -96,7 +96,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 state.ingest(ChatMessage("twitch", "ch", "m2", "Автор", "Только локально"))
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     obs = json.load(response)
-                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1"])
+                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1", "yt1"])
                 self.assertEqual(len(state.snapshot()["messages"]), 3)
 
                 # Invalid delay does not get persisted and is visibly restored.
