@@ -174,9 +174,17 @@ class Urls(unittest.TestCase):
             await_ms(100)
         self.assertEqual(json.loads(unchanged[0])["events"], [])
 
-        # Re-load the SAME WebEngine with a YouTube hostname, so the script
-        # exercises the platform-specific is-deleted attribute path.
-        loaded.clear()
+        # A separate page avoids stale ApplicationWorld or pending page
+        # callbacks after switching between two unrelated provider origins.
+        page.setUrl(QUrl("about:blank"))
+        page.deleteLater()
+        app.processEvents()
+        page = QWebEnginePage()
+        page.setVisible(True)
+        page.setAudioMuted(True)
+        page.scripts().insert(script)
+        loaded = []
+        page.loadFinished.connect(lambda ok: loaded.append(bool(ok)))
         page.setHtml(
             '<!doctype html><html><body><yt-live-chat-text-message-renderer id="old">'
             '<span id="author-name">Past</span><span id="message">earlier</span>'
