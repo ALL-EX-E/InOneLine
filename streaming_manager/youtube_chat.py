@@ -303,7 +303,9 @@ class YouTubeChatRuntime:
                     self._next_message_poll = 0.0
                 self._choices = []
                 self._offer_open = False
-                self._status = f"YouTube: выбран эфир «{by_id[selected]['title']}»."
+                self._status = (f"YouTube: выбран эфир «{by_id[selected]['title']}», чат недоступен."
+                                if not self._live_chat_id else
+                                f"YouTube: выбран эфир «{by_id[selected]['title']}».")
                 return
             if selected:
                 self._previous_ended = True
