@@ -199,6 +199,119 @@ class Urls(unittest.TestCase):
             await_ms(100)
         self.assertEqual(json.loads(unchanged[0])["events"], [])
 
+        # Real Twitch DOM report (25 Oct 2026): original line is removed,
+        # an identical new line appears without any stable data-id, and only
+        # later that NEW row becomes a deletion tombstone without a message
+        # text region. A normal remount must not create a duplicate.
+        page.runJavaScript(
+            """document.body.insertAdjacentHTML("beforeend",
+               '<div class="chat-line__message">' +
+               '<span class="chat-author__display-name">Again</span>' +
+               '<span data-a-target="chat-message-text">second message</span></div>');""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(400)
+        before_remount = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: before_remount.append(value),
+        )
+        for _ in range(20):
+            if before_remount:
+                break
+            await_ms(100)
+        self.assertEqual(
+            [(x["kind"], x["id"], x.get("text"))
+             for x in json.loads(before_remount[0])["events"]],
+            [("message", "dom-2", "second message")],
+        )
+        page.runJavaScript(
+            """(() => {
+                const items = document.querySelectorAll('.chat-line__message');
+                const row = items[items.length - 1];
+                row.replaceWith(row.cloneNode(true));
+              })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(350)
+        after_remount = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: after_remount.append(value),
+        )
+        for _ in range(20):
+            if after_remount:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(after_remount[0])["events"], [],
+                         "Ordinary Twitch remount must preserve one message ID")
+        page.runJavaScript(
+            """(() => {
+                const items = document.querySelectorAll('.chat-line__message');
+                const row = items[items.length - 1];
+                row.innerHTML =
+                  '<span class="chat-author__display-name">Again</span>: ' +
+                  '<span>&lt;сообщение удалено&gt;</span>';
+              })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(350)
+        after_tombstone = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: after_tombstone.append(value),
+        )
+        for _ in range(20):
+            if after_tombstone:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(after_tombstone[0])["events"],
+                         [{"kind": "delete", "id": "dom-2"}])
+
+        # No delete event from a message that merely scrolls/virtualizes out.
+        page.runJavaScript(
+            """document.body.insertAdjacentHTML("beforeend",
+               '<div class="chat-line__message">' +
+               '<span class="chat-author__display-name">Safe</span>' +
+               '<span data-a-target="chat-message-text">normal text</span></div>');""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        safe = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: safe.append(value),
+        )
+        for _ in range(20):
+            if safe:
+                break
+            await_ms(100)
+        self.assertEqual([x.get("kind") for x in json.loads(safe[0])["events"]], ["message"])
+        page.runJavaScript(
+            """(() => {
+               const rows = document.querySelectorAll('.chat-line__message');
+               rows[rows.length - 1].remove();
+              })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        no_false_delete = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: no_false_delete.append(value),
+        )
+        for _ in range(20):
+            if no_false_delete:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(no_false_delete[0])["events"], [],
+                         "Removal without confirmed moderation must not delete")
+
         # A separate page avoids stale ApplicationWorld or pending page
         # callbacks after switching between two unrelated provider origins.
         page.setUrl(QUrl("about:blank"))
