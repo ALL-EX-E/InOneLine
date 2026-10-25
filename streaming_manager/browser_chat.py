@@ -88,6 +88,8 @@ _BROWSER_OBSERVER = r"""
     : '.chat-line__message,[data-test-selector="chat-line-message"]';
   const observed = new WeakSet();
   const delivered = new WeakMap();
+  const deliveredById = new Map();
+  const removedIds = new Set();
   const events = [];
   let serial = 0;
   let dropped = 0;
@@ -119,23 +121,32 @@ _BROWSER_OBSERVER = r"""
     return yt ? pickText(el, '#message')
       : pickText(el, '[data-a-target="chat-message-text"],.text-fragment');
   }
+  const deletedText = /^(?:[<\[]\s*)?(?:сообщение удалено(?: отправителем| модератором)?|сообщение было удалено(?: отправителем| модератором)?|message deleted(?: by (?:sender|author|moderator))?|message removed|this message was deleted|deleted by moderator|message retracted|сообщение отозвано)(?:\s*[>\]])?$/i;
   function deletionMarker(el, info) {
-    if (yt) return el.hasAttribute('is-deleted');
-    if (el.matches('.chat-line__message--deleted,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"]') ||
-        el.querySelector('[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"],.chat-line__message--deleted')) return true;
-    // A deleted Twitch message may keep its row and replace only its text.
-    // Match entire platform-provided tombstone, never a mere substring.
+    // YouTube can mark the renderer or a nested deleted-state element.
+    if (el.hasAttribute('is-deleted') ||
+        el.matches('.chat-line__message--deleted,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"]') ||
+        el.querySelector('[is-deleted],#deleted-state,yt-live-chat-deleted-message-renderer,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"],.chat-line__message--deleted')) return true;
     const value = messageOf(el);
-    const tombstone = /^(?:<\s*)?(?:сообщение удалено|message deleted|message removed|this message was deleted|deleted by moderator)(?:\s*>)?$/i.test(value);
-    // Placeholder-only rows should not appear as new ordinary messages.
-    return info ? (value !== info.text && tombstone)
-      : (tombstone && /^</.test(value));
+    const text = (value || el.innerText || el.textContent || '').trim();
+    if (info && text === info.text) return false;
+    // A normal message containing "deleted" is NOT a moderation command.
+    // Only an exact platform tombstone can invalidate an existing item.
+    return deletedText.test(text);
+  }
+  function markDeleted(info) {
+    if (!info || removedIds.has(info.id)) return false;
+    removedIds.add(info.id);
+    deliveredById.delete(info.id);
+    push({kind: 'delete', id: info.id});
+    return true;
   }
   function removeKnown(el) {
-    const info = delivered.get(el);
+    const native = nativeId(el);
+    const info = delivered.get(el) || (native ? deliveredById.get(native) : null);
     if (!info || !deletionMarker(el, info)) return false;
     delivered.delete(el);
-    push({kind: 'delete', id: info.id});
+    markDeleted(info);
     return true;
   }
   function collect(el) {
@@ -149,7 +160,14 @@ _BROWSER_OBSERVER = r"""
     if (!author || !text) return;
     observed.add(el);
     const id = nativeId(el) || ('dom-' + (++serial));
-    delivered.set(el, {id, author, text});
+    const info = {id, author, text};
+    delivered.set(el, info);
+    // A framework may replace the old renderer with a deletion tombstone
+    // carrying the same stable platform ID. Retain a bounded recent index.
+    if (nativeId(el)) {
+      deliveredById.set(id, info);
+      if (deliveredById.size > 1000) deliveredById.delete(deliveredById.keys().next().value);
+    }
     push({kind: 'message', id, author: author.slice(0, 200), text: text.slice(0, 10000)});
   }
   function inspect(target) {
@@ -175,7 +193,7 @@ _BROWSER_OBSERVER = r"""
     const old = removed[0], fresh = added[0], nextId = nativeId(fresh);
     const nextAuthor = authorOf(fresh);
     if ((nextId && nextId !== old.id) || (nextAuthor && nextAuthor !== old.author)) return;
-    push({kind: 'delete', id: old.id});
+    markDeleted(old);
   }
   // Baseline existing items and late first-rendered history.
   document.querySelectorAll(selectors).forEach(n => observed.add(n));
