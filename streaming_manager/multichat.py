@@ -24,6 +24,7 @@ class ChatMessage:
     text: str
     sent_at: float | None = None
     received_at: float | None = None
+    author_id: str = ""
 
     def __post_init__(self) -> None:
         if not self.platform or not self.source_id or not self.external_id:
@@ -127,7 +128,7 @@ class MultichatState:
             received = self._wall_clock() if message.received_at is None else message.received_at
             item = ChatMessage(
                 message.platform, message.source_id, message.external_id,
-                message.author, message.text, message.sent_at, received,
+                message.author, message.text, message.sent_at, received, message.author_id,
             )
             self._sequence += 1
             self._pending.append((now, self._sequence, item))
@@ -145,6 +146,20 @@ class MultichatState:
             def keep(m: ChatMessage) -> bool:
                 return (m.platform, m.source_id, m.external_id) != (platform, source_id, external_id)
             self._pending = [p for p in self._pending if keep(p[2])]
+            self._operator = deque((m for m in self._operator if keep(m)), maxlen=self._limit)
+            self._obs = deque((m for m in self._obs if keep(m)), maxlen=self._limit)
+
+    def clear_chat(self, platform: str, source_id: str, *, author_id: str | None = None) -> None:
+        """Apply only an authenticated provider clear/ban to its own channel."""
+        if not platform or not source_id or author_id == "":
+            return
+        with self._lock:
+            def keep(m: ChatMessage) -> bool:
+                return not (
+                    m.platform == platform and m.source_id == source_id
+                    and (author_id is None or m.author_id == author_id)
+                )
+            self._pending = [item for item in self._pending if keep(item[2])]
             self._operator = deque((m for m in self._operator if keep(m)), maxlen=self._limit)
             self._obs = deque((m for m in self._obs if keep(m)), maxlen=self._limit)
 

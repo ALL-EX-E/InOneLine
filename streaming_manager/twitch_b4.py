@@ -13,12 +13,15 @@ import json
 import re
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable
 
 from .conversion import parse_positive_rate
+from .multichat import ChatMessage, MultichatState
 from .integrations import IntegrationError, IntegrationManager, NormalizedIntegrationEvent
 from .twitch import (
+    TWITCH_CHAT_READ_SCOPE,
+    TWITCH_CHAT_EVENT_TYPES,
     TWITCH_CHANNEL_POINTS_EVENT_TYPE,
     TWITCH_CHANNEL_POINTS_LABEL,
     TWITCH_CHANNEL_POINTS_UNIT,
@@ -534,8 +537,14 @@ class TwitchEventSubRuntime:
         *,
         socket_factory: Callable[[str], object] | None = None,
         retry_seconds: float = 5.0,
+        chat_state: MultichatState | None = None,
     ):
         self.service = service
+        self.chat_state = chat_state
+        self.chat_connected = False
+        self.chat_error = ""
+        self._chat_subscription_active = False
+        self._chat_source_id = ""
         self.socket_factory = socket_factory or self._default_socket_factory
         self.retry_seconds = max(0.2, float(retry_seconds))
         self._stop = threading.Event()
@@ -593,14 +602,99 @@ class TwitchEventSubRuntime:
         metadata = message.get("metadata") or {}
         return str(metadata.get("message_type") or "") if isinstance(metadata, dict) else ""
 
+    def _chat_profile(self) -> tuple[str, bool]:
+        row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+        config = row.get("provider_config") or {}
+        if not isinstance(config, dict):
+            return "", False
+        user_id = str(config.get("twitch_user_id") or "")
+        scopes = config.get("granted_scopes") or []
+        return user_id, bool(
+            user_id and isinstance(scopes, (list, tuple))
+            and TWITCH_CHAT_READ_SCOPE in scopes
+        )
+
+    def chat_status(self) -> str:
+        if not self.service.connection_ready():
+            return "Twitch: отключён. Подключение находится в разделе «Интеграции»."
+        source_id, ready = self._chat_profile()
+        if not source_id:
+            return "Twitch: не удалось определить авторизованный канал."
+        if not ready:
+            return ("Twitch: для чтения чата требуется повторная авторизация "
+                    "через «Интеграции» (user:read:chat). Награды не затрагиваются.")
+        if self.chat_error:
+            if self.chat_connected:
+                return "Twitch: чат подключён, но некоторые события модерации недоступны."
+            return "Twitch: ошибка подписки на чат; проверьте Twitch и права в «Интеграциях»."
+        if self.chat_connected:
+            return "Twitch: чат подключён."
+        if self.last_error:
+            return "Twitch: временная ошибка подключения EventSub. Проверьте интеграцию."
+        return "Twitch: подключение к чату..."
+
+    @staticmethod
+    def _event_timestamp(metadata: dict) -> float | None:
+        raw = str(metadata.get("message_timestamp") or "").strip()
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(timezone.utc).timestamp()
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    def _process_chat_notification(self, event_type: str, event: dict, metadata: dict) -> None:
+        state = self.chat_state
+        if state is None:
+            return
+        source_id = str(event.get("broadcaster_user_id") or "")
+        if not source_id or source_id != self._chat_source_id:
+            return
+        if event_type == "channel.chat.message":
+            msg_id = str(event.get("message_id") or "")
+            body = event.get("message") or {}
+            value = str(body.get("text") or "") if isinstance(body, dict) else ""
+            if not msg_id or not value:
+                return
+            state.ingest(ChatMessage(
+                platform="twitch", source_id=source_id, external_id=msg_id,
+                author=str(event.get("chatter_user_name") or event.get("chatter_user_login") or ""),
+                text=value, sent_at=self._event_timestamp(metadata),
+                author_id=str(event.get("chatter_user_id") or ""),
+            ))
+        elif event_type == "channel.chat.message_delete":
+            message_id = str(event.get("message_id") or "")
+            if message_id:
+                state.delete_message("twitch", source_id, message_id)
+        elif event_type == "channel.chat.clear_user_messages":
+            author_id = str(event.get("target_user_id") or "")
+            if author_id:
+                state.clear_chat("twitch", source_id, author_id=author_id)
+        elif event_type == "channel.chat.clear":
+            state.clear_chat("twitch", source_id)
+
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
-                if (
-                    not self.service.connection_ready()
-                    or not self.service.managed_reward_ids()
+
+                if not self.service.connection_ready():
+                    self.connected = False
+                    self.chat_connected = False
+                    if self.chat_state is not None:
+                        self.chat_state.disconnect("twitch")
+                    self._wait(1.0)
+                    continue
+                source_id, chat_ready = self._chat_profile()
+                if source_id and self._chat_source_id and source_id != self._chat_source_id:
+                    if self.chat_state is not None:
+                        self.chat_state.change_source("twitch")
+                if source_id:
+                    self._chat_source_id = source_id
+                if not self.service.managed_reward_ids() and not (
+                    self.chat_state is not None and chat_ready
                 ):
                     self.connected = False
+                    self.chat_connected = False
                     self._wait(1.0)
                     continue
                 url = TWITCH_EVENTSUB_URL
@@ -636,7 +730,11 @@ class TwitchEventSubRuntime:
                 raise RuntimeError("Twitch EventSub не прислал session_id.")
 
             reward_ids = self.service.managed_reward_ids()
+            chat_source, chat_ready = self._chat_profile()
+            chat_required = self.chat_state is not None and chat_ready
             if subscriptions_required:
+                self._chat_subscription_active = False
+                self.chat_error = ""
                 # First subscription is created immediately after welcome to
                 # satisfy Twitch's default 10-second unused-connection limit.
                 for reward_id in reward_ids:
@@ -646,6 +744,28 @@ class TwitchEventSubRuntime:
                         session_id,
                         reward_id,
                     )
+
+                if chat_required:
+                    for event_type in TWITCH_CHAT_EVENT_TYPES:
+                        try:
+                            self.service.integration_manager.call_adapter(
+                                TWITCH_SERVICE_KEY,
+                                "create_chat_eventsub_subscription",
+                                session_id,
+                                event_type,
+                            )
+                        except Exception:
+                            # A chat permission/provider failure must not stop
+                            # a working Channel Points EventSub subscription.
+                            self.chat_error = "Twitch chat subscription unavailable"
+                            if not reward_ids:
+                                raise
+                            break
+                        if event_type == "channel.chat.message":
+                            self._chat_subscription_active = True
+            self.chat_connected = bool(chat_required and self._chat_subscription_active)
+            current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+            subscribed_credential_ref = str(current_row.get("credential_ref") or "")
             self.connected = True
             self.last_error = ""
             try:
@@ -661,10 +781,14 @@ class TwitchEventSubRuntime:
                 if not self.service.connection_ready():
                     return ""
                 current_ids = self.service.managed_reward_ids()
-                if current_ids != reward_ids:
-                    # Reconnect so the subscription set exactly follows the
-                    # registered app-managed reward IDs.
-                    return
+                current_source, current_chat = self._chat_profile()
+                current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+                credential_ref = str(current_row.get("credential_ref") or "")
+                if (current_ids != reward_ids or current_source != chat_source
+                        or credential_ref != subscribed_credential_ref
+                        or (self.chat_state is not None and current_chat) != chat_required):
+                    # The shared socket's subscriptions must match both services.
+                    return ""
                 desired = self.service.desired_rewards_enabled()
                 if desired != last_desired:
                     self.service.sync_reward_enabled_state(desired)
@@ -686,16 +810,22 @@ class TwitchEventSubRuntime:
                     if isinstance(event, dict):
                         metadata = message.get("metadata") or {}
                         subscription = payload.get("subscription") or {} if isinstance(payload, dict) else {}
-                        enriched = dict(event)
-                        enriched["_eventsub_metadata"] = {
-                            "message_id": str(metadata.get("message_id") or "")
-                            if isinstance(metadata, dict) else "",
-                            "message_timestamp": str(metadata.get("message_timestamp") or "")
-                            if isinstance(metadata, dict) else "",
-                            "subscription_id": str(subscription.get("id") or "")
-                            if isinstance(subscription, dict) else "",
-                        }
-                        self.service.process_redemption(enriched)
+                        event_type = str(subscription.get("type") or "") if isinstance(subscription, dict) else ""
+                        if event_type in TWITCH_CHAT_EVENT_TYPES:
+                            self._process_chat_notification(
+                                event_type, event, metadata if isinstance(metadata, dict) else {},
+                            )
+                        elif event_type == "channel.channel_points_custom_reward_redemption.add":
+                            enriched = dict(event)
+                            enriched["_eventsub_metadata"] = {
+                                "message_id": str(metadata.get("message_id") or "")
+                                if isinstance(metadata, dict) else "",
+                                "message_timestamp": str(metadata.get("message_timestamp") or "")
+                                if isinstance(metadata, dict) else "",
+                                "subscription_id": str(subscription.get("id") or "")
+                                if isinstance(subscription, dict) else "",
+                            }
+                            self.service.process_redemption(enriched)
                     continue
                 if message_type == "session_reconnect":
                     payload = message.get("payload") or {}
@@ -711,6 +841,7 @@ class TwitchEventSubRuntime:
             return ""
         finally:
             self.connected = False
+            self.chat_connected = False
             self._socket = None
             try:
                 sock.close()
