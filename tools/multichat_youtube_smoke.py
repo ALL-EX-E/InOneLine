@@ -312,6 +312,102 @@ class Urls(unittest.TestCase):
         self.assertEqual(json.loads(no_false_delete[0])["events"], [],
                          "Removal without confirmed moderation must not delete")
 
+        # Two separate childList mutations (remove now, insert later) are
+        # permitted by Twitch's asynchronous React reconciliation. The
+        # replacement initially has no author element, but the same message.
+        page.runJavaScript(
+            """document.body.insertAdjacentHTML("beforeend",
+               '<div class="chat-line__message">' +
+               '<span class="chat-author__display-name">Late</span>' +
+               '<span data-a-target="chat-message-text">pending body</span></div>');""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        late_added = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: late_added.append(value),
+        )
+        for _ in range(20):
+            if late_added:
+                break
+            await_ms(100)
+        self.assertEqual(
+            [(x["kind"], x["id"]) for x in json.loads(late_added[0])["events"]],
+            [("message", "dom-4")],
+        )
+        page.runJavaScript(
+            """(() => {
+              const nodes = document.querySelectorAll('.chat-line__message');
+              nodes[nodes.length - 1].remove();
+              setTimeout(() => {
+                document.body.insertAdjacentHTML('beforeend',
+                  '<div class="chat-line__message">' +
+                  '<span data-a-target="chat-message-text">pending body</span></div>');
+              }, 150);
+            })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(500)
+        hydrated = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: hydrated.append(value),
+        )
+        for _ in range(20):
+            if hydrated:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(hydrated[0])["events"], [],
+                         "Separate remount mutations must not cause duplicate delivery")
+        page.runJavaScript(
+            """(() => {
+              const nodes = document.querySelectorAll('.chat-line__message');
+              nodes[nodes.length - 1].innerHTML = '<span>&lt;сообщение удалено&gt;</span>';
+            })();""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        late_deleted = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: late_deleted.append(value),
+        )
+        for _ in range(20):
+            if late_deleted:
+                break
+            await_ms(100)
+        self.assertEqual(json.loads(late_deleted[0])["events"],
+                         [{"kind": "delete", "id": "dom-4"}])
+
+        # A literal user-authored string that resembles a tombstone must not
+        # be interpreted as moderation when it is an actual message fragment.
+        page.runJavaScript(
+            """document.body.insertAdjacentHTML("beforeend",
+               '<div class="chat-line__message">' +
+               '<span class="chat-author__display-name">User</span>' +
+               '<span data-a-target="chat-message-text">&lt;сообщение удалено&gt;</span></div>');""",
+            QWebEngineScript.ScriptWorldId.MainWorld,
+        )
+        await_ms(300)
+        literal = []
+        page.runJavaScript(
+            "JSON.stringify(window.__iolBrowserChat.drain())",
+            QWebEngineScript.ScriptWorldId.ApplicationWorld,
+            lambda value: literal.append(value),
+        )
+        for _ in range(20):
+            if literal:
+                break
+            await_ms(100)
+        self.assertEqual(
+            [(x["kind"], x.get("text")) for x in json.loads(literal[0])["events"]],
+            [("message", "<сообщение удалено>")],
+        )
+
         # A separate page avoids stale ApplicationWorld or pending page
         # callbacks after switching between two unrelated provider origins.
         page.setUrl(QUrl("about:blank"))
