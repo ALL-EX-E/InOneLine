@@ -138,6 +138,15 @@ _BROWSER_OBSERVER = r"""
     {childList:true,subtree:true,characterData:true});
   window.__iolBrowserChat = {
     drain() {
+      // Reconcile the newest on-screen nodes as a fallback when the site's
+      // framework batches/virtualizes DOM updates outside observer callbacks.
+      // Only unseen nodes are collected; the initial baseline is already
+      // marked in observed. Bound the scan to avoid unbounded DOM traversal.
+      if (baseline) {
+        const latest = document.querySelectorAll(selectors);
+        const begin = Math.max(0, latest.length - 200);
+        for (let i = begin; i < latest.length; i++) collect(latest[i]);
+      }
       const batch = events.splice(0, 100);
       const lost = dropped;
       dropped = 0;
