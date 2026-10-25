@@ -68,8 +68,12 @@ class Api:
 class YouTubeChatSmoke(unittest.TestCase):
     def runtime(self, api=None, callback=None):
         s = MultichatState()
-        return YouTubeChatRuntime(Db(), Manager(), s, api=api or Api(),
-                                  selection_required=callback), s
+        runtime = YouTubeChatRuntime(Db(), Manager(), s, api=api or Api(),
+                                     selection_required=callback)
+        # Direct state-machine fixtures bypass _cycle(), which normally loads
+        # the authenticated channel before any broadcast is selected.
+        runtime._channel_id = "channel1"
+        return runtime, s
 
     def test_official_broadcast_filter_must_prove_channel(self):
         rows = [broadcast("mine"), broadcast("other", "someone-else"),
