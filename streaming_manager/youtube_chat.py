@@ -102,6 +102,7 @@ class YouTubeChatRuntime:
         self._cancelled = False
         self._offer_open = False
         self._previous_ended = False
+        self._requires_switch_choice = False
         self._next_discovery = 0.0
         self._next_message_poll = 0.0
 
@@ -176,6 +177,7 @@ class YouTubeChatRuntime:
         self._live_chat_id = new_chat
         self._page_token = None
         self._previous_ended = False
+        self._requires_switch_choice = False
         self._next_message_poll = 0.0
         self._status = (f"YouTube: эфир «{item['title']}», подключение чата."
                         if new_chat else f"YouTube: у эфира «{item['title']}» чат недоступен.")
@@ -190,6 +192,7 @@ class YouTubeChatRuntime:
             self._offer_open = False
             self._cancelled = False
             self._previous_ended = False
+            self._requires_switch_choice = False
             self._next_discovery = 0
             self._next_message_poll = 0
             self._status = "YouTube: отключён или требуется авторизация."
@@ -242,6 +245,7 @@ class YouTubeChatRuntime:
                 self._choices = []
                 self._cancelled = False
                 self._offer_open = False
+                self._requires_switch_choice = False
             self._channel_id = channel_id
             self._channel_name = channel_name
         access = self.manager.call_adapter(YOUTUBE_SERVICE_KEY, "account_access")
@@ -286,28 +290,33 @@ class YouTubeChatRuntime:
             selected = self._selected
             if selected and selected in by_id:
                 self._previous_ended = False
+                # A stream may enable live chat after going live. Do not clear
+                # any messages merely because its liveChatId was initially blank.
+                if not self._live_chat_id and by_id[selected]["live_chat_id"]:
+                    self._live_chat_id = by_id[selected]["live_chat_id"]
+                    self._page_token = None
+                    self._next_message_poll = 0.0
                 self._choices = []
                 self._offer_open = False
                 self._status = f"YouTube: выбран эфир «{by_id[selected]['title']}»."
                 return
             if selected:
-                # Confirmed absence from an authoritative active-broadcast list.
                 self._previous_ended = True
+                if active:
+                    # Another broadcast was already live at confirmed end:
+                    # manual selection required, even if only one remains.
+                    self._requires_switch_choice = True
             if not active:
                 self._choices = []
                 self._offer_open = False
                 self._status = ("YouTube: выбранный эфир завершён; ожидание нового."
                                 if selected else "YouTube: нет активных трансляций.")
                 return
-            if len(active) == 1 and not self._cancelled and (not selected or not self._previous_ended):
+            if len(active) == 1 and not self._cancelled and not self._requires_switch_choice:
                 self._activate(active[0])
                 self._choices = []
                 self._offer_open = False
                 return
-            if len(active) == 1 and selected and self._previous_ended and not self._cancelled:
-                # A different stream was already running when the old stream
-                # ended: the operator must confirm a switch (D41-REQ-56).
-                pass
             self._choices = [dict(x) for x in active]
             self._status = ("YouTube: выберите одну трансляцию."
                             if not self._cancelled else "YouTube: ожидание ручного выбора.")
