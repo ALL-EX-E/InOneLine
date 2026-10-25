@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QScrollArea,
@@ -26,6 +27,8 @@ from ..backup_restore import read_and_clear_restore_result
 from ..constants import APP_NAME, APP_VERSION, DEFAULT_API_HOST
 from ..integrations import STATUS_CONNECTED, IntegrationManager, IntegrationRegistry
 from ..twitch import TwitchAdapter
+from ..youtube import YouTubeAdapter
+from ..youtube_chat import YouTubeChatRuntime
 from ..twitch_b4 import TwitchChannelPointsService, TwitchEventSubRuntime
 from ..donationalerts import DonationAlertsAdapter
 from ..donationalerts_runtime import DonationAlertsDonationService, DonationAlertsRuntime
@@ -79,6 +82,8 @@ _TAB_ICON_COLORS = {
 
 
 class MainWindow(QMainWindow):
+    youtube_selection_ready = Signal(object)
+
     def __init__(self, db: Database, paths: AppPaths):
         super().__init__()
         self.db = db
@@ -99,8 +104,10 @@ class MainWindow(QMainWindow):
         self.integration_registry = IntegrationRegistry()
         self.twitch_adapter = TwitchAdapter()
         self.donationalerts_adapter = DonationAlertsAdapter()
+        self.youtube_adapter = YouTubeAdapter()
         self.integration_registry.register(self.twitch_adapter)
         self.integration_registry.register(self.donationalerts_adapter)
+        self.integration_registry.register(self.youtube_adapter)
         self.integration_manager = IntegrationManager(db, self.integration_registry)
         self.twitch_channel_points_service = TwitchChannelPointsService(
             db,
@@ -126,6 +133,11 @@ class MainWindow(QMainWindow):
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
         self.multichat_state = MultichatState()
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
+        self.youtube_selection_ready.connect(self._show_youtube_choices)
+        self.youtube_chat_runtime = YouTubeChatRuntime(
+            db, self.integration_manager, self.multichat_state,
+            selection_required=self.youtube_selection_ready.emit,
+        )
         self.api.set_multichat_state_provider(self.multichat_state.snapshot)
         try:
             self.api.start()
@@ -248,6 +260,7 @@ class MainWindow(QMainWindow):
             twitch_runtime_wake=self.twitch_eventsub_runtime.wake,
             donationalerts_service=self.donationalerts_service,
             donationalerts_runtime_wake=self.donationalerts_runtime.wake,
+            youtube_runtime_wake=self.youtube_chat_runtime.wake,
         )
         # D19 quick picker and Settings edit the exact same persisted center
         # asset. Keep the Settings combo synchronized when the user picks one
@@ -272,6 +285,10 @@ class MainWindow(QMainWindow):
         self.multichat_tab = MultichatTab(
             db, self.multichat_state, self.api,
             twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
+            youtube_status_provider=self.youtube_chat_runtime.status,
+            youtube_channel_provider=self.youtube_chat_runtime.channel_name,
+            youtube_choice_provider=self.youtube_chat_runtime.choice_required,
+            youtube_reopen=self.youtube_chat_runtime.request_selection,
         )
         self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
@@ -316,6 +333,24 @@ class MainWindow(QMainWindow):
         self._integration_health_timer.start()
         self.twitch_eventsub_runtime.start()
         self.donationalerts_runtime.start()
+        self.youtube_chat_runtime.start()
+
+    def _show_youtube_choices(self, _rows) -> None:
+        # A background discovery emits this into Qt's main thread. The list is
+        # re-checked against the current runtime choices before accepting an ID.
+        current = self.youtube_chat_runtime.choices()
+        if not current:
+            return
+        titles = [f"{x['title']} ({x['id']})" for x in current]
+        selected, ok = QInputDialog.getItem(
+            self, "Выбор трансляции YouTube",
+            "Выберите одну активную трансляцию своего YouTube-канала:",
+            titles, 0, False,
+        )
+        if ok and selected in titles:
+            self.youtube_chat_runtime.choose_broadcast(current[titles.index(selected)]["id"])
+        else:
+            self.youtube_chat_runtime.choose_broadcast(None)
 
     def _finalize_compact_headers_after_polish(self):
         """Re-floor compact table headers after the native style is polished."""
@@ -958,6 +993,8 @@ class MainWindow(QMainWindow):
         self._integration_health_timer.stop()
         self.twitch_adapter.cancel_authorization()
         self.donationalerts_adapter.cancel_authorization()
+        self.youtube_adapter.cancel_authorization()
+        self.youtube_chat_runtime.stop()
         self.twitch_eventsub_runtime.stop()
         self.donationalerts_runtime.stop()
         self._save_ui_state()
