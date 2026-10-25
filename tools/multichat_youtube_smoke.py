@@ -35,6 +35,7 @@ class Urls(unittest.TestCase):
         )
         self.assertEqual(source.source_id, 'alex_say62')
         self.assertEqual(source.channel, 'alex_say62')
+        self.assertEqual(source.url, 'https://www.twitch.tv/popout/alex_say62/chat?popout=')
 
     def test_twitch_public_popout(self):
         source = normalize_browser_chat_source('twitch', 'https://www.twitch.tv/popout/alex_say62/chat?popout=')
