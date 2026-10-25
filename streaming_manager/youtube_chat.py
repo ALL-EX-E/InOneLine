@@ -25,17 +25,22 @@ def _iso_seconds(raw: object) -> float | None:
 def _broadcast_choices(rows: list[dict], channel_id: str) -> list[dict]:
     choices = []
     seen = set()
+    seen_chats = set()
     for row in rows:
         data = row.get("snippet") or {}
         identifier = str(row.get("id") or "")
         owner = str(data.get("channelId") or "")
         # Never silently bind another channel when ownership is unprovable.
-        if not identifier or not owner or owner != channel_id or identifier in seen:
+        chat_id = str(data.get("liveChatId") or "")
+        if (not identifier or not owner or owner != channel_id
+                or identifier in seen or (chat_id and chat_id in seen_chats)):
             continue
         seen.add(identifier)
+        if chat_id:
+            seen_chats.add(chat_id)
         choices.append({
             "id": identifier, "title": str(data.get("title") or identifier),
-            "live_chat_id": str(data.get("liveChatId") or ""),
+            "live_chat_id": chat_id,
         })
     return choices
 
@@ -276,23 +281,28 @@ class YouTubeChatRuntime:
         # If a broadcast ended with another already live, keep the chosen
         # source pinned while the operator decides. Existing rows stay visible.
         page = self.api.chat_page(access, chat_id, self._page_token or "")
+        latest_row = self.db.get_integration_connection(YOUTUBE_SERVICE_KEY) or {}
+        if not latest_row.get("enabled") or latest_row.get("status") != "connected":
+            return 0.5
         next_token = str(page.get("nextPageToken") or "")
-        if self._page_token is None:
-            # Google's first page can include earlier chat history. It is never
-            # delivered to the user, even if it contains deletion events.
-            self._page_token = next_token or None
-        else:
-            for item in page.get("items") or ():
-                _consume_message(self.state, chat_id, item)
-            self._page_token = next_token or self._page_token
-        interval = page.get("pollingIntervalMillis")
-        try:
-            seconds = max(1.0, min(120.0, float(interval) / 1000))
-        except (ValueError, TypeError, OverflowError):
-            seconds = 5.0
-        self._next_message_poll = time.monotonic() + seconds
-        self._status_update(f"YouTube: чат канала «{channel_name}» подключён.")
-        return seconds
+        with self._lock:
+            if self._selected != active_selection or self._live_chat_id != chat_id:
+                return 0.5  # A late old-source response must never reappear.
+            if self._page_token is None:
+                # First response may include historical messages. Skip all.
+                self._page_token = next_token or None
+            else:
+                for item in page.get("items") or ():
+                    _consume_message(self.state, chat_id, item)
+                self._page_token = next_token or self._page_token
+            interval = page.get("pollingIntervalMillis")
+            try:
+                seconds = max(1.0, min(120.0, float(interval) / 1000))
+            except (ValueError, TypeError, OverflowError):
+                seconds = 5.0
+            self._next_message_poll = time.monotonic() + seconds
+            self._status = f"YouTube: чат канала «{channel_name}» подключён."
+            return seconds
 
     def _update_broadcasts(self, active: list[dict]):
         offer = None
