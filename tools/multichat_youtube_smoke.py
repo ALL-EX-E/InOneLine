@@ -389,6 +389,24 @@ class Urls(unittest.TestCase):
                 send(twitch, "tw-1", "first-tw")
                 until(lambda: len(state.snapshot()["messages"]) == 2,
                       "Both platforms must deliver new messages together")
+                # Embedded diagnostics must not drain the live queue or expose text.
+                diagnostics = []
+                before_diag = [(m["platform"], m["external_id"])
+                               for m in state.snapshot()["messages"]]
+                runtime.collect_diagnostics(lambda report: diagnostics.append(report))
+                until(lambda: len(diagnostics) == 1,
+                      "Embedded Qt diagnostics must complete for both live pages")
+                self.assertEqual(set(diagnostics[0]["sources"]), {"youtube", "twitch"})
+                self.assertTrue(diagnostics[0]["sources"]["youtube"]["dom"]["observerPresent"])
+                self.assertTrue(diagnostics[0]["sources"]["twitch"]["dom"]["observerPresent"])
+                self.assertEqual(
+                    before_diag,
+                    [(m["platform"], m["external_id"])
+                     for m in state.snapshot()["messages"]],
+                )
+                self.assertNotIn("first-yt", str(diagnostics[0]))
+                self.assertNotIn("first-tw", str(diagnostics[0]))
+
                 before = {m["platform"] for m in state.snapshot()["messages"]}
                 self.assertEqual(before, {"youtube", "twitch"})
 
