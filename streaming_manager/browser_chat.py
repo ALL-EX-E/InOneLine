@@ -66,7 +66,10 @@ def normalize_browser_chat_source(platform: str, url: str) -> BrowserChatSource:
             if not match:
                 raise ValueError("Twitch: нужна ссылка отдельного окна чата панели автора.")
             login = match.group(1).lower()
-            return BrowserChatSource(platform, f"https://dashboard.twitch.tv/popout/u/{login}/stream-manager/chat", login, login)
+            # Dashboard chat normally depends on the owner's signed-in
+            # browser. Use the equivalent public popout of that channel so
+            # the invisible Qt reader needs no credentials or Chrome cookie.
+            return BrowserChatSource(platform, f"https://www.twitch.tv/popout/{login}/chat?popout=", login, login)
         raise ValueError("Twitch: ссылка должна вести на twitch.tv или dashboard.twitch.tv.")
     raise ValueError("Неизвестная платформа браузерного чата.")
 
