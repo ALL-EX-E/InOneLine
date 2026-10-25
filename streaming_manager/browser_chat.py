@@ -87,10 +87,12 @@ _BROWSER_OBSERVER = r"""
     ? 'yt-live-chat-text-message-renderer,yt-live-chat-paid-message-renderer,yt-live-chat-membership-item-renderer'
     : '.chat-line__message,[data-test-selector="chat-line-message"]';
   const observed = new WeakSet();
+  const delivered = new WeakMap();
   const events = [];
   let serial = 0;
   let dropped = 0;
   let baseline = false;
+
   function nodesUnder(root) {
     const found = [];
     if (root.nodeType === 1 && root.matches && root.matches(selectors)) found.push(root);
@@ -101,24 +103,79 @@ _BROWSER_OBSERVER = r"""
     const node = root.querySelector(selector);
     return node ? (node.innerText || node.textContent || '').trim() : '';
   }
+  function push(event) {
+    if (events.length >= 512) { events.shift(); dropped++; }
+    events.push(event);
+  }
+  function nativeId(el) {
+    return (yt ? el.getAttribute('id')
+      : (el.getAttribute('data-id') || el.getAttribute('data-message-id'))) || '';
+  }
+  function authorOf(el) {
+    return yt ? pickText(el, '#author-name')
+      : pickText(el, '.chat-author__display-name,[data-a-target="chat-message-username"]');
+  }
+  function messageOf(el) {
+    return yt ? pickText(el, '#message')
+      : pickText(el, '[data-a-target="chat-message-text"],.text-fragment');
+  }
+  function deletionMarker(el, info) {
+    if (yt) return el.hasAttribute('is-deleted');
+    if (el.matches('.chat-line__message--deleted,[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"]') ||
+        el.querySelector('[data-a-target="chat-deleted-message"],[data-test-selector="chat-deleted-message"],.chat-line__message--deleted')) return true;
+    // A deleted Twitch message may keep its row and replace only its text.
+    // Match entire platform-provided tombstone, never a mere substring.
+    const value = messageOf(el);
+    return !!(info && value !== info.text &&
+      /^(?:<\s*)?(?:сообщение удалено|message deleted|message removed|this message was deleted|deleted by moderator)(?:\s*>)?$/i.test(value));
+  }
+  function removeKnown(el) {
+    const info = delivered.get(el);
+    if (!info || !deletionMarker(el, info)) return false;
+    delivered.delete(el);
+    push({kind: 'delete', id: info.id});
+    return true;
+  }
   function collect(el) {
+    if (removeKnown(el)) return;
     if (observed.has(el)) return;
     if (!baseline) { observed.add(el); return; }
-    const author = yt
-      ? pickText(el, '#author-name')
-      : pickText(el, '.chat-author__display-name,[data-a-target="chat-message-username"]');
-    const text = yt
-      ? pickText(el, '#message')
-      : pickText(el, '[data-a-target="chat-message-text"],.text-fragment');
+    // Never publish tombstones inserted after capture starts.
+    if (deletionMarker(el, null)) { observed.add(el); return; }
+    const author = authorOf(el);
+    const text = messageOf(el);
     if (!author || !text) return;
     observed.add(el);
-    const nativeId = yt ? (el.getAttribute('id') || '')
-      : (el.getAttribute('data-id') || el.getAttribute('data-message-id') || '');
-    const id = nativeId || ('dom-' + (++serial));
-    if (events.length >= 512) { events.shift(); dropped++; }
-    events.push({id, author: author.slice(0, 200), text: text.slice(0, 10000)});
+    const id = nativeId(el) || ('dom-' + (++serial));
+    delivered.set(el, {id, author, text});
+    push({kind: 'message', id, author: author.slice(0, 200), text: text.slice(0, 10000)});
   }
-  // Baseline existing items, and give the site a short loading grace period.
+  function inspect(target) {
+    if (!target) return;
+    const el = target.nodeType === 1 ? target : target.parentElement;
+    const row = el && el.closest && el.closest(selectors);
+    if (row) collect(row);
+  }
+  function replacement(change) {
+    // Some Twitch builds replace a row rather than changing its text.
+    // A normal React rerender or scrolling away is NEVER a deletion.
+    if (change.type !== 'childList' || !change.removedNodes.length || !change.addedNodes.length) return;
+    const removed = [];
+    const added = [];
+    change.removedNodes.forEach(node => nodesUnder(node).forEach(el => {
+      const item = delivered.get(el);
+      if (item) removed.push(item);
+    }));
+    change.addedNodes.forEach(node => nodesUnder(node).forEach(el => {
+      if (deletionMarker(el, {text: ''})) added.push(el);
+    }));
+    if (removed.length !== 1 || added.length !== 1) return;
+    const old = removed[0], fresh = added[0], nextId = nativeId(fresh);
+    const nextAuthor = authorOf(fresh);
+    if ((nextId && nextId !== old.id) || (nextAuthor && nextAuthor !== old.author)) return;
+    push({kind: 'delete', id: old.id});
+  }
+  // Baseline existing items and late first-rendered history.
   document.querySelectorAll(selectors).forEach(n => observed.add(n));
   setTimeout(() => {
     document.querySelectorAll(selectors).forEach(n => observed.add(n));
@@ -127,21 +184,19 @@ _BROWSER_OBSERVER = r"""
   const watcher = new MutationObserver(changes => {
     if (!baseline) return;
     for (const change of changes) {
-      for (const node of change.addedNodes) nodesUnder(node).forEach(collect);
-      if (change.target && change.target.nodeType === 1) {
-        const target = change.target.closest && change.target.closest(selectors);
-        if (target) collect(target);
-      }
+      replacement(change);
+      if (change.type === 'childList')
+        for (const node of change.addedNodes) nodesUnder(node).forEach(collect);
+      inspect(change.target);
     }
   });
   if (document.documentElement) watcher.observe(document.documentElement,
-    {childList:true,subtree:true,characterData:true});
+    {childList:true,subtree:true,characterData:true,attributes:true,
+     attributeFilter:['is-deleted','class','data-a-target','data-test-selector']});
   window.__iolBrowserChat = {
     drain() {
-      // Reconcile the newest on-screen nodes as a fallback when the site's
-      // framework batches/virtualizes DOM updates outside observer callbacks.
-      // Only unseen nodes are collected; the initial baseline is already
-      // marked in observed. Bound the scan to avoid unbounded DOM traversal.
+      // Reconcile only the newest 200 rows, never remove messages merely
+      // because a chat UI virtualizes or scrolls its older DOM nodes.
       if (baseline) {
         const latest = document.querySelectorAll(selectors);
         const begin = Math.max(0, latest.length - 200);
@@ -292,6 +347,13 @@ class _BrowserChatPage(QObject):
                 # Namespace it by page generation so new messages do not
                 # collide with the bounded RAM dedupe keys of an old page.
                 uid = f"page-{generation}-{uid}"
+            kind = str(item.get("kind") or "message")
+            if kind == "delete":
+                if uid:
+                    self.owner.state.delete_message(self.platform, source_id, uid)
+                continue
+            if kind != "message":
+                continue
             author = str(item.get("author") or "")[:200]
             text = str(item.get("text") or "")[:10000]
             if not uid or not author or not text:
