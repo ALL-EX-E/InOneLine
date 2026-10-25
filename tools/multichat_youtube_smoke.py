@@ -364,15 +364,23 @@ class Urls(unittest.TestCase):
                          "Separate remount mutations must not cause duplicate delivery")
         mutation_result = []
         page.runJavaScript(
-            """(() => {
-              const nodes = [...document.querySelectorAll('.chat-line__message')];
-              const row = nodes.find(el => el.querySelector('[data-a-target="chat-message-text"]')?.textContent.trim() === 'pending body');
-              if (!row) return {ok:false, count:nodes.length, note:'target row not found'};
-              row.innerHTML = '<span>&lt;сообщение удалено&gt;</span>';
-              return {ok:true, count:nodes.length,
-                      hasMessageRegion:!!row.querySelector('[data-a-target="chat-message-text"]'),
-                      deletedText:row.textContent.trim() === '<сообщение удалено>'};
-            })();""",
+            """JSON.stringify((function() {
+              try {
+                const nodes = document.querySelectorAll('.chat-line__message');
+                let row = null;
+                for (const item of nodes) {
+                  const region = item.querySelector('[data-a-target="chat-message-text"]');
+                  if (region && region.textContent.trim() === 'pending body') row = item;
+                }
+                if (!row) return {ok:false,count:nodes.length,note:'target row not found'};
+                row.innerHTML = '<span>&lt;сообщение удалено&gt;</span>';
+                return {ok:true,count:nodes.length,
+                        hasMessageRegion:!!row.querySelector('[data-a-target="chat-message-text"]'),
+                        deletedText:row.textContent.trim() === '<сообщение удалено>'};
+              } catch (error) {
+                return {ok:false,reason:String(error && error.name || 'javascript-error')};
+              }
+            })())""",
             QWebEngineScript.ScriptWorldId.MainWorld,
             lambda value: mutation_result.append(value),
         )
@@ -381,8 +389,10 @@ class Urls(unittest.TestCase):
                 break
             await_ms(100)
         self.assertTrue(
-            mutation_result and isinstance(mutation_result[0], dict)
-            and mutation_result[0].get("ok") and mutation_result[0].get("deletedText"),
+            mutation_result and isinstance(mutation_result[0], str)
+            and mutation_result[0] != ""
+            and json.loads(mutation_result[0]).get("ok")
+            and json.loads(mutation_result[0]).get("deletedText"),
             f"Qt MainWorld tombstone mutation did not execute: {mutation_result!r}",
         )
         await_ms(300)
