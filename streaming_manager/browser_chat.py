@@ -250,7 +250,6 @@ class _BrowserChatPage(QObject):
         self._next_retry = 0.0
         self._backoff = 5.0
         self._busy = False
-        self._create_page()
 
     def _create_page(self):
         # A navigation can leave pending asynchronous callbacks or an obsolete
@@ -339,6 +338,7 @@ class _BrowserChatPage(QObject):
             return
         if self._next_retry:
             self._next_retry = 0
+            self._create_page()
             self._load()
             return
         if self._busy:
@@ -401,8 +401,6 @@ class _BrowserChatPage(QObject):
     def shutdown(self):
         self._generation += 1
         self.source = None
-        self.page.loadFinished.disconnect(self._loaded)
-        self.page.renderProcessTerminated.disconnect(self._crashed)
         if self.page is not None:
             self.page.loadFinished.disconnect(self._loaded)
             self.page.renderProcessTerminated.disconnect(self._crashed)
