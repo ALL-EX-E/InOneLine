@@ -36,13 +36,14 @@ class _ChatFeed(QTextEdit):
 class MultichatTab(QWidget):
     def __init__(self, db, state, api, *, twitch_status_provider=None,
                  youtube_status_provider=None, twitch_browser_status_provider=None,
-                 browser_runtime_wake=None):
+                 browser_runtime_wake=None, twitch_runtime_wake=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
         self.youtube_status_provider = youtube_status_provider
         self.twitch_browser_status_provider = twitch_browser_status_provider
         self.browser_runtime_wake = browser_runtime_wake or (lambda: None)
+        self.twitch_runtime_wake = twitch_runtime_wake or (lambda: None)
         self._last_render = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         self.columns.setContentsMargins(8, 8, 8, 8)
@@ -186,8 +187,7 @@ class MultichatTab(QWidget):
         # The EventSub runtime re-subscribes to CHAT only in EventSub mode;
         # existing channel-point reward subscriptions are independent.
         self.browser_runtime_wake()
-        if hasattr(self, "twitch_runtime_wake"):
-            self.twitch_runtime_wake()
+        self.twitch_runtime_wake()
         self._update_twitch_browser_controls()
 
     def _apply_browser_url(self, platform):
