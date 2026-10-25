@@ -240,7 +240,8 @@ _BROWSER_OBSERVER = r"""
         old.previous === change.previousSibling &&
         old.next === change.nextSibling && now - old.when <= 10000 &&
         (!nativeId(el) || nativeId(el) === old.info.id) &&
-        (!authorOf(el) || authorOf(el) === old.info.author));
+        (!authorOf(el) || authorOf(el) === old.info.author) &&
+        (!messageOf(el) || messageOf(el) === old.info.text));
       if (candidates.length !== 1) return;
       const old = candidates[0];
       recentTwitchRemovals.splice(recentTwitchRemovals.indexOf(old), 1);
