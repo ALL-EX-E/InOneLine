@@ -90,6 +90,8 @@ _BROWSER_OBSERVER = r"""
   const delivered = new WeakMap();
   const deliveredById = new Map();
   const removedIds = new Set();
+  const recentTwitchRemovals = [];
+  const replacementCandidates = new WeakMap();
   const events = [];
   let serial = 0;
   let dropped = 0;
@@ -137,8 +139,17 @@ _BROWSER_OBSERVER = r"""
     const value = messageOf(el);
     const text = (value || el.innerText || el.textContent || '').trim();
     if (info && text === info.text) return false;
-    // A normal message containing "deleted" is NOT a moderation command.
-    // Only an exact platform tombstone can invalidate an existing item.
+    if (!yt) {
+      // Real Twitch dashboard DOM (25 Oct 2026) removes the original row
+      // and inserts a fresh row, often first with the OLD text.  The
+      // replacement later renders "Author: <сообщение удалено>" but retains
+      // neither an external ID nor a message-text element.  Require the
+      // complete, final tombstone suffix and absence of an ordinary message
+      // element; user-authored messages containing these words remain valid.
+      if (el.querySelector('[data-a-target="chat-message-text"],.text-fragment')) return false;
+      const suffix = text.replace(/^[^\n:]{1,200}:\s*/, '');
+      return deletedText.test(suffix);
+    }
     return deletedText.test(text);
   }
   function markDeleted(info) {
@@ -150,14 +161,28 @@ _BROWSER_OBSERVER = r"""
   }
   function removeKnown(el) {
     const native = nativeId(el);
-    const info = delivered.get(el) || (native ? deliveredById.get(native) : null);
+    const info = delivered.get(el) || (native ? deliveredById.get(native) : null)
+      || (!yt ? replacementCandidates.get(el) : null);
     if (!info || !deletionMarker(el, info)) return false;
     delivered.delete(el);
+    if (!yt) replacementCandidates.delete(el);
     markDeleted(info);
     return true;
   }
   function collect(el) {
     if (removeKnown(el)) return;
+    // An unconfirmed Twitch replacement is NOT a new message. Do not add a
+    // duplicate with a fresh dom-N ID while React rehydrates its placeholder.
+    if (!yt && replacementCandidates.has(el)) {
+      const old = replacementCandidates.get(el);
+      if (Date.now() - old.when <= 10000) return;
+      replacementCandidates.delete(el);
+      if (authorOf(el) === old.info.author && messageOf(el) === old.info.text) {
+        delivered.set(el, old.info);
+        observed.add(el);
+        return;
+      }
+    }
     if (observed.has(el)) return;
     if (!baseline) { observed.add(el); return; }
     // Never publish tombstones inserted after capture starts.
@@ -184,23 +209,47 @@ _BROWSER_OBSERVER = r"""
     if (row) collect(row);
   }
   function replacement(change) {
-    // Some Twitch builds replace a row rather than changing its text.
-    // A normal React rerender or scrolling away is NEVER a deletion.
-    if (change.type !== 'childList' || !change.removedNodes.length || !change.addedNodes.length) return;
+    if (yt || change.type !== 'childList') return;
+    // Deletion in the real Twitch dashboard is a two-phase DOM replacement.
+    // Track only one previously delivered row in one exact parent/sibling slot,
+    // for at most ten seconds; removal by itself is never a delete event.
+    const now = Date.now();
+    for (let i = recentTwitchRemovals.length - 1; i >= 0; i--)
+      if (now - recentTwitchRemovals[i].when > 10000) recentTwitchRemovals.splice(i, 1);
     const removed = [];
-    const added = [];
     change.removedNodes.forEach(node => nodesUnder(node).forEach(el => {
       const item = delivered.get(el);
-      if (item) removed.push(item);
+      if (item && !removedIds.has(item.id)) removed.push(item);
     }));
+    if (removed.length === 1) {
+      recentTwitchRemovals.push({
+        info: removed[0], parent: change.target,
+        previous: change.previousSibling, next: change.nextSibling, when: now
+      });
+      if (recentTwitchRemovals.length > 50) recentTwitchRemovals.shift();
+    }
     change.addedNodes.forEach(node => nodesUnder(node).forEach(el => {
-      if (deletionMarker(el, {text: ''})) added.push(el);
+      const candidates = recentTwitchRemovals.filter(old =>
+        old.parent === change.target &&
+        old.previous === change.previousSibling &&
+        old.next === change.nextSibling && now - old.when <= 10000 &&
+        (!nativeId(el) || nativeId(el) === old.info.id) &&
+        (!authorOf(el) || authorOf(el) === old.info.author));
+      if (candidates.length !== 1) return;
+      const old = candidates[0];
+      recentTwitchRemovals.splice(recentTwitchRemovals.indexOf(old), 1);
+      if (messageOf(el) === old.info.text &&
+          authorOf(el) === old.info.author) {
+        // React remounted the SAME message; link it to the same delivered ID.
+        delivered.set(el, old.info);
+        observed.add(el);
+      } else if (!messageOf(el)) {
+        // Placeholder still being hydrated. Wait for definitive tombstone;
+        // if it stays unmodified for 10s, allow normal ingestion again.
+        replacementCandidates.set(el, {info: old.info, when: now});
+      }
+      removeKnown(el);
     }));
-    if (removed.length !== 1 || added.length !== 1) return;
-    const old = removed[0], fresh = added[0], nextId = nativeId(fresh);
-    const nextAuthor = authorOf(fresh);
-    if ((nextId && nextId !== old.id) || (nextAuthor && nextAuthor !== old.author)) return;
-    markDeleted(old);
   }
   // Baseline existing items and late first-rendered history.
   document.querySelectorAll(selectors).forEach(n => observed.add(n));
