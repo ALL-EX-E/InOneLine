@@ -480,3 +480,82 @@ class BrowserChatRuntime(QObject):
                 self._readers[platform] = reader
             reader.set_source(source)
             reader.poll()
+
+
+    def collect_diagnostics(self, callback):
+        """Read-only embedded page snapshots: no text, cookies, URLs with tokens or chat drain."""
+        report = {
+            "format": "InOneLine-D41-Qt-diagnostic-v1",
+            "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "sources": {},
+        }
+        outstanding = set()
+        completed = False
+        script = r"""(() => {
+          const selectors = ['yt-live-chat-renderer','yt-live-chat-item-list-renderer',
+            'yt-live-chat-text-message-renderer','yt-live-chat-deleted-message-renderer',
+            '.chat-line__message','[data-test-selector="chat-line-message"]',
+            '[data-a-target="chat-deleted-message"]'];
+          const counts = {};
+          for (const q of selectors) counts[q] = document.querySelectorAll(q).length;
+          const body = document.body ? (document.body.innerText || '') : '';
+          const frames = [...document.querySelectorAll('iframe')].slice(0, 12).map(e => {
+            try {
+              const host = new URL(e.src || 'about:blank', location.href).hostname;
+              return /(^|\.)(youtube\.com|twitch\.tv)$/.test(host) ? host : 'other';
+            } catch (_) { return 'unknown'; }
+          });
+          return JSON.stringify({
+            pageHost:location.hostname,readyState:document.readyState,
+            visibility:document.visibilityState,observerPresent:!!window.__iolBrowserChat,
+            frameHosts:frames,counts,bodyTextLength:body.length,
+            possibleLogin:/sign in to|log in to|войдите в аккаунт/i.test(body),
+            possibleChallenge:/captcha|verify you are human|checking your browser/i.test(body)
+          });
+        })()"""
+
+        def complete():
+            nonlocal completed
+            if completed:
+                return
+            completed = True
+            for platform in outstanding:
+                report["sources"][platform]["dom"] = {"error": "timeout"}
+            callback(report)
+
+        for platform in ("youtube", "twitch"):
+            reader = self._readers[platform]
+            if reader is None or reader.source is None or reader.page is None:
+                report["sources"][platform] = {"connected": False, "status": self.status(platform)}
+                continue
+            page = reader.page
+            report["sources"][platform] = {
+                "connected": True, "status": reader.status,
+                "pageHost": page.url().host(),
+                "wantedHost": urlsplit(reader.source.url).hostname,
+                "generation": reader._generation,
+                "pollBusy": reader._busy,
+                "lastReplyAgeSec": round(max(0.0, time.monotonic() - reader._last_reply), 2),
+                "retryScheduled": reader._next_retry > time.monotonic(),
+            }
+            outstanding.add(platform)
+
+            def ready(value, platform=platform):
+                if completed or platform not in outstanding:
+                    return
+                outstanding.remove(platform)
+                try:
+                    parsed = json.loads(value) if isinstance(value, str) else None
+                except (TypeError, ValueError):
+                    parsed = None
+                report["sources"][platform]["dom"] = parsed if isinstance(parsed, dict) else {
+                    "error": "no_javascript_response",
+                }
+                if not outstanding:
+                    complete()
+
+            page.runJavaScript(script, QWebEngineScript.ScriptWorldId.ApplicationWorld, ready)
+        if not outstanding:
+            complete()
+        else:
+            QTimer.singleShot(6000, complete)
