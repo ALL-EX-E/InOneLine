@@ -13,7 +13,7 @@ import json
 import re
 import threading
 from collections import OrderedDict
-from queue import Empty, Full, Queue
+from queue import Empty, Full, PriorityQueue
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
@@ -562,7 +562,8 @@ class TwitchEventSubRuntime:
         # receive loop. Queue and caches are bounded; failed lookups do not
         # compromise the chat or channel-points connection.
         self._media_lock = threading.RLock()
-        self._media_tasks: Queue = Queue(maxsize=128)
+        self._media_tasks: PriorityQueue = PriorityQueue(maxsize=128)
+        self._media_sequence = 0
         self._media_thread: threading.Thread | None = None
         self._avatar_cache: OrderedDict[tuple[str, str], str] = OrderedDict()
         self._avatar_scheduled: OrderedDict[tuple[str, str], None] = OrderedDict()
@@ -574,7 +575,13 @@ class TwitchEventSubRuntime:
         if self._media_thread is None or not self._media_thread.is_alive():
             return False
         try:
-            self._media_tasks.put_nowait(task)
+            # Avatar of a new chatter must not wait behind full catalog scans;
+            # all adapter network calls still share the original OAuth lock.
+            priorities = {"avatar": 0, "badges": 1, "emotes": 2}
+            with self._media_lock:
+                self._media_sequence += 1
+                item = (priorities.get(task[0], 3), self._media_sequence, task)
+                self._media_tasks.put_nowait(item)
             return True
         except Full:
             return False  # no GUI stalls or EventSub backpressure
@@ -606,7 +613,7 @@ class TwitchEventSubRuntime:
                 task = self._media_tasks.get(timeout=0.4)
             except Empty:
                 continue
-            kind, source_id, user_id, login = task
+            _priority, _number, (kind, source_id, user_id, login) = task
             if not self.service.connection_ready():
                 continue
             try:
