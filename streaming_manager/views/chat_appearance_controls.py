@@ -66,6 +66,10 @@ class ChatAppearanceEditor(QWidget):
         common_form.addRow("Фон:", self.background)
         self.background_color = self._color(common_form, "Цвет фона:")
         self.background_opacity = self._number(common_form, "Непрозрачность:", 0, 100, " %")
+        self.bg_color_control = self.background_color.parentWidget()
+        self.bg_color_label = common_form.labelForField(self.bg_color_control)
+        self.bg_opacity_control = self.background_opacity.parentWidget()
+        self.bg_opacity_label = common_form.labelForField(self.bg_opacity_control)
         self.media_combo = ScrollSafeComboBox()
         self.media_combo.currentIndexChanged.connect(self._changed)
         common_form.addRow("Из библиотеки:", self.media_combo)
@@ -84,6 +88,8 @@ class ChatAppearanceEditor(QWidget):
         self.glow.toggled.connect(self._changed)
         common_form.addRow(self.glow)
         self.glow_color = self._color(common_form, "Цвет контура:")
+        self.glow_color_control = self.glow_color.parentWidget()
+        self.glow_color_label = common_form.labelForField(self.glow_color_control)
         self.visibility = ScrollSafeComboBox()
         self.visibility.addItem("Скрывать, когда чат пуст", "hide_empty")
         self.visibility.addItem("Показывать постоянно", "always")
@@ -269,13 +275,19 @@ class ChatAppearanceEditor(QWidget):
             if widget is not None:
                 widget.setEnabled(custom)
         bg = data["common"]["background"]
-        for widget in (self.background_color,self.background_opacity):
-            widget.setVisible(bg == "color")
+        for widget in (
+            self.bg_color_control, self.bg_color_label,
+            self.bg_opacity_control, self.bg_opacity_label,
+        ):
+            if widget is not None:
+                widget.setVisible(bg == "color")
         for widget in (self.media_combo,self.media_label,self.media_import,
                        self.background_fit,self.fit_label):
             if widget is not None:
                 widget.setVisible(bg == "media")
-        self.glow_color.setEnabled(data["common"]["glow"])
+        for widget in (self.glow_color_control, self.glow_color_label):
+            if widget is not None:
+                widget.setVisible(data["common"]["glow"])
         self.status.setText("Есть несохранённые изменения" if self.is_dirty() else "Сохранено")
         self.changed.emit(data["twitch"], data["common"], self.test_visible)
 
