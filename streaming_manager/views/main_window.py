@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import QEvent, QSize, Qt, QThreadPool, QTimer
-from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QPainter, QPixmap
+from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QThreadPool, QTimer, QUrl
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFrame,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QTableView,
@@ -440,6 +442,8 @@ class MainWindow(QMainWindow):
                 watched.installEventFilter(self)
                 self._responsive_watch_widgets.add(watched)
         scroll.setWidget(page)
+        if page is self.settings_tab:
+            self._install_settings_github_footer(scroll)
         scroll.setAccessibleName(title)
         self._main_tab_scroll_by_page[page] = scroll
         self._main_tab_page_by_scroll[scroll] = page
@@ -455,6 +459,76 @@ class MainWindow(QMainWindow):
         scroll.viewport().installEventFilter(self)
         self._queue_responsive_layout_update()
         return scroll
+
+    @staticmethod
+    def _github_project_icon() -> QIcon:
+        """Local GitHub Invertocat mark: Simple Icons (CC0-1.0), no network fetch.
+
+        GitHub permits its mark as a social button linking to a project:
+        https://brand.github.com/foundations/logo
+        """
+        svg = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<path fill="#f1f4f8" d="M12 .297c-6.63 0-12 5.373-12 12c0 5.303 3.438 9.8 8.205 11.385c.6.113.82-.258.82-.577c0-.285-.01-1.04-.015-2.04c-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729c1.205.084 1.838 1.236 1.838 1.236c1.07 1.835 2.809 1.305 3.495.998c.108-.776.417-1.305.76-1.605c-2.665-.3-5.466-1.332-5.466-5.93c0-1.31.465-2.38 1.235-3.22c-.135-.303-.54-1.523.105-3.176c0 0 1.005-.322 3.3 1.23c.96-.267 1.98-.399 3-.405c1.02.006 2.04.138 3 .405c2.28-1.552 3.285-1.23 3.285-1.23c.645 1.653.24 2.873.12 3.176c.765.84 1.23 1.91 1.23 3.22c0 4.61-2.805 5.625-5.475 5.92c.42.36.81 1.096.81 2.22c0 1.606-.015 2.896-.015 3.286c0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>"""
+        renderer = QSvgRenderer(QByteArray(svg))
+        if not renderer.isValid():
+            raise RuntimeError("Bundled GitHub SVG icon is invalid")
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        # Render at native pixel coordinates first. Setting DPR before
+        # QSvgRenderer.render() doubles the painter scaling on Windows,
+        # clipping the mark so only one quarter remains visible.
+        renderer.render(painter)
+        painter.end()
+        pixmap.setDevicePixelRatio(2.0)
+        return QIcon(pixmap)
+
+    def _install_settings_github_footer(self, scroll: QScrollArea) -> None:
+        """Keep the action outside the viewport: scrolling never covers a setting."""
+        scroll.setViewportMargins(0, 0, 0, 48)
+        button = QPushButton(scroll)
+        button.setObjectName("settings_github_link")
+        button.setFixedSize(40, 36)
+        button.setCursor(Qt.PointingHandCursor)
+        button.setIcon(self._github_project_icon())
+        button.setIconSize(QSize(24, 24))
+        button.setToolTip("Открыть GitHub проекта")
+        button.setAccessibleName("Открыть GitHub проекта")
+        button.setStyleSheet(
+            "QPushButton#settings_github_link {"
+            "background-color: #333a44; border: 1px solid #596271;"
+            "border-radius: 6px; padding: 0px; }"
+            "QPushButton#settings_github_link:hover {"
+            "background-color: #455164; border-color: #89aaff; }"
+            "QPushButton#settings_github_link:pressed {"
+            "background-color: #293747; }"
+        )
+        button.clicked.connect(self._open_project_github)
+        self._settings_github_button = button
+        self._settings_github_scroll = scroll
+        scroll.installEventFilter(self)
+        QTimer.singleShot(0, self._position_settings_github_button)
+
+    def _position_settings_github_button(self) -> None:
+        """Position in the reserved bottom margin, left of the scrollbar."""
+        button = getattr(self, "_settings_github_button", None)
+        scroll = getattr(self, "_settings_github_scroll", None)
+        if button is None or scroll is None:
+            return
+        viewport = scroll.viewport().geometry()
+        button.move(
+            max(viewport.left() + 4, viewport.right() - button.width() - 9),
+            viewport.bottom() + 7,
+        )
+        button.raise_()
+
+    def _open_project_github(self) -> None:
+        url = QUrl("https://github.com/ALL-EX-E/InOneLine")
+        if not QDesktopServices.openUrl(url):
+            QMessageBox.warning(
+                self, "GitHub проекта",
+                "Не удалось открыть страницу проекта в браузере.",
+            )
 
     def _make_tinted_tab_icon(
         self, icon_pixmap: QStyle.StandardPixmap, tint_color: str
@@ -493,6 +567,12 @@ class MainWindow(QMainWindow):
 
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Type.Resize:
+            if watched is getattr(self, "_settings_github_scroll", None) or (
+                watched is getattr(self, "_settings_github_scroll", None).viewport()
+                if getattr(self, "_settings_github_scroll", None) is not None
+                else False
+            ):
+                QTimer.singleShot(0, self._position_settings_github_button)
             is_tab_layout = watched is self.tabs or watched is self.tabs.tabBar()
             is_workspace_viewport = any(
                 watched is scroll.viewport()
