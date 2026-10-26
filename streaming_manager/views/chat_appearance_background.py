@@ -39,6 +39,10 @@ class ChatBackgroundFrame(QFrame):
         self.media.hide()
         stack.addWidget(self.media)
         stack.addWidget(feed)
+        # StackAll raises its *current* page above its siblings. The media
+        # layer was added first, so without selecting the feed it can cover
+        # every message and the local test sample in the operator preview.
+        stack.setCurrentWidget(feed)
         feed.setStyleSheet("QTextEdit{background:transparent;border:none;}")
         feed.viewport().setAutoFillBackground(False)
         feed.setAttribute(Qt.WA_TranslucentBackground, True)
