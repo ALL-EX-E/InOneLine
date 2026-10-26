@@ -22,6 +22,8 @@ body {color:#fff;font:18px/1.3 sans-serif}
   display:flex;flex-direction:column;justify-content:flex-end}
 .message {flex-shrink:0;min-width:0;padding:4px 8px;background:rgba(0,0,0,.5);
   overflow-wrap:anywhere}
+/* A fixed gap separates neighbouring glowing borders without altering message order. */
+.message + .message {margin-top:10px}
 .header {display:flex;align-items:center;flex-wrap:wrap;gap:5px;min-height:1.3em}
 .platform-icon {display:inline-block;width:auto;height:1em;flex-shrink:0}
 .avatar {border-radius:50%;width:1.35em;height:1.35em;object-fit:cover}
