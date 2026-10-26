@@ -568,14 +568,37 @@ class TwitchEventSubRuntime:
         self._avatar_scheduled: OrderedDict[tuple[str, str], None] = OrderedDict()
         self._badge_cache: dict[str, dict[tuple[str, str], str]] = {}
         self._badge_scheduled: set[str] = set()
+        self._emotes_scheduled: set[str] = set()
 
-    def _queue_media(self, task: tuple) -> None:
+    def _queue_media(self, task: tuple) -> bool:
         if self._media_thread is None or not self._media_thread.is_alive():
-            return
+            return False
         try:
             self._media_tasks.put_nowait(task)
+            return True
         except Full:
-            pass  # no GUI stalls or EventSub backpressure
+            return False  # no GUI stalls or EventSub backpressure
+
+    def _schedule_media_warmup(self, source_id: str) -> None:
+        """Queue provider metadata before the first chat message, off EventSub."""
+        if not self.chat_connected or not source_id:
+            return
+        row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
+        config = row.get("provider_config") or {}
+        if isinstance(config, dict) and str(config.get("twitch_user_id") or "") == source_id:
+            profile = safe_image_url(config.get("profile_image_url"))
+            if profile:
+                with self._media_lock:
+                    self._avatar_cache[(source_id, source_id)] = profile
+                if self.chat_state is not None:
+                    self.chat_state.set_media_preload("twitch", (profile,))
+        with self._media_lock:
+            if source_id not in self._badge_scheduled:
+                if self._queue_media(("badges", source_id, "", "")):
+                    self._badge_scheduled.add(source_id)
+            if source_id not in self._emotes_scheduled:
+                if self._queue_media(("emotes", source_id, "", "")):
+                    self._emotes_scheduled.add(source_id)
 
     def _media_worker(self) -> None:
         while not self._stop.is_set():
@@ -601,6 +624,41 @@ class TwitchEventSubRuntime:
                             self._badge_cache[source_id] = cleaned
                         if self.chat_state is not None:
                             self.chat_state.enrich_twitch_media(source_id, badge_urls=cleaned)
+                            # Warm the most common badge variants before a
+                            # moderator/subscriber first appears on screen.
+                            important = {"broadcaster", "moderator", "vip", "subscriber"}
+                            badge_images = [
+                                url for (set_id, _variant), url in cleaned.items()
+                                if set_id in important
+                            ][:12]
+                            self.chat_state.set_media_preload("twitch", badge_images)
+                elif kind == "emotes":
+                    catalog = self.service.integration_manager.call_adapter(
+                        TWITCH_SERVICE_KEY, "list_center_emotes",
+                    )
+                    rows = catalog.get("items") if isinstance(catalog, dict) else []
+                    if not isinstance(rows, list):
+                        rows = []
+                    preload = []
+                    # Use the same official EventSub image URL and rendition
+                    # as a real message, not the wheel picker's 3x thumbnails.
+                    for row in rows[:256]:
+                        if not isinstance(row, dict):
+                            continue
+                        parts = parse_twitch_fragments({"fragments": [{
+                            "type": "emote",
+                            "text": str(row.get("name") or ""),
+                            "emote": {
+                                "id": str(row.get("emote_id") or ""),
+                                "format": ["animated" if row.get("animated") else "static"],
+                            },
+                        }]})
+                        if parts and parts[0].get("kind") == "image":
+                            preload.append(parts[0]["url"])
+                        if len(preload) >= 10:
+                            break
+                    if self.chat_state is not None:
+                        self.chat_state.set_media_preload("twitch", preload)
                 elif kind == "avatar":
                     url = safe_image_url(
                         self.service.integration_manager.call_adapter(
@@ -627,8 +685,8 @@ class TwitchEventSubRuntime:
     ) -> tuple[str, tuple[dict, ...]]:
         with self._media_lock:
             if source_id not in self._badge_scheduled:
-                self._badge_scheduled.add(source_id)
-                self._queue_media(("badges", source_id, "", ""))
+                if self._queue_media(("badges", source_id, "", "")):
+                    self._badge_scheduled.add(source_id)
             if user_id and login and (source_id, user_id) not in self._avatar_scheduled:
                 key = (source_id, user_id)
                 self._avatar_scheduled[key] = None
@@ -873,6 +931,8 @@ class TwitchEventSubRuntime:
                         if event_type == "channel.chat.message":
                             self._chat_subscription_active = True
             self.chat_connected = bool(chat_required and self._chat_subscription_active)
+            if self.chat_connected:
+                self._schedule_media_warmup(chat_source)
             current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
             subscribed_credential_ref = str(current_row.get("credential_ref") or "")
             self.connected = True
