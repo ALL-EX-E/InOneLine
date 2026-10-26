@@ -157,6 +157,117 @@ class AppearanceModelTests(unittest.TestCase):
             frame.close()
         app.processEvents()
 
+    def test_saved_png_gif_video_preview_refresh_and_cleanup(self):
+        """Regression for user-reported close after saving any media background.
+
+        Exercise the REAL registered library, Qt layer and save controls through
+        repeated 250-ms-equivalent refreshes, not only color/static CSS tests.
+        """
+        import base64
+        import shutil
+        import time
+        os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QColor, QImage
+        from PySide6.QtMultimedia import QMediaPlayer
+        from streaming_manager.database import Database
+        from streaming_manager.media import (
+            MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, managed_media_directory,
+        )
+        from streaming_manager.views.chat_appearance_background import ChatBackgroundFrame
+        from streaming_manager.views.chat_appearance_controls import ChatAppearanceEditor
+        from streaming_manager.views.chat_rich_feed import ChatRichFeed
+
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            db = Database(Path(folder) / "chat_media.db")
+            media_dir = managed_media_directory(
+                db.path.parent, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
+            )
+            media_dir.mkdir(parents=True, exist_ok=True)
+            still = media_dir / "chat_background.png"
+            still_image = QImage(640, 360, QImage.Format_RGB32)
+            still_image.fill(QColor("#428A91"))
+            self.assertTrue(still_image.save(str(still)))
+            gif = media_dir / "chat_background.gif"
+            gif.write_bytes(base64.b64decode(
+                "R0lGODlhEAAQAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4w"
+                "AwEAAAAh+QQAGQAAACwAAAAAEAAQAAAIHQABCBxIsKDBgwgTKlz"
+                "IsKHDhxAjSpxIsaLFgQEBACH5BAEZAAEALAAAAAAQABAAgQAA"
+                "/wAAAAAAAAAAAAgdAAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAOw=="
+            ))
+            video = media_dir / "chat_background.webm"
+            shutil.copyfile(
+                Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm", video,
+            )
+            asset_ids = []
+            for path in (still, gif, video):
+                asset = db.ensure_managed_media_asset(
+                    MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, path.name, path.name
+                )
+                asset_ids.append(asset.id)
+
+            feed = ChatRichFeed()
+            frame = ChatBackgroundFrame(db, feed)
+            editor = ChatAppearanceEditor(db)
+            frame.resize(650, 400)
+            frame.show()
+            app.processEvents()
+            try:
+                editor._set_combo(editor.background, "media")
+                frame.feed.display(
+                    [{"platform":"twitch", "author":"test",
+                      "text":"Media regression",
+                      "fragments":[{"kind":"text","text":"Media regression"}]}],
+                    show_time=False, show_icons=True,
+                )
+                for id_, kind in zip(asset_ids, ("image", "gif", "video")):
+                    editor._refresh_media(id_)
+                    self.assertEqual(editor.media_combo.currentData(), id_)
+                    self.assertTrue(editor.save())
+                    current = saved_appearance(db)["common"]
+                    self.assertEqual(current["background_media_id"], id_)
+                    frame.apply(current, has_content=True)
+                    app.processEvents()
+                    self.assertEqual(frame._movie_kind,kind)
+                    self.assertIsNotNone(frame._source_key)
+                    if kind == "gif":
+                        self.assertTrue(frame._movie.isValid())
+                    if kind == "video":
+                        self.assertIsInstance(frame._player,QMediaPlayer)
+                        self.assertIsNone(frame._player.audioOutput())
+                    # Keep a real Qt event loop active for delayed QMovie,
+                    # QVideoSink and 250-ms operator refresh cycles.
+                    deadline = time.monotonic() + 2.0
+                    while time.monotonic() < deadline:
+                        frame.apply(current,has_content=True)
+                        app.processEvents()
+                        time.sleep(.025)
+                    self.assertEqual(frame._movie_kind,kind)
+                    self.assertIs(frame.layout().currentWidget(),feed)
+                    self.assertIn("Media regression",feed.toPlainText())
+                    if kind == "image":
+                        before = frame._paint_key
+                        for _ in range(12):
+                            frame.apply(current,has_content=True)
+                            app.processEvents()
+                        self.assertEqual(frame._paint_key,before,
+                            "Static media must NOT redraw every 250 ms")
+                # Leaving media releases native Qt decoder/animations cleanly.
+                editor._set_combo(editor.background,"transparent")
+                self.assertTrue(editor.save())
+                frame.apply(saved_appearance(db)["common"],has_content=True)
+                app.processEvents()
+                self.assertIsNone(frame._player)
+                self.assertIsNone(frame._movie)
+                self.assertIsNone(frame._source_key)
+            finally:
+                frame.shutdown()
+                feed._poll.stop()
+                editor.close()
+                frame.close()
+                app.processEvents()
+
     def test_browser_box_safe_area_does_not_clip_edges(self):
         html = Path("streaming_manager/web/multichat_overlay.html").read_text(
             encoding="utf-8"
@@ -168,6 +279,7 @@ class AppearanceModelTests(unittest.TestCase):
         self.assertIn("#shell.always {top:var(--chat-edge-inset)", html)
         self.assertIn("max-height:calc(100% - 2 * var(--chat-edge-inset))",html)
         self.assertIn("0 0 6px",html)
+        self.assertIn(".message + .message {margin-top:10px}", html)
 
     def test_overlay_never_renders_provider_html(self):
         overlay = Path("streaming_manager/web/multichat_overlay.html").read_text(encoding="utf-8")
