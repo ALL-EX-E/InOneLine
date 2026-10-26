@@ -25,6 +25,8 @@ class ChatBackgroundFrame(QFrame):
         self.feed = feed
         self._appearance = normalize_common({})
         self._source_key = None
+        self._paint_key = None
+        self._last_style = None
         self._original = QPixmap()
         self._movie: QMovie | None = None
         self._player: QMediaPlayer | None = None
@@ -73,6 +75,7 @@ class ChatBackgroundFrame(QFrame):
             self._sink = None
         self._movie_kind = ""
         self._source_key = None
+        self._paint_key = None
         self._original = QPixmap()
         self.media.hide()
         self.media.clear()
@@ -129,20 +132,37 @@ class ChatBackgroundFrame(QFrame):
                 self._paint_media()
 
     def _paint_media(self):
-        if self._original.isNull():
+        """Render once per new frame, size or fit. Never restack on each timer tick.
+
+        The operator refreshes every 250 ms. Rebuilding a full-size pixmap
+        and changing QStackedLayout z-order on each refresh caused unbounded
+        Qt repaints with media backgrounds, even for static PNG/JPG.
+        """
+        if self._original.isNull() or self._source_key is None:
             return
         size = self.size()
         width, height = max(1, size.width()), max(1, size.height())
-        aspect = (Qt.KeepAspectRatio if self._appearance["background_fit"] == "contain"
-                  else Qt.KeepAspectRatioByExpanding)
+        fit = self._appearance["background_fit"]
+        key = (self._source_key, self._original.cacheKey(), width, height, fit)
+        if key == self._paint_key:
+            return
+        aspect = Qt.KeepAspectRatio if fit == "contain" else Qt.KeepAspectRatioByExpanding
         scaled = self._original.scaled(width, height, aspect, Qt.SmoothTransformation)
-        if self._appearance["background_fit"] == "cover":
+        if fit == "cover":
             x = max(0, (scaled.width() - width) // 2)
             y = max(0, (scaled.height() - height) // 2)
             scaled = scaled.copy(x, y, width, height)
         self.media.setPixmap(scaled)
-        self.media.show()
-        self.media.lower()
+        self._paint_key = key
+        if self.media.isHidden():
+            self.media.show()
+            # StackAll may raise a newly shown QLabel over the QTextEdit.
+            # Select the one existing operator feed once; never lower/raise
+            # per animation frame or per 250 ms refresh.
+            stack = self.layout()
+            if isinstance(stack, QStackedLayout) and stack.currentWidget() is not self.feed:
+                stack.setCurrentWidget(self.feed)
+            self.feed.raise_()
 
     def apply(self, values, *, has_content):
         common = normalize_common(values)
@@ -160,15 +180,22 @@ class ChatBackgroundFrame(QFrame):
         if common["glow"] and show_shell:
             c = QColor(common["glow_color"])
             stroke = "rgba({},{},{},160)".format(c.red(),c.green(),c.blue())
-            self.effect.setColor(QColor(c.red(),c.green(),c.blue(),148))
-            self.effect.setEnabled(True)
+            glow_color = QColor(c.red(), c.green(), c.blue(), 148)
+            if self.effect.color() != glow_color:
+                self.effect.setColor(glow_color)
+            if not self.effect.isEnabled():
+                self.effect.setEnabled(True)
         else:
             stroke = "rgba(255,255,255,0)"
-            self.effect.setEnabled(False)
-        self.setStyleSheet(
+            if self.effect.isEnabled():
+                self.effect.setEnabled(False)
+        style = (
             "ChatBackgroundFrame {background-color:" + background +
             ";border:1px solid " + stroke + ";border-radius:8px;}"
         )
+        if style != self._last_style:
+            self._last_style = style
+            self.setStyleSheet(style)
         path = None
         if common["background"] == "media" and show_shell and common["background_media_id"]:
             asset = self.db.get_media_asset(common["background_media_id"])
