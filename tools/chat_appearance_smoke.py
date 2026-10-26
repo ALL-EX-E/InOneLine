@@ -86,7 +86,7 @@ class AppearanceModelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db = StubDatabase(folder)
             editor = ChatAppearanceEditor(db)
-            self.assertFalse(editor.is_dirty())
+            self.assertEqual(editor.values(), editor.saved)
             editor.mode.setCurrentIndex(1)
             editor.text_size.setValue(31)
             self.assertTrue(editor.is_dirty())
