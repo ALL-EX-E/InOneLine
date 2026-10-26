@@ -106,6 +106,89 @@ class AppearanceModelTests(unittest.TestCase):
         app.processEvents()
 
 
+    def test_reset_to_defaults_keeps_db_until_save_and_preserves_media(self):
+        """FIX3: confirmed reset is local draft; Cancel and Exit don't mutate OBS."""
+        from unittest.mock import patch
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        from streaming_manager.views.chat_appearance_controls import ChatAppearanceEditor
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as folder:
+            db = StubDatabase(folder)
+            # Simulate existing customized style, registered file and global switch.
+            save_appearance(
+                db,
+                {"mode":"custom", "text_size":42, "name_size":25,
+                 "text_color":"#12AB34", "avatar_size":36,
+                 "card_border_width":3, "card_radius":20},
+                {"background":"media", "background_media_id":42,
+                 "glow":True, "glow_color":"#00FF00",
+                 "visibility":"always"},
+            )
+            db.assets[42] = object()
+            db.set_setting("multichat_show_time", "false")
+            saved = saved_appearance(db)
+            original_public = public_appearance(db)
+            editor = ChatAppearanceEditor(db)
+            editor.resize(520, 360)
+            self.assertEqual(editor.values(),saved)
+            self.assertFalse(editor.is_dirty())
+            updates = []
+            editor.changed.connect(
+                lambda twitch, common, test: updates.append((twitch, common, test))
+            )
+            editor.test.click()
+            self.assertTrue(editor.test_visible)
+            editor.text_size.setValue(64)
+            current_draft = editor.values()
+            with patch.object(
+                QMessageBox, "question", return_value=QMessageBox.StandardButton.No
+            ) as confirm:
+                editor.reset_button.click()
+                self.assertEqual(confirm.call_count,1)
+            self.assertEqual(editor.values(),current_draft)
+            self.assertTrue(editor.is_dirty())
+            self.assertEqual(saved_appearance(db),saved)
+            self.assertEqual(public_appearance(db),original_public)
+
+            with patch.object(
+                QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
+            ):
+                editor.reset_button.click()
+            defaults = {
+                "twitch":normalize_twitch({}),
+                "common":normalize_common({}),
+            }
+            self.assertEqual(editor.values(),defaults)
+            self.assertTrue(editor.is_dirty())
+            self.assertTrue(editor.test_visible)
+            self.assertTrue(updates)
+            self.assertEqual(updates[-1][0],defaults["twitch"])
+            self.assertEqual(updates[-1][1],defaults["common"])
+            self.assertTrue(updates[-1][2])
+            self.assertEqual(saved_appearance(db),saved)
+            self.assertEqual(public_appearance(db),original_public)
+            self.assertIn(42,db.assets)
+            self.assertEqual(db.get_setting("multichat_show_time"),"false")
+
+            # Discard/close without Save restores old custom design.
+            editor.discard()
+            self.assertFalse(editor.is_dirty())
+            self.assertEqual(editor.values(),saved)
+            with patch.object(
+                QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
+            ):
+                editor.reset_button.click()
+            self.assertTrue(editor.save())
+            self.assertFalse(editor.is_dirty())
+            self.assertEqual(saved_appearance(db),defaults)
+            self.assertEqual(public_appearance(db)["twitch"],defaults["twitch"])
+            self.assertEqual(public_appearance(db)["common"]["background"],"transparent")
+            self.assertEqual(db.get_setting("multichat_show_time"),"false")
+            self.assertIn(42,db.assets, "Reset must never delete any media file")
+            editor.close()
+        app.processEvents()
+
     def test_operator_preview_is_visible_above_background(self):
         """Regression: StackAll index 0 (media) hid the real Qt operator feed."""
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
