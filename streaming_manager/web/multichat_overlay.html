@@ -47,6 +47,22 @@ body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif;
       return u.href;
     } catch (_) { return ""; }
   };
+  const warmCache = new Map();
+  function prewarmMedia(urls) {
+    if (!Array.isArray(urls)) return;
+    // Reuse the Browser Source's normal HTTP image cache, not a second API
+    // or another platform connection. Keep only a handful of warm assets.
+    for (const raw of urls.slice(0, 24)) {
+      const url = verifiedImage(raw);
+      if (!url || warmCache.has(url) || warmCache.size >= 12) continue;
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      warmCache.set(url, img);
+      img.onerror = () => warmCache.delete(url);
+      img.src = url;
+    }
+  }
   function image(parent, src, cls, textFallback) {
     const url = verifiedImage(src);
     if (!url) {
@@ -126,6 +142,7 @@ body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif;
       const response = await fetch("/api/multichat", {cache:"no-store"});
       if (!response.ok) return;
       const state = await response.json();
+      prewarmMedia(state.media_preload && state.media_preload.twitch);
       const messages = Array.isArray(state.messages) ?
         state.messages.filter(message => message.platform === "twitch") : [];
       const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages]);
