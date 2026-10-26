@@ -473,11 +473,14 @@ class MainWindow(QMainWindow):
         if not renderer.isValid():
             raise RuntimeError("Bundled GitHub SVG icon is invalid")
         pixmap = QPixmap(64, 64)
-        pixmap.setDevicePixelRatio(2.0)
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
+        # Render at native pixel coordinates first. Setting DPR before
+        # QSvgRenderer.render() doubles the painter scaling on Windows,
+        # clipping the mark so only one quarter remains visible.
         renderer.render(painter)
         painter.end()
+        pixmap.setDevicePixelRatio(2.0)
         return QIcon(pixmap)
 
     def _install_settings_github_footer(self, scroll: QScrollArea) -> None:
