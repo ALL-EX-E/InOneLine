@@ -156,7 +156,7 @@ class GraphicsSmoke(unittest.TestCase):
         runtime.chat_connected = True
         runtime._media_thread = SimpleNamespace(is_alive=lambda: True)
         runtime._schedule_media_warmup("123")
-        self.assertEqual([runtime._media_tasks.get_nowait()[0]
+        self.assertEqual([runtime._media_tasks.get_nowait()[2][0]
                           for _ in range(2)], ["badges", "emotes"])
         with self.assertRaises(Empty):
             runtime._media_tasks.get_nowait()
