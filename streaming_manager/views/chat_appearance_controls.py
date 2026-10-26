@@ -141,10 +141,19 @@ class ChatAppearanceEditor(QWidget):
 
     def _font(self, form, title):
         font = ScrollSafeFontComboBox()
-        font.currentFontChanged.connect(self._changed)
+        font.currentFontChanged.connect(self._font_changed)
         form.addRow(title, font)
         self.custom_widgets.extend([font, form.labelForField(font)])
         return font
+
+    def _font_changed(self, _font):
+        # A missing system font must not silently rewrite a saved preference.
+        # Clear the original requested family only after a real user edit.
+        if not self._loading:
+            sender = self.sender()
+            if sender is not None:
+                sender.setProperty("requestedFamily", None)
+            self._changed()
 
     def _color(self, form, title):
         controls = QWidget()
@@ -218,6 +227,7 @@ class ChatAppearanceEditor(QWidget):
             self._set_combo(widget, (t if key == "mode" else c)[key])
         for widget, key in ((self.text_font,"text_font"),(self.name_font,"name_font")):
             widget.setCurrentFont(QFont(t[key]))
+            widget.setProperty("requestedFamily", t[key])
         for widget,key in (
             (self.text_size,"text_size"),(self.name_size,"name_size"),
             (self.card_opacity,"card_opacity"),(self.card_border_width,"card_border_width"),
@@ -240,9 +250,13 @@ class ChatAppearanceEditor(QWidget):
 
     def values(self):
         t = {
-            "mode":self.mode.currentData(), "text_font":self.text_font.currentFont().family(),
+            "mode":self.mode.currentData(), "text_font":(
+                self.text_font.property("requestedFamily") or self.text_font.currentFont().family()
+            ),
             "text_size":self.text_size.value(), "text_color":self.text_color.property("selectedColor"),
-            "name_font":self.name_font.currentFont().family(),
+            "name_font":(
+                self.name_font.property("requestedFamily") or self.name_font.currentFont().family()
+            ),
             "name_size":self.name_size.value(), "name_color":self.name_color.property("selectedColor"),
             "card_color":self.card_color.property("selectedColor"),
             "card_opacity":self.card_opacity.value(),
