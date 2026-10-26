@@ -48,6 +48,8 @@ TWITCH_VALIDATE_URL = "https://id.twitch.tv/oauth2/validate"
 TWITCH_USERS_URL = "https://api.twitch.tv/helix/users"
 TWITCH_CHANNEL_EMOTES_URL = "https://api.twitch.tv/helix/chat/emotes"
 TWITCH_GLOBAL_EMOTES_URL = "https://api.twitch.tv/helix/chat/emotes/global"
+TWITCH_CHANNEL_BADGES_URL = "https://api.twitch.tv/helix/chat/badges"
+TWITCH_GLOBAL_BADGES_URL = "https://api.twitch.tv/helix/chat/badges/global"
 TWITCH_REWARDS_URL = "https://api.twitch.tv/helix/channel_points/custom_rewards"
 TWITCH_REDEMPTIONS_URL = TWITCH_REWARDS_URL + "/redemptions"
 TWITCH_EVENTSUB_SUBSCRIPTIONS_URL = "https://api.twitch.tv/helix/eventsub/subscriptions"
@@ -267,6 +269,19 @@ class TwitchApiClient:
         return self._request_json(
             "GET",
             TWITCH_GLOBAL_EMOTES_URL,
+            headers=self._api_headers(client_id, access),
+        )
+
+    def get_channel_chat_badges(self, client_id: str, access: str, broadcaster_id: str) -> dict:
+        return self._request_json(
+            "GET", TWITCH_CHANNEL_BADGES_URL,
+            query={"broadcaster_id": str(broadcaster_id)},
+            headers=self._api_headers(client_id, access),
+        )
+
+    def get_global_chat_badges(self, client_id: str, access: str) -> dict:
+        return self._request_json(
+            "GET", TWITCH_GLOBAL_BADGES_URL,
             headers=self._api_headers(client_id, access),
         )
 
@@ -705,6 +720,49 @@ class TwitchAdapter(IntegrationAdapter):
                     }
                 )
         return {"twitch_user_id": user_id, "login": login, "items": items}
+
+    def list_chat_badges(self, context, broadcaster_id: str) -> dict:
+        """Resolve officially supplied badge versions, channel overriding global."""
+        broadcaster_id = str(broadcaster_id or "").strip()
+        if not broadcaster_id.isdigit():
+            return {}
+        client_id = self._client_id(context)
+        credential = TwitchCredential.from_json(context.credential)
+        credential, _validation = self._validate_with_refresh(
+            context, client_id, credential
+        )
+        try:
+            global_badges = self.client.get_global_chat_badges(client_id, credential.access)
+            channel_badges = self.client.get_channel_chat_badges(
+                client_id, credential.access, broadcaster_id,
+            )
+        except TwitchHttpError as exc:
+            self._map_http_error(exc)
+            raise AssertionError("unreachable")
+
+        from .chat_graphics import safe_image_url
+        catalog: dict[tuple[str, str], str] = {}
+        for payload in (global_badges, channel_badges):
+            sets = payload.get("data") or []
+            if not isinstance(sets, list):
+                continue
+            for item in sets:
+                if not isinstance(item, dict):
+                    continue
+                set_id = str(item.get("set_id") or "")
+                versions = item.get("versions") or []
+                if not isinstance(versions, list):
+                    continue
+                for version in versions:
+                    if not isinstance(version, dict):
+                        continue
+                    variant = str(version.get("id") or "")
+                    url = safe_image_url(
+                        version.get("image_url_2x") or version.get("image_url_1x")
+                    )
+                    if set_id and variant and url:
+                        catalog[(set_id, variant)] = url
+        return catalog
 
     def resolve_profile_image(self, context, login: str) -> str:
         """Return one Twitch profile-image URL through the existing authorized client."""

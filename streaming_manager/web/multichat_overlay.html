@@ -5,15 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>InOneLine — чат Twitch (OBS)</title>
 <style>
-html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
-body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: white; }
-#messages { width: 100%; max-height: 100%; overflow: hidden; display: flex;
-            flex-direction: column; justify-content: flex-end; }
-.message { box-sizing: border-box; flex-shrink: 0; padding: 4px 8px;
-           background: rgba(0,0,0,.5); overflow-wrap: anywhere; }
-.name { font-weight: 700; }
-.time { opacity: .8; margin-left: 5px; }
-.text { white-space: pre-wrap; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
+body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif; }
+#messages { width:100%; max-height:100%; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; }
+.message { box-sizing:border-box; flex-shrink:0; padding:4px 8px; background:rgba(0,0,0,.5); overflow-wrap:anywhere; }
+.header { display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-height:1.3em; }
+.platform-icon { display:inline-block; width:auto; height:1em; flex-shrink:0; }
+.avatar { border-radius:50%; width:1.35em; height:1.35em; object-fit:cover; }
+.badge { width:auto; height:1em; max-width:2em; object-fit:contain; }
+.name { font-weight:700; }
+.time { opacity:.8; margin-left:2px; }
+.text { white-space:pre-wrap; overflow-wrap:anywhere; }
+.emote { height:1.5em; max-width:10em; width:auto; vertical-align:middle; object-fit:contain; }
 </style>
 </head>
 <body>
@@ -22,44 +25,141 @@ body { display: flex; align-items: flex-end; font: 18px/1.3 sans-serif; color: w
 (() => {
   "use strict";
   const root = document.getElementById("messages");
+  const ns = "http://www.w3.org/2000/svg";
+  const TWITCH_PATH = "M692.9 535 617 607h-76l-66.5 63v-63H389V337.2h303.9V535zM370 301.2l-95 89.9v323.8h114v89.9l95-89.9h76L730.9 553V301.2H370zM636 403h-38v107.9h38V403zm-142.5-.5h38v107.9h-38V402.5z";
   let last = "";
-  const add = (parent, tag, text, className) => {
-    const element = document.createElement(tag);
-    element.className = className;
-    element.textContent = text;
-    parent.appendChild(element);
+  const node = (parent, tag, text, cls) => {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    el.textContent = String(text || "");
+    parent.appendChild(el);
+    return el;
   };
+  const verifiedImage = value => {
+    try {
+      if (typeof value !== "string" || value.length > 2048) return "";
+      const u = new URL(value);
+      const host = u.hostname.toLowerCase();
+      const roots = ["jtvnw.net","twitchcdn.net","ttvnw.net","tenor.com","giphy.com"];
+      if (u.protocol !== "https:" || u.username || u.password ||
+          (u.port && u.port !== "443") ||
+          !roots.some(root => host === root || host.endsWith("." + root))) return "";
+      return u.href;
+    } catch (_) { return ""; }
+  };
+  const warmCache = new Map();
+  const failedWarm = new Set();
+  function prewarmMedia(urls) {
+    if (!Array.isArray(urls)) return;
+    // Reuse the Browser Source's normal HTTP image cache, not a second API
+    // or another platform connection. Keep only a handful of warm assets.
+    for (const raw of urls.slice(0, 24)) {
+      const url = verifiedImage(raw);
+      if (!url || warmCache.has(url) || failedWarm.has(url) ||
+          warmCache.size >= 12) continue;
+      const img = new Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      warmCache.set(url, img);
+      img.onerror = () => {
+        warmCache.delete(url);
+        if (failedWarm.size < 128) failedWarm.add(url);
+      };
+      img.src = url;
+    }
+  }
+  function image(parent, src, cls, textFallback) {
+    const url = verifiedImage(src);
+    if (!url) {
+      if (textFallback) node(parent, "span", textFallback, "");
+      return;
+    }
+    const img = document.createElement("img");
+    img.src = url;
+    img.className = cls;
+    img.alt = "";
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.onerror = () => {
+      if (textFallback) {
+        const span = document.createElement("span");
+        span.textContent = textFallback;
+        img.replaceWith(span);
+      } else img.remove();
+    };
+    parent.appendChild(img);
+  }
+  function platformIcon(parent) {
+    const icon = document.createElementNS(ns, "svg");
+    icon.setAttribute("viewBox", "0 0 1024 1024");
+    icon.setAttribute("class", "platform-icon");
+    icon.setAttribute("aria-label", "Twitch");
+    const circle = document.createElementNS(ns, "circle");
+    circle.setAttribute("cx", "512"); circle.setAttribute("cy", "512");
+    circle.setAttribute("r", "512"); circle.setAttribute("fill", "#9146ff");
+    icon.appendChild(circle);
+    const glyph = document.createElementNS(ns, "path");
+    glyph.setAttribute("d", TWITCH_PATH); glyph.setAttribute("fill", "#fff");
+    icon.appendChild(glyph);
+    parent.appendChild(icon);
+  }
+  function appendMessage(message, showTime, showIcons) {
+    const row = document.createElement("div");
+    row.className = "message";
+    const header = document.createElement("div");
+    header.className = "header";
+    if (showIcons) platformIcon(header);
+    image(header, message.avatar_url, "avatar", "");
+    // Twitch badge order comes from the original EventSub event.
+    if (Array.isArray(message.badges)) {
+      for (const badge of message.badges.slice(0,16)) {
+        if (badge && typeof badge === "object") image(header, badge.url, "badge", "");
+      }
+    }
+    const author = node(header, "span", message.author, "name");
+    if (/^#[0-9a-fA-F]{6}$/.test(String(message.color || "")))
+      author.style.color = message.color;
+    if (showTime) {
+      const value = message.sent_at ?? message.received_at;
+      if (typeof value === "number" && Number.isFinite(value)) {
+        const date = new Date(value * 1000);
+        node(header, "span", date.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}), "time");
+      }
+    }
+    row.appendChild(header);
+    const body = document.createElement("div");
+    body.className = "text";
+    if (Array.isArray(message.fragments) && message.fragments.length) {
+      for (const frag of message.fragments.slice(0,256)) {
+        if (!frag || typeof frag !== "object") continue;
+        if (frag.kind === "image")
+          image(body, frag.url, "emote", String(frag.text || ""));
+        else node(body, "span", String(frag.text || ""), "");
+      }
+    } else {
+      body.textContent = String(message.text || "");
+    }
+    row.appendChild(body);
+    root.appendChild(row);
+  }
   async function update() {
     try {
-      const response = await fetch("/api/multichat", {cache: "no-store"});
+      const response = await fetch("/api/multichat", {cache:"no-store"});
       if (!response.ok) return;
       const state = await response.json();
-      // Preserve the shared API for future expansion; this OBS view is Twitch-only.
+      prewarmMedia(state.media_preload && state.media_preload.twitch);
       const messages = Array.isArray(state.messages) ?
         state.messages.filter(message => message.platform === "twitch") : [];
-      const signature = JSON.stringify([state.show_time, messages]);
-      if (signature === last) return;
-      last = signature;
+      const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages]);
+      if (sig === last) return;
+      last = sig;
       root.replaceChildren();
-      for (const message of messages) {
-        const row = document.createElement("div");
-        row.className = "message";
-        add(row, "span", String(message.author || ""), "name");
-        if (state.show_time) {
-          const value = message.sent_at ?? message.received_at;
-          if (typeof value === "number" && Number.isFinite(value)) {
-            const date = new Date(value * 1000);
-            add(row, "span", date.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}), "time");
-          }
-        }
-        add(row, "div", String(message.text || ""), "text");
-        root.appendChild(row);
-      }
-      // The browser source height, not a custom row count, clips older rows.
-      while (root.scrollHeight > root.clientHeight && root.firstElementChild) {
+      for (const message of messages)
+        appendMessage(message, state.show_time, state.show_platform_icons !== false);
+      // Only OBS source height clips older rows; never truncate message contents horizontally.
+      while (root.scrollHeight > root.clientHeight && root.firstElementChild)
         root.firstElementChild.remove();
-      }
-    } catch (_) { /* operator sees diagnostics in InOneLine, never in OBS */ }
+    } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
   update();
   setInterval(update, 500);

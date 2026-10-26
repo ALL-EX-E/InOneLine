@@ -8,7 +8,7 @@ only source of published messages for both consumers.
 """
 
 from collections import deque
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from math import isfinite
 from threading import RLock
 from time import monotonic, time
@@ -25,6 +25,11 @@ class ChatMessage:
     sent_at: float | None = None
     received_at: float | None = None
     author_id: str = ""
+    # D41-04: provider-verified presentation data only; never an HTML payload.
+    fragments: tuple[dict, ...] = ()
+    badges: tuple[dict, ...] = ()
+    color: str = ""
+    avatar_url: str = ""
 
     def __post_init__(self) -> None:
         if not self.platform or not self.source_id or not self.external_id:
@@ -67,6 +72,8 @@ class MultichatState:
         self._seen_capacity = max(4096, self._limit * 4)
         self._overflow_count = 0
         self._show_time = True
+        self._show_platform_icons = True
+        self._chat_media_preload: dict[str, tuple[str, ...]] = {}
 
     @staticmethod
     def _valid_limit(value: int) -> int:
@@ -90,6 +97,7 @@ class MultichatState:
         limit: int | None = None,
         delay: float | None = None,
         show_time: bool | None = None,
+        show_platform_icons: bool | None = None,
     ) -> None:
         # Validate the entire change before mutating any field: an invalid
         # delay must never leave a partly-applied message limit behind.
@@ -106,12 +114,33 @@ class MultichatState:
                 self._delay = new_delay
             if show_time is not None:
                 self._show_time = bool(show_time)
+            if show_platform_icons is not None:
+                self._show_platform_icons = bool(show_platform_icons)
             self._flush_ready(self._clock())
             self._shed_pending()
 
     def set_obs_enabled(self, platform: str, enabled: bool) -> None:
         with self._lock:
             self._obs_enabled[platform] = bool(enabled)
+
+    def set_media_preload(self, platform: str, urls) -> None:
+        """Bounded session-only hint for Qt and local OBS image warm-up.
+
+        No image bytes, user data or chat history are persisted or duplicated.
+        """
+        from .chat_graphics import safe_image_url
+
+        choices = []
+        for raw in list(urls)[:48]:
+            url = safe_image_url(raw)
+            if url and url not in choices:
+                choices.append(url)
+            if len(choices) == 24:
+                break
+        with self._lock:
+            key = str(platform)
+            previous = self._chat_media_preload.get(key, ())
+            self._chat_media_preload[key] = tuple(dict.fromkeys((*previous, *choices)))[:24]
 
     def ingest(self, message: ChatMessage) -> bool:
         """Return False for a repeated event, True for a new received event."""
@@ -126,10 +155,7 @@ class MultichatState:
             self._trim_seen()
             now = self._clock()
             received = self._wall_clock() if message.received_at is None else message.received_at
-            item = ChatMessage(
-                message.platform, message.source_id, message.external_id,
-                message.author, message.text, message.sent_at, received, message.author_id,
-            )
+            item = replace(message, received_at=received)
             self._sequence += 1
             self._pending.append((now, self._sequence, item))
             self._flush_ready(now)
@@ -163,6 +189,43 @@ class MultichatState:
             self._operator = deque((m for m in self._operator if keep(m)), maxlen=self._limit)
             self._obs = deque((m for m in self._obs if keep(m)), maxlen=self._limit)
 
+    def enrich_twitch_media(
+        self, source_id: str, *, avatar_by_user: dict[str, str] | None = None,
+        badge_urls: dict[tuple[str, str], str] | None = None,
+    ) -> None:
+        """Update media on messages still present, without recreating deleted rows.
+
+        Only matching broadcaster records are touched. One RAM/OBS source of
+        truth remains in place; delayed messages receive the same enrichment.
+        """
+        avatars = avatar_by_user or {}
+        badge_map = badge_urls or {}
+        if not avatars and not badge_map:
+            return
+
+        def enhanced(item: ChatMessage) -> ChatMessage:
+            if item.platform != "twitch" or item.source_id != source_id:
+                return item
+            changes = {}
+            avatar = avatars.get(item.author_id, "")
+            if avatar and not item.avatar_url:
+                changes["avatar_url"] = avatar
+            if item.badges and badge_map:
+                new_badges = tuple(
+                    {**badge, "url": badge_map.get(
+                        (str(badge.get("set_id") or ""), str(badge.get("id") or "")),
+                        str(badge.get("url") or ""),
+                    )} for badge in item.badges
+                )
+                if new_badges != item.badges:
+                    changes["badges"] = new_badges
+            return replace(item, **changes) if changes else item
+
+        with self._lock:
+            self._pending = [(t, seq, enhanced(item)) for t, seq, item in self._pending]
+            self._operator = deque((enhanced(item) for item in self._operator), maxlen=self._limit)
+            self._obs = deque((enhanced(item) for item in self._obs), maxlen=self._limit)
+
     def disconnect(self, platform: str) -> None:
         """Ordinary disconnect discards unpublished items, not shown history."""
         with self._lock:
@@ -171,6 +234,7 @@ class MultichatState:
     def change_source(self, platform: str) -> None:
         """Only call after a confirmed change of account or chosen broadcast."""
         with self._lock:
+            self._chat_media_preload.pop(platform, None)
             self.disconnect(platform)
             self._operator = deque((m for m in self._operator if m.platform != platform), maxlen=self._limit)
             self._obs = deque((m for m in self._obs if m.platform != platform), maxlen=self._limit)
@@ -184,6 +248,8 @@ class MultichatState:
             return {
                 "messages": [asdict(m) for m in messages],
                 "show_time": self._show_time,
+                "show_platform_icons": self._show_platform_icons,
+                "media_preload": dict(self._chat_media_preload),
                 "limit": self._limit,
                 "delay": self._delay,
                 "overflow_count": self._overflow_count,
