@@ -229,6 +229,11 @@ class AppearanceModelTests(unittest.TestCase):
                     self.assertEqual(current["background_media_id"], id_)
                     frame.apply(current, has_content=True)
                     app.processEvents()
+                    # The canvas must not grow to its own scaled pixmap's
+                    # size: this feedback loop closed the Windows process.
+                    start_width, start_height = frame.width(), frame.height()
+                    self.assertEqual(frame.media.sizeHint().width(), 0)
+                    self.assertEqual(frame.media.sizeHint().height(), 0)
                     self.assertEqual(frame._movie_kind,kind)
                     self.assertIsNotNone(frame._source_key)
                     if kind == "gif":
@@ -244,9 +249,18 @@ class AppearanceModelTests(unittest.TestCase):
                         app.processEvents()
                         time.sleep(.025)
                     self.assertEqual(frame._movie_kind,kind)
+                    self.assertLessEqual(frame.width(), start_width + 2,
+                        "Scaled media must not cause growing Qt layout width")
+                    self.assertLessEqual(frame.height(), start_height + 2,
+                        "Scaled media must not cause growing Qt layout height")
                     self.assertIs(frame.layout().currentWidget(),feed)
                     self.assertIn("Media regression",feed.toPlainText())
                     if kind == "image":
+                        # Pump any pending Qt resize/layout events before
+                        # recording the stable pixmap render key.
+                        for _ in range(4):
+                            frame.apply(current,has_content=True)
+                            app.processEvents()
                         before = frame._paint_key
                         for _ in range(12):
                             frame.apply(current,has_content=True)
