@@ -41,6 +41,11 @@ def main() -> None:
             for width, height in ((520, 360), (720, 540), (1550, 900), (2560, 1440)):
                 window.resize(width, height)
                 window.show()
+                app.processEvents()
+                # Windows CI may clamp the requested outer size to its virtual
+                # desktop. Observe the actual native size after show(), then
+                # reject any resizing triggered by switching Settings pages.
+                stable_size = window.size()
                 for tab in range(4):
                     settings.settings_tabs.setCurrentIndex(tab)
                     app.processEvents()
@@ -49,6 +54,10 @@ def main() -> None:
                     window._position_settings_github_button()
                     assert button.isVisible()
                     assert scroll.isVisible()
+                    assert window.size() == stable_size, (
+                        "Settings page resized main window",
+                        (width, height), tab, stable_size, window.size(),
+                    )
                     viewport = scroll.viewport().geometry()
                     control = button.geometry()
                     assert control.top() > viewport.bottom(), (width, height, tab, control, viewport)
@@ -70,7 +79,10 @@ def main() -> None:
                     app.processEvents()
                     assert button.geometry().top() > scroll.viewport().geometry().bottom()
                     assert button.isVisible()
-                assert window.width() == width and window.height() == height
+                assert window.size() == stable_size, (
+                    "Settings tab switch changed main-window size",
+                    (width, height), stable_size, window.size(),
+                )
 
             with patch("streaming_manager.views.main_window.QDesktopServices.openUrl", return_value=True) as launch:
                 button.click()
