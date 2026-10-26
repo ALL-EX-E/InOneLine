@@ -96,20 +96,23 @@ class ChatAppearanceEditor(QWidget):
         self.visibility.currentIndexChanged.connect(self._changed)
         common_form.addRow("Видимость OBS:", self.visibility)
 
-        foot = QHBoxLayout()
+        # Keep the long Reset label from squeezing Save at narrow widths.
+        foot = QVBoxLayout()
         self.status = QLabel("Сохранено")
-        foot.addWidget(self.status, 1)
+        foot.addWidget(self.status)
+        buttons = QHBoxLayout()
         self.reset_button = QPushButton("Сбросить по умолчанию")
         self.reset_button.setToolTip(
             "Вернуть исходный вид Twitch-чата и общий фон в локальный "
             "предпросмотр. Для OBS нажмите «Сохранить»."
         )
         self.reset_button.clicked.connect(self.reset_to_defaults)
-        foot.addWidget(self.reset_button)
+        buttons.addWidget(self.reset_button, 1)
         self.save_button = QPushButton("Сохранить")
         self.save_button.setProperty("primary", True)
         self.save_button.clicked.connect(self.save)
-        foot.addWidget(self.save_button)
+        buttons.addWidget(self.save_button)
+        foot.addLayout(buttons)
         root.addLayout(foot)
         self._apply_values(self.saved)
         self._loading = False
