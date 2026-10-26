@@ -14,10 +14,11 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QImage, QMovie, QPainter, QTextCursor, QTextDocument
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QRect, QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import QColor, QFont, QImage, QMovie, QPainter, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QTextEdit
 
+from ..chat_appearance import normalize_twitch, normalize_common
 from ..chat_graphics import safe_image_url
 from ..remote_image import download_external_image
 
@@ -74,9 +75,23 @@ class ChatRichFeed(QTextEdit):
         self._rows: list[dict] = []
         self._show_time = True
         self._show_icons = True
+        self._appearance = normalize_twitch({})
+        self._common = normalize_common({})
+        self._test_visible = False
         self._signature = None
         self._platform_image = None
         self._make_platform_image()
+        # Synthesized local-only preview avatar (never a provider identity).
+        self._test_avatar = QImage(44, 44, QImage.Format_ARGB32_Premultiplied)
+        self._test_avatar.fill(Qt.transparent)
+        avatar_painter = QPainter(self._test_avatar)
+        avatar_painter.setBrush(QColor("#9146FF"))
+        avatar_painter.setPen(Qt.NoPen)
+        avatar_painter.drawEllipse(0, 0, 44, 44)
+        avatar_painter.setPen(QColor("#FFFFFF"))
+        avatar_painter.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        avatar_painter.drawText(QRect(0, 0, 44, 44), Qt.AlignCenter, "Т")
+        avatar_painter.end()
         self._poll = QTimer(self)
         # 75 ms responsiveness while loading, without an EventSub/GUI network wait.
         self._poll.setInterval(75)
@@ -185,9 +200,13 @@ class ChatRichFeed(QTextEdit):
                  if preview is not None and preview.height() > 0 else size)
         return f'<img src="{res}" height="{size}" width="{width}" />'
 
-    def display(self, rows: list[dict], *, show_time: bool, show_icons: bool):
+    def display(self, rows: list[dict], *, show_time: bool, show_icons: bool,
+                appearance=None, common=None, test_visible=False):
+        appearance = normalize_twitch(appearance)
+        common = normalize_common(common)
         signature = (
             bool(show_time), bool(show_icons),
+            repr(appearance), repr(common), bool(test_visible),
             repr(rows),  # bounded snapshot; no persistence or extra state
         )
         if signature == self._signature:
@@ -196,6 +215,9 @@ class ChatRichFeed(QTextEdit):
         self._rows = list(rows)
         self._show_time = bool(show_time)
         self._show_icons = bool(show_icons)
+        self._appearance = appearance
+        self._common = common
+        self._test_visible = bool(test_visible)
         self._draw()
 
     def _draw(self):
@@ -203,25 +225,46 @@ class ChatRichFeed(QTextEdit):
         self._wanted_urls = set()
         self._visible_movie_count = 0
         paragraphs = []
-        for row in self._rows:
+        a = self._appearance
+        custom = a["mode"] == "custom"
+        rows = list(self._rows)
+        if self._test_visible:
+            # Sample is local only: not ingested, persisted, forwarded, or timed.
+            rows.append({
+                "platform":"twitch", "_local_test":True,
+                "author":"Пример Twitch", "text":"Тестовое сообщение 🙂",
+                "color":"#9146FF", "fragments":[{"kind":"text","text":"Тестовое сообщение 🙂"}],
+            })
+        for row in rows:
             header = []
             if self._show_icons and self._platform_image is not None:
                 header.append('<img src="iol-chat-twitch-logo:" height="18" width="18" />')
-            avatar = self._image_tag(row.get("avatar_url",""),"",size=24,is_content=False)
+            avatar = self._image_tag(row.get("avatar_url",""),"",size=a["avatar_size"] if custom else 24,is_content=False)
+            if row.get("_local_test"):
+                sample_size = a["avatar_size"] if custom else 24
+                avatar = f'<img src="iol-chat-test-avatar:" height="{sample_size}" width="{sample_size}" />'
             if avatar:
                 header.append(avatar)
             badges = row.get("badges")
             if isinstance(badges, (tuple,list)):
                 for badge in badges[:16]:
                     if isinstance(badge, dict):
-                        icon = self._image_tag(badge.get("url",""),"",size=18,is_content=False)
+                        icon = self._image_tag(badge.get("url",""),"",size=a["badge_size"] if custom else 18,is_content=False)
                         if icon:
                             header.append(icon)
             color = str(row.get("color") or "")
             if (len(color) != 7 or color[0] != "#" or
                     any(c not in "0123456789abcdefABCDEF" for c in color[1:])):
                 color = "#FFFFFF"
-            header.append(f'<b><span style="color:{color}">{_escape(row.get("author"))}</span></b>')
+            if custom:
+                color = a["name_color"]
+                name_style = (
+                    f'color:{color};font-family:{_escape(a["name_font"])};'
+                    f'font-size:{a["name_size"]}px;'
+                )
+            else:
+                name_style = f"color:{color};"
+            header.append(f'<b><span style="{name_style}">{_escape(row.get("author"))}</span></b>')
             if self._show_time:
                 value = row.get("sent_at")
                 if value is None:
@@ -247,11 +290,21 @@ class ChatRichFeed(QTextEdit):
                         body.append(_escape(frag.get("text","")))
             else:
                 body.append(_escape(row.get("text")))
+            if custom:
+                rgba = QColor(a["card_color"])
+                panel = (
+                    f'background-color:rgba({rgba.red()},{rgba.green()},{rgba.blue()},'
+                    f'{a["card_opacity"] / 100:.3f});'
+                    f'color:{a["text_color"]};'
+                    f'font-family:{_escape(a["text_font"])};font-size:{a["text_size"]}px;'
+                    f'border:{a["card_border_width"]}px solid {a["card_border_color"]};'
+                    f'border-radius:{a["card_radius"]}px;'
+                )
+            else:
+                panel = "background-color:#303030;color:white;"
             paragraphs.append(
-                '<p style="background-color:#303030;color:white;'
-                'margin:3px 0;padding:5px;">' +
-                " ".join(header) + "<br/>" +
-                "".join(body) + "</p>"
+                f'<p style="{panel}margin:3px 0;padding:5px;">' +
+                " ".join(header) + "<br/>" + "".join(body) + "</p>"
             )
 
         html_body = (
@@ -260,6 +313,9 @@ class ChatRichFeed(QTextEdit):
             "".join(paragraphs) + "</body></html>"
         )
         self.setHtml(html_body)
+        self.document().addResource(
+            QTextDocument.ImageResource, QUrl("iol-chat-test-avatar:"), self._test_avatar
+        )
         if self._platform_image is not None:
             self.document().addResource(
                 QTextDocument.ImageResource,
