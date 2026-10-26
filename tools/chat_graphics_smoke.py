@@ -91,6 +91,36 @@ class GraphicsSmoke(unittest.TestCase):
                                            {"broadcaster_user_id":"12345","message_id":"m1"}, {})
         self.assertEqual(state.snapshot()["messages"],[])
 
+    def test_qt_animated_emote_uses_movie_not_one_static_frame(self):
+        import base64
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QMovie
+        from streaming_manager.views.chat_rich_feed import ChatRichFeed
+        app = QApplication.instance() or QApplication([])
+        feed = ChatRichFeed()
+        source = "https://static-cdn.jtvnw.net/emoticons/v2/25/animated/dark/2.0"
+        gif_bytes = base64.b64decode(
+            "R0lGODlhBAAEAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh"
+            "+QQACgAAACwAAAAABAAEAAAICQABCBxIsCCAgAAh+QQBCgABACwAAAAABAAE"
+            "AIEAAP8AAAAAAAAAAAAICQABCBxIsCCAgAA7"
+        )
+        try:
+            feed._cache[source] = (gif_bytes, None, None, None, True)
+            feed._cache_bytes += len(gif_bytes)
+            feed.display([{
+                "author":"Viewer","text":"Kappa","avatar_url":"","badges":[],
+                "platform":"twitch","fragments":[
+                    {"kind":"image","text":"Kappa","url":source},
+                ],
+            }],show_time=False,show_icons=False)
+            movie = feed._cache[source][2]
+            self.assertIsNotNone(movie)
+            self.assertEqual(movie.state(), QMovie.Running)
+            self.assertGreaterEqual(movie.frameCount(), 2)
+        finally:
+            feed.close()
+            app.processEvents()
+
     def test_qt_native_renderer_does_not_parse_untrusted_html(self):
         from PySide6.QtWidgets import QApplication
         from streaming_manager.views.chat_rich_feed import ChatRichFeed
