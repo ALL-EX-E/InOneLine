@@ -8,7 +8,7 @@ from PySide6.QtCore import QEvent, QSize, Qt, QUrl
 from PySide6.QtGui import QColor, QPalette, QPixmap, QMovie
 from PySide6.QtMultimedia import QMediaPlayer, QVideoSink
 from PySide6.QtWidgets import (
-    QFrame, QGraphicsDropShadowEffect, QLabel, QStackedLayout,
+    QFrame, QGraphicsDropShadowEffect, QLabel, QStackedLayout, QSizePolicy,
 )
 
 from ..chat_appearance import normalize_common
@@ -16,6 +16,21 @@ from ..media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available,
     resolve_media_asset_path,
 )
+
+
+class _BackdropLabel(QLabel):
+    """A pixmap must NEVER become the preferred size of its own canvas.
+
+    QStackedLayout consults both child size hints even in StackAll mode.
+    QLabel's default pixmap-sized hint produced an expanding feedback loop:
+    scale background -> grow label hint -> grow frame -> scale again.
+    """
+
+    def sizeHint(self):
+        return QSize(0, 0)
+
+    def minimumSizeHint(self):
+        return QSize(0, 0)
 
 
 class ChatBackgroundFrame(QFrame):
@@ -35,7 +50,9 @@ class ChatBackgroundFrame(QFrame):
         stack = QStackedLayout(self)
         stack.setContentsMargins(0, 0, 0, 0)
         stack.setStackingMode(QStackedLayout.StackAll)
-        self.media = QLabel(self)
+        self.media = _BackdropLabel(self)
+        self.media.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.media.setMinimumSize(0, 0)
         self.media.setAlignment(Qt.AlignCenter)
         self.media.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.media.hide()
