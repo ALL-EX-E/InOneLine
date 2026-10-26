@@ -192,9 +192,18 @@ def fetch_third_party_channel_emotes(twitch_user_id: str) -> list[EmoteCatalogIt
 
     def load_7tv() -> list[EmoteCatalogItem]:
         try:
-            user_payload = _fetch_json(
-                f"https://7tv.io/v3/users/twitch/{twitch_id}"
-            )
+            # api.7tv.app is the 2026 service-status endpoint; retain the
+            # older 7tv.io origin as compatibility fallback.
+            user_payload = {}
+            seven_root = "https://api.7tv.app/v3"
+            for root in ("https://api.7tv.app/v3", "https://7tv.io/v3"):
+                try:
+                    user_payload = _fetch_json(f"{root}/users/twitch/{twitch_id}")
+                except Exception:
+                    continue
+                if user_payload:
+                    seven_root = root
+                    break
             emote_set = user_payload.get("emote_set")
             set_id = str(
                 user_payload.get("emote_set_id")
@@ -210,7 +219,7 @@ def fetch_third_party_channel_emotes(twitch_user_id: str) -> list[EmoteCatalogIt
                 and isinstance(emote_set.get("emotes"), list)
             ):
                 user_payload = (
-                    _fetch_json(f"https://7tv.io/v3/emote-sets/{set_id}")
+                    _fetch_json(f"{seven_root}/emote-sets/{set_id}")
                     if set_id
                     else {}
                 )
@@ -292,12 +301,14 @@ def fetch_third_party_chat_emotes(twitch_user_id: str) -> list[EmoteCatalogItem]
         return []
 
     def global_7tv():
-        try:
-            return _parse_7tv_emotes(_fetch_json(
-                "https://7tv.io/v3/emote-sets/global"
-            ))
-        except Exception:
-            return []
+        for root in ("https://api.7tv.app/v3", "https://7tv.io/v3"):
+            try:
+                payload = _fetch_json(f"{root}/emote-sets/global")
+                if payload:
+                    return _parse_7tv_emotes(payload)
+            except Exception:
+                continue
+        return []
 
     def global_bttv():
         return _parse_bttv_emotes({
