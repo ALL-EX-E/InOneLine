@@ -32,7 +32,26 @@ def main() -> None:
             assert button.parent() is scroll
             assert scroll.viewportMargins().bottom() >= 48
             assert button.icon().isNull() is False
-            assert not button.icon().pixmap(24, 24).isNull()
+            icon_pixmap = button.icon().pixmap(24, 24)
+            assert not icon_pixmap.isNull()
+            # D10 FIX3: the prior test only checked that the pixmap existed.
+            # A DPR-before-render bug made just a quadrant of the Github
+            # silhouette visible on real Windows. Verify the whole shape.
+            glyph = icon_pixmap.toImage()
+            top_pixels = sum(
+                glyph.pixelColor(x, y).alpha() > 128
+                for y in range(glyph.height() // 2)
+                for x in range(glyph.width())
+            )
+            bottom_pixels = sum(
+                glyph.pixelColor(x, y).alpha() > 128
+                for y in range(glyph.height() // 2, glyph.height())
+                for x in range(glyph.width())
+            )
+            assert top_pixels > 30 and bottom_pixels > 30, (
+                "GitHub logo is visually clipped", glyph.size(),
+                top_pixels, bottom_pixels,
+            )
             assert button.toolTip() == "Открыть GitHub проекта"
             assert button.accessibleName() == "Открыть GitHub проекта"
             assert settings.settings_tabs.count() == 4
