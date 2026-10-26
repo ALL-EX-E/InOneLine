@@ -85,6 +85,12 @@ jobs:
           python -m tools.multichat_twitch_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-02 Twitch chat regression failed" }
 
+      - name: D41-04 native Twitch graphics and global platform marker regression
+        shell: pwsh
+        run: |
+          python -m tools.chat_graphics_smoke
+          if ($LASTEXITCODE -ne 0) { throw "D41-04 Twitch graphics regression failed" }
+
       - name: GitHub Actions version regression
         shell: pwsh
         run: |
