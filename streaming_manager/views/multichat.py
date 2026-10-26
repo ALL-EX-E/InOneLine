@@ -16,21 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 
-class _ChatFeed(QTextEdit):
-    def __init__(self):
-        super().__init__()
-        self.setReadOnly(True)
-        self.setTextInteractionFlags(Qt.NoTextInteraction)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setPlaceholderText("Ожидание сообщений Twitch")
-
-    def wheelEvent(self, event):
-        event.ignore()
-
-    def keyPressEvent(self, event):
-        event.ignore()
-
+from .chat_rich_feed import ChatRichFeed as _ChatFeed
 
 class MultichatTab(QWidget):
     def __init__(self, db, state, api, *, twitch_status_provider=None):
@@ -74,6 +60,12 @@ class MultichatTab(QWidget):
             down_tooltip="Уменьшить лимит сообщений",
         ))
         form.addRow(self.show_time)
+        self.show_platform_icons = QCheckBox("Показывать значки платформ")
+        self.show_platform_icons.setChecked(
+            db.get_setting("multichat_show_platform_icons", "1") == "1"
+        )
+        self.show_platform_icons.toggled.connect(self._on_platform_icons)
+        form.addRow(self.show_platform_icons)
         settings.addWidget(general)
         connections = QGroupBox("Подключения и OBS")
         connections_layout = QVBoxLayout(connections)
@@ -105,7 +97,10 @@ class MultichatTab(QWidget):
         settings.addStretch()
         # Platform-specific appearance controls remain hidden until adapters
         # can confirm that their channels are actually connected.
-        self.state.configure(limit=self.limit.value(), show_time=self.show_time.isChecked())
+        self.state.configure(
+            limit=self.limit.value(), show_time=self.show_time.isChecked(),
+            show_platform_icons=self.show_platform_icons.isChecked(),
+        )
         self._applied_delay = 0.0
         self._on_delay()
         self.refresh_timer = QTimer(self)
@@ -144,6 +139,11 @@ class MultichatTab(QWidget):
         self.db.set_setting("multichat_show_time", "1" if enabled else "0")
         self.refresh()
 
+    def _on_platform_icons(self, enabled):
+        self.state.configure(show_platform_icons=enabled)
+        self.db.set_setting("multichat_show_platform_icons", "1" if enabled else "0")
+        self.refresh()
+
     def refresh(self):
         if self.twitch_status_provider is not None:
             try:
@@ -163,20 +163,18 @@ class MultichatTab(QWidget):
             self.buffer_warning.setVisible(bool(warning))
         # Keep multi-provider RAM/API contracts intact, but the current UI is Twitch-only.
         messages = [m for m in snapshot["messages"] if m["platform"] == "twitch"]
-        key = (snapshot["show_time"], tuple(
-            (m["platform"], m["source_id"], m["external_id"], m["author"], m["text"])
-            for m in messages
-        ))
+        key = (
+            snapshot["show_time"], snapshot["show_platform_icons"],
+            repr(messages),
+        )
         if key == self._last_render:
             return
         self._last_render = key
-        lines = []
-        for m in messages:
-            value = m["sent_at"] if m["sent_at"] is not None else m["received_at"]
-            stamp = datetime.fromtimestamp(value).strftime("%H:%M") if snapshot["show_time"] and value is not None else ""
-            lines.append(f"{m['author']} {stamp}  {m['text']}".strip())
-        self.feed.setPlainText("\n".join(lines))
-        self.feed.moveCursor(QTextCursor.End)
+        self.feed.display(
+            messages,
+            show_time=snapshot["show_time"],
+            show_icons=snapshot["show_platform_icons"],
+        )
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
