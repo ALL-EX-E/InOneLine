@@ -156,8 +156,11 @@ class GraphicsSmoke(unittest.TestCase):
         runtime.chat_connected = True
         runtime._media_thread = SimpleNamespace(is_alive=lambda: True)
         runtime._schedule_media_warmup("123")
+        # An unrecognised chatter must jump ahead of low-priority catalog
+        # prewarming without blocking EventSub for network images.
+        runtime._media_for_message("123", "999", "viewer", ())
         self.assertEqual([runtime._media_tasks.get_nowait()[2][0]
-                          for _ in range(2)], ["badges", "emotes"])
+                          for _ in range(3)], ["avatar", "badges", "emotes"])
         with self.assertRaises(Empty):
             runtime._media_tasks.get_nowait()
         self.assertEqual(state.snapshot()["media_preload"]["twitch"],
