@@ -121,6 +121,81 @@ class GraphicsSmoke(unittest.TestCase):
             feed.close()
             app.processEvents()
 
+    def test_preload_catalog_is_bounded_shared_and_cleared_for_new_account(self):
+        from streaming_manager.multichat import MultichatState
+        state = MultichatState()
+        state.set_media_preload("twitch", [
+            "https://static-cdn.jtvnw.net/emote" + str(i) + ".png"
+            for i in range(80)
+        ] + ["http://127.0.0.1/private"])
+        for for_obs in (False, True):
+            snap = state.snapshot(for_obs=for_obs)
+            self.assertEqual(len(snap["media_preload"]["twitch"]), 24)
+            self.assertTrue(all(x.startswith("https://static-cdn.jtvnw.net/")
+                                for x in snap["media_preload"]["twitch"]))
+        state.set_media_preload("twitch", [
+            "https://static-cdn.jtvnw.net/emote0.png"
+        ])
+        self.assertEqual(len(state.snapshot()["media_preload"]["twitch"]), 24)
+        state.change_source("twitch")
+        self.assertNotIn("twitch", state.snapshot()["media_preload"])
+
+    def test_preconnect_profile_and_badges_are_queued_before_first_message(self):
+        from queue import Empty
+        state = MultichatState()
+        settings = {
+            "provider_config": {
+                "twitch_user_id": "123",
+                "profile_image_url": "https://static-cdn.jtvnw.net/avatar.png",
+            },
+        }
+        service = SimpleNamespace(
+            db=SimpleNamespace(get_integration_connection=lambda _: settings),
+        )
+        runtime = TwitchEventSubRuntime(service, chat_state=state)
+        runtime.chat_connected = True
+        runtime._media_thread = SimpleNamespace(is_alive=lambda: True)
+        runtime._schedule_media_warmup("123")
+        self.assertEqual([runtime._media_tasks.get_nowait()[0]
+                          for _ in range(2)], ["badges", "emotes"])
+        with self.assertRaises(Empty):
+            runtime._media_tasks.get_nowait()
+        self.assertEqual(state.snapshot()["media_preload"]["twitch"],
+                         ["https://static-cdn.jtvnw.net/avatar.png"])
+        runtime._schedule_media_warmup("123")
+        with self.assertRaises(Empty):
+            runtime._media_tasks.get_nowait()
+        avatar, badges = runtime._media_for_message("123", "123", "", ())
+        self.assertEqual(avatar, "https://static-cdn.jtvnw.net/avatar.png")
+        self.assertEqual(badges, ())
+
+    def test_qt_prefetch_uses_spare_workers_and_never_waits(self):
+        from concurrent.futures import Future
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QApplication
+        from streaming_manager.views.chat_rich_feed import ChatRichFeed
+        app = QApplication.instance() or QApplication([])
+        feed = ChatRichFeed()
+        futures = []
+        def pending_submit(_fun, url):
+            result = Future()
+            futures.append(result)
+            return result
+        try:
+            urls = ["https://static-cdn.jtvnw.net/i%d.png" % i
+                    for i in range(15)]
+            with patch.object(feed._pool, "submit", side_effect=pending_submit):
+                feed.prefetch_media(urls)
+                self.assertEqual(len(feed._jobs), 2)
+                self.assertEqual(len(futures), 2)
+                feed.prefetch_media(urls)
+                self.assertEqual(len(feed._jobs), 2)
+            self.assertEqual(feed._poll.interval(), 75)
+            self.assertEqual(len(feed._preload_candidates), 15)
+        finally:
+            feed.close()
+            app.processEvents()
+
     def test_qt_native_renderer_does_not_parse_untrusted_html(self):
         from PySide6.QtWidgets import QApplication
         from streaming_manager.views.chat_rich_feed import ChatRichFeed
