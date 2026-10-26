@@ -272,6 +272,9 @@ class MainWindow(QMainWindow):
         self.multichat_tab = MultichatTab(
             db, self.multichat_state, self.api,
             twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
+            import_background=lambda callback, owner: self.stream_tab._import_background_media_for(
+                'chat', dialog_parent=owner, on_imported=callback,
+            ),
         )
         self._add_main_tab(self.multichat_tab, "Чат Twitch", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
@@ -955,6 +958,28 @@ class MainWindow(QMainWindow):
         self._update_status_bar()
 
     def closeEvent(self, event):
+        # D41-06: presentation drafts are local until explicit Save.  Never
+        # terminate Twitch/OBS first and ask about unsaved changes afterwards.
+        editor = getattr(getattr(self, "multichat_tab", None), "appearance_editor", None)
+        if editor is not None and editor.is_dirty():
+            question = QMessageBox(self)
+            question.setWindowTitle("Несохранённое оформление чата")
+            question.setText("Сохранить изменения оформления Twitch перед выходом?")
+            save = question.addButton("Сохранить", QMessageBox.ButtonRole.AcceptRole)
+            discard = question.addButton("Выйти без сохранения", QMessageBox.ButtonRole.DestructiveRole)
+            cancel = question.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+            question.exec()
+            if question.clickedButton() is cancel or question.clickedButton() is None:
+                event.ignore()
+                return
+            if question.clickedButton() is save:
+                if not editor.save():
+                    event.ignore()
+                    return
+            elif question.clickedButton() is discard:
+                editor.discard()
+        if hasattr(self.multichat_tab, "feed_frame"):
+            self.multichat_tab.feed_frame.shutdown()
         self._integration_health_timer.stop()
         self.twitch_adapter.cancel_authorization()
         self.donationalerts_adapter.cancel_authorization()
