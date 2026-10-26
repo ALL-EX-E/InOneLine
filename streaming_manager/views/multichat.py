@@ -154,6 +154,9 @@ class MultichatTab(QWidget):
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
         snapshot = self.state.snapshot()
+        # Preload platform media as soon as Twitch connects, before any text
+        # messages appear; the Qt image pool retains free slots for live chat.
+        self.feed.prefetch_media(snapshot.get("media_preload", {}).get("twitch", ()))
         overflow = snapshot["overflow_count"]
         warning = ("Буфер задержки переполнен: для сохранения сообщений "
                    "часть сообщений показана раньше установленного времени "
