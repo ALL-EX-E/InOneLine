@@ -261,6 +261,91 @@ def fetch_third_party_channel_emotes(twitch_user_id: str) -> list[EmoteCatalogIt
     return unique
 
 
+
+def _fetch_list(url: str) -> list:
+    """BTTV global endpoint is a JSON array; channel endpoints are mappings."""
+    request = urlrequest.Request(
+        url,
+        headers={"Accept": "application/json", "User-Agent": USER_AGENT},
+        method="GET",
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=12.0) as response:
+            raw = _read_limited(response, JSON_LIMIT)
+        payload = json.loads(raw.decode("utf-8"))
+        return payload if isinstance(payload, list) else []
+    except (urlerror.HTTPError, urlerror.URLError, TimeoutError, OSError,
+            ValueError, UnicodeError, json.JSONDecodeError):
+        return []
+
+
+def fetch_third_party_chat_emotes(twitch_user_id: str) -> list[EmoteCatalogItem]:
+    """Fetch all *publicly applicable* channel/global sets for one Twitch room.
+
+    Global FFZ user-scoped sets are intentionally excluded unless user-specific
+    eligibility can be authenticated per sender. Only default_sets apply to
+    every viewer in the Twitch channel. Independent provider failures never
+    block EventSub and never invent images.
+    """
+    channel = str(twitch_user_id or "").strip()
+    if not channel.isdigit():
+        return []
+
+    def global_7tv():
+        try:
+            return _parse_7tv_emotes(_fetch_json(
+                "https://7tv.io/v3/emote-sets/global"
+            ))
+        except Exception:
+            return []
+
+    def global_bttv():
+        return _parse_bttv_emotes({
+            "channelEmotes": _fetch_list(
+                "https://api.betterttv.net/3/cached/emotes/global"
+            ),
+        })
+
+    def global_ffz():
+        try:
+            payload = _fetch_json("https://api.frankerfacez.com/v1/set/global")
+            defaults = {str(x) for x in (payload.get("default_sets") or [])}
+            sets = payload.get("sets") or {}
+            if not isinstance(sets, dict):
+                return []
+            # Do not accidentally expose user-gated global sets to everyone.
+            return _parse_ffz_emotes({
+                "sets": {key: value for key, value in sets.items()
+                         if str(key) in defaults}
+            })
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        jobs = [pool.submit(global_7tv), pool.submit(global_bttv),
+                pool.submit(global_ffz),
+                pool.submit(fetch_third_party_channel_emotes, channel)]
+        result = []
+        for job in jobs:
+            try:
+                result.extend(job.result())
+            except Exception:
+                continue
+    # A channel/global code may legitimately repeat, including collisions.
+    # Do not deduplicate by code here: the chat resolver decides ambiguity.
+    seen = set()
+    catalog = []
+    for item in result[:4500]:
+        key = (item.source, item.emote_id, item.name, item.image_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        catalog.append(item)
+        if len(catalog) >= 3000:
+            break
+    return catalog
+
+
 def hydrate_emote_thumbnails(
     items: list[EmoteCatalogItem],
     *,
