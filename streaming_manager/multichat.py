@@ -138,7 +138,9 @@ class MultichatState:
             if len(choices) == 24:
                 break
         with self._lock:
-            self._chat_media_preload[str(platform)] = tuple(choices)
+            key = str(platform)
+            previous = self._chat_media_preload.get(key, ())
+            self._chat_media_preload[key] = tuple(dict.fromkeys((*previous, *choices)))[:24]
 
     def ingest(self, message: ChatMessage) -> bool:
         """Return False for a repeated event, True for a new received event."""
@@ -232,6 +234,7 @@ class MultichatState:
     def change_source(self, platform: str) -> None:
         """Only call after a confirmed change of account or chosen broadcast."""
         with self._lock:
+            self._chat_media_preload.pop(platform, None)
             self.disconnect(platform)
             self._operator = deque((m for m in self._operator if m.platform != platform), maxlen=self._limit)
             self._obs = deque((m for m in self._obs if m.platform != platform), maxlen=self._limit)
