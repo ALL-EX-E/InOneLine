@@ -68,6 +68,8 @@ class ChatRichFeed(QTextEdit):
         self._failed: set[str] = set()
         self._cache_bytes = 0
         self._active_urls: set[str] = set()
+        self._wanted_urls: set[str] = set()
+        self._preload_candidates: tuple[str, ...] = ()
         self._visible_movie_count = 0
         self._rows: list[dict] = []
         self._show_time = True
@@ -76,7 +78,8 @@ class ChatRichFeed(QTextEdit):
         self._platform_image = None
         self._make_platform_image()
         self._poll = QTimer(self)
-        self._poll.setInterval(300)
+        # 75 ms responsiveness while loading, without an EventSub/GUI network wait.
+        self._poll.setInterval(75)
         self._poll.timeout.connect(self._finish_downloads)
         self._poll.start()
 
@@ -93,6 +96,30 @@ class ChatRichFeed(QTextEdit):
         svg.render(painter)
         painter.end()
         self._platform_image = image
+
+    def prefetch_media(self, urls) -> None:
+        """Warm a few common assets while the chat is idle.
+
+        Never occupy all three image workers: a new viewer/emote needs one
+        immediately available worker even during background preloading.
+        """
+        choices = tuple(dict.fromkeys(
+            url for raw in list(urls)[:24]
+            if (url := safe_image_url(raw))
+        ))
+        if choices != self._preload_candidates:
+            self._preload_candidates = choices
+        self._maybe_prefetch()
+
+    def _maybe_prefetch(self):
+        inflight = sum(1 for url in self._jobs if url in self._preload_candidates)
+        for url in self._preload_candidates:
+            if inflight >= 2 or len(self._jobs) >= 8:
+                break
+            if url not in self._jobs and url not in self._cache and url not in self._failed:
+                self._enqueue(url)
+                if url in self._jobs:
+                    inflight += 1
 
     def _enqueue(self, url: str):
         if (
@@ -121,7 +148,7 @@ class ChatRichFeed(QTextEdit):
             self._cache[url] = (asset.image_bytes, image, None, None, bool(asset.animated))
             self._cache.move_to_end(url)
             self._cache_bytes += len(asset.image_bytes)
-            changed = True
+            changed = changed or url in self._wanted_urls
         while (len(self._cache) > _MAX_CACHE_ITEMS or
                self._cache_bytes > _MAX_CACHE_BYTES):
             url, (raw, _image, movie, buffer, _animated) = self._cache.popitem(last=False)
@@ -133,11 +160,13 @@ class ChatRichFeed(QTextEdit):
                 buffer.deleteLater()
         if changed:
             self._draw()
+        self._maybe_prefetch()
 
     def _image_tag(self, url: str, fallback: str, *, size: int, is_content: bool):
         url = safe_image_url(url)
         if not url:
             return _escape(fallback) if is_content else ""
+        self._wanted_urls.add(url)
         if url not in self._cache:
             self._enqueue(url)
             return _escape(fallback) if is_content else ""
@@ -167,6 +196,7 @@ class ChatRichFeed(QTextEdit):
 
     def _draw(self):
         self._active_urls = set()
+        self._wanted_urls = set()
         self._visible_movie_count = 0
         paragraphs = []
         for row in self._rows:
