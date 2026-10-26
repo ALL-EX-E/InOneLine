@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from .chat_graphics import safe_image_url
 
-# Only stand-alone Twitch-style codes, preserving surrounding punctuation.
+# Only discrete emote codes; retain surrounding punctuation.
 _TOKEN = re.compile(r"""^([("'\[{]*)([A-Za-z0-9_]{1,64})([.,!?;:)"'\]}]*)$""")
 _MAX_EMOTES = 3000
 _MAX_IMAGES_PER_MESSAGE = 32
