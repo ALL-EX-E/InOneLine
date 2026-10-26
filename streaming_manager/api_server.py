@@ -11,6 +11,7 @@ from .constants import APP_VERSION
 from .default_wheel_icon import default_wheel_icon_png
 from .database import Database
 from .music_player import music_player_overlay_appearance
+from .chat_appearance import public_appearance
 from .media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     is_supported_media_name,
@@ -146,7 +147,9 @@ class LocalApiServer:
             state = provider(for_obs=for_obs)
         except Exception:
             return {"messages": [], "show_time": True}
-        return dict(state) if isinstance(state, dict) else {"messages": [], "show_time": True}
+        payload = dict(state) if isinstance(state, dict) else {"messages": [], "show_time": True}
+        payload["appearance"] = public_appearance(self.db)
+        return payload
 
     def start(self) -> None:
         if self.running:
