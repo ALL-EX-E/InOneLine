@@ -40,7 +40,8 @@ body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif;
       if (typeof value !== "string" || value.length > 2048) return "";
       const u = new URL(value);
       const host = u.hostname.toLowerCase();
-      const roots = ["jtvnw.net","twitchcdn.net","ttvnw.net","tenor.com","giphy.com"];
+      const roots = ["jtvnw.net","twitchcdn.net","ttvnw.net","tenor.com","giphy.com",
+                     "betterttv.net","frankerfacez.com","7tv.app","7tv.io"];
       if (u.protocol !== "https:" || u.username || u.password ||
           (u.port && u.port !== "443") ||
           !roots.some(root => host === root || host.endsWith("." + root))) return "";
