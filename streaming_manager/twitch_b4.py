@@ -642,7 +642,19 @@ class TwitchEventSubRuntime:
                     preload = []
                     # Use the same official EventSub image URL and rendition
                     # as a real message, not the wheel picker's 3x thumbnails.
-                    for row in rows[:256]:
+                    # A channel with 10+ custom emotes should not prevent
+                    # common *global* native emotes from being warmed.
+                    common = {
+                        "kappa", "lul", "pogchamp", "biblethump",
+                        "heyguys", "residentsleeper", "kreygasm", "vohiyo",
+                    }
+                    preferred = rows[:4] + [
+                        row for row in rows
+                        if isinstance(row, dict)
+                        and str(row.get("name") or "").casefold() in common
+                    ]
+                    preferred += rows[:256]
+                    for row in preferred:
                         if not isinstance(row, dict):
                             continue
                         parts = parse_twitch_fragments({"fragments": [{
@@ -653,7 +665,8 @@ class TwitchEventSubRuntime:
                                 "format": ["animated" if row.get("animated") else "static"],
                             },
                         }]})
-                        if parts and parts[0].get("kind") == "image":
+                        if (parts and parts[0].get("kind") == "image"
+                                and parts[0]["url"] not in preload):
                             preload.append(parts[0]["url"])
                         if len(preload) >= 10:
                             break
