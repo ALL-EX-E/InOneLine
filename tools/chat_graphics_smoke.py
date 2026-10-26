@@ -161,7 +161,7 @@ class GraphicsSmoke(unittest.TestCase):
         with self.assertRaises(Empty):
             runtime._media_tasks.get_nowait()
         self.assertEqual(state.snapshot()["media_preload"]["twitch"],
-                         ["https://static-cdn.jtvnw.net/avatar.png"])
+                         ("https://static-cdn.jtvnw.net/avatar.png",))
         runtime._schedule_media_warmup("123")
         with self.assertRaises(Empty):
             runtime._media_tasks.get_nowait()
