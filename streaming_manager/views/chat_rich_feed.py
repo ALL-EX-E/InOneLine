@@ -44,12 +44,12 @@ def _fetch_chat_image(url: str):
     if len(result.image_bytes) > _MAX_LOADED_IMAGE:
         return None
     # Decode static media in the background, not the GUI event loop.
-    image = None
-    if not result.animated:
-        image = QImage.fromData(result.image_bytes)
-        if image.isNull():
-            return None
-        image = image.scaled(48,48,Qt.KeepAspectRatio,Qt.SmoothTransformation)
+    # Read first frame of both static and animated images OFF the GUI thread.
+    # Keep its dimensions so inline content preserves the provider aspect ratio.
+    image = QImage.fromData(result.image_bytes)
+    if image.isNull():
+        return None
+    image = image.scaled(48,48,Qt.KeepAspectRatio,Qt.SmoothTransformation)
     return result, image
 
 
@@ -147,9 +147,10 @@ class ChatRichFeed(QTextEdit):
             self._visible_movie_count += 1
         self._active_urls.add(url)
         res = _resource_url(url)
-        if is_content:
-            return f'<img src="{res}" height="{size}" width="{size}" />'
-        return f'<img src="{res}" height="{size}" width="{size}" />'
+        preview = self._cache[url][1]
+        width = (max(1, round(size * preview.width() / preview.height()))
+                 if preview is not None and preview.height() > 0 else size)
+        return f'<img src="{res}" height="{size}" width="{width}" />'
 
     def display(self, rows: list[dict], *, show_time: bool, show_icons: bool):
         signature = (
@@ -242,7 +243,10 @@ class ChatRichFeed(QTextEdit):
                 if buffer.open(QIODevice.ReadOnly):
                     movie = QMovie(buffer, parent=self)
                     movie.setCacheMode(QMovie.CacheNone)
-                    movie.setScaledSize(QSize(28, 28))
+                    width = max(1, round(28 * image.width() / image.height())) if (
+                        image is not None and image.height() > 0
+                    ) else 28
+                    movie.setScaledSize(QSize(width, 28))
                     movie.frameChanged.connect(
                         lambda _frame, key=url: self._on_movie_frame(key)
                     )
