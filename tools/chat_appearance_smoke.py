@@ -164,7 +164,6 @@ class AppearanceModelTests(unittest.TestCase):
         repeated 250-ms-equivalent refreshes, not only color/static CSS tests.
         """
         import base64
-        import shutil
         import time
         os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
         from PySide6.QtWidgets import QApplication
@@ -197,9 +196,9 @@ class AppearanceModelTests(unittest.TestCase):
                 "/wAAAAAAAAAAAAgdAAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWBAQEAOw=="
             ))
             video = media_dir / "chat_background.webm"
-            shutil.copyfile(
-                Path(__file__).parent / "fixtures" / "rules_k8c_loop.webm", video,
-            )
+            # Valid five-frame VP8 WebM; exercise real Windows video decoding,
+            # not just QMediaPlayer's handling of a placeholder EBML header.
+            video.write_bytes(base64.b64decode("GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAKWEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggEjTbuMU6uEHFO7a1OsggKA7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjEuNy4xMDNXQYxMYXZmNjEuNy4xMDNEiYhAlNQAAAAAABZUrmvIrgEAAAAAAAA/14EBc8WIULi87M8V5IicgQAitZyDdW5kiIEAhoVWX1ZQOIOBASPjg4QT3kNV4JCwgTC6gSCagQJVsIRVuYEBElTDZ/tzc59jwIBnyJlFo4dFTkNPREVSRIeMTGF2ZjYxLjcuMTAzc3PWY8CLY8WIULi87M8V5IhnyKFFo4dFTkNPREVSRIeUTGF2YzYxLjE5LjEwMSBsaWJ2cHhnyKFFo4hEVVJBVElPTkSHkzAwOjAwOjAxLjMzMzAwMDAwMAAfQ7Z1QNfngQCjv4EAAIDwAgCdASowACAAAEcIhYWImYSIAgICdaoD+AIHkcI+qoD+/00S//xKp/Eqn8Sqf/Eqn/0Yfww/hh/eEKOvgQFNANEBAAEQEAAYABxH9AwAKTGI/v9NEv/8SqfxKp/Eqn/xKp/9GH8MP4Yf3hCjr4ECmwDRAQABEBAAGAAcR/QMACkxiP7/TRL//Eqn8SqfxKp/8Sqf/Rh/DD+GH94Qo6+BA+gA0QEAARAQABgAHEf0DAApMYj+/00S//xKp/Eqn8Sqf/Eqn/0Yfww/hh/eEBxTu2uRu4+zgQC3iveBAfGCAaPwgQM="))
             asset_ids = []
             for path in (still, gif, video):
                 asset = db.ensure_managed_media_asset(
@@ -253,6 +252,9 @@ class AppearanceModelTests(unittest.TestCase):
                         app.processEvents()
                         time.sleep(.025)
                     self.assertEqual(frame._movie_kind,kind)
+                    if kind == "video":
+                        self.assertFalse(frame._original.isNull(),
+                            "Windows must decode real WebM frames in Qt preview")
                     self.assertLessEqual(frame.width(), start_width + 2,
                         "Scaled media must not cause growing Qt layout width")
                     self.assertLessEqual(frame.height(), start_height + 2,
