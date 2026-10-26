@@ -111,6 +111,7 @@ class AppearanceModelTests(unittest.TestCase):
         from unittest.mock import patch
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PySide6.QtWidgets import QApplication, QMessageBox
+        from streaming_manager.media import MediaAsset, MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
         from streaming_manager.views.chat_appearance_controls import ChatAppearanceEditor
         app = QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory() as folder:
@@ -125,7 +126,15 @@ class AppearanceModelTests(unittest.TestCase):
                  "glow":True, "glow_color":"#00FF00",
                  "visibility":"always"},
             )
-            db.assets[42] = object()
+            original_media = Path(folder) / "user_background.png"
+            original_media.write_bytes(b"existing user media must be retained")
+            db.assets[42] = MediaAsset(
+                id=42, category=MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
+                storage_mode="external", managed_name="",
+                external_path=str(original_media),
+                original_name="user_background.png",
+                created_at="", updated_at="",
+            )
             db.set_setting("multichat_show_time", "false")
             saved = saved_appearance(db)
             original_public = public_appearance(db)
@@ -185,7 +194,8 @@ class AppearanceModelTests(unittest.TestCase):
             self.assertEqual(public_appearance(db)["twitch"],defaults["twitch"])
             self.assertEqual(public_appearance(db)["common"]["background"],"transparent")
             self.assertEqual(db.get_setting("multichat_show_time"),"false")
-            self.assertIn(42,db.assets, "Reset must never delete any media file")
+            self.assertIn(42,db.assets, "Reset must never delete any media entry")
+            self.assertTrue(original_media.exists(), "Reset must not delete user files")
             editor.close()
         app.processEvents()
 
