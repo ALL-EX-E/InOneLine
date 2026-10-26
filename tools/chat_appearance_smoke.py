@@ -105,6 +105,70 @@ class AppearanceModelTests(unittest.TestCase):
             editor.close()
         app.processEvents()
 
+
+    def test_operator_preview_is_visible_above_background(self):
+        """Regression: StackAll index 0 (media) hid the real Qt operator feed."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication, QStackedLayout
+        from streaming_manager.views.chat_appearance_background import ChatBackgroundFrame
+        from streaming_manager.views.chat_rich_feed import ChatRichFeed
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as folder:
+            feed = ChatRichFeed()
+            frame = ChatBackgroundFrame(StubDatabase(folder), feed)
+            frame.resize(720, 420)
+            frame.show()
+            app.processEvents()
+            self.assertIsInstance(frame.layout(), QStackedLayout)
+            self.assertIs(frame.layout().currentWidget(), feed)
+            self.assertTrue(feed.isVisible())
+            frame.apply({"background":"color", "background_color":"#606554",
+                         "background_opacity":65, "glow":True},
+                        has_content=True)
+            feed.display(
+                [{"platform":"twitch", "author":"Alex_say62",
+                  "text":"Привет", "fragments":[{"kind":"text","text":"Привет"}],
+                  "color":"#FAC21F"}],
+                show_time=False,show_icons=True,
+                appearance={"mode":"custom", "text_color":"#176DA5",
+                            "text_size":30, "card_opacity":0},
+                test_visible=False,
+            )
+            app.processEvents()
+            self.assertIn("Привет",feed.toPlainText())
+            self.assertIn("Alex_say62",feed.toPlainText())
+            before = frame.grab().toImage()
+            feed.display(
+                [{"platform":"twitch", "author":"Alex_say62",
+                  "text":"Привет", "fragments":[{"kind":"text","text":"Привет"}],
+                  "color":"#FAC21F"}],
+                show_time=False,show_icons=True,
+                appearance={"mode":"custom", "text_color":"#176DA5",
+                            "text_size":30, "card_opacity":0},
+                test_visible=True,
+            )
+            app.processEvents()
+            self.assertIn("Тестовое сообщение",feed.toPlainText())
+            after = frame.grab().toImage()
+            self.assertFalse(before == after,
+                             "Local preview must visibly change on test message")
+            frame.shutdown()
+            feed._poll.stop()
+            frame.close()
+        app.processEvents()
+
+    def test_browser_box_safe_area_does_not_clip_edges(self):
+        html = Path("streaming_manager/web/multichat_overlay.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--chat-edge-inset:12px", html)
+        self.assertIn("left:var(--chat-edge-inset)", html)
+        self.assertIn("right:var(--chat-edge-inset)", html)
+        self.assertIn("bottom:var(--chat-edge-inset)", html)
+        self.assertIn("#shell.always {top:var(--chat-edge-inset)", html)
+        self.assertIn("max-height:calc(100% - 2 * var(--chat-edge-inset))",html)
+        self.assertIn("0 0 6px",html)
+
     def test_overlay_never_renders_provider_html(self):
         overlay = Path("streaming_manager/web/multichat_overlay.html").read_text(encoding="utf-8")
         self.assertIn('row.style.background = rgba(',overlay)
