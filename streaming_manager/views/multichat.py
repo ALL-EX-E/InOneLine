@@ -17,9 +17,13 @@ from PySide6.QtWidgets import (
 
 
 from .chat_rich_feed import ChatRichFeed as _ChatFeed
+from .chat_appearance_controls import ChatAppearanceEditor
+from .chat_appearance_background import ChatBackgroundFrame
+from ..chat_appearance import normalize_twitch, normalize_common
 
 class MultichatTab(QWidget):
-    def __init__(self, db, state, api, *, twitch_status_provider=None):
+    def __init__(self, db, state, api, *, twitch_status_provider=None,
+                 import_background=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
@@ -27,7 +31,8 @@ class MultichatTab(QWidget):
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         self.columns.setContentsMargins(8, 8, 8, 8)
         self.feed = _ChatFeed()
-        self.columns.addWidget(self.feed, 3)
+        self.feed_frame = ChatBackgroundFrame(db, self.feed)
+        self.columns.addWidget(self.feed_frame, 3)
         options_scroll = QScrollArea()
         options_scroll.setFrameShape(QFrame.NoFrame)
         options_scroll.setWidgetResizable(True)
@@ -94,6 +99,12 @@ class MultichatTab(QWidget):
         actions.addWidget(preview)
         connections_layout.addLayout(actions)
         settings.addWidget(connections)
+        self.appearance_editor = ChatAppearanceEditor(
+            db, import_background=import_background
+        )
+        self.appearance_editor.changed.connect(self._appearance_changed)
+        self._appearance_draft = self.appearance_editor.values()
+        settings.addWidget(self.appearance_editor)
         settings.addStretch()
         # Platform-specific appearance controls remain hidden until adapters
         # can confirm that their channels are actually connected.
@@ -107,6 +118,14 @@ class MultichatTab(QWidget):
         self.refresh_timer.setInterval(250)
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
+        self.refresh()
+
+    def _appearance_changed(self, twitch, common, test_visible):
+        self._appearance_draft = {
+            "twitch": normalize_twitch(twitch),
+            "common": normalize_common(common),
+        }
+        self._last_render = None
         self.refresh()
 
     def _on_twitch_obs(self, enabled):
@@ -166,17 +185,22 @@ class MultichatTab(QWidget):
             self.buffer_warning.setVisible(bool(warning))
         # Keep multi-provider RAM/API contracts intact, but the current UI is Twitch-only.
         messages = [m for m in snapshot["messages"] if m["platform"] == "twitch"]
+        twitch = self._appearance_draft["twitch"]
+        common = self._appearance_draft["common"]
+        test_visible = self.appearance_editor.test_visible
         key = (
             snapshot["show_time"], snapshot["show_platform_icons"],
-            repr(messages),
+            repr(messages), repr(twitch), repr(common), test_visible,
         )
         if key == self._last_render:
             return
         self._last_render = key
+        self.feed_frame.apply(common, has_content=bool(messages) or test_visible)
         self.feed.display(
             messages,
             show_time=snapshot["show_time"],
             show_icons=snapshot["show_platform_icons"],
+            appearance=twitch, common=common, test_visible=test_visible,
         )
 
     def resizeEvent(self, event):
