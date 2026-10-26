@@ -127,7 +127,7 @@ body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif;
       if (!response.ok) return;
       const state = await response.json();
       const messages = Array.isArray(state.messages) ?
-        state.messages.filter(m => m.platform === "twitch") : [];
+        state.messages.filter(message => message.platform === "twitch") : [];
       const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages]);
       if (sig === last) return;
       last = sig;
