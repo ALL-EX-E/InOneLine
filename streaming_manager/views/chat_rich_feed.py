@@ -14,8 +14,8 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QSize, Qt, QTimer, QUrl
-from PySide6.QtGui import QColor, QImage, QMovie, QPainter, QTextCursor, QTextDocument
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QRect, QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import QColor, QFont, QImage, QMovie, QPainter, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QTextEdit
 
 from ..chat_appearance import normalize_twitch, normalize_common
@@ -81,6 +81,17 @@ class ChatRichFeed(QTextEdit):
         self._signature = None
         self._platform_image = None
         self._make_platform_image()
+        # Synthesized local-only preview avatar (never a provider identity).
+        self._test_avatar = QImage(44, 44, QImage.Format_ARGB32_Premultiplied)
+        self._test_avatar.fill(Qt.transparent)
+        avatar_painter = QPainter(self._test_avatar)
+        avatar_painter.setBrush(QColor("#9146FF"))
+        avatar_painter.setPen(Qt.NoPen)
+        avatar_painter.drawEllipse(0, 0, 44, 44)
+        avatar_painter.setPen(QColor("#FFFFFF"))
+        avatar_painter.setFont(QFont("Segoe UI", 16, QFont.Bold))
+        avatar_painter.drawText(QRect(0, 0, 44, 44), Qt.AlignCenter, "Т")
+        avatar_painter.end()
         self._poll = QTimer(self)
         # 75 ms responsiveness while loading, without an EventSub/GUI network wait.
         self._poll.setInterval(75)
@@ -220,7 +231,8 @@ class ChatRichFeed(QTextEdit):
         if self._test_visible:
             # Sample is local only: not ingested, persisted, forwarded, or timed.
             rows.append({
-                "platform":"twitch", "author":"Пример Twitch", "text":"Тестовое сообщение 🙂",
+                "platform":"twitch", "_local_test":True,
+                "author":"Пример Twitch", "text":"Тестовое сообщение 🙂",
                 "color":"#9146FF", "fragments":[{"kind":"text","text":"Тестовое сообщение 🙂"}],
             })
         for row in rows:
@@ -228,6 +240,9 @@ class ChatRichFeed(QTextEdit):
             if self._show_icons and self._platform_image is not None:
                 header.append('<img src="iol-chat-twitch-logo:" height="18" width="18" />')
             avatar = self._image_tag(row.get("avatar_url",""),"",size=a["avatar_size"] if custom else 24,is_content=False)
+            if row.get("_local_test"):
+                sample_size = a["avatar_size"] if custom else 24
+                avatar = f'<img src="iol-chat-test-avatar:" height="{sample_size}" width="{sample_size}" />'
             if avatar:
                 header.append(avatar)
             badges = row.get("badges")
@@ -298,6 +313,9 @@ class ChatRichFeed(QTextEdit):
             "".join(paragraphs) + "</body></html>"
         )
         self.setHtml(html_body)
+        self.document().addResource(
+            QTextDocument.ImageResource, QUrl("iol-chat-test-avatar:"), self._test_avatar
+        )
         if self._platform_image is not None:
             self.document().addResource(
                 QTextDocument.ImageResource,
