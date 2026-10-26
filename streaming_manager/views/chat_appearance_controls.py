@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ..chat_appearance import saved_appearance, save_appearance
+from ..chat_appearance import normalize_common, normalize_twitch, saved_appearance, save_appearance
 from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
 from ..media import media_asset_available
 from .common import (
@@ -99,6 +99,13 @@ class ChatAppearanceEditor(QWidget):
         foot = QHBoxLayout()
         self.status = QLabel("Сохранено")
         foot.addWidget(self.status, 1)
+        self.reset_button = QPushButton("Сбросить по умолчанию")
+        self.reset_button.setToolTip(
+            "Вернуть исходный вид Twitch-чата и общий фон в локальный "
+            "предпросмотр. Для OBS нажмите «Сохранить»."
+        )
+        self.reset_button.clicked.connect(self.reset_to_defaults)
+        foot.addWidget(self.reset_button)
         self.save_button = QPushButton("Сохранить")
         self.save_button.setProperty("primary", True)
         self.save_button.clicked.connect(self.save)
@@ -309,6 +316,27 @@ class ChatAppearanceEditor(QWidget):
         self.test_visible = not self.test_visible
         self.test.setText("Закрыть предпросмотр" if self.test_visible else
                           "Показать тестовое сообщение")
+        self._changed()
+
+    def reset_to_defaults(self):
+        """Only replace appearance draft; OBS reads saved settings until Save."""
+        choice = QMessageBox.question(
+            self,
+            "Сбросить оформление чата",
+            "Вернуть настройки внешнего вида Twitch-чата к значениям "
+            "по умолчанию?\n\n"
+            "Сначала изменится только предпросмотр в программе. "
+            "Чтобы применить оформление в OBS, нажмите «Сохранить».\n"
+            "Сообщения и фоны из библиотеки не удаляются.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        self._apply_values({
+            "twitch": normalize_twitch({}),
+            "common": normalize_common({}),
+        })
         self._changed()
 
     def save(self):
