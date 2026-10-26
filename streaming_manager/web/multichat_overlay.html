@@ -41,7 +41,7 @@ body { display:flex; align-items:flex-end; color:#fff; font:18px/1.3 sans-serif;
       const u = new URL(value);
       const host = u.hostname.toLowerCase();
       const roots = ["jtvnw.net","twitchcdn.net","ttvnw.net","tenor.com","giphy.com",
-                     "betterttv.net","frankerfacez.com","7tv.app","7tv.io"];
+                     "cdn.betterttv.net","cdn.frankerfacez.com","cdn.7tv.app"];
       if (u.protocol !== "https:" || u.username || u.password ||
           (u.port && u.port !== "443") ||
           !roots.some(root => host === root || host.endsWith("." + root))) return "";
