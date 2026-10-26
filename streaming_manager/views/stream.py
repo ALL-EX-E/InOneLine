@@ -1673,7 +1673,7 @@ class StreamTab(QWidget):
         *, on_imported: Callable[[int], None] | None = None,
     ) -> None:
         """The one shared importer also serves the Rules editor without side effects."""
-        if target not in {"main", "auction_lots", "timer", "rules"}:
+        if target not in {"main", "auction_lots", "timer", "rules", "chat"}:
             raise ValueError(f"Неизвестный виджет фона: {target}")
         # The existing selector is still singular. A batch adds all files to
         # the shared D26 library, but commits only its last successful asset.
@@ -1686,7 +1686,9 @@ class StreamTab(QWidget):
             asset_id if target == "auction_lots" else None
         )
         self._refresh_timer_background_library(asset_id if target == "timer" else None)
-        if target == "rules" and on_imported is not None:
+        if target == "chat" and on_imported is None:
+            on_imported = getattr(self, "_chat_background_callback", None)
+        if target in {"rules", "chat"} and on_imported is not None:
             on_imported(asset_id)
 
     def _selected_background_asset(self):
@@ -1817,6 +1819,7 @@ class StreamTab(QWidget):
             "main": self.choose_background_btn,
             "auction_lots": self.auction_lots_choose_background_btn,
             "timer": self.timer_choose_background_btn,
+            "chat": self.choose_background_btn,
         }[selection_target]
         active_button.setText("Копирование…")
         worker = FunctionWorker(self._copy_background_video, source, target)
@@ -1893,6 +1896,8 @@ class StreamTab(QWidget):
     ):
         if self._background_copy_worker is not None or self._background_import_batch is not None:
             return
+        if selection_target == "chat":
+            self._chat_background_callback = on_imported
         owner = dialog_parent or self
         rules_only = selection_target == "rules"
         extensions = (
