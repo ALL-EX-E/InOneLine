@@ -215,6 +215,8 @@ class AppearanceModelTests(unittest.TestCase):
             app.processEvents()
             try:
                 editor._set_combo(editor.background, "media")
+                # Actual report used a bright outer glow while cycling media.
+                editor.glow.setChecked(True)
                 frame.feed.display(
                     [{"platform":"twitch", "author":"test",
                       "text":"Media regression",
@@ -227,7 +229,9 @@ class AppearanceModelTests(unittest.TestCase):
                     self.assertTrue(editor.save())
                     current = saved_appearance(db)["common"]
                     self.assertEqual(current["background_media_id"], id_)
+                    self.assertTrue(current["glow"])
                     frame.apply(current, has_content=True)
+                    self.assertTrue(frame.effect.isEnabled())
                     app.processEvents()
                     # The canvas must not grow to its own scaled pixmap's
                     # size: this feedback loop closed the Windows process.
