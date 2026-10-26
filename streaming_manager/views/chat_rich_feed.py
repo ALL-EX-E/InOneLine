@@ -129,6 +129,8 @@ class ChatRichFeed(QTextEdit):
         ):
             return
         self._jobs[url] = self._pool.submit(_fetch_chat_image, url)
+        if self._poll.interval() != 75:
+            self._poll.setInterval(75)
 
     def _finish_downloads(self):
         changed = False
@@ -161,6 +163,8 @@ class ChatRichFeed(QTextEdit):
         if changed:
             self._draw()
         self._maybe_prefetch()
+        if not self._jobs and self._poll.interval() != 300:
+            self._poll.setInterval(300)
 
     def _image_tag(self, url: str, fallback: str, *, size: int, is_content: bool):
         url = safe_image_url(url)
