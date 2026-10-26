@@ -14,7 +14,7 @@ from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from PySide6.QtCore import QByteArray, QBuffer, QIODevice, Qt, QTimer, QUrl
+from PySide6.QtCore import QByteArray, QBuffer, QIODevice, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QImage, QMovie, QPainter, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QTextEdit
 
@@ -43,7 +43,14 @@ def _fetch_chat_image(url: str):
     result = download_external_image(url)
     if len(result.image_bytes) > _MAX_LOADED_IMAGE:
         return None
-    return result
+    # Decode static media in the background, not the GUI event loop.
+    image = None
+    if not result.animated:
+        image = QImage.fromData(result.image_bytes)
+        if image.isNull():
+            return None
+        image = image.scaled(48,48,Qt.KeepAspectRatio,Qt.SmoothTransformation)
+    return result, image
 
 
 class ChatRichFeed(QTextEdit):
@@ -56,11 +63,12 @@ class ChatRichFeed(QTextEdit):
         self.setPlaceholderText("Ожидание сообщений Twitch")
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="TwitchChatImage")
         self._jobs: dict[str, object] = {}
-        # Value: (raw bytes, QImage, QMovie | None, QBuffer | None)
+        # Value: (raw bytes, decoded small QImage, QMovie, QBuffer, animated)
         self._cache: OrderedDict[str, tuple] = OrderedDict()
         self._failed: set[str] = set()
         self._cache_bytes = 0
         self._active_urls: set[str] = set()
+        self._visible_movie_count = 0
         self._rows: list[dict] = []
         self._show_time = True
         self._show_icons = True
@@ -102,23 +110,27 @@ class ChatRichFeed(QTextEdit):
                 continue
             del self._jobs[url]
             try:
-                asset = future.result()
+                payload = future.result()
             except Exception:
-                asset = None
-            if asset is None or not asset.image_bytes:
+                payload = None
+            if payload is None:
                 if len(self._failed) < 1024:
                     self._failed.add(url)
                 continue
-            self._cache[url] = (asset.image_bytes, None, None, None)
+            asset, image = payload
+            self._cache[url] = (asset.image_bytes, image, None, None, bool(asset.animated))
             self._cache.move_to_end(url)
             self._cache_bytes += len(asset.image_bytes)
             changed = True
         while (len(self._cache) > _MAX_CACHE_ITEMS or
                self._cache_bytes > _MAX_CACHE_BYTES):
-            url, (raw, _image, movie, _buffer) = self._cache.popitem(last=False)
+            url, (raw, _image, movie, buffer, _animated) = self._cache.popitem(last=False)
             self._cache_bytes -= len(raw)
             if movie is not None:
                 movie.stop()
+                movie.deleteLater()
+            if buffer is not None:
+                buffer.deleteLater()
         if changed:
             self._draw()
 
@@ -129,6 +141,10 @@ class ChatRichFeed(QTextEdit):
         if url not in self._cache:
             self._enqueue(url)
             return _escape(fallback) if is_content else ""
+        if self._cache[url][4]:
+            if self._visible_movie_count >= _MAX_ACTIVE_MOVIES:
+                return _escape(fallback) if is_content else ""
+            self._visible_movie_count += 1
         self._active_urls.add(url)
         res = _resource_url(url)
         if is_content:
@@ -150,6 +166,7 @@ class ChatRichFeed(QTextEdit):
 
     def _draw(self):
         self._active_urls = set()
+        self._visible_movie_count = 0
         paragraphs = []
         for row in self._rows:
             header = []
@@ -213,37 +230,24 @@ class ChatRichFeed(QTextEdit):
                 QTextDocument.ImageResource,
                 QUrl("iol-chat-twitch-logo:"), self._platform_image,
             )
-        active_movie_count = 0
-        for url, (raw, image, movie, buffer) in list(self._cache.items()):
+        for url, (raw, image, movie, buffer, animated) in list(self._cache.items()):
             if url not in self._active_urls:
                 if movie is not None:
                     movie.stop()
                 continue
             target = QUrl(_resource_url(url))
-            if image is None:
-                if movie is None:
-                    from ..remote_image import prepare_image_bytes
-                    try:
-                        prepared = prepare_image_bytes(raw)
-                    except Exception:
-                        self._failed.add(url)
-                        continue
-                    if prepared.animated and active_movie_count < _MAX_ACTIVE_MOVIES:
-                        buffer = QBuffer(self)
-                        buffer.setData(QByteArray(raw))
-                        if buffer.open(QIODevice.ReadOnly):
-                            movie = QMovie(buffer, parent=self)
-                            movie.setCacheMode(QMovie.CacheNone)
-                            # Update only QTextDocument resources; do NOT rebuild
-                            # chat on each animation frame.
-                            movie.frameChanged.connect(
-                                lambda _frame, key=url: self._on_movie_frame(key)
-                            )
-                    if movie is None:
-                        image = QImage.fromData(raw)
-                self._cache[url] = (raw, image, movie, buffer)
+            if animated and movie is None:
+                buffer = QBuffer(self)
+                buffer.setData(QByteArray(raw))
+                if buffer.open(QIODevice.ReadOnly):
+                    movie = QMovie(buffer, parent=self)
+                    movie.setCacheMode(QMovie.CacheNone)
+                    movie.setScaledSize(QSize(28, 28))
+                    movie.frameChanged.connect(
+                        lambda _frame, key=url: self._on_movie_frame(key)
+                    )
+                self._cache[url] = (raw, image, movie, buffer, animated)
             if movie is not None:
-                active_movie_count += 1
                 if movie.state() != QMovie.Running:
                     movie.start()
                 frame = movie.currentImage()
@@ -277,7 +281,7 @@ class ChatRichFeed(QTextEdit):
 
     def closeEvent(self, event):
         self._poll.stop()
-        for _raw, _image, movie, _buffer in self._cache.values():
+        for _raw, _image, movie, _buffer, _animated in self._cache.values():
             if movie is not None:
                 movie.stop()
         self._pool.shutdown(wait=False, cancel_futures=True)
