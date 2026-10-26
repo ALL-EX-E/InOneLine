@@ -43,6 +43,8 @@ class MultichatWindowsSmoke(unittest.TestCase):
             tab = None
             try:
                 tab = MultichatTab(db, state, api)
+                self.assertIn("Twitch", tab.connection_status.text())
+                self.assertNotIn("YouTube", tab.connection_status.text())
                 tab.resize(520, 360)
                 tab.show()
                 self.app.processEvents()
@@ -73,13 +75,19 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 state.ingest(message)
                 tab.refresh()
                 self.assertIn("<script>hello</script>", tab.feed.toPlainText())
+                self.assertNotIn("twitch  ", tab.feed.toPlainText())
+                state.ingest(ChatMessage("youtube", "future", "yt1", "YouTubeAuthor", "Not in Twitch tab"))
+                tab.refresh()
+                self.assertNotIn("Not in Twitch tab", tab.feed.toPlainText())
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     payload = json.load(response)
-                self.assertEqual(len(payload["messages"]), 1)
+                self.assertEqual(len(payload["messages"]), 2)
                 self.assertEqual(payload["messages"][0]["text"], "<script>hello</script>")
                 with urllib.request.urlopen(api.base_url + "/multichat-overlay", timeout=10) as response:
                     html = response.read().decode("utf-8")
                 self.assertIn("textContent", html)
+                self.assertIn("чат Twitch (OBS)", html)
+                self.assertIn('message.platform === "twitch"', html)
                 self.assertIn("/api/multichat", html)
                 self.assertIn('iol-version-handshake', html)
 
@@ -88,8 +96,8 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 state.ingest(ChatMessage("twitch", "ch", "m2", "Автор", "Только локально"))
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     obs = json.load(response)
-                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1"])
-                self.assertEqual(len(state.snapshot()["messages"]), 2)
+                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1", "yt1"])
+                self.assertEqual(len(state.snapshot()["messages"]), 3)
 
                 # Invalid delay does not get persisted and is visibly restored.
                 tab.delay.setText("-5")

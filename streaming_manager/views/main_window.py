@@ -62,7 +62,7 @@ _COMPACT_TAB_LABELS = {
     "История аукционов": "Ист",
     "Журнал": "Жур",
     "Стрим / OBS": "OBS",
-    "Мультичат": "Чат",
+    "Чат Twitch": "Чат",
     "Настройки": "Наст",
 }
 _TAB_ICON_COLORS = {
@@ -73,7 +73,7 @@ _TAB_ICON_COLORS = {
     "История аукционов": "#E5C454",
     "Журнал": "#59B8C9",
     "Стрим / OBS": "#EA6F78",
-    "Мультичат": "#21D3BD",
+    "Чат Twitch": "#21D3BD",
     "Настройки": "#87A9FF",
 }
 
@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
             db, self.multichat_state, self.api,
             twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
         )
-        self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.multichat_tab, "Чат Twitch", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
         self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
