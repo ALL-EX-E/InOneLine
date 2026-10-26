@@ -73,6 +73,7 @@ class MultichatState:
         self._overflow_count = 0
         self._show_time = True
         self._show_platform_icons = True
+        self._chat_media_preload: dict[str, tuple[str, ...]] = {}
 
     @staticmethod
     def _valid_limit(value: int) -> int:
@@ -121,6 +122,23 @@ class MultichatState:
     def set_obs_enabled(self, platform: str, enabled: bool) -> None:
         with self._lock:
             self._obs_enabled[platform] = bool(enabled)
+
+    def set_media_preload(self, platform: str, urls) -> None:
+        """Bounded session-only hint for Qt and local OBS image warm-up.
+
+        No image bytes, user data or chat history are persisted or duplicated.
+        """
+        from .chat_graphics import safe_image_url
+
+        choices = []
+        for raw in list(urls)[:48]:
+            url = safe_image_url(raw)
+            if url and url not in choices:
+                choices.append(url)
+            if len(choices) == 24:
+                break
+        with self._lock:
+            self._chat_media_preload[str(platform)] = tuple(choices)
 
     def ingest(self, message: ChatMessage) -> bool:
         """Return False for a repeated event, True for a new received event."""
@@ -228,6 +246,7 @@ class MultichatState:
                 "messages": [asdict(m) for m in messages],
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,
+                "media_preload": dict(self._chat_media_preload),
                 "limit": self._limit,
                 "delay": self._delay,
                 "overflow_count": self._overflow_count,
