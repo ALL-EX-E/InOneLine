@@ -18,6 +18,15 @@ _MAX_EMOTES = 3000
 _MAX_IMAGES_PER_MESSAGE = 32
 
 
+def _text(out: list[dict], value: str) -> None:
+    if not value:
+        return
+    if out and out[-1]["kind"] == "text":
+        out[-1]["text"] += value
+    else:
+        out.append({"kind": "text", "text": value})
+
+
 @dataclass(frozen=True)
 class ChatEmote:
     provider: str
@@ -59,14 +68,14 @@ def resolve_text(text: str, catalog: dict[str, ChatEmote | None], *,
         match = _TOKEN.fullmatch(piece)
         emote = catalog.get(match.group(2)) if match else None
         if emote is None or count >= max_images:
-            result.append({"kind": "text", "text": piece})
+            _text(result, piece)
             continue
         prefix, code, suffix = match.groups()
         if prefix:
-            result.append({"kind": "text", "text": prefix})
+            _text(result, prefix)
         result.append({"kind": "image", "text": code, "url": emote.url})
         if suffix:
-            result.append({"kind": "text", "text": suffix})
+            _text(result, suffix)
         count += 1
     return tuple(result)
 
@@ -89,11 +98,11 @@ def resolve_fragments(fragments: tuple[dict, ...], text: str,
         # Never transform image URLs or a Twitch-native graphics fragment.
         for part in resolve_text(str(fragment.get("text") or ""), catalog,
                                  max_images=max(0, _MAX_IMAGES_PER_MESSAGE - images)):
-            result.append(part)
             if part.get("kind") == "image":
+                result.append(part)
                 images += 1
-            if len(result) >= 256:
-                break
-        if len(result) >= 256:
-            break
-    return tuple(result)
+            else:
+                _text(result, part.get("text", ""))
+    # Defensive: preserve the complete original message if a provider ever
+    # sends enough fragments to exceed the bounded renderer limit.
+    return tuple(result) if len(result) <= 256 else fragments
