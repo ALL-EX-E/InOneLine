@@ -97,6 +97,12 @@ jobs:
           python -m tools.chat_third_party_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-05 third-party Twitch emotes regression failed" }
 
+      - name: D41-06 Twitch chat appearance, draft and safe rendering regression
+        shell: pwsh
+        run: |
+          python -m tools.chat_appearance_smoke
+          if ($LASTEXITCODE -ne 0) { throw "D41-06 Twitch chat appearance failed" }
+
       - name: GitHub Actions version regression
         shell: pwsh
         run: |
@@ -916,6 +922,43 @@ jobs:
         with:
           name: InOneLine_D41-05_CANDIDATE_QA
           path: ${{ runner.temp }}\D41-05_QA\*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+- name: Package D41-06 QA from the tested installer
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/d41-twitch-appearance-06'
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\D41-06_QA"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "installer\output\InOneLine_Setup_1.0.8.exe" "$out\InOneLine_D41-06_Setup_CANDIDATE.exe"
+          Copy-Item "docs\qa\D41-06-manual-checklist.md" "$out\CHECKLIST_D41-06.md"
+          python tools/create_source_snapshot.py "$out\InOneLine_D41-06_Source.zip" --ref HEAD
+          if ($LASTEXITCODE -ne 0) { throw "D41-06 source snapshot failed" }
+          $installer = Get-Item "$out\InOneLine_D41-06_Setup_CANDIDATE.exe"
+          $source = Get-Item "$out\InOneLine_D41-06_Source.zip"
+          $installerSha = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceSha = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          status=D41-06 candidate ONLY; not accepted, merged or released
+          qa_pr=${{ github.event.pull_request.number }}
+          workflow_commit=$env:GITHUB_SHA
+          actual_candidate_head=${{ github.event.pull_request.head.sha }}
+          installer_bytes=$($installer.Length)
+          installer_sha256=$installerSha
+          source_bytes=$($source.Length)
+          source_sha256=$sourceSha
+          "@ | Set-Content "$out\BUILD_INFO.txt" -Encoding UTF8
+          Write-Host "D41-06_INSTALLER_SHA256=$installerSha"
+          Write-Host "D41-06_SOURCE_SHA256=$sourceSha"
+
+      - name: Upload D41-06 candidate QA bundle
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/d41-twitch-appearance-06'
+        uses: actions/upload-artifact@v7
+        with:
+          name: InOneLine_D41-06_CANDIDATE_QA
+          path: ${{ runner.temp }}\D41-06_QA\*
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
