@@ -12,6 +12,7 @@ redemption fulfillment/refund semantics remain unchanged.
 import json
 import re
 import threading
+from time import monotonic
 from collections import OrderedDict
 from queue import Empty, Full, PriorityQueue
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from typing import Callable
 
 from .conversion import parse_positive_rate
 from .multichat import ChatMessage, MultichatState
+from .chat_third_party import make_catalog, resolve_fragments
 from .chat_graphics import (
     parse_twitch_badges, parse_twitch_fragments, safe_image_url, twitch_name_color,
 )
@@ -570,6 +572,12 @@ class TwitchEventSubRuntime:
         self._badge_cache: dict[str, dict[tuple[str, str], str]] = {}
         self._badge_scheduled: set[str] = set()
         self._emotes_scheduled: set[str] = set()
+        # External catalogs never share EventSub/Channel Points or the OAuth
+        # media queue; their independent slow endpoints cannot delay avatars.
+        self._third_party_catalog = {}
+        self._third_party_source = ""
+        self._third_party_thread: threading.Thread | None = None
+        self._third_party_next_refresh = 0.0
 
     def _queue_media(self, task: tuple) -> bool:
         if self._media_thread is None or not self._media_thread.is_alive():
@@ -585,6 +593,42 @@ class TwitchEventSubRuntime:
             return True
         except Full:
             return False  # no GUI stalls or EventSub backpressure
+
+    def _schedule_third_party_catalog(self, source_id: str) -> None:
+        """Asynchronous channel+global catalog; updates affect *future* events."""
+        if not self.chat_connected or not source_id or self._stop.is_set():
+            return
+        with self._media_lock:
+            if source_id != self._third_party_source:
+                self._third_party_catalog = {}
+                self._third_party_source = source_id
+                self._third_party_next_refresh = 0.0
+            if monotonic() < self._third_party_next_refresh:
+                return
+            if self._third_party_thread and self._third_party_thread.is_alive():
+                return
+            self._third_party_next_refresh = monotonic() + 1800.0
+            worker = threading.Thread(
+                target=self._load_third_party_catalog,
+                args=(source_id,),
+                name="TwitchThirdPartyEmotes",
+                daemon=True,
+            )
+            self._third_party_thread = worker
+            worker.start()
+
+    def _load_third_party_catalog(self, source_id: str) -> None:
+        try:
+            from .emote_catalog import fetch_third_party_chat_emotes
+            catalog = make_catalog(fetch_third_party_chat_emotes(source_id))
+        except Exception:
+            return
+        with self._media_lock:
+            if (self._stop.is_set()
+                    or self._chat_source_id != source_id
+                    or self._third_party_source != source_id):
+                return
+            self._third_party_catalog = catalog
 
     def _schedule_media_warmup(self, source_id: str) -> None:
         """Queue provider metadata before the first chat message, off EventSub."""
@@ -760,6 +804,10 @@ class TwitchEventSubRuntime:
         if media_thread is not None and media_thread.is_alive():
             media_thread.join(timeout=1.0)
         self._media_thread = None
+        # Never wait for external third-party endpoints during shutdown.
+        with self._media_lock:
+            self._third_party_catalog = {}
+            self._third_party_source = ""
         self.connected = False
 
     def _wait(self, seconds: float) -> None:
@@ -832,6 +880,13 @@ class TwitchEventSubRuntime:
             body = event.get("message") or {}
             value = str(body.get("text") or "") if isinstance(body, dict) else ""
             fragments = parse_twitch_fragments(body)
+            with self._media_lock:
+                active_catalog = (
+                    self._third_party_catalog
+                    if self._third_party_source == source_id else {}
+                )
+            if active_catalog:
+                fragments = resolve_fragments(fragments, value, active_catalog)
             if not msg_id or (not value and not fragments):
                 return
             author_id = str(event.get("chatter_user_id") or "")
@@ -875,6 +930,10 @@ class TwitchEventSubRuntime:
                 if source_id and self._chat_source_id and source_id != self._chat_source_id:
                     if self.chat_state is not None:
                         self.chat_state.change_source("twitch")
+                    with self._media_lock:
+                        self._third_party_catalog = {}
+                        self._third_party_source = ""
+                        self._third_party_next_refresh = 0.0
                 if source_id:
                     self._chat_source_id = source_id
                 if not self.service.managed_reward_ids() and not (
@@ -953,6 +1012,7 @@ class TwitchEventSubRuntime:
             self.chat_connected = bool(chat_required and self._chat_subscription_active)
             if self.chat_connected:
                 self._schedule_media_warmup(chat_source)
+                self._schedule_third_party_catalog(chat_source)
             current_row = self.service.db.get_integration_connection(TWITCH_SERVICE_KEY) or {}
             subscribed_credential_ref = str(current_row.get("credential_ref") or "")
             self.connected = True
@@ -967,6 +1027,8 @@ class TwitchEventSubRuntime:
             last_desired = self.service.desired_rewards_enabled()
 
             while not self._stop.is_set():
+                if self.chat_connected:
+                    self._schedule_third_party_catalog(chat_source)
                 if not self.service.connection_ready():
                     return ""
                 current_ids = self.service.managed_reward_ids()

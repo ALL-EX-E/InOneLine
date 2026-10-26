@@ -14,6 +14,7 @@ _EMOTE_ID = re.compile(r"^[a-zA-Z0-9_-]{1,120}$")
 _ALLOWED_IMAGE_DOMAINS = (
     "jtvnw.net", "twitchcdn.net", "ttvnw.net",
     "tenor.com", "giphy.com",
+    "cdn.betterttv.net", "cdn.frankerfacez.com", "cdn.7tv.app",
 )
 
 
