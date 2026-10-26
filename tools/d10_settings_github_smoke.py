@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QPoint, QRect, QThreadPool
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from streaming_manager.app_paths import AppPaths
@@ -55,7 +57,15 @@ def main() -> None:
                     assert control.right() < viewport.right()
                     scrollbar = scroll.verticalScrollBar()
                     if scrollbar.isVisible():
-                        assert control.right() < scrollbar.geometry().left()
+                        # QScrollBar.geometry() is relative to its own Qt scroll
+                        # container, not to the QScrollArea. Convert to the same
+                        # coordinates and compare real two-dimensional overlap.
+                        scrollbar_rect = QRect(
+                            scrollbar.mapTo(scroll, QPoint(0, 0)), scrollbar.size()
+                        )
+                        assert not control.intersects(scrollbar_rect), (
+                            width, height, tab, control, scrollbar_rect
+                        )
                     scrollbar.setValue(scrollbar.maximum())
                     app.processEvents()
                     assert button.geometry().top() > scroll.viewport().geometry().bottom()
@@ -68,7 +78,11 @@ def main() -> None:
                 assert launch.call_args.args[0].toString() == "https://github.com/ALL-EX-E/InOneLine"
             print("D10_GITHUB_ICON_FOOTER_NATIVE_QT=PASS")
         finally:
+            # Startup/backup workers must finish before the temporary DB folder
+            # is deleted; otherwise unrelated async teardown errors are emitted.
+            QTest.qWait(600)
             window.api.stop()
+            QThreadPool.globalInstance().waitForDone(15000)
             window.close()
             app.processEvents()
 
