@@ -12,6 +12,7 @@ redemption fulfillment/refund semantics remain unchanged.
 import json
 import re
 import threading
+from collections import OrderedDict
 from queue import Empty, Full, Queue
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -563,8 +564,8 @@ class TwitchEventSubRuntime:
         self._media_lock = threading.RLock()
         self._media_tasks: Queue = Queue(maxsize=128)
         self._media_thread: threading.Thread | None = None
-        self._avatar_cache: dict[tuple[str, str], str] = {}
-        self._avatar_scheduled: set[tuple[str, str]] = set()
+        self._avatar_cache: OrderedDict[tuple[str, str], str] = OrderedDict()
+        self._avatar_scheduled: OrderedDict[tuple[str, str], None] = OrderedDict()
         self._badge_cache: dict[str, dict[tuple[str, str], str]] = {}
         self._badge_scheduled: set[str] = set()
 
@@ -608,7 +609,11 @@ class TwitchEventSubRuntime:
                     )
                     if url:
                         with self._media_lock:
-                            self._avatar_cache[(source_id, user_id)] = url
+                            key = (source_id, user_id)
+                            self._avatar_cache[key] = url
+                            self._avatar_cache.move_to_end(key)
+                            while len(self._avatar_cache) > 512:
+                                self._avatar_cache.popitem(last=False)
                         if self.chat_state is not None:
                             self.chat_state.enrich_twitch_media(
                                 source_id, avatar_by_user={user_id: url},
@@ -625,9 +630,13 @@ class TwitchEventSubRuntime:
                 self._badge_scheduled.add(source_id)
                 self._queue_media(("badges", source_id, "", ""))
             if user_id and login and (source_id, user_id) not in self._avatar_scheduled:
-                if len(self._avatar_scheduled) < 512:
-                    self._avatar_scheduled.add((source_id, user_id))
-                    self._queue_media(("avatar", source_id, user_id, login))
+                key = (source_id, user_id)
+                self._avatar_scheduled[key] = None
+                self._queue_media(("avatar", source_id, user_id, login))
+                while len(self._avatar_scheduled) > 512:
+                    self._avatar_scheduled.popitem(last=False)
+            elif (source_id, user_id) in self._avatar_scheduled:
+                self._avatar_scheduled.move_to_end((source_id, user_id))
             urls = self._badge_cache.get(source_id, {})
             avatar_url = self._avatar_cache.get((source_id, user_id), "")
             mapped = tuple(
