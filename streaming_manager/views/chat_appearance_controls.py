@@ -122,7 +122,10 @@ class ChatAppearanceEditor(QWidget):
         spin.setRange(lo, hi)
         spin.setSuffix(suffix)
         spin.valueChanged.connect(self._changed)
-        widget = make_wide_step_control(spin)
+        widget = make_wide_step_control(
+            spin, up_tooltip='Увеличить: ' + title,
+            down_tooltip='Уменьшить: ' + title,
+        )
         form.addRow(title, widget)
         if hasattr(self, "custom_widgets") and title != "Непрозрачность:":
             if title not in ("",):
