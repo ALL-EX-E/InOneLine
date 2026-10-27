@@ -34,6 +34,8 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
     AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT, AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
+    AUCTION_LOTS_OVERLAY_LAYOUT_KEY, AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT,
+    AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT, TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT, TIMER_OVERLAY_BACKGROUND_KEY,
     TIMER_OVERLAY_BACKGROUND_MEDIA_ID_KEY,
@@ -2112,6 +2114,7 @@ class ServicesMixin:
             AUCTION_WHEEL_CHANCE_VISIBLE_KEY,
             WIDGETS["auction_lots"].key,
             AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
+            AUCTION_LOTS_OVERLAY_LAYOUT_KEY,
             AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
             AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY,
             AUCTION_LOTS_OVERLAY_BACKGROUND_KEY,
@@ -2278,6 +2281,12 @@ class ServicesMixin:
             "rows": payload_rows,
             "visibility": visibility_payload(settings, "auction_lots"),
             "presentation": {
+                "layout_mode": (
+                    AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT
+                    if settings.get(AUCTION_LOTS_OVERLAY_LAYOUT_KEY)
+                    == AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT
+                    else AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT
+                ),
                 "font_family": family,
                 "font_size": self._timer_overlay_bounded_int(
                     settings.get(AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY),
