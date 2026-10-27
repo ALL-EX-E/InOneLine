@@ -130,6 +130,17 @@ body {
   min-width: 0;
 }
 .lot-row { padding-bottom: 9px; }
+/* R38: compact density affects geometry only, not user-selected appearance. */
+body.auction-lots-compact #root { padding: 7px; }
+body.auction-lots-compact #header-shell { padding-bottom: 5px; }
+body.auction-lots-compact #header-row,
+body.auction-lots-compact .lot-row { gap: 5px; }
+body.auction-lots-compact .lot-row { padding-bottom: 5px; }
+body.auction-lots-compact .lot-cell,
+body.auction-lots-compact #total-footer {
+  padding: clamp(2px, .18em, 10px) clamp(4px, .42em, 12px);
+}
+body.auction-lots-compact #total-footer { margin-top: 5px; }
 .lot-cell {
   min-width: 0;
   padding: .45em .58em;
@@ -423,6 +434,8 @@ body.preview #api-state.visible { display: block; }
     const signature = JSON.stringify(p);
     if (signature === lastPresentationSignature) return false;
     lastPresentationSignature = signature;
+    // Operator-only selection: the Browser Source contains no toggle UI.
+    document.body.classList.toggle("auction-lots-compact", p.layout_mode === "compact");
 
     document.documentElement.style.setProperty(
       "--font-family",
