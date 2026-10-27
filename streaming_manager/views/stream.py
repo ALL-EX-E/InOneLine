@@ -63,6 +63,9 @@ from ..constants import (
     AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT,
     AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY,
+    AUCTION_LOTS_OVERLAY_LAYOUT_KEY,
+    AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT,
+    AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT,
     TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT,
     TIMER_OVERLAY_BACKGROUND_COLOR_KEY,
     TIMER_OVERLAY_BACKGROUND_DEFAULT,
@@ -963,6 +966,12 @@ class StreamTab(QWidget):
         auction_lots_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         add_show_mode("auction_lots", auction_lots_form)
 
+        # R38: layout is selected only by the operator in Stream / OBS.
+        self.auction_lots_overlay_layout = ScrollSafeComboBox()
+        self.auction_lots_overlay_layout.addItem("Обычный", AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT)
+        self.auction_lots_overlay_layout.addItem("Компактный", AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT)
+        auction_lots_form.addRow("Вид списка:", self.auction_lots_overlay_layout)
+
         self.auction_lots_overlay_font = ScrollSafeFontComboBox()
         self.auction_lots_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         auction_lots_form.addRow("Шрифт:", self.auction_lots_overlay_font)
@@ -1476,6 +1485,8 @@ class StreamTab(QWidget):
         )
         self.db.set_settings_bulk({
             WIDGETS["auction_lots"].key: str(self.obs_show_modes["auction_lots"].currentData()),
+            AUCTION_LOTS_OVERLAY_LAYOUT_KEY:
+                str(self.auction_lots_overlay_layout.currentData()),
             AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY:
                 self.auction_lots_overlay_font.currentFont().family(),
             AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY:
@@ -2645,6 +2656,10 @@ class StreamTab(QWidget):
         )
         self._update_music_player_overlay_enabled_state()
 
+        self._set_combo_by_data(
+            self.auction_lots_overlay_layout,
+            setting(AUCTION_LOTS_OVERLAY_LAYOUT_KEY, AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT),
+        )
         self.auction_lots_overlay_font.setCurrentFont(QFont(
             setting(
                 AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY,
