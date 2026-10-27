@@ -1180,6 +1180,28 @@ def assert_p09_obs_access(app, window, db) -> None:
             stream.refresh()
             if control.value() != value:
                 raise AssertionError(f"P09 UI-042 saved value did not reload: {key}")
+
+        # R38: density is saved only through desktop Stream / OBS settings.
+        density = stream.auction_lots_overlay_layout
+        density_label = stream.auction_lots_overlay_form.labelForField(density)
+        if density_label is None or density_label.text() != "Вид списка:":
+            raise AssertionError("R38 operator-only layout selector is not in Stream / OBS")
+        if [density.itemData(i) for i in range(density.count())] != [
+            "normal", "compact"
+        ]:
+            raise AssertionError("R38 layout choices changed")
+        for mode in ("compact", "normal"):
+            density.setCurrentIndex(density.findData(mode))
+            with patch.object(QMessageBox, "information"):
+                stream._save_auction_lots_overlay_settings()
+            if db.get_setting("auction_lots_overlay_layout") != mode:
+                raise AssertionError(f"R38 saved layout differs: {mode}")
+            payload = db.current_auction_lots_payload()
+            if payload["presentation"]["layout_mode"] != mode:
+                raise AssertionError(f"R38 API presentation differs: {mode}")
+            stream.refresh()
+            if density.currentData() != mode:
+                raise AssertionError(f"R38 Qt control did not reload: {mode}")
     finally:
         stream.api = original_api
         db.set_settings_bulk(originals)
@@ -4171,6 +4193,20 @@ def main() -> int:
             "<table", "<tbody", "<thead", "border-collapse:", "buildColumnGroup("
         )):
             raise AssertionError("P14-A Auction Lots still contains legacy table grid")
+        # R38: the browser only consumes the operator-selected presentation;
+        # its own page must contain no interactive layout controls.
+        for snippet in (
+            "body.auction-lots-compact .lot-row { padding-bottom: 5px; }",
+            "body.auction-lots-compact .lot-cell,",
+            'document.body.classList.toggle("auction-lots-compact"',
+            "padding: clamp(2px, .18em, 10px)",
+        ):
+            if snippet not in lots_html:
+                raise AssertionError(f"R38 compact browser geometry missing: {snippet}")
+        if any(token in lots_html for token in (
+            '<select', '<button', 'type="checkbox"', 'type="radio"'
+        )):
+            raise AssertionError("R38 viewer-facing layout control was added to OBS")
         # P14-B: controller stays on original StreamTab/OBS save path; both
         # soundtrack checkboxes must inherit the card surface without bands.
         if 'QFrame[sectionCard="true"] QCheckBox' not in APP_STYLE:
