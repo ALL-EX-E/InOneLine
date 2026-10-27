@@ -55,6 +55,10 @@ AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY = "auction_lots_overlay_font_family"
 AUCTION_LOTS_OVERLAY_FONT_FAMILY_DEFAULT = "Segoe UI"
 AUCTION_LOTS_OVERLAY_FONT_SIZE_KEY = "auction_lots_overlay_font_size"
 AUCTION_LOTS_OVERLAY_FONT_SIZE_DEFAULT = 24
+# R38: operator-only setting; the OBS page has no viewer controls.
+AUCTION_LOTS_OVERLAY_LAYOUT_KEY = "auction_lots_overlay_layout"
+AUCTION_LOTS_OVERLAY_LAYOUT_DEFAULT = "normal"
+AUCTION_LOTS_OVERLAY_LAYOUT_COMPACT = "compact"
 AUCTION_LOTS_OVERLAY_FONT_COLOR_KEY = "auction_lots_overlay_font_color"
 AUCTION_LOTS_OVERLAY_FONT_COLOR_DEFAULT = "#FFFFFF"
 AUCTION_LOTS_OVERLAY_BACKGROUND_KEY = "auction_lots_overlay_background"
