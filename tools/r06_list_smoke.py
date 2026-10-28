@@ -69,7 +69,7 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertIn("/list-composition.js", get("/list-overlay"))
                 self.assertIn("/list-composition.js", get("/overlay"))
                 self.assertIn("IOLListComposition", get("/list-composition.js"))
-                self.assertIn('embedded=1', get("/multichat-overlay?embedded=1") if False else get("/list-overlay"))
+                self.assertIn('embedded=1', get("/list-overlay"))
 
                 state.ingest(ChatMessage("twitch", "ch", "first", "viewer", "!list"))
                 self.assertEqual(data()["list_show"]["remaining_ms"], 30000)
