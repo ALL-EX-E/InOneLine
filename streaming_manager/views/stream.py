@@ -419,6 +419,45 @@ class StreamTab(QWidget):
         list_show_mode.currentIndexChanged.connect(
             self._update_main_overlay_conditional_visibility
         )
+        self.list_slide_direction = ScrollSafeComboBox()
+        for label, value in (
+            ("Слева", "left"), ("Справа", "right"),
+            ("Сверху", "top"), ("Снизу", "bottom"),
+        ):
+            self.list_slide_direction.addItem(label, value)
+        overlay_form.addRow("Направление выезда:", self.list_slide_direction)
+
+        self.list_slide_duration = ScrollSafeSpinBox()
+        self.list_slide_duration.setRange(1, 120)
+        self.list_slide_duration.setValue(30)
+        self.list_slide_duration.setSuffix(" сек.")
+        overlay_form.addRow("Время показа:", self.list_slide_duration)
+
+        self.list_slide_command = QLineEdit()
+        self.list_slide_command.setPlaceholderText("Команда Twitch (необязательно)")
+        overlay_form.addRow("Команда Twitch:", self.list_slide_command)
+        self.list_command_hint = QLabel(
+            "Укажите команду для вызова списка из Twitch-чата. "
+            "Пока поле пустое, вызов по команде отключён"
+        )
+        self.list_command_hint.setWordWrap(True)
+        self.list_command_hint.setProperty("muted", True)
+        overlay_form.addRow("", self.list_command_hint)
+        self.list_slide_command.textChanged.connect(
+            self._update_main_overlay_conditional_visibility
+        )
+
+        self.list_chat_layout = ScrollSafeComboBox()
+        self.list_chat_layout.addItem("Разделение области", "split")
+        self.list_chat_layout.addItem("Замещение области", "replace")
+        overlay_form.addRow("Совмещение с чатом:", self.list_chat_layout)
+
+        self.list_with_chat = QCheckBox("Показывать чат вместе со списком")
+        self.list_with_chat.setToolTip(
+            "Включить Twitch-чат в отдельном OBS-источнике списка. "
+            "В основном оверлее чат отображается независимо."
+        )
+        overlay_form.addRow("", self.list_with_chat)
 
         self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
@@ -2389,6 +2428,15 @@ class StreamTab(QWidget):
             self._set_form_row_visible(
                 self.webcam_form, self.webcam_position, webcam_enabled,
             )
+        if hasattr(self, "list_slide_direction"):
+            slide = self.obs_show_modes["list"].currentData() == "slide"
+            for control in (self.list_slide_direction, self.list_slide_duration,
+                            self.list_slide_command):
+                self._set_form_row_visible(self.overlay_form, control, slide)
+            self._set_form_row_visible(
+                self.overlay_form, self.list_command_hint,
+                slide and not self.list_slide_command.text(),
+            )
         if hasattr(self, "overlay_list_side"):
             self._set_form_row_visible(
                 self.overlay_form, self.overlay_list_side, list_enabled,
@@ -2524,6 +2572,21 @@ class StreamTab(QWidget):
             self.overlay_list_side,
             setting("overlay_list_side", "auto"),
         )
+        self._set_combo_by_data(
+            self.list_slide_direction,
+            setting("list_slide_direction", "right"),
+        )
+        try:
+            seconds = int(setting("list_slide_duration", "30"))
+        except (TypeError, ValueError):
+            seconds = 30
+        self.list_slide_duration.setValue(max(1, min(120, seconds)))
+        self.list_slide_command.setText(setting("list_slide_command", ""))
+        self._set_combo_by_data(
+            self.list_chat_layout,
+            setting("list_chat_layout", "split"),
+        )
+        self.list_with_chat.setChecked(setting("list_with_chat", "0") == "1")
         self._set_combo_by_data(
             self.info_position,
             setting("overlay_info_position", "auto"),
@@ -2790,6 +2853,11 @@ class StreamTab(QWidget):
             # state; an older saved 'hidden' must never hide the primary canvas.
             WIDGETS["overlay"].key: "always",
             WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
+            "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
+            "list_slide_duration": str(self.list_slide_duration.value()),
+            "list_slide_command": self.list_slide_command.text(),
+            "list_chat_layout": str(self.list_chat_layout.currentData() or "split"),
+            "list_with_chat": "1" if self.list_with_chat.isChecked() else "0",
             "stream_current_game_id": str(self.game_combo.currentData() or ""),
             # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
             "stream_info": self.info_field.text().strip(),
@@ -2819,5 +2887,10 @@ class StreamTab(QWidget):
         values.update(self._collect_typography_settings())
 
         self.db.set_settings_bulk(values)
+        self.api.configure_list_show(
+            values[WIDGETS["list"].key],
+            values["list_slide_command"],
+            int(values["list_slide_duration"]),
+        )
         QMessageBox.information(self, "Стрим", "Параметры сохранены. OBS API обновлён.")
 
