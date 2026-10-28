@@ -274,6 +274,7 @@ body.preview .preview-label { display: flex; }
 #api-state.visible { display: block; }
 </style>
 <script src="/obs-visibility.js"></script>
+<script src="/list-composition.js"></script>
 </head>
 <body>
 <div id="viewport">
@@ -341,11 +342,19 @@ body.preview .preview-label { display: flex; }
         <div class="preview-label" style="font-size:26px">Веб-камера</div>
       </div>
 
-      <div id="list-panel" class="panel">
-        <div id="top-three"></div>
-        <div id="top-three-divider"></div>
-        <div id="list-viewport">
-          <div id="game-list"></div>
+      <div id="list-composition" class="r06-compose">
+        <div id="list-layer" class="r06-list-layer">
+          <div id="list-panel" class="panel">
+            <div id="top-three"></div>
+            <div id="top-three-divider"></div>
+            <div id="list-viewport">
+              <div id="game-list"></div>
+            </div>
+          </div>
+        </div>
+        <div id="list-chat" class="r06-chat-layer">
+          <iframe src="/multichat-overlay" title="Чат Twitch" tabindex="-1"
+                  aria-hidden="true"></iframe>
         </div>
       </div>
 
@@ -399,6 +408,14 @@ body.preview .preview-label { display: flex; }
 
   const webcamFrame = document.getElementById("webcam-frame");
   const listPanel = document.getElementById("list-panel");
+  const listComposition = document.getElementById("list-composition");
+  const composer = IOLListComposition.create(
+    listComposition,
+    document.getElementById("list-layer"),
+    listPanel,
+    document.getElementById("list-chat"),
+    () => requestAnimationFrame(() => rebuildInfiniteScroll(false))
+  );
   const topThree = document.getElementById("top-three");
   const topThreeDivider = document.getElementById("top-three-divider");
   const listViewport = document.getElementById("list-viewport");
@@ -746,6 +763,9 @@ body.preview .preview-label { display: flex; }
     const webcamPos = parseCorner(cfg.webcam_position || "top_right");
 
     const listEnabled = cfg.list_enabled !== false;
+    // Keep a temporarily hidden sliding list's column reserved. When both
+    // elements are fully disabled, the old column-release rule still applies.
+    const listAreaNeeded = listEnabled || composer.hasChatSpace();
     let listSide = cfg.list_side || "auto";
     if (!["left", "right"].includes(listSide)) {
       listSide = webcamEnabled ? webcamPos.side : "right";
@@ -765,19 +785,19 @@ body.preview .preview-label { display: flex; }
 
     // Отключённые элементы убираются из рабочих колонок полностью.
     if (!webcamEnabled) parking.appendChild(webcamFrame);
-    if (!listEnabled) parking.appendChild(listPanel);
+    if (!listAreaNeeded) parking.appendChild(listComposition);
     if (!infoEnabled) parking.appendChild(infoPanel);
 
     webcamFrame.classList.toggle("hidden", !webcamEnabled);
-    listPanel.classList.toggle("hidden", !listEnabled);
+    // The composition owns the list transition, including hidden->visible.
     infoPanel.classList.toggle("hidden", !infoEnabled);
 
     if (webcamEnabled) {
       appendToStack(webcamFrame, webcamPos.side, webcamPos.vertical);
     }
 
-    if (listEnabled) {
-      slots[listSide].list.appendChild(listPanel);
+    if (listAreaNeeded) {
+      slots[listSide].list.appendChild(listComposition);
     }
 
     if (infoEnabled) {
@@ -798,12 +818,12 @@ body.preview .preview-label { display: flex; }
 
     const leftUsed =
       (webcamEnabled && webcamPos.side === "left") ||
-      (listEnabled && listSide === "left") ||
+      (listAreaNeeded && listSide === "left") ||
       (infoEnabled && infoPos.side === "left");
 
     const rightUsed =
       (webcamEnabled && webcamPos.side === "right") ||
-      (listEnabled && listSide === "right") ||
+      (listAreaNeeded && listSide === "right") ||
       (infoEnabled && infoPos.side === "right");
 
     leftColumn.classList.toggle("hidden", !leftUsed);
@@ -1033,6 +1053,7 @@ body.preview .preview-label { display: flex; }
       applyTypography(overlayConfig.typography || {});
       applyFrameColors(overlayConfig);
       applyBackgroundMedia(overlayConfig.background || {});
+      composer.apply(data, true);
       applyOverlayLayout(overlayConfig, game);
 
       // renderList() already computes the large row signature. Keep this
@@ -1044,6 +1065,9 @@ body.preview .preview-label { display: flex; }
         webcam_position: overlayConfig.webcam_position,
         list_enabled: overlayConfig.list_enabled,
         list_side: overlayConfig.list_side,
+        list_show_mode: data.visibility?.list?.show_mode,
+        chat_layout: overlayConfig.list_chat_layout,
+        chat_available: composer.hasChatSpace(),
         info_position: overlayConfig.info_position,
         info_enabled: game?.reviews_enabled !== false,
       });
