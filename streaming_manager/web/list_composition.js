@@ -37,6 +37,8 @@
     let transitionTimer = null;
     let expiryTimer = null;
     let lastChatHeight = -1;
+    let outgoingOverlay = false;
+    let transitionDirection = direction;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -44,7 +46,7 @@
     }
     function hiddenTransform() {
       return {left:"translateX(-105%)",right:"translateX(105%)",
-        top:"translateY(-105%)",bottom:"translateY(105%)"}[direction];
+        top:"translateY(-105%)",bottom:"translateY(105%)"}[transitionDirection];
     }
     function measureChat() {
       if (!chatAvailable) return 0;
@@ -65,7 +67,7 @@
       const available = root.clientHeight;
       if (available <= 0) return;
       const replacing = composeMode === "replace" && mode === "slide";
-      const listAllocated = mode === "always" || (mode === "slide" && reserved);
+      const listAllocated = mode === "always" || reserved;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
       const natural = chatAlways ? available : measureChat();
       const splitCap = listAllocated ? Math.floor((available - 12) / 2) : available;
@@ -91,14 +93,33 @@
       root.classList.toggle("r06-shown", visualActive);
       root.classList.toggle("r06-not-shown", !visualActive);
     }
+    function resetOutgoingOverlay() {
+      if (!outgoingOverlay) return;
+      outgoingOverlay = false;
+      for (const name of ["position","height","width","top","left","right","zIndex","pointerEvents"]) {
+        listLayer.style[name] = "";
+      }
+    }
+    function freezeOutgoingVerticalLayer() {
+      // Keep the outgoing content physically on-screen for its full 450 ms
+      // while the flex column is freed for the expanding chat below it.
+      const height = listLayer.getBoundingClientRect().height;
+      if (height <= 0) return false;
+      outgoingOverlay = true;
+      Object.assign(listLayer.style, {
+        position:"absolute",height:height+"px",width:"100%",
+        top:"0",left:"0",right:"0",zIndex:"2",pointerEvents:"none",
+      });
+      return true;
+    }
     function changeActive(next) {
       if (active === next) return;
       active = next;
       clearTransition();
+      if (next) resetOutgoingOverlay();
+      transitionDirection = direction;
       const horizontalSplit = composeMode === "split" &&
         mode === "slide" && ["left","right"].includes(direction);
-      // A two-stage transition is needed only when the chat really must
-      // resize. If its natural height already fits the 50% cap, do not wait.
       const available = Math.max(0, root.clientHeight);
       const half = Math.max(0, Math.floor((available - 12) / 2));
       const currentChat = Math.max(0, lastChatHeight);
@@ -122,19 +143,25 @@
           visualActive = true;
         }
       } else {
-        visualActive = false;
-        if (staged) {
-          transitionTimer = setTimeout(() => {
-            transitionTimer = null;
-            if (!active) {
-              reserved = false;
-              layout();
-              if (onResize) onResize();
-            }
-          }, 450);
-        } else {
+        // Always retain the outgoing content for a full transition.
+        // Otherwise flex-basis=0 instantly clips a still-animated panel.
+        reserved = true;
+        const vertical = ["top","bottom"].includes(direction);
+        if (vertical && composeMode === "split" && freezeOutgoingVerticalLayer()) {
+          // The outgoing layer floats above the chat, so both transitions
+          // can run together while the chat reclaims the available height.
           reserved = false;
         }
+        visualActive = false;
+        transitionTimer = setTimeout(() => {
+          transitionTimer = null;
+          if (!active) {
+            reserved = false;
+            resetOutgoingOverlay();
+            layout();
+            if (onResize) onResize();
+          }
+        }, 450);
       }
       applyVisual();
       layout();
@@ -177,17 +204,10 @@
       } else {
         deadline = 0;
       }
-      if (changedGeometry) {
-        clearTransition();
-        reserved = active;
-        applyVisual();
-      }
+      // Keep an in-progress exit on its old trajectory. New geometry is
+      // used for the *next* transition; changing a saved direction does
+      // not interrupt or teleport the current one.
       const shouldShow = previewEnabled || mode === "always" || (mode === "slide" && deadline > performance.now());
-      if (changedGeometry && active && shouldShow) {
-        // A changed direction is applied without hiding a currently visible list.
-        visualActive = true;
-        applyVisual();
-      }
       changeActive(shouldShow);
       layout();
       if (expiryTimer) clearTimeout(expiryTimer);
@@ -202,6 +222,7 @@
       apply,
       hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
+      hasListArea: () => active || reserved || outgoingOverlay,
     };
   }
   window.IOLListComposition = Object.freeze({create});

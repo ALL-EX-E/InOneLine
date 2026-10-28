@@ -339,7 +339,7 @@ html, body {
       // Unlike other widgets, preview must exactly mirror the live list/chat
       // event state. The list's temporary visibility is application-owned.
       document.documentElement.dataset.obsVisible = String(
-        composer.listActive() || composer.hasChatSpace()
+        composer.hasListArea() || composer.hasChatSpace()
       );
       document.documentElement.dataset.obsShowMode =
         String(data.visibility?.list?.show_mode || "always");
