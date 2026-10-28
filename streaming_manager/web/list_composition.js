@@ -184,7 +184,7 @@
       if (onResize) setTimeout(onResize, 450 + animationMs + 60);
     }
     function expire() {
-      if (!previewEnabled && mode === "slide" && deadline && performance.now() >= deadline) {
+      if (mode === "slide" && deadline && performance.now() >= deadline) {
         deadline = 0;
         changeActive(false);
       }
@@ -228,11 +228,12 @@
       // Keep an in-progress exit on its old trajectory. New geometry is
       // used for the *next* transition; changing a saved direction does
       // not interrupt or teleport the current one.
-      const shouldShow = previewEnabled || mode === "always" || (mode === "slide" && deadline > performance.now());
+      // Preview must follow the same state/timer as the real OBS source.
+      const shouldShow = mode === "always" || (mode === "slide" && deadline > performance.now());
       changeActive(shouldShow);
       layout();
       if (expiryTimer) clearTimeout(expiryTimer);
-      if (mode === "slide" && deadline && !previewEnabled) {
+      if (mode === "slide" && deadline) {
         expiryTimer = setTimeout(expire, Math.max(0, deadline - performance.now()));
       }
     }
