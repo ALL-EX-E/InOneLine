@@ -105,10 +105,24 @@ def main():
                 view = QWebEngineView()
                 view.resize(width, 620)
                 view.move(screen.x() + 5 + i * 100, screen.y() + 5 + i * 35)
+                view.loadFinished.connect(
+                    lambda ok, source=route: print("R06_BROWSER_LOAD:", source, ok, flush=True)
+                )
+                view.renderProcessTerminated.connect(
+                    lambda status, code, source=route: print(
+                        "R06_BROWSER_RENDER_EXIT:", source, status, code, flush=True)
+                )
                 view.show()
                 view.load(QUrl(api.base_url + route))
                 views.append(view)
                 app.processEvents()
+                QTest.qWait(400)
+                print("R06_BROWSER_DIAGNOSTIC:", route, "url", view.page().url().toString(),
+                      "math", evaluate(view.page(), "2+2"),
+                      "ready", evaluate(view.page(), "document.readyState"),
+                      "panel", evaluate(view.page(),
+                                        "!!document.getElementById('list-panel')"),
+                      flush=True)
                 until(view.page(), lambda m: m["panel"] and m["count"] == 0 and m["height"] == 0,
                       "Empty chat releases entire area in " + route)
             pages = [view.page() for view in views]
