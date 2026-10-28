@@ -251,7 +251,8 @@ body {color:#fff;font:18px/1.3 sans-serif}
       applyAppearance(state.appearance);
       const messages = Array.isArray(state.messages) ?
         state.messages.filter(message => message.platform === "twitch") : [];
-      const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages,appearanceKey]);
+      const obsEnabled = state.obs_enabled?.twitch !== false;
+      const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages,appearanceKey,obsEnabled]);
       if (sig === last) return;
       last = sig;
       root.replaceChildren();
@@ -259,7 +260,6 @@ body {color:#fff;font:18px/1.3 sans-serif}
         appendMessage(message, state.show_time, state.show_platform_icons !== false);
       // The existing operator OBS switch is global: even the Always mode
       // must not leave an empty frame/background on screen when disabled.
-      const obsEnabled = state.obs_enabled?.twitch !== false;
       shell.classList.toggle("hidden", !obsEnabled ||
         (messages.length === 0 && currentCommon.visibility !== "always"));
       // Only OBS source height clips older rows; never truncate message contents horizontally.
