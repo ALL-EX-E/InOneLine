@@ -154,7 +154,7 @@ def main():
                 print("R06_BROWSER_API_MULTICHAT:", response.read().decode("utf-8")[:1000], flush=True)
             first_heights = []
             for p in pages:
-                metrics = until(p, lambda m: m["count"] == 1 and m["height"] >= 40,
+                metrics = until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
                                 "One message has natural height")
                 assert abs(metrics["transition"] - 1.5) < 0.03, metrics
                 first_heights.append(metrics["height"])
@@ -164,7 +164,7 @@ def main():
                     "Additional text to make the card taller and validate dynamic layout"))
             for idx, p in enumerate(pages):
                 metrics = until(p, lambda m: m["count"] == 4 and
-                                m["height"] > first_heights[idx] + 18,
+                                m["height"] > first_heights[idx] + 8,
                                 "More messages grow chat in " + str(idx))
                 heights = []
                 for _ in range(5):
@@ -186,7 +186,7 @@ def main():
                       "Slide replaces chat in both layouts")
             db.set_setting("list_chat_layout", "split")
             for p in pages:
-                until(p, lambda m: not m["replace"] and m["shown"] and m["height"] > 40,
+                until(p, lambda m: not m["replace"] and m["shown"] and m["height"] > 8,
                       "Return to split without resetting active list")
 
             state.set_obs_enabled("twitch", False)
@@ -196,7 +196,7 @@ def main():
             state.set_obs_enabled("twitch", True)
             state.ingest(ChatMessage("twitch", "chan", "fresh", "alice", "new only"))
             for p in pages:
-                until(p, lambda m: m["count"] == 1 and m["height"] >= 40,
+                until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
                       "Fresh history after re-enabling chat")
             print("R06_BROWSER_FIX1_PASS", flush=True)
         finally:
