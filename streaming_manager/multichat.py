@@ -181,6 +181,16 @@ class MultichatState:
             self._seen_order.append(key)
             self._trim_seen()
             now = self._clock()
+            if (
+                message.platform == "twitch"
+                and self._list_mode == "slide"
+                and self._list_command
+                and message.text == self._list_command
+            ):
+                # Trigger at authenticated arrival, not after optional chat delay.
+                # Changing the command never activates previously queued text.
+                self._list_show_until = now + self._list_duration
+                self._list_sequence += 1
             received = self._wall_clock() if message.received_at is None else message.received_at
             item = replace(message, received_at=received)
             self._sequence += 1
@@ -299,14 +309,6 @@ class MultichatState:
         ))
         for received_clock, _, message in items:
             self._operator.append(message)
-            if (
-                message.platform == "twitch"
-                and self._list_mode == "slide"
-                and self._list_command
-                and message.text == self._list_command
-            ):
-                self._list_show_until = self._clock() + self._list_duration
-                self._list_sequence += 1
             if (
                 self._obs_enabled.get(message.platform, True)
                 and received_clock >= self._obs_allowed_since.get(message.platform, 0.0)
