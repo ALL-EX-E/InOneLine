@@ -6,6 +6,7 @@ import os
 import socket
 import sys
 import time
+from urllib.request import urlopen
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -65,6 +66,10 @@ CHAT_METRICS = """JSON.stringify((() => {
     transition: parseFloat(getComputedStyle(panel).transitionDuration) || 0,
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
+    chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
+    childURL: doc?.location?.href ?? '(not ready)',
+    childState: doc?.readyState ?? '(not ready)',
+    childText: cards?.textContent?.slice(0,100) ?? '(not ready)',
   };
 })())"""
 
@@ -136,7 +141,10 @@ def main():
                       "Empty chat releases entire area in " + route)
             pages = [view.page() for view in views]
 
-            state.ingest(ChatMessage("twitch", "chan", "first", "alice", "short message"))
+            accepted = state.ingest(ChatMessage("twitch", "chan", "first", "alice", "short message"))
+            print("R06_BROWSER_INGEST:", accepted, state.snapshot(for_obs=True)["messages"], flush=True)
+            with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                print("R06_BROWSER_API_MULTICHAT:", response.read().decode("utf-8")[:1000], flush=True)
             first_heights = []
             for p in pages:
                 metrics = until(p, lambda m: m["count"] == 1 and m["height"] >= 40,
