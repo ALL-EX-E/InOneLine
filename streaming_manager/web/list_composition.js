@@ -29,6 +29,7 @@
     let visualActive = false;
     let reserved = false;
     let chatAvailable = false;
+    let chatHasMessages = false;
     let chatAlways = false;
     let lastSequence = null;
     let deadline = 0;
@@ -59,7 +60,7 @@
       if (available <= 0) return;
       const replacing = composeMode === "replace" && mode === "slide";
       const listAllocated = mode === "always" || (mode === "slide" && reserved);
-      const chatNeeded = chatAvailable && (chatAlways || measureChat() > 0);
+      const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
       const natural = chatAlways ? available : measureChat();
       const splitCap = listAllocated ? Math.floor((available - 12) / 2) : available;
       const desiredChat = replacing
@@ -154,6 +155,7 @@
       direction = newDirection;
       composeMode = newCompose;
       chatAvailable = Boolean(allowChat && chat.enabled);
+      chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
@@ -192,7 +194,7 @@
     root.classList.add("r06-not-shown");
     return {
       apply,
-      hasChatSpace: () => chatAvailable && (chatAlways || measureChat() > 0),
+      hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
     };
   }
