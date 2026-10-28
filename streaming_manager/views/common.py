@@ -713,6 +713,13 @@ class ScrollSafeSpinBox(QSpinBox):
     def wheelEvent(self, event):
         event.ignore()
 
+
+class ScrollSafeDoubleSpinBox(QDoubleSpinBox):
+    """Не меняет дробное число при прокрутке родительской страницы."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
 def make_wide_step_control(
     spin: QSpinBox,
     *,
