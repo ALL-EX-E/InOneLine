@@ -182,6 +182,9 @@ class LocalApiServer:
         obs_visibility_js = (
             Path(__file__).resolve().parent / "web" / "obs_visibility.js"
         ).read_text(encoding="utf-8")
+        list_composition_js = (
+            Path(__file__).resolve().parent / "web" / "list_composition.js"
+        ).read_text(encoding="utf-8")
         # Static HTML does not change while the program is running. Read once
         # instead of hitting disk for every browser-source navigation/refresh.
         overlay_html = _inject_overlay_version_handshake(
@@ -494,6 +497,12 @@ class LocalApiServer:
                 if path == "/obs-visibility.js":
                     self._send_text(
                         obs_visibility_js,
+                        content_type="application/javascript; charset=utf-8",
+                    )
+                    return
+                if path == "/list-composition.js":
+                    self._send_text(
+                        list_composition_js,
                         content_type="application/javascript; charset=utf-8",
                     )
                     return
