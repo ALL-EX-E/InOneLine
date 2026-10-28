@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEventLoop, QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QBoxLayout, QComboBox, QFontComboBox, QFormLayout,
+    QAbstractSpinBox, QBoxLayout, QComboBox, QDoubleSpinBox, QFontComboBox, QFormLayout,
     QHeaderView, QHBoxLayout, QPushButton, QScrollArea, QSpinBox,
     QTabWidget, QTableWidget, QTableWidgetItem, QWidget,
 )
