@@ -1,6 +1,7 @@
 """R06 FIX1: actual Chromium chat/list geometry across both existing OBS URLs."""
 from __future__ import annotations
 
+import json
 import os
 import socket
 import sys
@@ -42,7 +43,7 @@ def evaluate(page, expression):
     return values[0]
 
 
-CHAT_METRICS = """(() => {
+CHAT_METRICS = """JSON.stringify((() => {
   const chat = document.getElementById('list-chat');
   const doc = chat?.querySelector('iframe')?.contentDocument;
   const cards = doc?.getElementById('messages');
@@ -59,7 +60,7 @@ CHAT_METRICS = """(() => {
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
   };
-})()"""
+})())"""
 
 
 def until(page, predicate, label, timeout=50):
@@ -68,6 +69,8 @@ def until(page, predicate, label, timeout=50):
     last_log = 0
     while time.monotonic() < end:
         latest = evaluate(page, CHAT_METRICS)
+        if isinstance(latest, str) and latest.startswith("{"):
+            latest = json.loads(latest)
         if latest and isinstance(latest, dict) and predicate(latest):
             print("R06_BROWSER_PASS:", label, latest, flush=True)
             return latest
