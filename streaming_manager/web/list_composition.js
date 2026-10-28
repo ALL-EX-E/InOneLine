@@ -51,9 +51,14 @@
       try {
         const doc = iframe.contentDocument;
         const messages = doc && doc.getElementById("messages");
-        if (messages) return Math.max(0, messages.scrollHeight + 24);
+        if (messages) {
+          const measured = Math.max(0, messages.scrollHeight + 24);
+          // A zero-height iframe can defer its first inner layout. Give the
+          // first new message room; the next tick uses actual DOM height.
+          return chatHasMessages ? Math.max(44, measured) : 0;
+        }
       } catch (_) { /* local same-origin frame not yet available */ }
-      return 0;
+      return chatHasMessages ? 44 : 0;
     }
     function layout() {
       const available = root.clientHeight;
