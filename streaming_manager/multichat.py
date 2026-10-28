@@ -67,7 +67,7 @@ class MultichatState:
         self._operator: deque[ChatMessage] = deque(maxlen=self._limit)
         self._obs: deque[ChatMessage] = deque(maxlen=self._limit)
         self._obs_enabled: dict[str, bool] = {}
-        self._obs_allowed_since: dict[str, float] = {}
+        self._obs_allowed_since: dict[str, int] = {}
         self._list_mode = "always"
         self._list_command = ""
         self._list_duration = 30
@@ -135,7 +135,7 @@ class MultichatState:
                     maxlen=self._limit,
                 )
             elif not previous:
-                self._obs_allowed_since[platform] = self._clock()
+                self._obs_allowed_since[platform] = self._sequence
 
     def configure_list_show(self, mode: str, command: str, duration: int) -> None:
         """Configure one Twitch command timer shared by the two list sources."""
@@ -307,11 +307,11 @@ class MultichatState:
             p[2].sent_at if p[2].sent_at is not None else p[2].received_at,
             p[1],
         ))
-        for received_clock, _, message in items:
+        for _, received_sequence, message in items:
             self._operator.append(message)
             if (
                 self._obs_enabled.get(message.platform, True)
-                and received_clock >= self._obs_allowed_since.get(message.platform, 0.0)
+                and received_sequence > self._obs_allowed_since.get(message.platform, 0)
             ):
                 self._obs.append(message)
 
