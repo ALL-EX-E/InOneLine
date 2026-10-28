@@ -23,7 +23,8 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
 
 from streaming_manager.api_server import LocalApiServer
-from streaming_manager.database import Database
+from streaming_manager.database import Database, Game
+from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.multichat import ChatMessage, MultichatState
 
 
@@ -97,6 +98,12 @@ def main():
     app = QApplication.instance() or QApplication([])
     with TemporaryDirectory(ignore_cleanup_errors=True) as temporary:
         db = Database(Path(temporary) / "r06_browser.db")
+        # The production /overlay side slot depends on a populated scrolling
+        # list; an empty DB collapses its root to about 17px and cannot test
+        # the chat's intrinsic height or list/chat split at all.
+        for index in range(8):
+            db.add_game(Game(None, "QA List Entry " + str(index), "2026-01-01",
+                             100 + index, 0, STATUS_NOT_PLAYED, ""))
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
             "list_slide_direction": "right",
