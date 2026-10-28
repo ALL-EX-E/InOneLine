@@ -127,6 +127,7 @@ from ..workers import FunctionWorker
 from ..obs_visibility import WIDGETS, show_mode
 from .common import (
     ScrollSafeComboBox,
+    ScrollSafeDoubleSpinBox,
     ScrollSafeFontComboBox,
     ScrollSafeSpinBox,
     make_wide_step_control,
@@ -432,6 +433,18 @@ class StreamTab(QWidget):
         self.list_slide_duration.setValue(30)
         self.list_slide_duration.setSuffix(" сек.")
         overlay_form.addRow("Время показа:", self.list_slide_duration)
+
+        self.list_animation_seconds = ScrollSafeDoubleSpinBox()
+        self.list_animation_seconds.setDecimals(2)
+        self.list_animation_seconds.setRange(0.25, 3.00)
+        self.list_animation_seconds.setSingleStep(0.05)
+        self.list_animation_seconds.setValue(1.00)
+        self.list_animation_seconds.setSuffix(" сек.")
+        self.list_animation_seconds.setToolTip(
+            "Скорость появления и скрытия списка в обоих OBS-оверлеях. "
+            "Не изменяет время показа и скорость изменения высоты Twitch-чата."
+        )
+        overlay_form.addRow("Длительность анимации:", self.list_animation_seconds)
 
         self.list_slide_command = QLineEdit()
         self.list_slide_command.setPlaceholderText("Команда Twitch (необязательно)")
@@ -2581,6 +2594,13 @@ class StreamTab(QWidget):
         except (TypeError, ValueError):
             seconds = 30
         self.list_slide_duration.setValue(max(1, min(120, seconds)))
+        try:
+            animation_seconds = float(setting("list_animation_seconds", "1.00"))
+            if not 0.25 <= animation_seconds <= 3.00:
+                animation_seconds = 1.00
+        except (TypeError, ValueError):
+            animation_seconds = 1.00
+        self.list_animation_seconds.setValue(animation_seconds)
         self.list_slide_command.setText(setting("list_slide_command", ""))
         self._set_combo_by_data(
             self.list_chat_layout,
@@ -2855,6 +2875,7 @@ class StreamTab(QWidget):
             WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
             "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
             "list_slide_duration": str(self.list_slide_duration.value()),
+            "list_animation_seconds": f"{self.list_animation_seconds.value():.2f}",
             "list_slide_command": self.list_slide_command.text(),
             "list_chat_layout": str(self.list_chat_layout.currentData() or "split"),
             "list_with_chat": "1" if self.list_with_chat.isChecked() else "0",
