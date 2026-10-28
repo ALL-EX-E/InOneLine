@@ -23,8 +23,8 @@ html, body {
   font-family: "Segoe UI", "Noto Sans", Arial, sans-serif;
 }
 #list-panel {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
   min-width: 0;
   min-height: 0;
   padding: 10px 9px;
@@ -114,19 +114,36 @@ html, body {
 #api-state.visible { display: block; }
 </style>
 <script src="/obs-visibility.js"></script>
+<script src="/list-composition.js"></script>
 </head>
 <body>
-<div id="list-panel">
+<div id="list-composition" class="r06-compose">
+  <div id="list-layer" class="r06-list-layer">
+    <div id="list-panel">
   <div id="top-three"></div>
   <div id="top-three-divider"></div>
   <div id="list-viewport">
     <div id="game-list"></div>
   </div>
   <div id="api-state">Нет связи с In one line</div>
+    </div>
+  </div>
+  <div id="list-chat" class="r06-chat-layer">
+    <iframe src="/multichat-overlay" title="Чат Twitch" tabindex="-1"
+            aria-hidden="true"></iframe>
+  </div>
 </div>
 <script>
 (() => {
   const panel = document.getElementById("list-panel");
+  const rootComposition = document.getElementById("list-composition");
+  const composer = IOLListComposition.create(
+    rootComposition,
+    document.getElementById("list-layer"),
+    panel,
+    document.getElementById("list-chat"),
+    () => requestAnimationFrame(() => rebuildInfiniteScroll(false))
+  );
   const topThree = document.getElementById("top-three");
   const divider = document.getElementById("top-three-divider");
   const viewport = document.getElementById("list-viewport");
@@ -316,8 +333,16 @@ html, body {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      ObsVisibility.apply(data.visibility?.list);
       const overlayConfig = data.overlay || {};
+      composer.apply(data, overlayConfig.list_with_chat === true);
+      // Unlike other widgets, preview must exactly mirror the live list/chat
+      // event state. The list's temporary visibility is application-owned.
+      document.documentElement.dataset.obsVisible = String(
+        composer.listActive() || composer.hasChatSpace()
+      );
+      document.documentElement.dataset.obsShowMode =
+        String(data.visibility?.list?.show_mode || "always");
+      document.documentElement.dataset.obsPolicyReady = "true";
 
       const rowsChanged = renderRows(data.auction_list || []);
       applyTypography(overlayConfig.typography || {});
@@ -332,6 +357,9 @@ html, body {
         typography: overlayConfig.typography || {},
         width: viewport.clientWidth,
         height: viewport.clientHeight,
+        list_mode: data.visibility?.list?.show_mode,
+        chat_layout: overlayConfig.list_chat_layout,
+        chat_available: composer.hasChatSpace(),
       });
       if (rowsChanged || metricsKey !== lastMetricsKey) {
         const reset = lastMetricsKey === "";
