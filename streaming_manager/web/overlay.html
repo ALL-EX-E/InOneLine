@@ -786,7 +786,9 @@ body.preview .preview-label { display: flex; }
 
     // Отключённые элементы убираются из рабочих колонок полностью.
     if (!webcamEnabled) parking.appendChild(webcamFrame);
-    if (!listAreaNeeded) parking.appendChild(listComposition);
+    if (!listAreaNeeded && listComposition.parentElement !== parking) {
+      parking.appendChild(listComposition);
+    }
     if (!infoEnabled) parking.appendChild(infoPanel);
 
     webcamFrame.classList.toggle("hidden", !webcamEnabled);
@@ -798,7 +800,13 @@ body.preview .preview-label { display: flex; }
     }
 
     if (listAreaNeeded) {
-      slots[listSide].list.appendChild(listComposition);
+      // Moving an existing iframe-bearing composition on every API poll
+      // navigates its embedded Twitch document and visibly flickers chat.
+      // Reparent only when the user actually changes the selected side.
+      const targetSlot = slots[listSide].list;
+      if (listComposition.parentElement !== targetSlot) {
+        targetSlot.appendChild(listComposition);
+      }
     }
 
     if (infoEnabled) {
