@@ -131,10 +131,14 @@ class MainWindow(QMainWindow):
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
         self.api.set_multichat_state_provider(self.multichat_state.snapshot)
         self.api.set_list_show_controller(self.multichat_state.configure_list_show)
+        try:
+            list_duration = int(db.get_setting("list_slide_duration", "30"))
+        except (TypeError, ValueError):
+            list_duration = 30
         self.api.configure_list_show(
             show_mode(db.get_settings(), "list"),
             db.get_setting("list_slide_command", ""),
-            max(1, min(120, int(db.get_setting("list_slide_duration", "30")))),
+            max(1, min(120, list_duration)),
         )
         try:
             self.api.start()
