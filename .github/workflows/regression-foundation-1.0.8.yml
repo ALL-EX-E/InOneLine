@@ -87,6 +87,12 @@ jobs:
           python -m tools.multichat_windows_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-01 Qt/HTTP failed" }
 
+      - name: R06 shared List state and Twitch OBS API integration
+        shell: pwsh
+        run: |
+          python -m tools.r06_list_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 shared List / Twitch OBS API regression failed" }
+
       - name: D41-02 Twitch chat EventSub and Channel Points isolated regression
         shell: pwsh
         run: |
