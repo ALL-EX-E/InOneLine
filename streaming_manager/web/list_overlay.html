@@ -142,7 +142,8 @@ html, body {
     document.getElementById("list-layer"),
     panel,
     document.getElementById("list-chat"),
-    () => requestAnimationFrame(() => rebuildInfiniteScroll(false))
+    () => requestAnimationFrame(() => rebuildInfiniteScroll(false)),
+    new URLSearchParams(location.search).get("preview") === "1"
   );
   const topThree = document.getElementById("top-three");
   const divider = document.getElementById("top-three-divider");
