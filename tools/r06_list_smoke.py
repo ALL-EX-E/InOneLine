@@ -38,6 +38,7 @@ class R06ListApiSmoke(unittest.TestCase):
                 "list_overlay_show_mode": "slide",
                 "list_slide_direction": "top",
                 "list_slide_duration": "30",
+                "list_animation_seconds": "1.50",
                 "list_slide_command": "!list",
                 "list_chat_layout": "replace",
                 "list_with_chat": "1",
@@ -61,6 +62,7 @@ class R06ListApiSmoke(unittest.TestCase):
                 current = data()
                 self.assertEqual(current["visibility"]["list"]["show_mode"], "slide")
                 self.assertEqual(current["overlay"]["list_slide_direction"], "top")
+                self.assertEqual(current["overlay"]["list_animation_seconds"], "1.50")
                 self.assertEqual(current["overlay"]["list_chat_layout"], "replace")
                 self.assertTrue(current["overlay"]["list_with_chat"])
                 self.assertEqual(current["list_show"]["remaining_ms"], 0)
@@ -68,7 +70,11 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertTrue(current["multichat"]["enabled"])
                 self.assertIn("/list-composition.js", get("/list-overlay"))
                 self.assertIn("/list-composition.js", get("/overlay"))
-                self.assertIn("IOLListComposition", get("/list-composition.js"))
+                composition = get("/list-composition.js")
+                self.assertIn("IOLListComposition", composition)
+                self.assertIn("card.getBoundingClientRect().height", composition)
+                self.assertNotIn("messages.scrollHeight", composition)
+                self.assertIn("list_animation_seconds", composition)
                 self.assertIn('embedded=1', get("/list-overlay"))
 
                 state.ingest(ChatMessage("twitch", "ch", "first", "viewer", "!list"))
