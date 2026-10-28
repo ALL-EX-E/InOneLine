@@ -5,7 +5,7 @@
     .r06-compose {position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
     .r06-list-layer {flex:1 1 auto;min-height:0;min-width:0;overflow:hidden;position:relative}
     .r06-compose .r06-list-layer > #list-panel {width:100%;height:100%;min-height:0;
-      transition:transform .45s ease,opacity .45s ease}
+      transition:transform var(--r06-list-transition,1000ms) ease,opacity var(--r06-list-transition,1000ms) ease}
     .r06-chat-layer {height:0;flex:0 0 auto;min-height:0;overflow:hidden;position:relative;
       transition:height .45s ease}
     .r06-chat-layer iframe {position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
@@ -39,6 +39,8 @@
     let lastChatHeight = -1;
     let outgoingOverlay = false;
     let transitionDirection = direction;
+    let animationMs = 1000;
+    let intrinsicChatHeight = 0;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -49,19 +51,32 @@
         top:"translateY(-105%)",bottom:"translateY(105%)"}[transitionDirection];
     }
     function measureChat() {
-      if (!chatAvailable) return 0;
+      if (!chatAvailable || !chatHasMessages) return 0;
       if (chatAlways) return root.clientHeight;
       try {
         const doc = iframe.contentDocument;
         const messages = doc && doc.getElementById("messages");
-        if (messages) {
-          const measured = Math.max(0, messages.scrollHeight + 24);
-          // A zero-height iframe can defer its first inner layout. Give the
-          // first new message room; the next tick uses actual DOM height.
-          return chatHasMessages ? Math.max(44, measured) : 0;
+        if (messages && messages.children.length) {
+          // The iframe height is the *result* of this calculation. Its
+          // scrollHeight is clipped by #shell/#messages and feeds back into
+          // itself, pinning the chat to one short row (or oscillating).
+          // Measure the individual non-shrinking cards instead; this stays
+          // intrinsic even if the surrounding iframe is currently 44px tall.
+          let cardsHeight = 0;
+          for (const card of messages.children) {
+            const css = doc.defaultView.getComputedStyle(card);
+            cardsHeight += card.getBoundingClientRect().height +
+              (parseFloat(css.marginTop) || 0) + (parseFloat(css.marginBottom) || 0);
+          }
+          if (cardsHeight > 0) {
+            intrinsicChatHeight = Math.ceil(cardsHeight + 24);
+            return intrinsicChatHeight;
+          }
         }
-      } catch (_) { /* local same-origin frame not yet available */ }
-      return chatHasMessages ? 44 : 0;
+      } catch (_) { /* same-origin frame may not be ready yet */ }
+      // An iframe may update one poll after /api/data. Preserve its last
+      // intrinsic height so that a transient empty DOM never flashes closed.
+      return Math.max(44, intrinsicChatHeight);
     }
     function layout() {
       const available = root.clientHeight;
@@ -74,7 +89,7 @@
       const desiredChat = replacing
         ? (chatNeeded ? available : 0)
         : chatNeeded ? Math.min(natural, splitCap) : 0;
-      if (Math.abs(desiredChat - lastChatHeight) > 1) {
+      if (Math.abs(desiredChat - lastChatHeight) > 2) {
         chatLayer.style.height = desiredChat + "px";
         lastChatHeight = desiredChat;
       }
@@ -89,6 +104,7 @@
       }
     }
     function applyVisual() {
+      root.style.setProperty("--r06-list-transition", animationMs + "ms");
       root.style.setProperty("--r06-hidden-transform", hiddenTransform());
       root.classList.toggle("r06-shown", visualActive);
       root.classList.toggle("r06-not-shown", !visualActive);
@@ -101,7 +117,7 @@
       }
     }
     function freezeOutgoingVerticalLayer() {
-      // Keep the outgoing content physically on-screen for its full 450 ms
+      // Keep the outgoing content physically on-screen until the list exit ends
       // while the flex column is freed for the expanding chat below it.
       const height = listLayer.getBoundingClientRect().height;
       if (height <= 0) return false;
@@ -161,11 +177,11 @@
             layout();
             if (onResize) onResize();
           }
-        }, 450);
+        }, animationMs);
       }
       applyVisual();
       layout();
-      if (onResize) setTimeout(onResize, 500);
+      if (onResize) setTimeout(onResize, 450 + animationMs + 60);
     }
     function expire() {
       if (!previewEnabled && mode === "slide" && deadline && performance.now() >= deadline) {
@@ -183,13 +199,18 @@
       const newDirection = ["left","right","top","bottom"].includes(cfg.list_slide_direction) ?
         cfg.list_slide_direction : "right";
       const newCompose = cfg.list_chat_layout === "replace" ? "replace" : "split";
+      const seconds = Number(cfg.list_animation_seconds);
+      const nextAnimationMs = Math.round((Number.isFinite(seconds) && seconds > 0
+        ? Math.max(0.25, Math.min(3, seconds)) : 1) * 1000);
       const changedGeometry = direction !== newDirection || composeMode !== newCompose;
       mode = newMode;
       direction = newDirection;
       composeMode = newCompose;
+      animationMs = nextAnimationMs;
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
+      if (!chatAvailable || !chatHasMessages) intrinsicChatHeight = 0;
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
       if (mode === "slide") {
