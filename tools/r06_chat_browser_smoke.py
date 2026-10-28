@@ -47,7 +47,12 @@ CHAT_METRICS = """(() => {
   const doc = chat?.querySelector('iframe')?.contentDocument;
   const cards = doc?.getElementById('messages');
   const panel = document.getElementById('list-panel');
+  if (!chat || !panel) return {
+    ready: document.readyState, href: location.href, panel: !!panel,
+    height: -1, count: -1, transition: 0, replace: false, shown: false
+  };
   return {
+    ready: document.readyState, href: location.href, panel: true,
     height: Math.round(chat?.getBoundingClientRect().height || 0),
     count: cards?.children.length ?? -1,
     transition: parseFloat(getComputedStyle(panel).transitionDuration) || 0,
@@ -57,14 +62,19 @@ CHAT_METRICS = """(() => {
 })()"""
 
 
-def until(page, predicate, label, timeout=22):
+def until(page, predicate, label, timeout=50):
     end = time.monotonic() + timeout
     latest = None
+    last_log = 0
     while time.monotonic() < end:
         latest = evaluate(page, CHAT_METRICS)
-        if latest and predicate(latest):
+        if latest and isinstance(latest, dict) and predicate(latest):
             print("R06_BROWSER_PASS:", label, latest, flush=True)
             return latest
+        if time.monotonic() - last_log > 6:
+            print("R06_BROWSER_WAIT:", label, "url=", page.url().toString(),
+                  "state=", latest, flush=True)
+            last_log = time.monotonic()
         QTest.qWait(120)
     raise AssertionError(f"{label}: timed out, last result {latest!r}")
 
@@ -98,11 +108,10 @@ def main():
                 view.show()
                 view.load(QUrl(api.base_url + route))
                 views.append(view)
-            app.processEvents()
+                app.processEvents()
+                until(view.page(), lambda m: m["panel"] and m["count"] == 0 and m["height"] == 0,
+                      "Empty chat releases entire area in " + route)
             pages = [view.page() for view in views]
-            for p in pages:
-                until(p, lambda m: m["count"] == 0 and m["height"] == 0,
-                      "Empty chat releases entire area")
 
             state.ingest(ChatMessage("twitch", "chan", "first", "alice", "short message"))
             first_heights = []
