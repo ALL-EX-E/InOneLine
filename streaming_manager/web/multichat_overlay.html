@@ -259,8 +259,13 @@ body {color:#fff;font:18px/1.3 sans-serif}
         appendMessage(message, state.show_time, state.show_platform_icons !== false);
       shell.classList.toggle("hidden", messages.length === 0 && currentCommon.visibility !== "always");
       // Only OBS source height clips older rows; never truncate message contents horizontally.
-      while (root.scrollHeight > root.clientHeight && root.firstElementChild)
-        root.firstElementChild.remove();
+      // An embedded chat must retain its existing DOM rows while the
+      // surrounding list temporarily shrinks the viewport. CSS clips
+      // older rows; when expanded they remain available without new events.
+      if (new URLSearchParams(location.search).get("embedded") !== "1") {
+        while (root.scrollHeight > root.clientHeight && root.firstElementChild)
+          root.firstElementChild.remove();
+      }
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
   update();
