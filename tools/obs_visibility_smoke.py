@@ -61,7 +61,7 @@ def policy_smoke() -> None:
             assert show_mode({spec.key: "bogus"}, widget) == default
             for mode, label in spec.options:
                 assert show_mode({spec.key: mode}, widget) == ("always" if widget == "overlay" else mode)
-                assert label in {"Не показывать", "При смене трека", "Когда колесо используется", "Показывать постоянно"}
+                assert label in {"Не показывать", "При смене трека", "Когда колесо используется", "Показывать постоянно", "Выезд"}
             assert visibility_payload({spec.key: "hidden"}, widget, False) == {
                 "show_mode": "always" if widget == "overlay" else "hidden",
                 "context_visible": False,
@@ -548,15 +548,16 @@ def browser_smoke() -> None:
                     wait_js(normal, "getComputedStyle(document.documentElement).opacity",
                             "1" if widget == "overlay" else "0", route + " computed opacity")
                     if widget == "overlay":
-                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
+                        wait_js(normal, "document.querySelector('#list-composition').classList.contains('r06-not-shown')",
                                 True, "Hidden shared List omitted from main canvas")
                         db.set_settings_bulk({"list_overlay_show_mode": "always"})
-                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
-                                False, "Shared List live Save shows embedded list")
+                        wait_js(normal, "document.querySelector('#list-composition').classList.contains('r06-shown')",
+                                True, "Shared List live Save shows embedded list")
                         db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
-                        wait_js(normal, "document.querySelector('#list-panel').classList.contains('hidden')",
+                        wait_js(normal, "document.querySelector('#list-composition').classList.contains('r06-not-shown')",
                                 True, "Shared List live Save hides embedded list")
-                    wait_js(preview, visible, "true", route + " hidden-mode preview")
+                    wait_js(preview, visible, "false" if widget == "list" else "true",
+                            route + " hidden-mode preview")
                     assert db.get_settings() == before_settings, "Preview changed persisted mode"
                     assert music["event_serial"] == 17, "Preview manufactured a music event"
                     if widget == "rules":
@@ -739,7 +740,8 @@ def browser_smoke() -> None:
                         if widget == "list":
                             snapshot = read_json(server, "/api/data")
                             assert snapshot["overlay"]["list_enabled"] is False, "Shared List Hide did not hide embedded list"
-                    wait_js(preview, visible, "true", route + " preview after Save")
+                    wait_js(preview, visible, "false" if widget == "list" else "true",
+                            route + " preview after Save")
                     if widget == "music_player":
                         save(widget, "track_change")
                         wait_js(normal, mode_js, "track_change", "Music event mode")
