@@ -141,7 +141,7 @@
       if (onResize) setTimeout(onResize, 500);
     }
     function expire() {
-      if (mode === "slide" && deadline && performance.now() >= deadline) {
+      if (!previewEnabled && mode === "slide" && deadline && performance.now() >= deadline) {
         deadline = 0;
         changeActive(false);
       }
