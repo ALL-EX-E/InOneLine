@@ -21,7 +21,7 @@
   sheet.textContent = css;
   document.head.appendChild(sheet);
 
-  function create(root, listLayer, listPanel, chatLayer, onResize) {
+  function create(root, listLayer, listPanel, chatLayer, onResize, previewEnabled = false) {
     const iframe = chatLayer.querySelector("iframe");
     let mode = "always";
     let direction = "right";
@@ -182,7 +182,7 @@
         reserved = active;
         applyVisual();
       }
-      const shouldShow = mode === "always" || (mode === "slide" && deadline > performance.now());
+      const shouldShow = previewEnabled || mode === "always" || (mode === "slide" && deadline > performance.now());
       if (changedGeometry && active && shouldShow) {
         // A changed direction is applied without hiding a currently visible list.
         visualActive = true;
@@ -191,7 +191,7 @@
       changeActive(shouldShow);
       layout();
       if (expiryTimer) clearTimeout(expiryTimer);
-      if (mode === "slide" && deadline) {
+      if (mode === "slide" && deadline && !previewEnabled) {
         expiryTimer = setTimeout(expire, Math.max(0, deadline - performance.now()));
       }
     }
