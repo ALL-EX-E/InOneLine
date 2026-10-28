@@ -67,6 +67,12 @@ class MultichatState:
         self._operator: deque[ChatMessage] = deque(maxlen=self._limit)
         self._obs: deque[ChatMessage] = deque(maxlen=self._limit)
         self._obs_enabled: dict[str, bool] = {}
+        self._obs_allowed_since: dict[str, float] = {}
+        self._list_mode = "always"
+        self._list_command = ""
+        self._list_duration = 30
+        self._list_show_until = 0.0
+        self._list_sequence = 0
         self._seen: set[tuple[str, str, str]] = set()
         self._seen_order: deque[tuple[str, str, str]] = deque()
         self._seen_capacity = max(4096, self._limit * 4)
@@ -121,7 +127,28 @@ class MultichatState:
 
     def set_obs_enabled(self, platform: str, enabled: bool) -> None:
         with self._lock:
+            previous = self._obs_enabled.get(platform, True)
             self._obs_enabled[platform] = bool(enabled)
+            if not enabled:
+                self._obs = deque(
+                    (m for m in self._obs if m.platform != platform),
+                    maxlen=self._limit,
+                )
+            elif not previous:
+                self._obs_allowed_since[platform] = self._clock()
+
+    def configure_list_show(self, mode: str, command: str, duration: int) -> None:
+        """Configure one Twitch command timer shared by the two list sources."""
+        seconds = int(duration)
+        if not 1 <= seconds <= 120:
+            raise ValueError("List display duration must be from 1 to 120 seconds")
+        with self._lock:
+            previous = self._list_mode
+            self._list_mode = mode if mode in {"hidden", "always", "slide"} else "always"
+            self._list_command = str(command)
+            self._list_duration = seconds
+            if self._list_mode != "slide" or previous != self._list_mode:
+                self._list_show_until = 0.0
 
     def set_media_preload(self, platform: str, urls) -> None:
         """Bounded session-only hint for Qt and local OBS image warm-up.
@@ -245,8 +272,14 @@ class MultichatState:
         with self._lock:
             self._flush_ready(self._clock())
             messages = self._obs if for_obs else self._operator
+            remaining = max(0.0, self._list_show_until - self._clock())
             return {
                 "messages": [asdict(m) for m in messages],
+                "obs_enabled": dict(self._obs_enabled),
+                "list_show": {
+                    "remaining_ms": int(remaining * 1000) if self._list_mode == "slide" else 0,
+                    "sequence": self._list_sequence,
+                },
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,
                 "media_preload": dict(self._chat_media_preload),
@@ -264,9 +297,20 @@ class MultichatState:
             p[2].sent_at if p[2].sent_at is not None else p[2].received_at,
             p[1],
         ))
-        for _, _, message in items:
+        for received_clock, _, message in items:
             self._operator.append(message)
-            if self._obs_enabled.get(message.platform, True):
+            if (
+                message.platform == "twitch"
+                and self._list_mode == "slide"
+                and self._list_command
+                and message.text == self._list_command
+            ):
+                self._list_show_until = self._clock() + self._list_duration
+                self._list_sequence += 1
+            if (
+                self._obs_enabled.get(message.platform, True)
+                and received_clock >= self._obs_allowed_since.get(message.platform, 0.0)
+            ):
                 self._obs.append(message)
 
     def _flush_ready(self, now: float) -> None:

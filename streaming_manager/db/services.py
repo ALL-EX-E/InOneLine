@@ -2497,6 +2497,17 @@ class ServicesMixin:
                 "webcam_position": setting("overlay_webcam_position", "top_right"),
                 "list_enabled": show_mode(settings, "list") != "hidden",
                 "list_side": setting("overlay_list_side", "auto"),
+                "list_slide_direction": (
+                    setting("list_slide_direction", "right")
+                    if setting("list_slide_direction", "right") in ("left", "right", "top", "bottom")
+                    else "right"
+                ),
+                "list_chat_layout": (
+                    setting("list_chat_layout", "split")
+                    if setting("list_chat_layout", "split") in ("split", "replace")
+                    else "split"
+                ),
+                "list_with_chat": setting("list_with_chat", "0") == "1",
                 "info_position": setting("overlay_info_position", "auto"),
                 "background": {
                     "asset_id": background_asset_id,
