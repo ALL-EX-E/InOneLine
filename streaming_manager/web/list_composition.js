@@ -14,7 +14,8 @@
     .r06-compose.r06-replace .r06-chat-layer {position:absolute;inset:0;height:100%!important;width:100%}
     .r06-compose.r06-replace .r06-list-layer {position:absolute;inset:0;width:100%;height:100%;
       z-index:2;flex:none}
-    .r06-compose.r06-replace #list-panel {background-color:rgba(10,13,16,.99)}
+    .r06-compose.r06-replace .r06-chat-layer iframe {transition:opacity .45s ease}
+    .r06-compose.r06-replace.r06-shown .r06-chat-layer iframe {opacity:0}
   `;
   const sheet = document.createElement("style");
   sheet.textContent = css;
