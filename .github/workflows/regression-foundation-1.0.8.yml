@@ -93,6 +93,14 @@ jobs:
           python -m tools.r06_list_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 shared List / Twitch OBS API regression failed" }
 
+      - name: R06 FIX1 real Chromium both List sources, dynamic chat and speed
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_chat_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 FIX1 chat layout/animation browser regression failed" }
+
       - name: D41-02 Twitch chat EventSub and Channel Points isolated regression
         shell: pwsh
         run: |
