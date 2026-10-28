@@ -2502,6 +2502,7 @@ class ServicesMixin:
                     if setting("list_slide_direction", "right") in ("left", "right", "top", "bottom")
                     else "right"
                 ),
+                "list_animation_seconds": setting("list_animation_seconds", "1.00"),
                 "list_chat_layout": (
                     setting("list_chat_layout", "split")
                     if setting("list_chat_layout", "split") in ("split", "replace")
