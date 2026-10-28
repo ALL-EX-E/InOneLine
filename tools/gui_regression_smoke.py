@@ -1018,8 +1018,12 @@ def assert_p09_api_ui_cleanup(window, db) -> None:
     for route in ("/health", "/api/health"):
         if read_json(route) != expected_health:
             raise AssertionError(f"P09 UI-043 health contract changed: {route}")
-    if read_json("/api/data") != db.current_stream_payload():
+    obs_payload = read_json("/api/data")
+    previous_payload = db.current_stream_payload()
+    if any(obs_payload.get(key) != value for key, value in previous_payload.items()):
         raise AssertionError("P09 UI-043 OBS data endpoint lost the existing snapshot")
+    if not {"multichat", "list_show"}.issubset(obs_payload):
+        raise AssertionError("R06 List/Chat presentation state missing from existing OBS route")
     if read_json("/api/public") != {"games": db.public_games()}:
         raise AssertionError("P09 UI-043 live public data contract changed")
     for route in ("/overlay", "/list-overlay"):
