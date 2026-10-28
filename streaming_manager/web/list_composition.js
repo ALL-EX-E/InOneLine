@@ -90,9 +90,17 @@
       clearTransition();
       const horizontalSplit = composeMode === "split" &&
         mode === "slide" && ["left","right"].includes(direction);
+      // A two-stage transition is needed only when the chat really must
+      // resize. If its natural height already fits the 50% cap, do not wait.
+      const available = Math.max(0, root.clientHeight);
+      const half = Math.max(0, Math.floor((available - 12) / 2));
+      const currentChat = Math.max(0, lastChatHeight);
+      const needsResize = chatAvailable && (chatAlways || measureChat() > half) &&
+        (next ? currentChat > half : currentChat >= half);
+      const staged = horizontalSplit && needsResize;
       if (next) {
         reserved = true;
-        if (horizontalSplit) {
+        if (staged) {
           visualActive = false;
           layout();
           transitionTimer = setTimeout(() => {
@@ -108,7 +116,7 @@
         }
       } else {
         visualActive = false;
-        if (horizontalSplit) {
+        if (staged) {
           transitionTimer = setTimeout(() => {
             transitionTimer = null;
             if (!active) {
