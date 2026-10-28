@@ -40,7 +40,13 @@ def evaluate(page, expression):
         QTest.qWait(25)
     if not values:
         raise AssertionError("Chromium JS callback timed out: " + expression)
-    return values[0]
+    value = values[0]
+    if expression.startswith("JSON.stringify") and isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+    return value
 
 
 CHAT_METRICS = """JSON.stringify((() => {
