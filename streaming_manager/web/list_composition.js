@@ -7,15 +7,28 @@
     .r06-compose .r06-list-layer > #list-panel {width:100%;height:100%;min-height:0;
       transition:transform var(--r06-list-transition,1000ms) ease,opacity var(--r06-list-transition,1000ms) ease}
     .r06-chat-layer {height:0;flex:0 0 auto;min-height:0;overflow:hidden;position:relative;
-      transition:height .45s ease}
+      transition:height var(--r06-list-transition,1000ms) ease}
     .r06-chat-layer iframe {position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
     .r06-compose.r06-not-shown #list-panel {opacity:0;transform:var(--r06-hidden-transform,translateX(105%))}
     .r06-compose.r06-shown #list-panel {opacity:1;transform:translate3d(0,0,0)}
-    .r06-compose.r06-replace .r06-chat-layer {position:absolute;inset:0;height:100%!important;width:100%}
-    .r06-compose.r06-replace .r06-list-layer {position:absolute;inset:0;width:100%;height:100%;
-      z-index:2;flex:none}
-    .r06-compose.r06-replace .r06-chat-layer iframe {transition:opacity .45s ease}
-    .r06-compose.r06-replace.r06-shown .r06-chat-layer iframe {opacity:0}
+    /* Replacement is a real directional wipe, never an immediate fade of
+       the chat. The chat stays alive behind the moving list; its clipped
+       visible portion shrinks in sync with the moving panel. */
+    .r06-compose.r06-replace .r06-chat-layer {
+      position:absolute;inset:0;height:100%!important;width:100%;z-index:1;
+      clip-path:inset(0 0 0 0);
+      transition:clip-path var(--r06-list-transition,1000ms) ease
+    }
+    .r06-compose.r06-replace.r06-shown .r06-chat-layer {
+      clip-path:var(--r06-chat-covered-clip,inset(0 100% 0 0))
+    }
+    .r06-compose.r06-replace .r06-list-layer {
+      position:absolute;inset:0;width:100%;height:100%;z-index:2;flex:none
+    }
+    .r06-compose.r06-replace .r06-list-layer > #list-panel {
+      opacity:1;
+      transition:transform var(--r06-list-transition,1000ms) ease
+    }
   `;
   const sheet = document.createElement("style");
   sheet.textContent = css;
@@ -49,6 +62,10 @@
     function hiddenTransform() {
       return {left:"translateX(-105%)",right:"translateX(105%)",
         top:"translateY(-105%)",bottom:"translateY(105%)"}[transitionDirection];
+    }
+    function coveredChatClip() {
+      return {left:"inset(0 0 0 100%)",right:"inset(0 100% 0 0)",
+        top:"inset(100% 0 0 0)",bottom:"inset(0 0 100% 0)"}[transitionDirection];
     }
     function measureChat() {
       if (!chatAvailable || !chatHasMessages) return 0;
@@ -106,6 +123,7 @@
     function applyVisual() {
       root.style.setProperty("--r06-list-transition", animationMs + "ms");
       root.style.setProperty("--r06-hidden-transform", hiddenTransform());
+      root.style.setProperty("--r06-chat-covered-clip", coveredChatClip());
       root.classList.toggle("r06-shown", visualActive);
       root.classList.toggle("r06-not-shown", !visualActive);
     }
@@ -154,7 +172,7 @@
               applyVisual();
               if (onResize) onResize();
             }
-          }, 450);
+          }, animationMs);
         } else {
           visualActive = true;
         }
@@ -181,7 +199,8 @@
       }
       applyVisual();
       layout();
-      if (onResize) setTimeout(onResize, 450 + animationMs + 60);
+      if (onResize) setTimeout(onResize,
+        (staged ? animationMs * 2 : animationMs) + 60);
     }
     function expire() {
       if (mode === "slide" && deadline && performance.now() >= deadline) {
