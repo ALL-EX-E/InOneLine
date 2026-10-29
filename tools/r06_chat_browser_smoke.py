@@ -1,4 +1,4 @@
-"""R06 FIX1: actual Chromium chat/list geometry across both existing OBS URLs."""
+"""R06 FIX2: real Chromium chat/list geometry, equal speed and replacement wipe."""
 from __future__ import annotations
 
 import json
@@ -65,6 +65,10 @@ CHAT_METRICS = """JSON.stringify((() => {
     height: Math.round(chat?.getBoundingClientRect().height || 0),
     count: cards?.children.length ?? -1,
     transition: parseFloat(getComputedStyle(panel).transitionDuration) || 0,
+    chatTransition: parseFloat(getComputedStyle(chat).transitionDuration) || 0,
+    iframeOpacity: parseFloat(getComputedStyle(chat?.querySelector('iframe')).opacity),
+    panelOpacity: parseFloat(getComputedStyle(panel).opacity),
+    chatClip: getComputedStyle(chat).clipPath,
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
     chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
@@ -157,6 +161,8 @@ def main():
                 metrics = until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
                                 "One message has natural height")
                 assert abs(metrics["transition"] - 1.5) < 0.03, metrics
+                assert abs(metrics["chatTransition"] - 1.5) < 0.03, (
+                    "List/chat animation speeds must be identical", metrics)
                 first_heights.append(metrics["height"])
 
             for i in range(2, 5):
@@ -175,15 +181,38 @@ def main():
                 )
                 print("R06_BROWSER_PASS: stable height", heights, flush=True)
 
-            # Same saved composition mode in both URLs; an active slide
-            # replaces chat, returning to split restores intrinsic sizing.
+            # One operator setting must control BOTH transitions (and URLs).
+            for seconds in (0.25, 1.0, 3.0, 1.5):
+                db.set_setting("list_animation_seconds", f"{seconds:.2f}")
+                for p in pages:
+                    until(p, lambda m, expected=seconds:
+                          abs(m["transition"] - expected) < 0.03 and
+                          abs(m["chatTransition"] - expected) < 0.03,
+                          f"Shared List+chat speed {seconds:.2f} seconds")
+
+            # Same saved composition mode in both URLs; a real replacement
+            # wipes OVER the intact chat (never fades its iframe to zero).
             db.set_setting("list_overlay_show_mode", "slide")
             db.set_setting("list_chat_layout", "replace")
             api.configure_list_show("slide", "!list", 30)
             state.ingest(ChatMessage("twitch", "chan", "trigger", "alice", "!list"))
             for p in pages:
-                until(p, lambda m: m["replace"] and m["shown"],
-                      "Slide replaces chat in both layouts")
+                until(p, lambda m:
+                      m["replace"] and m["shown"] and
+                      abs(m["chatTransition"] - 1.5) < 0.03 and
+                      abs(m["transition"] - 1.5) < 0.03 and
+                      m["count"] >= 4 and
+                      m["iframeOpacity"] == 1.0 and
+                      m["panelOpacity"] == 1.0 and
+                      m["chatClip"] != "none",
+                      "Replace overlays moving panel over still-live opaque chat")
+                # It must remain in the iframe DOM even when fully occluded.
+                QTest.qWait(1800)
+                snapshot = evaluate(p, CHAT_METRICS)
+                assert snapshot["count"] >= 4, snapshot
+                assert snapshot["iframeOpacity"] == 1.0, (
+                    "Replace must not fade/clear Twitch iframe", snapshot)
+                assert snapshot["chatClip"] != "none", snapshot
             db.set_setting("list_chat_layout", "split")
             for p in pages:
                 until(p, lambda m: not m["replace"] and m["shown"] and m["height"] > 8,
@@ -198,7 +227,7 @@ def main():
             for p in pages:
                 until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
                       "Fresh history after re-enabling chat")
-            print("R06_BROWSER_FIX1_PASS", flush=True)
+            print("R06_BROWSER_FIX2_PASS", flush=True)
         finally:
             for v in views:
                 v.close()
