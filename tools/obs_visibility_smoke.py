@@ -556,7 +556,9 @@ def browser_smoke() -> None:
                         db.set_settings_bulk({"list_overlay_show_mode": "hidden"})
                         wait_js(normal, "document.querySelector('#list-composition').classList.contains('r06-not-shown')",
                                 True, "Shared List live Save hides embedded list")
-                    wait_js(preview, visible, "true",
+                    # R06: List preview is identical to its live OBS source;
+                    # older widgets still retain their original forced-preview policy.
+                    wait_js(preview, visible, "false" if widget == "list" else "true",
                             route + " hidden-mode preview")
                     assert db.get_settings() == before_settings, "Preview changed persisted mode"
                     assert music["event_serial"] == 17, "Preview manufactured a music event"
@@ -740,7 +742,7 @@ def browser_smoke() -> None:
                         if widget == "list":
                             snapshot = read_json(server, "/api/data")
                             assert snapshot["overlay"]["list_enabled"] is False, "Shared List Hide did not hide embedded list"
-                    wait_js(preview, visible, "true",
+                    wait_js(preview, visible, "false" if widget == "list" else "true",
                             route + " preview after Save")
                     if widget == "music_player":
                         save(widget, "track_change")
