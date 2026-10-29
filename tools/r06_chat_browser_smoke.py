@@ -221,21 +221,25 @@ def main():
                           direction + " slide started")
                 # The accepted horizontal entry remains staged. Check the
                 # exit during the fifth second and sample throughout growth.
-                for p in pages:
-                    until(p, lambda m: not m["shown"] and m["splitOutgoing"],
-                          direction + " simultaneous Split exit", timeout=15)
-                    samples = []
-                    for _ in range(8):
-                        samples.append(evaluate(p, CHAT_METRICS))
-                        QTest.qWait(90)
-                    gaps = [m["chatBottomGap"] for m in samples]
+                until(pages[0], lambda m: not m["shown"] and m["splitOutgoing"],
+                      direction + " simultaneous Split exit", timeout=15)
+                # Capture both pages in the SAME frame window; a sequential
+                # wait can miss the second source's 0.75 s outgoing interval.
+                samples = {idx: [] for idx in range(len(pages))}
+                for _ in range(6):
+                    for idx, p in enumerate(pages):
+                        samples[idx].append(evaluate(p, CHAT_METRICS))
+                    QTest.qWait(95)
+                for idx, sequence in samples.items():
+                    gaps = [m["chatBottomGap"] for m in sequence]
                     assert max(abs(g) for g in gaps) <= 3, (
-                        direction + " chat jumped vertically", gaps)
-                    assert all(m["count"] >= 16 for m in samples), (
-                        direction + " Twitch rows disappeared during exit", samples)
-                    assert any(m["splitOutgoing"] for m in samples), samples
+                        direction + " chat jumped vertically", idx, gaps)
+                    assert all(m["count"] >= 16 for m in sequence), (
+                        direction + " Twitch rows disappeared during exit", idx, sequence)
+                    assert any(m["splitOutgoing"] for m in sequence), (
+                        direction + " never reported simultaneous exit", idx, sequence)
                     print("R06_BROWSER_PASS: FIX3 chat bottom pinned " +
-                          direction, gaps, flush=True)
+                          direction, idx, gaps, flush=True)
                 QTest.qWait(1000)
 
             # Restore the original FIX2 speed for the remaining cases.
