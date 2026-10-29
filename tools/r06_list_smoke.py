@@ -75,6 +75,11 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertIn("card.getBoundingClientRect().height", composition)
                 self.assertNotIn("messages.scrollHeight", composition)
                 self.assertIn("list_animation_seconds", composition)
+                self.assertIn("transition:height var(--r06-list-transition", composition)
+                self.assertIn("r06-chat-covered-clip", composition)
+                self.assertIn("updateOutgoingMask", composition)
+                self.assertIn("root.clientHeight + 12", composition)
+                self.assertNotIn("r06-shown .r06-chat-layer iframe {opacity:0}", composition)
                 self.assertIn('embedded=1', get("/list-overlay"))
 
                 state.ingest(ChatMessage("twitch", "ch", "first", "viewer", "!list"))
