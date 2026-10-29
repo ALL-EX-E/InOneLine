@@ -182,7 +182,10 @@
     function freezeOutgoingVerticalLayer() {
       // Keep the outgoing content physically on-screen until the list exit ends
       // while the flex column is freed for the expanding chat below it.
-      const height = listLayer.getBoundingClientRect().height;
+      // offsetHeight is in the element's own CSS coordinate system.
+      // getBoundingClientRect() includes the main overlay's responsive
+      // scale and would shrink the outgoing layer a second time.
+      const height = listLayer.offsetHeight;
       if (height <= 0) return false;
       outgoingOverlay = true;
       root.classList.add("r06-split-vertical-exit");
