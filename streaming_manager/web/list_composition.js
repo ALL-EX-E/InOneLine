@@ -275,6 +275,10 @@
       composeMode = newCompose;
       if (outgoingOverlay && composeMode !== "split") resetOutgoingOverlay();
       animationMs = nextAnimationMs;
+      // The operator may change speed while a list is already visible.
+      // Do not wait for another visibility toggle to update either CSS
+      // transition: both must always share the latest saved duration.
+      root.style.setProperty("--r06-list-transition", animationMs + "ms");
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
