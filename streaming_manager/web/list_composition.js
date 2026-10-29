@@ -29,6 +29,13 @@
       opacity:1;
       transition:transform var(--r06-list-transition,1000ms) ease
     }
+    /* During simultaneous vertical Split exit, the outgoing panel stays
+       opaque in itself. A per-frame mask prevents chat text behind it from
+       bleeding through its user-configurable translucent background. */
+    .r06-compose.r06-split-vertical-exit .r06-list-layer > #list-panel {
+      opacity:1;
+      transition:transform var(--r06-list-transition,1000ms) ease
+    }
   `;
   const sheet = document.createElement("style");
   sheet.textContent = css;
@@ -54,6 +61,7 @@
     let transitionDirection = direction;
     let animationMs = 1000;
     let intrinsicChatHeight = 0;
+    let outgoingMaskFrame = null;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -127,7 +135,38 @@
       root.classList.toggle("r06-shown", visualActive);
       root.classList.toggle("r06-not-shown", !visualActive);
     }
+    function updateOutgoingMask() {
+      outgoingMaskFrame = null;
+      if (!outgoingOverlay || composeMode !== "split") return;
+      const p = listPanel.getBoundingClientRect();
+      const c = chatLayer.getBoundingClientRect();
+      const lo = Math.max(c.top, p.top);
+      const hi = Math.min(c.bottom, p.bottom);
+      if (hi > lo && c.height > 0) {
+        const scale = chatLayer.clientHeight / c.height;
+        const start = Math.max(0, (lo - c.top) * scale);
+        const end = Math.min(chatLayer.clientHeight, (hi - c.top) * scale);
+        const clear = "#000";
+        // Three consecutive bands: exposed chat, temporarily covered chat,
+        // exposed chat. Never hide the entire iframe or discard any rows.
+        const mask = "linear-gradient(to bottom," +
+          clear + " 0px," + clear + " " + start + "px," +
+          "transparent " + start + "px,transparent " + end + "px," +
+          clear + " " + end + "px," + clear + " 100%)";
+        chatLayer.style.maskImage = mask;
+        chatLayer.style.webkitMaskImage = mask;
+      } else {
+        chatLayer.style.maskImage = "";
+        chatLayer.style.webkitMaskImage = "";
+      }
+      outgoingMaskFrame = requestAnimationFrame(updateOutgoingMask);
+    }
     function resetOutgoingOverlay() {
+      if (outgoingMaskFrame !== null) cancelAnimationFrame(outgoingMaskFrame);
+      outgoingMaskFrame = null;
+      chatLayer.style.maskImage = "";
+      chatLayer.style.webkitMaskImage = "";
+      root.classList.remove("r06-split-vertical-exit");
       if (!outgoingOverlay) return;
       outgoingOverlay = false;
       for (const name of ["position","height","width","top","left","right","zIndex","pointerEvents"]) {
@@ -140,10 +179,13 @@
       const height = listLayer.getBoundingClientRect().height;
       if (height <= 0) return false;
       outgoingOverlay = true;
+      root.classList.add("r06-split-vertical-exit");
       Object.assign(listLayer.style, {
         position:"absolute",height:height+"px",width:"100%",
         top:"0",left:"0",right:"0",zIndex:"2",pointerEvents:"none",
       });
+      if (outgoingMaskFrame !== null) cancelAnimationFrame(outgoingMaskFrame);
+      outgoingMaskFrame = requestAnimationFrame(updateOutgoingMask);
       return true;
     }
     function changeActive(next) {
@@ -225,6 +267,7 @@
       mode = newMode;
       direction = newDirection;
       composeMode = newCompose;
+      if (outgoingOverlay && composeMode !== "split") resetOutgoingOverlay();
       animationMs = nextAnimationMs;
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
