@@ -68,8 +68,14 @@
       transitionTimer = null;
     }
     function hiddenTransform() {
+      // In Split the list can be only half as tall as the composition.
+      // Moving it down by 105% of its OWN height leaves it partly on-screen
+      // and causes an abrupt disappearance when the outgoing layer is freed.
+      const bottom = composeMode === "split"
+        ? "translateY(" + (root.clientHeight + 12) + "px)"
+        : "translateY(105%)";
       return {left:"translateX(-105%)",right:"translateX(105%)",
-        top:"translateY(-105%)",bottom:"translateY(105%)"}[transitionDirection];
+        top:"translateY(-105%)",bottom}[transitionDirection];
     }
     function coveredChatClip() {
       return {left:"inset(0 0 0 100%)",right:"inset(0 100% 0 0)",
