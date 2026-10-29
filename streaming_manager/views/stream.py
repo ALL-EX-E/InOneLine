@@ -441,8 +441,9 @@ class StreamTab(QWidget):
         self.list_animation_seconds.setValue(1.00)
         self.list_animation_seconds.setSuffix(" сек.")
         self.list_animation_seconds.setToolTip(
-            "Скорость появления и скрытия списка в обоих OBS-оверлеях. "
-            "Не изменяет время показа и скорость изменения высоты Twitch-чата."
+            "Единая длительность появления и скрытия списка, а также "
+            "плавного изменения высоты чата в обоих OBS-оверлеях. "
+            "Не изменяет время показа списка."
         )
         overlay_form.addRow("Длительность анимации:", self.list_animation_seconds)
 
