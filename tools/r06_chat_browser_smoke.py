@@ -69,6 +69,11 @@ CHAT_METRICS = """JSON.stringify((() => {
     iframeOpacity: parseFloat(getComputedStyle(chat?.querySelector('iframe')).opacity),
     panelOpacity: parseFloat(getComputedStyle(panel).opacity),
     chatClip: getComputedStyle(chat).clipPath,
+    chatBottomGap: +((document.getElementById('list-composition').getBoundingClientRect().bottom
+      - chat.getBoundingClientRect().bottom).toFixed(2)),
+    chatTop: +chat.getBoundingClientRect().top.toFixed(2),
+    listTop: +document.getElementById('list-layer').getBoundingClientRect().top.toFixed(2),
+    splitOutgoing: document.getElementById('list-composition')?.classList.contains('r06-split-exit'),
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
     chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
@@ -184,6 +189,60 @@ def main():
                     "Chat panel flickers/oscillates", heights
                 )
                 print("R06_BROWSER_PASS: stable height", heights, flush=True)
+
+            # FIX3 regression from nine user videos: the chat must remain
+            # bottom-anchored while the list exits LEFT and RIGHT. Before
+            # the fix, the reserved List flex area vanished instantly after
+            # the slide had ended, teleporting the chat to the top before its
+            # height animated. Simultaneous outgoing animation must keep
+            # the chat's bottom coordinate stable at every sampled frame.
+            for i in range(5, 18):
+                state.ingest(ChatMessage("twitch", "chan", str(i), "viewer",
+                    "Long multi-line content for a tall Twitch chat layout"))
+            for direction in ("left", "right"):
+                db.set_settings_bulk({
+                    "list_overlay_show_mode": "slide",
+                    "list_chat_layout": "split",
+                    "list_slide_direction": direction,
+                    "list_animation_seconds": "0.75",
+                    "list_slide_duration": "5",
+                })
+                api.configure_list_show("slide", "!list", 5)
+                # Settles previous list mode before we send a new command.
+                QTest.qWait(1300)
+                for p in pages:
+                    until(p, lambda m: not m["shown"] and m["count"] >= 16
+                          and abs(m["chatBottomGap"]) <= 3,
+                          direction + " hidden chat pinned at bottom")
+                state.ingest(ChatMessage("twitch", "chan", "cmd-" + direction,
+                             "alice", "!list"))
+                for p in pages:
+                    until(p, lambda m: m["shown"] and not m["replace"],
+                          direction + " slide started")
+                # The accepted horizontal entry remains staged. Check the
+                # exit during the fifth second and sample throughout growth.
+                for p in pages:
+                    until(p, lambda m: not m["shown"] and m["splitOutgoing"],
+                          direction + " simultaneous Split exit", timeout=15)
+                    samples = []
+                    for _ in range(8):
+                        samples.append(evaluate(p, CHAT_METRICS))
+                        QTest.qWait(90)
+                    gaps = [m["chatBottomGap"] for m in samples]
+                    assert max(abs(g) for g in gaps) <= 3, (
+                        direction + " chat jumped vertically", gaps)
+                    assert all(m["count"] >= 16 for m in samples), (
+                        direction + " Twitch rows disappeared during exit", samples)
+                    assert any(m["splitOutgoing"] for m in samples), samples
+                    print("R06_BROWSER_PASS: FIX3 chat bottom pinned " +
+                          direction, gaps, flush=True)
+                QTest.qWait(1000)
+
+            # Restore the original FIX2 speed for the remaining cases.
+            db.set_setting("list_animation_seconds", "1.50")
+            api.configure_list_show("always", "!list", 30)
+            db.set_setting("list_overlay_show_mode", "always")
+            QTest.qWait(600)
 
             # One operator setting must control BOTH transitions (and URLs).
             for seconds in (0.25, 1.0, 3.0, 1.5):
