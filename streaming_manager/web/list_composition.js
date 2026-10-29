@@ -2,7 +2,7 @@
 (() => {
   "use strict";
   const css = `
-    .r06-compose {position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
+    .r06-compose {position:relative;display:flex;flex-direction:column;justify-content:flex-end;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
     .r06-list-layer {flex:1 1 auto;min-height:0;min-width:0;overflow:hidden;position:relative}
     .r06-compose .r06-list-layer > #list-panel {width:100%;height:100%;min-height:0;
       transition:transform var(--r06-list-transition,1000ms) ease,opacity var(--r06-list-transition,1000ms) ease}
@@ -29,10 +29,9 @@
       opacity:1;
       transition:transform var(--r06-list-transition,1000ms) ease
     }
-    /* During simultaneous vertical Split exit, the outgoing panel stays
-       opaque in itself. A per-frame mask prevents chat text behind it from
-       bleeding through its user-configurable translucent background. */
-    .r06-compose.r06-split-vertical-exit .r06-list-layer > #list-panel {
+    /* During simultaneous Split exit in any direction, the outgoing panel
+       stays visually opaque. Mask only the portion of the chat beneath it. */
+    .r06-compose.r06-split-exit .r06-list-layer > #list-panel {
       opacity:1;
       transition:transform var(--r06-list-transition,1000ms) ease
     }
@@ -146,24 +145,34 @@
       if (!outgoingOverlay || composeMode !== "split") return;
       const p = listPanel.getBoundingClientRect();
       const c = chatLayer.getBoundingClientRect();
-      const lo = Math.max(c.top, p.top);
-      const hi = Math.min(c.bottom, p.bottom);
-      if (hi > lo && c.height > 0) {
-        const scale = chatLayer.clientHeight / c.height;
-        const start = Math.max(0, (lo - c.top) * scale);
-        const end = Math.min(chatLayer.clientHeight, (hi - c.top) * scale);
-        const clear = "#000";
-        // Three consecutive bands: exposed chat, temporarily covered chat,
-        // exposed chat. Never hide the entire iframe or discard any rows.
-        const mask = "linear-gradient(to bottom," +
-          clear + " 0px," + clear + " " + start + "px," +
-          "transparent " + start + "px,transparent " + end + "px," +
-          clear + " " + end + "px," + clear + " 100%)";
-        chatLayer.style.maskImage = mask;
-        chatLayer.style.webkitMaskImage = mask;
-      } else {
-        chatLayer.style.maskImage = "";
-        chatLayer.style.webkitMaskImage = "";
+      const x0 = Math.max(c.left, p.left), x1 = Math.min(c.right, p.right);
+      const y0 = Math.max(c.top, p.top), y1 = Math.min(c.bottom, p.bottom);
+      chatLayer.style.maskImage = "";
+      chatLayer.style.webkitMaskImage = "";
+      chatLayer.style.clipPath = "";
+      if (x1 > x0 && y1 > y0 && c.width > 0 && c.height > 0) {
+        // The outgoing list occupies the top of the expanding, bottom-anchored
+        // chat. Clip the exact overlap instead of fading the entire iframe.
+        const scaleX = chatLayer.clientWidth / c.width;
+        const scaleY = chatLayer.clientHeight / c.height;
+        const left = Math.max(0, (x0 - c.left) * scaleX);
+        const right = Math.min(chatLayer.clientWidth, (x1 - c.left) * scaleX);
+        const top = Math.max(0, (y0 - c.top) * scaleY);
+        const bottom = Math.min(chatLayer.clientHeight, (y1 - c.top) * scaleY);
+        const w = chatLayer.clientWidth, h = chatLayer.clientHeight;
+        if (transitionDirection === "left" || transitionDirection === "right") {
+          // During a horizontal exit the overlap touches the chat's top
+          // edge and one side: the uncovered region is an L-shaped polygon.
+          const exposed = transitionDirection === "right"
+            ? `polygon(0 0,${left}px 0,${left}px ${bottom}px,${w}px ${bottom}px,${w}px ${h}px,0 ${h}px)`
+            : `polygon(${right}px 0,${w}px 0,${w}px ${h}px,0 ${h}px,0 ${bottom}px,${right}px ${bottom}px)`;
+          chatLayer.style.clipPath = exposed;
+        } else {
+          // For vertical motion a full-width band may cross the chat.
+          const mask = `linear-gradient(to bottom,#000 0px,#000 ${top}px,transparent ${top}px,transparent ${bottom}px,#000 ${bottom}px,#000 100%)`;
+          chatLayer.style.maskImage = mask;
+          chatLayer.style.webkitMaskImage = mask;
+        }
       }
       outgoingMaskFrame = requestAnimationFrame(updateOutgoingMask);
     }
@@ -172,23 +181,25 @@
       outgoingMaskFrame = null;
       chatLayer.style.maskImage = "";
       chatLayer.style.webkitMaskImage = "";
-      root.classList.remove("r06-split-vertical-exit");
+      chatLayer.style.clipPath = "";
+      root.classList.remove("r06-split-exit");
       if (!outgoingOverlay) return;
       outgoingOverlay = false;
       for (const name of ["position","height","width","top","left","right","zIndex","pointerEvents"]) {
         listLayer.style[name] = "";
       }
     }
-    function freezeOutgoingVerticalLayer() {
-      // Keep the outgoing content physically on-screen until the list exit ends
-      // while the flex column is freed for the expanding chat below it.
+    function freezeOutgoingListLayer() {
+      // Keep the outgoing content physically on-screen until the list exit
+      // ends. Release its flex space at the SAME instant the chat expands;
+      // both transitions use the saved duration and a single timeline.
       // offsetHeight is in the element's own CSS coordinate system.
       // getBoundingClientRect() includes the main overlay's responsive
       // scale and would shrink the outgoing layer a second time.
       const height = listLayer.offsetHeight;
       if (height <= 0) return false;
       outgoingOverlay = true;
-      root.classList.add("r06-split-vertical-exit");
+      root.classList.add("r06-split-exit");
       Object.assign(listLayer.style, {
         position:"absolute",height:height+"px",width:"100%",
         top:"0",left:"0",right:"0",zIndex:"2",pointerEvents:"none",
@@ -231,10 +242,9 @@
         // Always retain the outgoing content for a full transition.
         // Otherwise flex-basis=0 instantly clips a still-animated panel.
         reserved = true;
-        const vertical = ["top","bottom"].includes(direction);
-        if (vertical && composeMode === "split" && freezeOutgoingVerticalLayer()) {
-          // The outgoing layer floats above the chat, so both transitions
-          // can run together while the chat reclaims the available height.
+        if (composeMode === "split" && freezeOutgoingListLayer()) {
+          // Both the List exit and chat growth start now, not one after
+          // another. No flex reflow can teleport a bottom-anchored chat.
           reserved = false;
         }
         visualActive = false;
