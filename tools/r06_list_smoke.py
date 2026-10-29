@@ -79,6 +79,8 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertIn("r06-chat-covered-clip", composition)
                 self.assertIn("updateOutgoingMask", composition)
                 self.assertIn("root.clientHeight + 12", composition)
+                self.assertIn("listLayer.offsetHeight", composition)
+                self.assertNotIn("listLayer.getBoundingClientRect().height", composition)
                 self.assertNotIn("r06-shown .r06-chat-layer iframe {opacity:0}", composition)
                 self.assertIn('embedded=1', get("/list-overlay"))
 
