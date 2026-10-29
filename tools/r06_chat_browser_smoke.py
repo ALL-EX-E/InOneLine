@@ -172,6 +172,10 @@ def main():
                 metrics = until(p, lambda m: m["count"] == 4 and
                                 m["height"] > first_heights[idx] + 8,
                                 "More messages grow chat in " + str(idx))
+                # FIX2 deliberately slows the chat to the same saved
+                # duration as the List. Growing during that time is correct;
+                # only sample for oscillation once the transition settles.
+                QTest.qWait(1650)
                 heights = []
                 for _ in range(5):
                     QTest.qWait(500)
