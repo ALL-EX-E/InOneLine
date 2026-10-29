@@ -205,9 +205,13 @@ def main():
                     "list_chat_layout": "split",
                     "list_slide_direction": direction,
                     "list_animation_seconds": "0.75",
-                    "list_slide_duration": "5",
+                    "list_slide_duration": "15",
                 })
-                api.configure_list_show("slide", "!list", 5)
+                # A multi-window Qt Chromium CI runner can throttle one
+                # unfocused page for several seconds. Keep this geometry
+                # smoke observable in BOTH pages; 5 s is still covered by
+                # the shared command/API regression and user's manual QA.
+                api.configure_list_show("slide", "!list", 15)
                 # Settles previous list mode before we send a new command.
                 QTest.qWait(1300)
                 for p in pages:
