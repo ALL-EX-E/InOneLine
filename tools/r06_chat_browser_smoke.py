@@ -239,9 +239,10 @@ def main():
             assert len(trace) >= 3, ("T01 outgoing boundary trace missing", trace)
             assert max(abs(gap) for gap in trace) <= 4.0, (
                 "T01 list lower edge outpaces chat upper edge", trace)
-            assert evaluate(pages[0], """document.getElementById(
-              'list-composition').style.getPropertyValue('--r06-hidden-transform')""") \\
-                == "translateY(-100%)", "T01 hide must travel exactly one List height"
+            hidden_transform = evaluate(pages[0], """document.getElementById(
+              'list-composition').style.getPropertyValue('--r06-hidden-transform')""")
+            assert hidden_transform == "translateY(-100%)", (
+                "T01 hide must travel exactly one List height", hidden_transform)
             print("R06_T01_EQUAL_BOUNDARY_PASS", len(trace),
                   max(abs(gap) for gap in trace), flush=True)
             db.set_setting("multichat_appearance_common",
