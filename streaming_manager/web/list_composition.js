@@ -36,6 +36,12 @@
       opacity:1;
       transition:transform var(--r06-list-transition,1000ms) ease
     }
+    /* T01: when chat fills the freed area, keep the outgoing List immediately
+       above it in normal flex flow. The ONLY animated dimension is chat height.
+       List movement is then identical to chat-top movement by construction. */
+    .r06-compose.r06-flow-exit .r06-list-layer > #list-panel {
+      opacity:1!important;transform:none!important;transition:none!important
+    }
   `;
   const sheet = document.createElement("style");
   sheet.textContent = css;
@@ -58,6 +64,8 @@
     let expiryTimer = null;
     let lastChatHeight = -1;
     let outgoingOverlay = false;
+    let outgoingFlowExit = false;
+    let outgoingFlowHeight = 0;
     let transitionDirection = direction;
     let animationMs = 1000;
     let intrinsicChatHeight = 0;
@@ -144,7 +152,9 @@
         lastChatHeight = desiredChat;
       }
       root.classList.toggle("r06-replace", replacing);
-      if (!replacing) {
+      if (outgoingFlowExit) {
+        listLayer.style.flex = "0 0 " + outgoingFlowHeight + "px";
+      } else if (!replacing) {
         listLayer.style.flex = listAllocated ? "1 1 auto" : "0 0 0px";
       } else {
         listLayer.style.flex = "none";
@@ -162,7 +172,7 @@
     }
     function updateOutgoingMask() {
       outgoingMaskFrame = null;
-      if (!outgoingOverlay || composeMode !== "split") return;
+      if (!outgoingOverlay || outgoingFlowExit || composeMode !== "split") return;
       const p = listPanel.getBoundingClientRect();
       const c = chatLayer.getBoundingClientRect();
       const x0 = Math.max(c.left, p.left), x1 = Math.min(c.right, p.right);
@@ -202,12 +212,33 @@
       chatLayer.style.maskImage = "";
       chatLayer.style.webkitMaskImage = "";
       chatLayer.style.clipPath = "";
-      root.classList.remove("r06-split-exit");
+      root.classList.remove("r06-split-exit", "r06-flow-exit");
+      outgoingFlowExit = false;
+      outgoingFlowHeight = 0;
       if (!outgoingOverlay) return;
       outgoingOverlay = false;
-      for (const name of ["position","height","width","top","left","right","zIndex","pointerEvents"]) {
+      for (const name of ["position","height","width","top","left","right","zIndex","pointerEvents","flex"]) {
         listLayer.style[name] = "";
       }
+    }
+    function freezeOutgoingFlowListLayer() {
+      // With an expanding full-height Twitch chat, animate only chat HEIGHT.
+      // A fixed-height, non-shrinking List remains the preceding flex child.
+      // Flex-end alignment makes its lower boundary EXACTLY chat's upper
+      // boundary at every frame (including fractional CSS pixels).
+      const height = listLayer.getBoundingClientRect().height;
+      // This source can be responsively scaled, so CSS layout measurements
+      // must be in unscaled local coordinates.
+      const localHeight = listLayer.offsetHeight;
+      if (height <= 0 || localHeight <= 0) return false;
+      outgoingOverlay = true;
+      outgoingFlowExit = true;
+      outgoingFlowHeight = localHeight;
+      root.classList.add("r06-flow-exit");
+      listLayer.style.position = "relative";
+      listLayer.style.flex = "0 0 " + localHeight + "px";
+      listLayer.style.height = localHeight + "px";
+      return true;
     }
     function freezeOutgoingListLayer() {
       // Keep the outgoing content physically on-screen until the list exit
@@ -264,9 +295,16 @@
         // Always retain the outgoing content for a full transition.
         // Otherwise flex-basis=0 instantly clips a still-animated panel.
         reserved = true;
-        if ((composeMode === "split" || mode === "hidden") && freezeOutgoingListLayer()) {
-          // Both the List exit and chat growth start now, not one after
-          // another. No flex reflow can teleport a bottom-anchored chat.
+        const chatFillsArea = chatAvailable &&
+          (chatAlways || (chatHasMessages && measureChat() >= available - 1));
+        if (mode === "hidden" && composeMode === "split" &&
+            chatFillsArea && freezeOutgoingFlowListLayer()) {
+          // The List is a fixed-size flex predecessor of chat. Its visual
+          // motion is driven solely by chat height, never a second clock.
+          reserved = false;
+        } else if ((composeMode === "split" || mode === "hidden") &&
+                   freezeOutgoingListLayer()) {
+          // Fallback for absent/short chat and other List exit directions.
           reserved = false;
         }
         visualActive = false;
