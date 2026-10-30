@@ -231,11 +231,10 @@
       // A fixed-height, non-shrinking List remains the preceding flex child.
       // Flex-end alignment makes its lower boundary EXACTLY chat's upper
       // boundary at every frame (including fractional CSS pixels).
-      const height = listLayer.getBoundingClientRect().height;
       // This source can be responsively scaled, so CSS layout measurements
-      // must be in unscaled local coordinates.
+      // must be in unscaled local coordinates (never getBoundingClientRect).
       const localHeight = listLayer.offsetHeight;
-      if (height <= 0 || localHeight <= 0) return false;
+      if (localHeight <= 0) return false;
       outgoingOverlay = true;
       outgoingFlowExit = true;
       outgoingFlowHeight = localHeight;
