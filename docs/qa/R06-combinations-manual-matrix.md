@@ -5,7 +5,7 @@
 ## Т01 — повторный FIX, новая проверяемая сборка (30.10.2026)
 
 - **Кандидат:** `c633740b2fca9e78d9b489920da309efa597b3dd`, PR №383; общий скрывающий transform теперь `translateY(-100%)`, синхронный с ростом чата, включая сохранение анимации при переходе Replace→Hidden. Если список уже скрыт — новую анимацию не создавать.
-- **Автоматическая Windows-проверка:** [run 41118953993](https://github.com/ALL-EX-E/InOneLine/actions/runs/41118953993); все 92/92 job steps, в том числе проверка реальных границ Chromium, installer и silent installer, получили success. На момент записи общий run/job API ещё показывает `in_progress`, поэтому общий SUCCESS не выдавать до окончательного статуса.
+- **Автоматическая Windows-проверка:** [run 41118953993](https://github.com/ALL-EX-E/InOneLine/actions/runs/41118953993); все 92/92 job steps, в том числе проверка реальных границ Chromium, installer и silent installer, получили success. На последней проверке **job `windows-regression` завершился `completed/success`**; общий workflow run API ещё показывает `in_progress`, поэтому финальный статус run нужно отличать от успешного job.
 - **QA-артефакт:** `InOneLine_R06_CANDIDATE_QA`, GitHub artifact ID `13008127737`; вложенный EXE 47 878 918 байт, SHA-256 `02c11bb88debf79737cfe14bd9a96c5672cf600f4d09955045ffef51044d97b8`.
 - **Google Диск:** [ZIP-архив с установщиком](https://drive.google.com/file/d/1B_WlIqsQFCCwJa4UF7PQg0NjiHyXUjgT/view?usp=drivesdk), `InOneLine_R06_T01_FIX2_QA_c633740b.zip`; повторное скачивание проверено по SHA вложенного EXE. **Это ZIP, не прямая ссылка на EXE.**
 - **Ручная приёмка:** T01 по новой сборке не выполнена, не закрывать и не переходить к T02.
