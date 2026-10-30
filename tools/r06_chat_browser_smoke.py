@@ -189,6 +189,26 @@ def main():
                 assert frame["shellBorder"] == "0px", frame
                 assert abs(frame["listWidth"] - frame["chatWidth"]) <= 3, frame
                 print("R06_T01_FRAME_PASS", frame, flush=True)
+            # T01: same CSS duration is NOT enough. Sample the actual
+            # moving boundaries frame-by-frame; chat top must track the
+            # outgoing List bottom all the way to the top of the viewport.
+            evaluate(pages[0], """(() => {
+              window.__r06T01BoundaryTrace = [];
+              const root = document.getElementById('list-composition');
+              const chat = document.getElementById('list-chat');
+              const panel = document.getElementById('list-panel');
+              const started = performance.now();
+              const tick = () => {
+                if (root.classList.contains('r06-split-exit')) {
+                  const gap = chat.getBoundingClientRect().top -
+                    panel.getBoundingClientRect().bottom;
+                  window.__r06T01BoundaryTrace.push(+gap.toFixed(3));
+                }
+                if (performance.now() - started < 4500) requestAnimationFrame(tick);
+              };
+              requestAnimationFrame(tick);
+              return true;
+            })()""")
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 30)
             for p in pages:
@@ -214,6 +234,16 @@ def main():
                 assert abs(snapshot["frameGap"]) <= 3, snapshot
                 assert abs(snapshot["chatHeight"] - snapshot["composeHeight"]) <= 3, snapshot
                 print("R06_T01_HIDE_PASS", snapshot, flush=True)
+            trace = evaluate(pages[0],
+                             "JSON.stringify(window.__r06T01BoundaryTrace || [])")
+            assert len(trace) >= 3, ("T01 outgoing boundary trace missing", trace)
+            assert max(abs(gap) for gap in trace) <= 4.0, (
+                "T01 list lower edge outpaces chat upper edge", trace)
+            assert evaluate(pages[0], """document.getElementById(
+              'list-composition').style.getPropertyValue('--r06-hidden-transform')""") \\
+                == "translateY(-100%)", "T01 hide must travel exactly one List height"
+            print("R06_T01_EQUAL_BOUNDARY_PASS", len(trace),
+                  max(abs(gap) for gap in trace), flush=True)
             db.set_setting("multichat_appearance_common",
                            json.dumps({"visibility": "hide_empty"}))
             db.set_setting("list_overlay_show_mode", "always")
