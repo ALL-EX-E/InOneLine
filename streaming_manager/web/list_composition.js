@@ -70,6 +70,7 @@
     let animationMs = 1000;
     let intrinsicChatHeight = 0;
     let outgoingMaskFrame = null;
+    let outgoingChatHeightHandler = null;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -207,6 +208,10 @@
       outgoingMaskFrame = requestAnimationFrame(updateOutgoingMask);
     }
     function resetOutgoingOverlay() {
+      if (outgoingChatHeightHandler !== null) {
+        chatLayer.removeEventListener("transitionend", outgoingChatHeightHandler);
+        outgoingChatHeightHandler = null;
+      }
       if (outgoingMaskFrame !== null) cancelAnimationFrame(outgoingMaskFrame);
       outgoingMaskFrame = null;
       chatLayer.style.maskImage = "";
@@ -308,7 +313,7 @@
           reserved = false;
         }
         visualActive = false;
-        transitionTimer = setTimeout(() => {
+        const finishExit = () => {
           transitionTimer = null;
           if (!active) {
             reserved = false;
@@ -316,7 +321,22 @@
             layout();
             if (onResize) onResize();
           }
-        }, animationMs);
+        };
+        if (outgoingFlowExit) {
+          // Preserve flex geometry until the actual CSS HEIGHT animation ends.
+          // A timer started before Chromium's next style frame can run slightly
+          // early and create a visible final one-frame snap.
+          outgoingChatHeightHandler = event => {
+            if (event.target !== chatLayer || event.propertyName !== "height") return;
+            clearTransition();
+            finishExit();
+          };
+          chatLayer.addEventListener("transitionend", outgoingChatHeightHandler);
+        }
+        // Safety fallback if CSS transitionend is suppressed (background OBS
+        // tab, resize or interrupted transition). Normal exits are unchanged.
+        transitionTimer = setTimeout(finishExit, animationMs +
+          (outgoingFlowExit ? 250 : 0));
       }
       applyVisual();
       layout();
