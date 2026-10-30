@@ -41,6 +41,13 @@ body {color:#fff;font:18px/1.3 sans-serif}
   "use strict";
   const root = document.getElementById("messages");
   const shell = document.getElementById("shell");
+  const embedded = new URLSearchParams(location.search).get("embedded") === "1";
+  if (embedded) {
+    // Composition owns the outer frame: no second inset border or glow.
+    // Keep the standalone /multichat-overlay unchanged.
+    document.documentElement.style.setProperty("--chat-edge-inset", "0px");
+    root.style.padding = "10px 9px";
+  }
   const bgImage = document.getElementById("bg-image");
   const bgVideo = document.getElementById("bg-video");
   let appearanceKey = "";
@@ -153,8 +160,11 @@ body {color:#fff;font:18px/1.3 sans-serif}
       ? common.background : "transparent";
     shell.style.background = bg === "color"
       ? rgba(common.background_color,common.background_opacity) : "transparent";
-    shell.style.border = common.glow ? "1px solid "+rgba(common.glow_color,70) : "none";
-    shell.style.boxShadow = common.glow ?
+    // The embedded List+chat source uses the List's exact outer frame,
+    // while the independent chat keeps its own saved glow settings.
+    shell.style.border = embedded ? "none" :
+      common.glow ? "1px solid "+rgba(common.glow_color,70) : "none";
+    shell.style.boxShadow = embedded ? "none" : common.glow ?
       "inset 0 0 8px "+rgba(common.glow_color,22)+
       ",inset 0 0 16px "+rgba(common.glow_color,42)+
       ",0 0 6px "+rgba(common.glow_color,52) : "none";
@@ -266,7 +276,7 @@ body {color:#fff;font:18px/1.3 sans-serif}
       // An embedded chat must retain its existing DOM rows while the
       // surrounding list temporarily shrinks the viewport. CSS clips
       // older rows; when expanded they remain available without new events.
-      if (new URLSearchParams(location.search).get("embedded") !== "1") {
+      if (!embedded) {
         while (root.scrollHeight > root.clientHeight && root.firstElementChild)
           root.firstElementChild.remove();
       }
