@@ -74,8 +74,13 @@
       const bottom = composeMode === "split"
         ? "translateY(" + (root.clientHeight + 12) + "px)"
         : "translateY(105%)";
+      // An explicit "Не показывать" always exits upward. The frozen List
+      // panel and the growing chat partition release precisely one List
+      // height. Moving 105% made its bottom boundary outrun the chat top,
+      // even though both animations used the same easing and duration.
+      const top = mode === "hidden" ? "translateY(-100%)" : "translateY(-105%)";
       return {left:"translateX(-105%)",right:"translateX(105%)",
-        top:"translateY(-105%)",bottom}[transitionDirection];
+        top,bottom}[transitionDirection];
     }
     function coveredChatClip() {
       return {left:"inset(0 0 0 100%)",right:"inset(0 100% 0 0)",
