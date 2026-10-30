@@ -157,6 +157,72 @@ def main():
                       "Empty chat releases entire area in " + route)
             pages = [view.page() for view in views]
 
+            # T01 approved manual fix: an empty but always-shown Twitch
+            # chat has the SAME outer frame dimensions as the List. Saving
+            # 'Не показывать' must move the list UP regardless of the last
+            # saved command slide direction ('right' deliberately remains).
+            db.set_setting("multichat_appearance_common",
+                           json.dumps({"visibility": "always", "glow": True}))
+            for p in pages:
+                until(p, lambda m: m["count"] == 0 and m["height"] > 30,
+                      "R06_T01_EMPTY_CHAT: always-chat occupies a frame")
+                frame = evaluate(p, """JSON.stringify((() => {
+                  const panel = document.getElementById('list-panel');
+                  const chat = document.getElementById('list-chat');
+                  const shell = chat.querySelector('iframe').contentDocument
+                    ?.getElementById('shell');
+                  return {
+                    listBorder: getComputedStyle(panel).border,
+                    chatBorder: getComputedStyle(chat).border,
+                    listRadius: getComputedStyle(panel).borderRadius,
+                    chatRadius: getComputedStyle(chat).borderRadius,
+                    listGlow: getComputedStyle(panel).boxShadow,
+                    chatGlow: getComputedStyle(chat).boxShadow,
+                    shellBorder: shell && getComputedStyle(shell).borderTopWidth,
+                    listWidth: panel.getBoundingClientRect().width,
+                    chatWidth: chat.getBoundingClientRect().width,
+                  };
+                })())""")
+                assert frame["listBorder"] == frame["chatBorder"], frame
+                assert frame["listRadius"] == frame["chatRadius"], frame
+                assert frame["listGlow"] == frame["chatGlow"], frame
+                assert frame["shellBorder"] == "0px", frame
+                assert abs(frame["listWidth"] - frame["chatWidth"]) <= 3, frame
+                print("R06_T01_FRAME_PASS", frame, flush=True)
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 30)
+            for p in pages:
+                until(p, lambda m: not m["shown"] and m["height"] > 40,
+                      "R06_T01_HIDE: empty chat grows when list hides")
+                QTest.qWait(1800)
+                snapshot = evaluate(p, """JSON.stringify((() => {
+                  const root = document.getElementById('list-composition');
+                  const panel = document.getElementById('list-panel');
+                  const chat = document.getElementById('list-chat');
+                  return {
+                    hiddenTransform: root.style.getPropertyValue('--r06-hidden-transform'),
+                    panelTop: panel.getBoundingClientRect().top,
+                    composeTop: root.getBoundingClientRect().top,
+                    frameGap: root.getBoundingClientRect().bottom -
+                      chat.getBoundingClientRect().bottom,
+                    chatHeight: chat.getBoundingClientRect().height,
+                    composeHeight: root.getBoundingClientRect().height,
+                  };
+                })())""")
+                assert snapshot["hiddenTransform"].startswith("translateY(-"), snapshot
+                assert snapshot["panelTop"] < snapshot["composeTop"], snapshot
+                assert abs(snapshot["frameGap"]) <= 3, snapshot
+                assert abs(snapshot["chatHeight"] - snapshot["composeHeight"]) <= 3, snapshot
+                print("R06_T01_HIDE_PASS", snapshot, flush=True)
+            db.set_setting("multichat_appearance_common",
+                           json.dumps({"visibility": "hide_empty"}))
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 30)
+            for p in pages:
+                until(p, lambda m: m["count"] == 0 and m["height"] == 0,
+                      "R06_T01_RESTORE: empty hide-empty chat hidden")
+            QTest.qWait(1750)
+
             accepted = state.ingest(ChatMessage("twitch", "chan", "first", "alice", "short message"))
             print("R06_BROWSER_INGEST:", accepted, state.snapshot(for_obs=True)["messages"], flush=True)
             with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
