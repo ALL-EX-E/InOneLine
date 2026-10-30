@@ -264,7 +264,7 @@
         // Always retain the outgoing content for a full transition.
         // Otherwise flex-basis=0 instantly clips a still-animated panel.
         reserved = true;
-        if (composeMode === "split" && freezeOutgoingListLayer()) {
+        if ((composeMode === "split" || mode === "hidden") && freezeOutgoingListLayer()) {
           // Both the List exit and chat growth start now, not one after
           // another. No flex reflow can teleport a bottom-anchored chat.
           reserved = false;
@@ -308,7 +308,11 @@
       mode = newMode;
       direction = newDirection;
       composeMode = newCompose;
-      if (outgoingOverlay && composeMode !== "split") resetOutgoingOverlay();
+      // A hidden-mode exit is preserved even if the previously displayed
+      // command List used the Replace composition instead of Split.
+      if (outgoingOverlay && composeMode !== "split" && mode !== "hidden") {
+        resetOutgoingOverlay();
+      }
       animationMs = nextAnimationMs;
       // The operator may change speed while a list is already visible.
       // Do not wait for another visibility toggle to update either CSS
