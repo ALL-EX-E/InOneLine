@@ -7,6 +7,7 @@
     .r06-compose .r06-list-layer > #list-panel {width:100%;height:100%;min-height:0;
       transition:transform var(--r06-list-transition,1000ms) ease,opacity var(--r06-list-transition,1000ms) ease}
     .r06-chat-layer {height:0;flex:0 0 auto;min-height:0;overflow:hidden;position:relative;
+      box-sizing:border-box;border-radius:8px;
       transition:height var(--r06-list-transition,1000ms) ease}
     .r06-chat-layer iframe {position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none}
     .r06-compose.r06-not-shown #list-panel {opacity:0;transform:var(--r06-hidden-transform,translateX(105%))}
@@ -108,12 +109,26 @@
       // intrinsic height so that a transient empty DOM never flashes closed.
       return Math.max(44, intrinsicChatHeight);
     }
+    function matchEmbeddedChatFrame(visible) {
+      // The list and the embedded chat must use the same OUTER geometry and
+      // frame styling. The embedded iframe only paints chat messages/media;
+      // the standalone multichat source keeps its independent appearance.
+      const panelStyle = getComputedStyle(listPanel);
+      const frame = visible ? panelStyle.border : "none";
+      const shadow = visible ? panelStyle.boxShadow : "none";
+      if (chatLayer.style.border !== frame) chatLayer.style.border = frame;
+      if (chatLayer.style.boxShadow !== shadow) chatLayer.style.boxShadow = shadow;
+      if (chatLayer.style.borderRadius !== panelStyle.borderRadius) {
+        chatLayer.style.borderRadius = panelStyle.borderRadius;
+      }
+    }
     function layout() {
       const available = root.clientHeight;
       if (available <= 0) return;
       const replacing = composeMode === "replace" && mode === "slide";
       const listAllocated = mode === "always" || reserved;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
       const splitCap = listAllocated ? Math.floor((available - 12) / 2) : available;
       const desiredChat = replacing
@@ -213,7 +228,9 @@
       active = next;
       clearTransition();
       if (next) resetOutgoingOverlay();
-      transitionDirection = direction;
+      // "Не показывать" is a vertical collapse, not a command slide.
+      // A saved earlier slide direction must never rotate this transition.
+      transitionDirection = mode === "hidden" ? "top" : direction;
       const horizontalSplit = composeMode === "split" &&
         mode === "slide" && ["left","right"].includes(direction);
       const available = Math.max(0, root.clientHeight);
