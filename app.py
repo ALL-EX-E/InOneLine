@@ -80,9 +80,36 @@ def run_internal_helper_if_requested() -> int | None:
     if command == "--autotest-sandbox":
         if len(sys.argv) != 3:
             return 2
-        from streaming_manager.operator_autotest import run_sandbox
+        # Frozen GUI executables have no console: always provide a minimal
+        # non-sensitive machine-readable error when the isolated helper fails.
+        output_file = Path(sys.argv[2])
+        try:
+            from streaming_manager.operator_autotest import run_sandbox
 
-        return run_sandbox(sys.argv[2])
+            return run_sandbox(sys.argv[2])
+        except BaseException as exc:
+            import json
+
+            report = {
+                "schema": "inone-autotest-sandbox-v1",
+                "tests": [{
+                    "name": "sandbox_helper_startup",
+                    "status": "FAIL",
+                    "duration_ms": 0,
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc)[:240],
+                }],
+                "summary": {"pass": 0, "fail": 1},
+                "data_scope": "temporary_local_sandbox_only",
+            }
+            try:
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+                output_file.write_text(
+                    json.dumps(report, ensure_ascii=False), encoding="utf-8"
+                )
+            except OSError:
+                pass
+            return 1
 
     if command == "--create-backup":
         if len(sys.argv) != 5:
