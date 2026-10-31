@@ -5,6 +5,7 @@ from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QThreadPool, QTimer, Q
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QLabel,
     QMainWindow,
@@ -1069,20 +1070,37 @@ class MainWindow(QMainWindow):
                     return
             elif question.clickedButton() is discard:
                 editor.discard()
+        # PERF-01 diagnostics are off by default. This event only occurs
+        # AFTER Save/Discard was accepted, never on Cancel or failed Save.
+        exit_trace = getattr(QApplication.instance(), "_inone_line_exit_trace", None)
+        if exit_trace is not None:
+            exit_trace.mark("close_accepted")
         if hasattr(self.multichat_tab, "feed_frame"):
             self.multichat_tab.feed_frame.shutdown()
+        if exit_trace is not None:
+            exit_trace.mark("chat_stopped")
         self._integration_health_timer.stop()
         self.twitch_adapter.cancel_authorization()
         self.donationalerts_adapter.cancel_authorization()
         self.twitch_eventsub_runtime.stop()
         self.donationalerts_runtime.stop()
+        if exit_trace is not None:
+            exit_trace.mark("integrations_stopped")
         self._save_ui_state()
         self.public_tab.shutdown_public_xlsx()
         self.auction_tab.shutdown_shared_xlsx()
+        if exit_trace is not None:
+            exit_trace.mark("xlsx_timers_stopped")
         # Unregister Music Player first: Auction shutdown can then release its
         # owner without briefly restoring audible playback while the app exits.
         self.music_player.shutdown()
         self.auction_tab.shutdown_audio()
+        if exit_trace is not None:
+            exit_trace.mark("audio_stopped")
         self.api.stop()
+        if exit_trace is not None:
+            exit_trace.mark("api_stopped")
         super().closeEvent(event)
+        if exit_trace is not None:
+            exit_trace.mark("close_event_returned")
 
