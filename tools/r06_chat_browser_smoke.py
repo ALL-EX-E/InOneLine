@@ -595,6 +595,12 @@ def main():
             # entire composition and must enter vertically from ABOVE.
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 30)
+            # MUST actually reach "hidden" in both independently polling
+            # OBS sources before asking for the inverse top entry. Otherwise
+            # Already-visible->Always correctly has NO entry animation.
+            for p in pages:
+                until(p, lambda m: not m["shown"] and m["height"] == 0,
+                      "T02 no-chat: prior List mode is really hidden")
             QTest.qWait(1850)
             for p in pages:
                 evaluate(p, """(() => {
