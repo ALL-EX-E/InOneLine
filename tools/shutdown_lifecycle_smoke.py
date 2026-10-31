@@ -6,6 +6,8 @@ import subprocess
 import sys
 import threading
 import time
+import tempfile
+from pathlib import Path
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
@@ -19,7 +21,6 @@ from PySide6.QtWidgets import QApplication
 from streaming_manager.views.chat_rich_feed import (
     ChatRichFeed, _ChatImageProcessRunner,
 )
-from streaming_manager.remote_image import run_chat_image_fetch_helper
 
 
 class BlockedChild:
@@ -107,16 +108,19 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
     def test_helper_rejects_local_source_before_network_access(self):
         # This exercises the REAL source-mode subprocess entrypoint, including
         # safe-URL validation and absence of binary payload on failure.
-        p = subprocess.run(
-            [sys.executable, "-m", "streaming_manager.remote_image",
-             "--chat-image-fetch", "http://127.0.0.1/internal.png"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=12,
-            check=False,
-        )
-        self.assertNotEqual(p.returncode, 0)
-        self.assertEqual(p.stdout, b"")
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "image.img"
+            p = subprocess.run(
+                [sys.executable, "-m", "streaming_manager.remote_image",
+                 "--chat-image-fetch", "http://127.0.0.1/internal.png", str(output)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=12,
+                check=False,
+            )
+            self.assertNotEqual(p.returncode, 0)
+            self.assertEqual(p.stdout, b"")
+            self.assertFalse(output.exists(), "Rejected URL must not write data")
 
     def test_helper_binary_protocol_preserves_static_image(self):
         image = QImage(2, 3, QImage.Format_ARGB32)
@@ -131,11 +135,15 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
         def communicate(timeout=None):
             fake.started.set()
             fake.returncode = 0
-            return encoded, b""
+            return b"", b""
+
+        def start_fake(command, **_kwargs):
+            Path(command[-1]).write_bytes(encoded)
+            return fake
 
         fake.communicate = communicate
         runner = _ChatImageProcessRunner()
-        with patch("streaming_manager.views.chat_rich_feed.subprocess.Popen", return_value=fake):
+        with patch("streaming_manager.views.chat_rich_feed.subprocess.Popen", side_effect=start_fake):
             result = runner.fetch("https://cdn.7tv.app/static.png")
         self.assertIsNotNone(result)
         self.assertFalse(result[0].animated)
