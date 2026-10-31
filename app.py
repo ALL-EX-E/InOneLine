@@ -63,11 +63,11 @@ def run_internal_helper_if_requested() -> int | None:
         return run_restore_helper(paths.root_dir, staged_path, target_database, parent_pid)
 
     if command == "--chat-image-fetch":
-        if len(sys.argv) != 3:
+        if len(sys.argv) != 4:
             return 2
         from streaming_manager.remote_image import run_chat_image_fetch_helper
 
-        return run_chat_image_fetch_helper(sys.argv[2])
+        return run_chat_image_fetch_helper(sys.argv[2], sys.argv[3])
 
     if command == "--create-backup":
         if len(sys.argv) != 5:
