@@ -1,31 +1,30 @@
-InOneLine AutoTest v1: Windows 11, Python installation is NOT required.
+InOneLine — автоматический проверочный комплект v1
+Работает на Windows 11. Python устанавливать не требуется.
 
-INSTALL:
-1. Install the matching candidate InOneLine_Setup_1.0.8.exe first.
-2. Copy Start_InOneLine_AutoTest.cmd and InOneLine_AutoTest.ps1 beside installed InOneLine.exe (e.g. C:\InOneLine).
-3. Close InOneLine if it is open.
-4. Double-click Start_InOneLine_AutoTest.cmd.
-5. Follow the on-screen instructions for optional Twitch message and normal window closing.
-6. Send InOneLine_AutoTest_yyyyMMdd_HHmmss.zip from the desktop to the developer.
+ПОРЯДОК ЗАПУСКА
+1. Установите приложенный InOneLine_Setup_1.0.8.exe. Перед установкой сохраните резервную копию данных.
+2. Скопируйте два файла Start_InOneLine_AutoTest.cmd и InOneLine_AutoTest.ps1 в папку, где находится InOneLine.exe (например, C:\InOneLine).
+3. Закройте программу InOneLine, если она запущена.
+4. Дважды щёлкните Start_InOneLine_AutoTest.cmd.
+5. Скрипт проведёт изолированные проверки, запустит InOneLine и проверит локальный API и адреса OBS-виджетов.
+6. В появившемся окне (Y/N) можно согласиться отправить одно сообщение Twitch. Если не хотите проверять реальный Twitch — введите N. Сценарий с проверкой чата НЕ отправляет сообщение самостоятельно, это делает только пользователь.
+7. Когда скрипт попросит, закройте основное окно InOneLine обычным крестиком и нажмите Enter в окне скрипта.
+8. Отправьте файл InOneLine_AutoTest_YYYYMMDD_HHMMSS.zip, созданный на рабочем столе, для разбора результатов.
 
-SAFETY:
-- Sandbox creates a new temporary database and simulates DonationAlerts RUB/EUR donations locally.
-- No simulated donations enter your real account/database, XLSX, OBS, or auction.
-- Real Twitch channel points tests are SKIP because this feature is unavailable on your channel.
-- Live DonationAlerts payment event tests are SKIP.
-- The tester does not create/delete rewards or send chat messages on its own.
-- It never includes your database, token files, chat message text, passwords or credential payloads in the ZIP.
-- Read-only HTTP route probes do not mean each UI function was exhaustively tested.
+ВАЖНО
+— Донаты RUB/EUR эмулируются в отдельной временной SQLite-базе. Они не поступают на настоящий счёт DonationAlerts и не изменяют рабочий аукцион.
+— Проверки настоящих наград Twitch отмечаются SKIP: они пока недоступны на вашем канале.
+— Проверка реального денежного доната — SKIP. Добавление сообщения вручную в DonationAlerts НЕ создаёт нужного события.
+— Скрипт проверяет доступность HTTP API и адресов OBS, но не оценивает визуальную правильность анимаций.
+— Скрипт не включает в отчёт базу данных, пароли, токены и текст сообщений чата.
+— Если запустить проверку при открытой InOneLine, она сообщит об ошибке и не будет управлять существующей копией.
+— Если API занят другим приложением или Windows запрещает получать порт по PID, будет честная ошибка, а не ложное подтверждение.
+— При штатном закрытии долгая запись резервной копии может задержать исчезновение процесса.
 
-COVERAGE:
-- Main app launch, local HTTP API/overlay routes, normal process close.
-- Nine main tabs in a separate offscreen GUI sandbox.
-- Genuine DonationAlerts mapping and duplicate/conversion/invalid payload scenarios in temp DB.
-- Optional real Twitch message with unique marker.
-- Remaining UI button interactions and actual OBS rendering need future coverage.
+ПОКРЫТИЕ ВЕРСИИ V1
+1. Отдельная тестовая база: сценарии DonationAlerts, защита от дублей и некорректных входных данных.
+2. Отдельное окно Qt: обход всех девяти основных вкладок.
+3. Установленное приложение: запуск, HTTP API и пути OBS, обычное завершение процесса.
+4. Необязательная интерактивная отправка сообщения Twitch.
 
-KNOWN LIMITATIONS:
-- Get-NetTCPConnection is needed to discover the HTTP port owned by the actual launched PID. If Windows restricts that query, API checks report FAIL rather than claiming a result from a different program.
-- Program may legitimately need time to finish an active backup or XLSX write before its process disappears.
-- If the script is stored under Program Files, reports are still written to your desktop, not the protected install folder.
-- This is an opt-in test utility, not unattended production monitoring.
+Это ПЕРВАЯ версия тестировщика. Проверка всех отдельных кнопок и анимаций требует отдельной дальнейшей реализации.
