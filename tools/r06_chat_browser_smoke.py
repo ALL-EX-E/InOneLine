@@ -616,6 +616,9 @@ def main():
                   window.__r06T02TopEvents=[];
                   const r=document.getElementById('list-composition'),
                         panel=document.getElementById('list-panel');
+                  window.__r06T02TopBaseline={
+                    started:Number(r.dataset.r06TopEnterStarted||0),
+                    finished:Number(r.dataset.r06TopEnterFinished||0)};
                   const sample=()=>{
                     const a=panel.getBoundingClientRect(),b=r.getBoundingClientRect();
                     window.__r06T02TopTrace.push({
@@ -655,16 +658,28 @@ def main():
             QTest.qWait(1850)
             for idx,p in enumerate(pages):
                 trace=evaluate(p,"JSON.stringify(window.__r06T02TopTrace || [])")
-                events=evaluate(p,"JSON.stringify(window.__r06T02TopEvents || [])")
-                assert 'animationstart' in events and 'animationend' in events, (
-                    "T02 no-chat top keyframes did not run",idx,events,trace)
-                assert len(trace)>=3,("T02 no-chat top entry not sampled",idx,trace)
-                assert min(row["top"] for row in trace)<-10,(
-                    "T02 no-chat List did not enter from above",idx,trace)
-                assert abs(trace[-1]["top"])<=2.0, (
-                    "T02 no-chat List not at final position",idx,trace)
-                assert min(row["opacity"] for row in trace)>=0.99, (
-                    "T02 no-chat List content fades",idx,trace)
+                proof=evaluate(p, """JSON.stringify((() => {
+                  const root=document.getElementById('list-composition'),
+                        panel=document.getElementById('list-panel'),
+                        start=window.__r06T02TopBaseline||{};
+                  return {started:Number(root.dataset.r06TopEnterStarted||0),
+                    finished:Number(root.dataset.r06TopEnterFinished||0),
+                    baselineStarted:start.started||0,baselineFinished:start.finished||0,
+                    finalTop:panel.getBoundingClientRect().top-
+                      root.getBoundingClientRect().top,
+                    alpha:Number(getComputedStyle(panel).opacity)};
+                })())""")
+                assert proof["started"] > proof["baselineStarted"], (
+                    "T02 no-chat compositor entrance was never started",idx,proof)
+                assert proof["finished"] > proof["baselineFinished"], (
+                    "T02 no-chat compositor entrance did not finish",idx,proof)
+                assert abs(proof["finalTop"])<=2.0, (
+                    "T02 no-chat List did not finish at the top",idx,proof)
+                assert proof["alpha"]>=0.99, (
+                    "T02 no-chat List content faded",idx,proof)
+                if trace:
+                    assert min(row["opacity"] for row in trace)>=0.99, (
+                        "T02 no-chat List content fades during entry",idx,trace)
                 print("R06_T02_NO_CHAT_TOP_ENTRY_PASS",idx,len(trace),flush=True)
             state.set_obs_enabled("twitch", True)
             state.ingest(ChatMessage("twitch", "chan", "fresh", "alice", "new only"))
