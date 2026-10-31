@@ -729,6 +729,89 @@ def main():
                               online:navigator.onLine};
                           })())"""), flush=True)
                     raise
+            # T02 FIX4: all four previously saved command-slide directions
+            # MUST be ignored when a HIDDEN List is switched to Always.
+            # Exercise both shared Chromium sources, a permanently visible
+            # chat, dynamic hide-empty chat, and globally disabled OBS chat.
+            # This specifically covers the user's post-PASS left entry report.
+            for chat_mode in ("always", "hide_empty", "disabled"):
+                state.set_obs_enabled("twitch", chat_mode != "disabled")
+                db.set_setting("multichat_appearance_common",
+                               json.dumps({"visibility":
+                                           "always" if chat_mode == "always"
+                                           else "hide_empty"}))
+                db.set_settings_bulk({
+                    "list_chat_layout": "split",
+                    "list_animation_seconds": "0.75",
+                    "list_slide_duration": "15",
+                })
+                for direction in ("left", "right", "top", "bottom"):
+                    db.set_settings_bulk({
+                        "list_overlay_show_mode": "slide",
+                        "list_slide_direction": direction,
+                    })
+                    api.configure_list_show("slide", "!list", 15)
+                    for p in pages:
+                        until(p, lambda m: not m["shown"] and
+                              not m["splitOutgoing"] and
+                              not m["flowOutgoing"],
+                              "T02 FIX4 hidden command List " + chat_mode +
+                              "/" + direction, timeout=25)
+                    # Wait until the PRIOR directional slide is fully gone
+                    # before claiming this tests a new Always entry.
+                    QTest.qWait(900)
+                    for p in pages:
+                        evaluate(p, """(() => {
+                          const root=document.getElementById('list-composition'),
+                                panel=document.getElementById('list-panel');
+                          window.__r06UniversalTrace=[];
+                          const started=performance.now();
+                          const tick=()=>{
+                            if(root.classList.contains('r06-shown')){
+                              const t=new DOMMatrixReadOnly(
+                                getComputedStyle(panel).transform);
+                              window.__r06UniversalTrace.push({
+                                x:t.m41, y:t.m42,
+                                opacity:+getComputedStyle(panel).opacity,
+                                flow:root.classList.contains('r06-flow-enter'),
+                                top:root.classList.contains('r06-top-enter')
+                              });
+                            }
+                            if(performance.now()-started<2800)
+                              requestAnimationFrame(tick);
+                          };
+                          requestAnimationFrame(tick);
+                          return true;
+                        })()""")
+                    db.set_setting("list_overlay_show_mode", "always")
+                    api.configure_list_show("always", "!list", 30)
+                    for p in pages:
+                        until(p, lambda m: m["shown"],
+                              "T02 FIX4 Always visible " + chat_mode +
+                              "/" + direction, timeout=25)
+                    QTest.qWait(1100)
+                    for idx,p in enumerate(pages):
+                        until(p, lambda m: m["shown"] and
+                              not m["alwaysEntering"],
+                              "T02 FIX4 Always settled " + chat_mode +
+                              "/" + direction, timeout=25)
+                        trace=evaluate(p,
+                          "JSON.stringify(window.__r06UniversalTrace || [])")
+                        assert trace, ("T02 FIX4 missing trace", idx,
+                                       chat_mode, direction)
+                        assert max(abs(row["x"]) for row in trace) <= 1.0, (
+                          "T02 FIX4 inherited horizontal slide during Always",
+                          idx, chat_mode, direction, trace)
+                        assert min(row["opacity"] for row in trace) >= 0.99, (
+                          "T02 FIX4 List faded during Always",
+                          idx, chat_mode, direction, trace)
+                        assert any(row["flow"] or row["top"]
+                                   for row in trace), (
+                          "T02 FIX4 no universal top/flow entry seen",
+                          idx, chat_mode, direction, trace)
+                        print("R06_T02_ANY_SLIDE_TO_ALWAYS_PASS",
+                              idx, chat_mode, direction, len(trace),
+                              flush=True)
             print("R06_BROWSER_FIX2_PASS", flush=True)
         finally:
             for v in views:
