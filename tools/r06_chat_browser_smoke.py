@@ -244,7 +244,6 @@ def main():
             for view in views:
                 view.close()
             api.stop()
-            db.close()
     return 0
 
 
