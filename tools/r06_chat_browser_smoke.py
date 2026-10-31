@@ -91,14 +91,16 @@ T01_TRACE_SCRIPT = """(() => {
                   const root = document.getElementById('list-composition');
                   const chat = document.getElementById('list-chat');
                   const panel = document.getElementById('list-panel');
-                  const started = performance.now();
+                  let started = null;
                   const tick = () => {
                     if (root.classList.contains('r06-flow-exit')) {
+                      if (started === null) started = performance.now();
                       const gap = chat.getBoundingClientRect().top -
                         panel.getBoundingClientRect().bottom;
                       window.__r06T01BoundaryTrace.push(+gap.toFixed(3));
                     }
-                    if (performance.now() - started < 4500) requestAnimationFrame(tick);
+                    if (started === null || performance.now() - started < 4500)
+                      requestAnimationFrame(tick);
                   };
                   requestAnimationFrame(tick);
                   return true;
