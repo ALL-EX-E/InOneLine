@@ -1,0 +1,109 @@
+name: InOneLine PERF-01 Shutdown Candidate (Windows)
+
+on:
+  push:
+    branches:
+      - audit/performance-20261031
+    paths:
+      - "app.py"
+      - "streaming_manager/**"
+      - "tools/shutdown_lifecycle_smoke.py"
+      - "tools/graceful_frozen_exit_smoke.py"
+      - "installer/**"
+      - ".github/workflows/performance-shutdown-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  perf-01-windows:
+    runs-on: windows-2025
+    timeout-minutes: 55
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Install locked dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build-lock.txt
+          python -m pip check
+
+      - name: Compile all source and tools
+        shell: pwsh
+        run: |
+          python -m compileall -q app.py streaming_manager tools
+          if ($LASTEXITCODE -ne 0) { throw "Compile failed" }
+
+      - name: PERF-01 DNS, queue, timeout and lifecycle regression
+        shell: pwsh
+        run: |
+          python -m tools.shutdown_lifecycle_smoke
+          if ($LASTEXITCODE -ne 0) { throw "PERF-01 lifecycle failed" }
+
+      - name: Existing chat graphics, appearance, Twitch and API regression
+        shell: pwsh
+        run: |
+          python -m tools.multichat_core_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Multichat core failed" }
+          python -m tools.multichat_windows_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Multichat windows failed" }
+          python -m tools.chat_graphics_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Chat graphics failed" }
+          python -m tools.chat_appearance_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Chat appearance failed" }
+          python -m tools.chat_third_party_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Third-party chat failed" }
+          python -m tools.r06_list_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 List failed" }
+
+      - name: Build frozen app using existing spec
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean installer/InOneLine.spec
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+          if (!(Test-Path "dist/InOneLine/InOneLine.exe")) { throw "Frozen app missing" }
+
+      - name: PERF-04 real frozen WM_CLOSE and PID/port release
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/graceful_frozen_exit_smoke.py "dist/InOneLine/InOneLine.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Frozen graceful exit failed" }
+
+      - name: Install Inno Setup 7.1.0
+        shell: pwsh
+        run: |
+          $setup = "$env:RUNNER_TEMP/innosetup-7.1.0-x64.exe"
+          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $inno = "$env:RUNNER_TEMP/InnoSetup710"
+          $proc = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Inno install failed: $($proc.ExitCode)" }
+          if (!(Test-Path "$inno/ISCC.exe")) { throw "Inno compiler missing" }
+
+      - name: Build candidate installer
+        shell: pwsh
+        run: |
+          $inno = "$env:RUNNER_TEMP/InnoSetup710/ISCC.exe"
+          $dist = (Resolve-Path "dist/InOneLine").Path
+          & $inno "/DDistRoot=$dist" "installer/InOneLine.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer failed" }
+          $setup = "installer/output/InOneLine_Setup_1.0.8.exe"
+          if (!(Test-Path $setup)) { throw "Installer missing" }
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash
+          Write-Host "PERF01_INSTALLER_SHA256=$hash"
+
+      - name: Publish candidate installer for QA only
+        uses: actions/upload-artifact@v4
+        with:
+          name: InOneLine_PERF01_Shutdown_Candidate
+          path: installer/output/InOneLine_Setup_1.0.8.exe
+          retention-days: 14
+          if-no-files-found: error
