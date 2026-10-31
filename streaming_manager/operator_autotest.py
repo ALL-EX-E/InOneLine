@@ -30,9 +30,12 @@ def run_sandbox(output_file: str) -> int:
             status, error_type = "PASS", ""
         except Exception as exc:
             status, error_type = "FAIL", type(exc).__name__
+            # Only diagnostics from synthetic temporary fixtures, never live data.
+            error_message = str(exc)[:350]
         results.append({
             "name": name, "status": status, "duration_ms": int((time.monotonic()-started)*1000),
             "error_type": error_type,
+            "error_message": error_message if status == "FAIL" else "",
         })
 
     # Private test data only; no canonical installed program data paths.
