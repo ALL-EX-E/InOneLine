@@ -392,6 +392,8 @@ class PublicTab(QWidget):
 
     def _public_xlsx_worker_finished(self) -> None:
         self._public_xlsx_worker = None
+        if self._public_xlsx_shutdown:
+            return  # An in-flight write has finished: never schedule another.
         self._public_xlsx_update_controls()
         if self._public_xlsx_write_pending and self._public_xlsx_path is not None:
             delay = 1500 if self._public_xlsx_write_retry else PUBLIC_XLSX_LOCAL_WRITE_DEBOUNCE_MS
