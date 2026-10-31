@@ -93,7 +93,7 @@ def run_sandbox(output_file: str) -> int:
         def rejected_payloads():
             for change in (
                 {"id": 0}, {"amount": "-1"}, {"amount": "Infinity"},
-                {"currency": "INVALID"}, {"currency": "RUB\n"},
+                {"currency": "INVALID"}, {"currency": "12"},
             ):
                 invalid = dict(payload, **change)
                 try:
@@ -121,10 +121,10 @@ def run_sandbox(output_file: str) -> int:
     # SQLite. Port 0 asks Windows to allocate a sandbox-only local HTTP port.
     def navigate_tabs():
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        from PySide6.QtWidgets import QApplication
-        from .views.main_window import MainWindow
         from .windows_long_path import prepare_frozen_qt_plugins_for_long_path
         prepare_frozen_qt_plugins_for_long_path()
+        from PySide6.QtWidgets import QApplication
+        from .views.main_window import MainWindow
         app = QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory(prefix="InOneLine_AutoTest_QT_") as folder:
             paths = AppPaths.from_root(folder)
