@@ -10,6 +10,9 @@ No remote HTML, JavaScript or user-provided local paths are interpreted.
 import base64
 import hashlib
 import html
+import subprocess
+import sys
+import threading
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -20,7 +23,7 @@ from PySide6.QtWidgets import QTextEdit
 
 from ..chat_appearance import normalize_twitch, normalize_common
 from ..chat_graphics import safe_image_url
-from ..remote_image import download_external_image
+from ..remote_image import CHAT_FEED_IMAGE_LIMIT_BYTES, PreparedImage
 
 _GLITCH = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
 <circle cx="512" cy="512" r="512" fill="#9146ff"/>
@@ -40,18 +43,89 @@ def _resource_url(url: str) -> str:
     return "iol-chat-media:" + hashlib.sha256(url.encode("utf-8")).hexdigest()
 
 
-def _fetch_chat_image(url: str):
-    result = download_external_image(url)
-    if len(result.image_bytes) > _MAX_LOADED_IMAGE:
-        return None
-    # Decode static media in the background, not the GUI event loop.
-    # Read first frame of both static and animated images OFF the GUI thread.
-    # Keep its dimensions so inline content preserves the provider aspect ratio.
-    image = QImage.fromData(result.image_bytes)
-    if image.isNull():
-        return None
-    image = image.scaled(48,48,Qt.KeepAspectRatio,Qt.SmoothTransformation)
-    return result, image
+_CHAT_FETCH_DEADLINE_SECONDS = 20.0
+
+
+class _ChatImageProcessRunner:
+    """Own active image helpers, including those blocked in native DNS.
+
+    ThreadPoolExecutor bounds parallel starts to 3; each thread supervises
+    one disposable subprocess. Killing a child interrupts resolver/read calls
+    that Python's thread cancellation cannot interrupt.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._children: set[subprocess.Popen] = set()
+        self._stopped = False
+
+    def fetch(self, url: str):
+        if getattr(sys, "frozen", False):
+            command = [sys.executable, "--chat-image-fetch", url]
+        else:
+            command = [
+                sys.executable, "-m", "streaming_manager.remote_image",
+                "--chat-image-fetch", url,
+            ]
+        with self._lock:
+            if self._stopped:
+                return None
+            try:
+                process = subprocess.Popen(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+            except OSError:
+                return None
+            self._children.add(process)
+        try:
+            # communicate's timeout encompasses DNS, redirects and the body.
+            payload, _ = process.communicate(timeout=_CHAT_FETCH_DEADLINE_SECONDS)
+            if (
+                process.returncode != 0 or len(payload) < 2
+                or len(payload) > CHAT_FEED_IMAGE_LIMIT_BYTES + 1
+                or payload[0] not in (0, 1)
+            ):
+                return None
+            result = PreparedImage(
+                image_bytes=payload[1:],
+                extension=".gif" if payload[0] else ".png",
+                animated=bool(payload[0]),
+            )
+            # Preserve the existing off-GUI small first-frame decode.
+            image = QImage.fromData(result.image_bytes)
+            if image.isNull():
+                return None
+            image = image.scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            return result, image
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            try:
+                process.kill()
+            except OSError:
+                pass
+            try:
+                process.communicate(timeout=2)
+            except (subprocess.TimeoutExpired, OSError, ValueError):
+                pass
+            return None
+        finally:
+            with self._lock:
+                self._children.discard(process)
+
+    def shutdown(self):
+        with self._lock:
+            if self._stopped:
+                return
+            self._stopped = True
+            children = list(self._children)
+        for process in children:
+            try:
+                process.kill()
+            except OSError:
+                pass
 
 
 class ChatRichFeed(QTextEdit):
@@ -63,6 +137,8 @@ class ChatRichFeed(QTextEdit):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setPlaceholderText("Ожидание сообщений Twitch")
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="TwitchChatImage")
+        self._fetch_processes = _ChatImageProcessRunner()
+        self._shutting_down = False
         self._jobs: dict[str, object] = {}
         # Value: (raw bytes, decoded small QImage, QMovie, QBuffer, animated)
         self._cache: OrderedDict[str, tuple] = OrderedDict()
@@ -118,6 +194,8 @@ class ChatRichFeed(QTextEdit):
         Never occupy all three image workers: a new viewer/emote needs one
         immediately available worker even during background preloading.
         """
+        if self._shutting_down:
+            return
         choices = tuple(dict.fromkeys(
             url for raw in list(urls)[:24]
             if (url := safe_image_url(raw))
@@ -127,6 +205,8 @@ class ChatRichFeed(QTextEdit):
         self._maybe_prefetch()
 
     def _maybe_prefetch(self):
+        if self._shutting_down:
+            return
         inflight = sum(1 for url in self._jobs if url in self._preload_candidates)
         for url in self._preload_candidates:
             if inflight >= 2 or len(self._jobs) >= 8:
@@ -138,16 +218,18 @@ class ChatRichFeed(QTextEdit):
 
     def _enqueue(self, url: str):
         if (
-            not safe_image_url(url)
+            self._shutting_down or not safe_image_url(url)
             or url in self._cache or url in self._jobs or url in self._failed
             or len(self._jobs) >= 24
         ):
             return
-        self._jobs[url] = self._pool.submit(_fetch_chat_image, url)
+        self._jobs[url] = self._pool.submit(self._fetch_processes.fetch, url)
         if self._poll.interval() != 75:
             self._poll.setInterval(75)
 
     def _finish_downloads(self):
+        if self._shutting_down:
+            return
         changed = False
         for url, future in list(self._jobs.items()):
             if not future.done():
@@ -202,6 +284,8 @@ class ChatRichFeed(QTextEdit):
 
     def display(self, rows: list[dict], *, show_time: bool, show_icons: bool,
                 appearance=None, common=None, test_visible=False):
+        if self._shutting_down:
+            return
         appearance = normalize_twitch(appearance)
         common = normalize_common(common)
         signature = (
@@ -373,10 +457,24 @@ class ChatRichFeed(QTextEdit):
     def keyPressEvent(self, event):
         event.ignore()
 
-    def closeEvent(self, event):
+    def shutdown(self):
+        """Idempotent explicit shutdown; child QWidget.closeEvent is not guaranteed."""
+        if self._shutting_down:
+            return
+        self._shutting_down = True
         self._poll.stop()
+        self._preload_candidates = ()
+        self._wanted_urls.clear()
+        self._active_urls.clear()
+        for future in self._jobs.values():
+            future.cancel()
+        self._jobs.clear()
         for _raw, _image, movie, _buffer, _animated in self._cache.values():
             if movie is not None:
                 movie.stop()
+        self._fetch_processes.shutdown()
         self._pool.shutdown(wait=False, cancel_futures=True)
+
+    def closeEvent(self, event):
+        self.shutdown()
         super().closeEvent(event)
