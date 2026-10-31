@@ -37,7 +37,7 @@ MAIN_OVERLAY_SHOW_MODE_CONTROL_ENABLED = False
 
 WIDGETS = {
     "overlay": WidgetVisibility("overlay_show_mode", "always", _SIMPLE),
-    "list": WidgetVisibility("list_overlay_show_mode", "always", _SIMPLE),
+    "list": WidgetVisibility("list_overlay_show_mode", "always", (_HIDDEN, _ALWAYS, ("slide", "Выезд"))),
     "timer": WidgetVisibility("timer_overlay_show_mode", "always", _SIMPLE),
     "music_player": WidgetVisibility(
         MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY, "track_change",

@@ -23,6 +23,7 @@ from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
 from ..music_player import MusicPlayerController
 from ..multichat import MultichatState
+from ..obs_visibility import show_mode
 from ..ui_settings import open_ui_settings
 from ..backup_restore import read_and_clear_restore_result
 from ..constants import APP_NAME, APP_VERSION, DEFAULT_API_HOST
@@ -129,6 +130,16 @@ class MainWindow(QMainWindow):
         self.multichat_state = MultichatState()
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
         self.api.set_multichat_state_provider(self.multichat_state.snapshot)
+        self.api.set_list_show_controller(self.multichat_state.configure_list_show)
+        try:
+            list_duration = int(db.get_setting("list_slide_duration", "30"))
+        except (TypeError, ValueError):
+            list_duration = 30
+        self.api.configure_list_show(
+            show_mode(db.get_settings(), "list"),
+            db.get_setting("list_slide_command", ""),
+            max(1, min(120, list_duration)),
+        )
         try:
             self.api.start()
         except OSError:

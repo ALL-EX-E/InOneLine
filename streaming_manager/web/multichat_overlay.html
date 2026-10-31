@@ -41,6 +41,13 @@ body {color:#fff;font:18px/1.3 sans-serif}
   "use strict";
   const root = document.getElementById("messages");
   const shell = document.getElementById("shell");
+  const embedded = new URLSearchParams(location.search).get("embedded") === "1";
+  if (embedded) {
+    // Composition owns the outer frame: no second inset border or glow.
+    // Keep the standalone /multichat-overlay unchanged.
+    document.documentElement.style.setProperty("--chat-edge-inset", "0px");
+    root.style.padding = "10px 9px";
+  }
   const bgImage = document.getElementById("bg-image");
   const bgVideo = document.getElementById("bg-video");
   let appearanceKey = "";
@@ -153,8 +160,11 @@ body {color:#fff;font:18px/1.3 sans-serif}
       ? common.background : "transparent";
     shell.style.background = bg === "color"
       ? rgba(common.background_color,common.background_opacity) : "transparent";
-    shell.style.border = common.glow ? "1px solid "+rgba(common.glow_color,70) : "none";
-    shell.style.boxShadow = common.glow ?
+    // The embedded List+chat source uses the List's exact outer frame,
+    // while the independent chat keeps its own saved glow settings.
+    shell.style.border = embedded ? "none" :
+      common.glow ? "1px solid "+rgba(common.glow_color,70) : "none";
+    shell.style.boxShadow = embedded ? "none" : common.glow ?
       "inset 0 0 8px "+rgba(common.glow_color,22)+
       ",inset 0 0 16px "+rgba(common.glow_color,42)+
       ",0 0 6px "+rgba(common.glow_color,52) : "none";
@@ -242,26 +252,44 @@ body {color:#fff;font:18px/1.3 sans-serif}
     row.appendChild(body);
     root.appendChild(row);
   }
-  async function update() {
+  function renderState(state) {
     try {
-      const response = await fetch("/api/multichat", {cache:"no-store"});
-      if (!response.ok) return;
-      const state = await response.json();
       prewarmMedia(state.media_preload && state.media_preload.twitch);
       applyAppearance(state.appearance);
       const messages = Array.isArray(state.messages) ?
         state.messages.filter(message => message.platform === "twitch") : [];
-      const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages,appearanceKey]);
+      const obsEnabled = state.obs_enabled?.twitch !== false;
+      const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages,appearanceKey,obsEnabled]);
       if (sig === last) return;
       last = sig;
       root.replaceChildren();
       for (const message of messages)
         appendMessage(message, state.show_time, state.show_platform_icons !== false);
-      shell.classList.toggle("hidden", messages.length === 0 && currentCommon.visibility !== "always");
+      // The existing operator OBS switch is global: even the Always mode
+      // must not leave an empty frame/background on screen when disabled.
+      shell.classList.toggle("hidden", !obsEnabled ||
+        (messages.length === 0 && currentCommon.visibility !== "always"));
       // Only OBS source height clips older rows; never truncate message contents horizontally.
-      while (root.scrollHeight > root.clientHeight && root.firstElementChild)
-        root.firstElementChild.remove();
+      // An embedded chat must retain its existing DOM rows while the
+      // surrounding list temporarily shrinks the viewport. CSS clips
+      // older rows; when expanded they remain available without new events.
+      if (!embedded) {
+        while (root.scrollHeight > root.clientHeight && root.firstElementChild)
+          root.firstElementChild.remove();
+      }
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
+  }
+  async function update() {
+    try {
+      const response = await fetch("/api/multichat", {cache:"no-store"});
+      if (response.ok) renderState(await response.json());
+    } catch (_) { /* operator diagnostics stay in InOneLine */ }
+  }
+  // The same renderer serves ordinary child polling and a targeted parent
+  // resync when Chromium suspends an embedded iframe's asynchronous timers.
+  if (embedded) {
+    window.IOLRefreshEmbeddedChat = update;
+    window.IOLRenderEmbeddedChatState = renderState;
   }
   update();
   setInterval(update, 500);

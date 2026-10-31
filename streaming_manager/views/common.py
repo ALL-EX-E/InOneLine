@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEventLoop, QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QBoxLayout, QComboBox, QFontComboBox, QFormLayout,
+    QAbstractSpinBox, QBoxLayout, QComboBox, QDoubleSpinBox, QFontComboBox, QFormLayout,
     QHeaderView, QHBoxLayout, QPushButton, QScrollArea, QSpinBox,
     QTabWidget, QTableWidget, QTableWidgetItem, QWidget,
 )
@@ -709,6 +709,13 @@ class ScrollSafeFontComboBox(QFontComboBox):
 
 class ScrollSafeSpinBox(QSpinBox):
     """Не меняет число колесом; размер меняется кнопками ▲/▼ или вводом."""
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class ScrollSafeDoubleSpinBox(QDoubleSpinBox):
+    """Не меняет дробное число при прокрутке родительской страницы."""
 
     def wheelEvent(self, event):
         event.ignore()
