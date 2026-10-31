@@ -1,6 +1,7 @@
 """PERF-01 diagnostic logging regression: opt-in, no sensitive values."""
 from __future__ import annotations
 
+import atexit
 import json
 import tempfile
 import time
@@ -20,6 +21,7 @@ class ExitDiagnosticsSmoke(unittest.TestCase):
             # Ensure the 1-second watchdog checkpoint is emitted.
             time.sleep(1.1)
             trace._at_exit()
+            atexit.unregister(trace._at_exit)
             rows = [json.loads(line) for line in trace.path.read_text(
                 encoding="utf-8"
             ).splitlines()]
