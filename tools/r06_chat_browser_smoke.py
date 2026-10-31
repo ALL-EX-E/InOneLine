@@ -512,13 +512,20 @@ def main():
                         top:+a.top.toFixed(3)
                       });
                     }
-                    if(performance.now()-started<4200)requestAnimationFrame(tick);
+                    if(performance.now()-started<7000)requestAnimationFrame(tick);
                   };
                   requestAnimationFrame(tick);return true;
                 })()""")
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 30)
-            QTest.qWait(1900)
+            # The persisted-setting polling period may exceed the first
+            # 1.9 seconds on a loaded Windows Qt runner. Do not inspect an
+            # animation which the source has not even started yet.
+            for p in pages:
+                until(p, lambda m: m["shown"] and not m["replace"] and
+                      m["height"] < 600,
+                      "T02 Replace->Always saved state reached browser")
+            QTest.qWait(1850)
             for idx,p in enumerate(pages):
                 trace=evaluate(p,"JSON.stringify(window.__r06T02ResizeTrace || [])")
                 assert len(trace)>=5, ("T02 visible resizing frames missing",idx,trace)
@@ -562,6 +569,9 @@ def main():
                 })()""")
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 30)
+            for p in pages:
+                until(p, lambda m: m["shown"] and m["height"] == 0,
+                      "T02 no-chat saved state reached browser")
             QTest.qWait(1850)
             for idx,p in enumerate(pages):
                 trace=evaluate(p,"JSON.stringify(window.__r06T02TopTrace || [])")
