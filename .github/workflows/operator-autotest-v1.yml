@@ -1,10 +1,11 @@
-name: InOneLine Operator AutoTest v1.1 List (Windows)
+name: InOneLine Operator AutoTest v1.2 CSV (Windows)
 
 on:
   push:
     branches:
       - audit/operator-autotest-v1-20261031
       - audit/operator-autotest-list-20261101
+      - audit/operator-autotest-csv-20261101
     paths:
       - "app.py"
       - "streaming_manager/operator_autotest.py"
@@ -46,7 +47,7 @@ jobs:
           if (!(Test-Path "$env:RUNNER_TEMP/operator_source.json")) { throw 'Sandbox JSON absent' }
           $j = Get-Content "$env:RUNNER_TEMP/operator_source.json" -Raw | ConvertFrom-Json
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_SOURCE {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
-          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 11) { throw 'Source sandbox test failed' }
+          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 14) { throw 'Source sandbox test failed' }
 
       - name: PowerShell 5.1 operator script parser
         shell: powershell
@@ -101,7 +102,7 @@ jobs:
           if (!(Test-Path $result)) { throw 'Frozen sandbox JSON absent' }
           $j = Get-Content $result -Raw | ConvertFrom-Json
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_FROZEN {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
-          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 11) { throw 'Frozen sandbox test failed' }
+          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 14) { throw 'Frozen sandbox test failed' }
 
       - name: Real Windows normal close without forced success
         shell: pwsh
@@ -138,7 +139,7 @@ jobs:
       - name: Upload installer and runnable CMD / PowerShell scripts
         uses: actions/upload-artifact@v4
         with:
-          name: InOneLine_Operator_AutoTest_v1_1_List_Windows
+          name: InOneLine_Operator_AutoTest_v1_2_CSV_Windows
           path: operator-autotest-output/*
           retention-days: 14
           if-no-files-found: error
