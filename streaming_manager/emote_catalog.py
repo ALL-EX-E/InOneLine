@@ -389,3 +389,45 @@ def hydrate_emote_thumbnails(
         )
         for index, item in enumerate(items)
     ]
+
+# Internal helper protocol: no credentials, no user-controlled HTML, no images,
+# only provider catalog metadata. This subprocess is supervised by Twitch
+# runtime and can be stopped even if urllib's resolver is blocked.
+CHAT_CATALOG_MAX_BYTES = 8 * 1024 * 1024
+
+
+def run_chat_catalog_helper(channel_id: str, output_path: str) -> int:
+    """Fetch the unchanged catalog in a disposable separate process."""
+    import re
+
+    if not re.fullmatch(r"[0-9]{1,24}", str(channel_id or "")):
+        return 2
+    try:
+        items = fetch_third_party_chat_emotes(channel_id)
+        data = [
+            {
+                "source": item.source,
+                "emote_id": item.emote_id,
+                "name": item.name,
+                "image_url": item.image_url,
+                "preview_url": item.preview_url,
+                "animated": bool(item.animated),
+            }
+            for item in items[:3000]
+        ]
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        if len(payload) > CHAT_CATALOG_MAX_BYTES:
+            return 1
+        with open(output_path, "wb") as f:
+            f.write(payload)
+        return 0
+    except Exception:
+        return 1
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) == 4 and sys.argv[1] == "--fetch-chat-catalog":
+        raise SystemExit(run_chat_catalog_helper(sys.argv[2], sys.argv[3]))
+    raise SystemExit(2)
