@@ -426,7 +426,7 @@ def run_chat_image_fetch_helper(url: str) -> int:
         result = download_external_image(url)
         if len(result.image_bytes) > CHAT_FEED_IMAGE_LIMIT_BYTES:
             return 1
-        payload = (b"\\x01" if result.animated else b"\\x00") + result.image_bytes
+        payload = (bytes((1,)) if result.animated else bytes((0,))) + result.image_bytes
         sys.stdout.buffer.write(payload)
         sys.stdout.buffer.flush()
         return 0
