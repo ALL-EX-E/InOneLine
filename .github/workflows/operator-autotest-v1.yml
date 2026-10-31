@@ -7,6 +7,7 @@ on:
     paths:
       - "app.py"
       - "streaming_manager/operator_autotest.py"
+      - "installer/InOneLine.spec"
       - "tools/operator_autotest/**"
       - ".github/workflows/operator-autotest-v1.yml"
   workflow_dispatch:
