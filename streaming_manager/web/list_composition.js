@@ -356,6 +356,9 @@
             incomingTopAnimation.onfinish = () => {
               root.dataset.r06TopEnterFinished = String(
                 Number(root.dataset.r06TopEnterFinished || 0) + 1);
+              // Unlike a timeout, onfinish follows Chromium's actual
+              // compositor time when OBS/Qt throttles a hidden source.
+              finish();
             };
           });
         }
@@ -391,7 +394,12 @@
         layout();
         if (onResize) onResize();
       };
-      incomingAlwaysTimer = setTimeout(finish, animationMs + 180);
+      // The top-entry compositor can start late in an occluded OBS
+      // window. Never cancel a still-running animation at duration+180ms.
+      // The shared flex-flow and resize transitions keep their bounded
+      // timing; top-entry completes via WAAPI.onfinish above.
+      incomingAlwaysTimer = setTimeout(finish, incomingAlways?.type === "top"
+        ? Math.max(20000, animationMs * 10) : animationMs + 180);
     }
     function changeActive(next) {
       if (active === next) return;
