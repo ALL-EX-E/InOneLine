@@ -550,8 +550,25 @@ def main():
             for p in pages:
                 evaluate(p, """(() => {
                   window.__r06T02TopTrace=[];
+                  window.__r06T02TopEvents=[];
                   const r=document.getElementById('list-composition'),
                         panel=document.getElementById('list-panel');
+                  const sample=()=>{
+                    const a=panel.getBoundingClientRect(),b=r.getBoundingClientRect();
+                    window.__r06T02TopTrace.push({
+                      top:+(a.top-b.top).toFixed(3),
+                      opacity:+getComputedStyle(panel).opacity,
+                      transform:getComputedStyle(panel).transform
+                    });
+                  };
+                  for(const name of ['animationstart','animationend']){
+                    panel.addEventListener(name,e=>{
+                      if(e.animationName==='r06-always-enter-top'){
+                        window.__r06T02TopEvents.push(name);
+                        sample();
+                      }
+                    });
+                  }
                   const started=performance.now();
                   const tick=()=>{
                     const a=panel.getBoundingClientRect(),b=r.getBoundingClientRect();
@@ -575,6 +592,9 @@ def main():
             QTest.qWait(1850)
             for idx,p in enumerate(pages):
                 trace=evaluate(p,"JSON.stringify(window.__r06T02TopTrace || [])")
+                events=evaluate(p,"JSON.stringify(window.__r06T02TopEvents || [])")
+                assert 'animationstart' in events and 'animationend' in events, (
+                    "T02 no-chat top keyframes did not run",idx,events,trace)
                 assert len(trace)>=3,("T02 no-chat top entry not sampled",idx,trace)
                 assert min(row["top"] for row in trace)<-10,(
                     "T02 no-chat List did not enter from above",idx,trace)
