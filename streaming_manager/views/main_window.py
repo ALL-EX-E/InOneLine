@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self._integration_health_timer.setInterval(60 * 60 * 1000)
         self._integration_health_timer.timeout.connect(self._validate_active_integrations)
         self._startup_backup_worker = None
+        self._exit_accepted = False
         self.setStyleSheet(APP_STYLE)
 
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
@@ -863,7 +864,7 @@ class MainWindow(QMainWindow):
         return result
 
     def _validate_active_integrations(self) -> None:
-        if self._integration_health_worker is not None:
+        if self._exit_accepted or self._integration_health_worker is not None:
             return
         active_keys = []
         for adapter in self.integration_registry.adapters():
@@ -887,6 +888,8 @@ class MainWindow(QMainWindow):
         self.thread_pool.start(worker)
 
     def _integration_health_done(self) -> None:
+        if self._exit_accepted:
+            return
         if hasattr(self, "settings_tab"):
             self.settings_tab._refresh_integrations()
         if hasattr(self, "auction_tab"):
@@ -976,7 +979,7 @@ class MainWindow(QMainWindow):
                 )
 
     def _startup_backup(self):
-        if self._startup_backup_worker is not None:
+        if self._exit_accepted or self._startup_backup_worker is not None:
             return
 
         def create_backup():
@@ -1070,6 +1073,9 @@ class MainWindow(QMainWindow):
                     return
             elif question.clickedButton() is discard:
                 editor.discard()
+        # PERF-02: accept no further deferred read/backup jobs only AFTER
+        # an approved Save/Discard. Cancel and failed Save leave this False.
+        self._exit_accepted = True
         # PERF-01 diagnostics are off by default. This event only occurs
         # AFTER Save/Discard was accepted, never on Cancel or failed Save.
         exit_trace = getattr(QApplication.instance(), "_inone_line_exit_trace", None)
