@@ -96,6 +96,7 @@
     let incomingTopAnimation = null;
     let pendingAlwaysEntry = null;
     let lastEmbeddedChatNeeded = false;
+    let lastEmbeddedRefreshAt = -Infinity;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -202,6 +203,24 @@
         }
       }
       lastEmbeddedChatNeeded = chatNeeded;
+      // The parent remains active even if Qt suspends polling inside an
+      // off-screen iframe. Once its new message is in /api/data, wake the
+      // existing embedded chat only when its DOM is still empty. A bounded
+      // retry repairs an initial post-reenable reload that stayed suspended.
+      if (chatNeeded && chatHasMessages &&
+          performance.now() - lastEmbeddedRefreshAt >= 1000) {
+        try {
+          const childFrame = chatLayer.querySelector("iframe");
+          const childMessages = childFrame?.contentDocument
+            ?.getElementById("messages");
+          const refresh = childFrame?.contentWindow?.IOLRefreshEmbeddedChat;
+          if (childMessages && childMessages.children.length === 0 &&
+              typeof refresh === "function") {
+            lastEmbeddedRefreshAt = performance.now();
+            refresh();
+          }
+        } catch (_) { /* iframe may be reloading; next poll retries */ }
+      }
       matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
       const splitCap = listAllocated ? Math.floor((available - 12) / 2) : available;
