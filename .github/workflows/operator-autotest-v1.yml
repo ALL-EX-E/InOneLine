@@ -46,6 +46,21 @@ jobs:
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_SOURCE {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
           if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 6) { throw 'Source sandbox test failed' }
 
+      - name: PowerShell 5.1 operator script parser
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "tools/operator_autotest/InOneLine_AutoTest.ps1").Path,
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Host ("PS_PARSE_ERROR: " + $_.Message) }
+            throw "Operator PS1 syntax invalid"
+          }
+          Write-Host "OPERATOR_PS5_PARSE=PASS"
+
       - name: Retained accepted PERF-02 and PERF-01 regressions
         shell: pwsh
         run: |
