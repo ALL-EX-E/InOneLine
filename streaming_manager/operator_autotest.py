@@ -348,7 +348,10 @@ def run_sandbox(output_file: str) -> int:
                     assert len(new_files) == 1, "safety backup not created"
                     backup_file = next(iter(new_files))
                     assert backup_file.stat().st_size > 0, "safety backup empty"
-                    with sqlite3.connect(str(backup_file)) as copied:
+                    # sqlite3.Connection.__exit__ commits but does NOT close.
+                    # Windows keeps the .db handle locked until explicit close.
+                    from contextlib import closing
+                    with closing(sqlite3.connect(str(backup_file))) as copied:
                         assert copied.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
                     return backup_file
 
