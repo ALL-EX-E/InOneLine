@@ -94,6 +94,7 @@
     let incomingAlways = null;
     let incomingAlwaysTimer = null;
     let incomingTopAnimation = null;
+    let pendingAlwaysEntry = null;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -174,6 +175,16 @@
     function layout() {
       const available = root.clientHeight;
       if (available <= 0) return;
+      if (pendingAlwaysEntry && mode === "always") {
+        // /overlay can briefly have ZERO height while its responsive
+        // slot is recalculated. A mode change is observed only once by
+        // apply(), so never discard the inverse entry in that frame.
+        // Layout's existing 200ms poll completes it at the first valid
+        // size, preserving the original visible/hidden starting state.
+        const pending = pendingAlwaysEntry;
+        pendingAlwaysEntry = null;
+        beginAlwaysEntry(pending.wasVisible, pending.wasReplace);
+      }
       const replacing = composeMode === "replace" && mode === "slide";
       const listAllocated = mode === "always" || reserved;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
@@ -387,7 +398,10 @@
       active = next;
       clearTransition();
       if (next) resetOutgoingOverlay();
-      else if (incomingAlways) resetAlwaysEntry();
+      else {
+        pendingAlwaysEntry = null;
+        if (incomingAlways) resetAlwaysEntry();
+      }
       // "Не показывать" is a vertical collapse, not a command slide.
       // A saved earlier slide direction must never rotate this transition.
       transitionDirection = mode === "hidden" || mode === "always"
@@ -526,9 +540,12 @@
       // Preview must follow the same state/timer as the real OBS source.
       const shouldShow = mode === "always" || (mode === "slide" && deadline > performance.now());
       if (becomingAlways) {
-        beginAlwaysEntry(previouslyVisible, previousReplace);
-      } else if (incomingAlways && mode !== "always") {
-        resetAlwaysEntry();
+        pendingAlwaysEntry = {
+          wasVisible: previouslyVisible, wasReplace: previousReplace
+        };
+      } else if (mode !== "always") {
+        pendingAlwaysEntry = null;
+        if (incomingAlways) resetAlwaysEntry();
       }
       changeActive(shouldShow);
       layout();
