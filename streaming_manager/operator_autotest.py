@@ -354,9 +354,9 @@ def run_sandbox(output_file: str) -> int:
                     before = safety_backup_files()
                     message = csv_import_via_ui(
                         "autotest_valid.csv",
-                        "НАЗВАНИЕ;БАЛЛЫ;ДАТА;ОТЗЫВ\\n"
-                        + edited_title + ";0;;\\n"
-                        + "IOL CSV New;78;27.08.2019;\\n",
+                        "НАЗВАНИЕ;БАЛЛЫ;ДАТА;ОТЗЫВ\n"
+                        + edited_title + ";0;;\n"
+                        + "IOL CSV New;78;27.08.2019;\n",
                         expect_success=True,
                     )
                     assert "Добавлено: 1" in message and "Изменено: 1" in message
@@ -378,9 +378,9 @@ def run_sandbox(output_file: str) -> int:
                     count = db.count_all_games()
                     message = csv_import_via_ui(
                         "autotest_invalid.csv",
-                        "НАЗВАНИЕ;БАЛЛЫ;СТАТУС\\n"
-                        "IOL CSV Atomic Good;99;НЕ ИГРАЛ\\n"
-                        "IOL CSV Atomic Bad;50;НЕИЗВЕСТНО\\n",
+                        "НАЗВАНИЕ;БАЛЛЫ;СТАТУС\n"
+                        "IOL CSV Atomic Good;99;НЕ ИГРАЛ\n"
+                        "IOL CSV Atomic Bad;50;НЕИЗВЕСТНО\n",
                         expect_success=False,
                     )
                     assert "Импорт не выполнен" in message, "missing import error detail"
@@ -397,7 +397,7 @@ def run_sandbox(output_file: str) -> int:
                     before = safety_backup_files()
                     message = csv_import_via_ui(
                         "autotest_legacy.csv",
-                        "IOL CSV Legacy|125\\n",
+                        "IOL CSV Legacy|125\n",
                         expect_success=True,
                     )
                     assert "Добавлено: 1" in message
