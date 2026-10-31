@@ -78,13 +78,11 @@ jobs:
           python -m tools.runtime_filesystem_cleanup_smoke
           if ($LASTEXITCODE -ne 0) { throw "Runtime filesystem regression failed" }
 
-      - name: Native Windows public and shared XLSX smoke
+      - name: Existing comprehensive GUI, public/shared XLSX and data safety smoke
         shell: pwsh
         run: |
-          python -m tools.public_xlsx_smoke
-          if ($LASTEXITCODE -ne 0) { throw "Public XLSX regression failed" }
-          python -m tools.shared_xlsx_smoke
-          if ($LASTEXITCODE -ne 0) { throw "Shared XLSX regression failed" }
+          python tools/gui_regression_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "GUI / XLSX regression failed" }
 
       - name: Build frozen app with accepted spec
         shell: pwsh
