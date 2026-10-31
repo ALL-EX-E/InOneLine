@@ -77,6 +77,13 @@ def run_internal_helper_if_requested() -> int | None:
 
         return run_chat_catalog_helper(sys.argv[2], sys.argv[3])
 
+    if command == "--autotest-sandbox":
+        if len(sys.argv) != 3:
+            return 2
+        from streaming_manager.operator_autotest import run_sandbox
+
+        return run_sandbox(sys.argv[2])
+
     if command == "--create-backup":
         if len(sys.argv) != 5:
             return 2
