@@ -53,7 +53,7 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
         runner = _ChatImageProcessRunner()
         with patch("streaming_manager.views.chat_rich_feed.subprocess.Popen", return_value=fake):
             with ThreadPoolExecutor(max_workers=1) as workers:
-                future = workers.submit(runner.fetch, "https://cdn.example.com/icon.png")
+                future = workers.submit(runner.fetch, "https://cdn.7tv.app/icon.png")
                 self.assertTrue(fake.started.wait(2), "helper was not started")
                 start = time.monotonic()
                 runner.shutdown()
@@ -61,7 +61,7 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
                 self.assertIsNone(future.result(timeout=2))
                 self.assertTrue(fake.killed)
                 runner.shutdown()  # idempotent
-                self.assertIsNone(runner.fetch("https://cdn.example.com/new.png"))
+                self.assertIsNone(runner.fetch("https://cdn.7tv.app/new.png"))
 
     def test_slow_body_has_total_deadline(self):
         fake = BlockedChild()
@@ -71,7 +71,7 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
             patch("streaming_manager.views.chat_rich_feed._CHAT_FETCH_DEADLINE_SECONDS", 0.1),
         ):
             start = time.monotonic()
-            self.assertIsNone(runner.fetch("https://cdn.example.com/slow.png"))
+            self.assertIsNone(runner.fetch("https://cdn.7tv.app/slow.png"))
             self.assertLess(time.monotonic() - start, 2)
             self.assertTrue(fake.killed)
         runner.shutdown()
@@ -89,14 +89,14 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
         feed._fetch_processes.fetch = fake_fetch
         try:
             for i in range(9):
-                feed._enqueue(f"https://cdn.example.com/image{i}.png")
+                feed._enqueue(f"https://cdn.7tv.app/image{i}.png")
             self.assertTrue(started.wait(2))
             self.assertGreater(len(feed._jobs), 0)
             feed.shutdown()
             self.assertTrue(feed._pool._shutdown)
             self.assertFalse(feed._poll.isActive())
             self.assertEqual(feed._jobs, {})
-            feed._enqueue("https://cdn.example.com/after.png")
+            feed._enqueue("https://cdn.7tv.app/after.png")
             self.assertEqual(feed._jobs, {})
             feed.shutdown()
         finally:
@@ -136,7 +136,7 @@ class ShutdownLifecycleSmoke(unittest.TestCase):
         fake.communicate = communicate
         runner = _ChatImageProcessRunner()
         with patch("streaming_manager.views.chat_rich_feed.subprocess.Popen", return_value=fake):
-            result = runner.fetch("https://cdn.example.com/static.png")
+            result = runner.fetch("https://cdn.7tv.app/static.png")
         self.assertIsNotNone(result)
         self.assertFalse(result[0].animated)
         self.assertEqual(result[1].height(), 48)
