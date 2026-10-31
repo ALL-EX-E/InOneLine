@@ -826,6 +826,84 @@ def main():
                         print("R06_T02_ANY_SLIDE_TO_ALWAYS_PASS",
                               idx, chat_mode, direction, len(trace),
                               flush=True)
+            # T02 FIX4 completion: command-activated List is ALREADY VISIBLE
+            # when the operator switches it to Always. No disappearance and
+            # no entrance from its former directional setting are permitted.
+            # Cover every direction x both compositions x both chat modes in
+            # both real OBS browser sources, not merely the hidden transitions.
+            state.set_obs_enabled("twitch", True)
+            for chat_mode in ("always", "hide_empty"):
+                db.set_setting("multichat_appearance_common",
+                               json.dumps({"visibility":chat_mode}))
+                for composition in ("split", "replace"):
+                    for direction in ("left", "right", "top", "bottom"):
+                        db.set_settings_bulk({
+                            "list_overlay_show_mode": "slide",
+                            "list_chat_layout": composition,
+                            "list_slide_direction": direction,
+                            "list_animation_seconds": "0.75",
+                            "list_slide_duration": "15",
+                        })
+                        api.configure_list_show("slide", "!list", 15)
+                        for p in pages:
+                            until(p, lambda m: not m["shown"] and
+                                  not m["splitOutgoing"] and
+                                  not m["flowOutgoing"],
+                                  "T02 visible setup " + chat_mode + "/" +
+                                  composition + "/" + direction, timeout=25)
+                        QTest.qWait(900)
+                        result = state.ingest(ChatMessage(
+                            "twitch", "chan",
+                            "visible-" + chat_mode + "-" + composition +
+                            "-" + direction, "alice", "!list"))
+                        assert result, ("T02 visible command rejected",
+                                        chat_mode, composition, direction)
+                        for p in pages:
+                            until(p, lambda m: m["shown"],
+                                  "T02 visible command shown " + chat_mode +
+                                  "/" + composition + "/" + direction,
+                                  timeout=25)
+                        QTest.qWait(940)
+                        # Verify the precondition in BOTH browser sources:
+                        # this must be an on-screen, not hidden, transition.
+                        for idx, p in enumerate(pages):
+                            visible = evaluate(p, CHAT_METRICS)
+                            assert visible["shown"], (
+                                "T02 visible precondition failed", idx,
+                                chat_mode, composition, direction, visible)
+                            assert visible["replace"] == (composition == "replace"), (
+                                "T02 wrong source composition", idx, visible)
+                        before = [evaluate(p, """JSON.stringify(
+                          Number(document.getElementById('list-composition')
+                            .dataset.r06TopEnterStarted || 0))""")
+                          for p in pages]
+                        db.set_setting("list_overlay_show_mode", "always")
+                        api.configure_list_show("always", "!list", 30)
+                        for idx, p in enumerate(pages):
+                            until(p, lambda m: m["shown"] and
+                                  not m["alwaysEntering"] and
+                                  not m["replace"] and
+                                  m["panelOpacity"] >= 0.99,
+                                  "T02 visible always settled " + chat_mode +
+                                  "/" + composition + "/" + direction,
+                                  timeout=30)
+                            current = evaluate(p, CHAT_METRICS)
+                            counter = evaluate(p, """JSON.stringify(
+                              Number(document.getElementById('list-composition')
+                                .dataset.r06TopEnterStarted || 0))""")
+                            assert counter == before[idx], (
+                                "T02 visible List erroneously entered again",
+                                idx, chat_mode, composition, direction,
+                                before[idx], counter)
+                            assert current["shown"] and current["panelOpacity"] >= 0.99, (
+                                "T02 visible List lost visible content", idx,
+                                chat_mode, composition, direction, current)
+                            assert abs(current["chatBottomGap"]) <= 3, (
+                                "T02 visible List changed chat bottom", idx,
+                                chat_mode, composition, direction, current)
+                            print("R06_T02_VISIBLE_SLIDE_TO_ALWAYS_PASS",
+                                  idx, chat_mode, composition, direction,
+                                  flush=True)
             print("R06_BROWSER_FIX2_PASS", flush=True)
         finally:
             for v in views:
