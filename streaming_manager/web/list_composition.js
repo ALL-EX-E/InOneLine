@@ -203,21 +203,32 @@
         }
       }
       lastEmbeddedChatNeeded = chatNeeded;
-      // The parent remains active even if Qt suspends polling inside an
-      // off-screen iframe. Once its new message is in /api/data, wake the
-      // existing embedded chat only when its DOM is still empty. A bounded
-      // retry repairs an initial post-reenable reload that stayed suspended.
+      // The parent is already polling /api/data while Qt may suspend a
+      // nested iframe's async refresh. If /api/data confirms messages but
+      // the iframe is still empty, fetch the EXISTING chat endpoint from
+      // the active parent and pass its snapshot through the child's normal
+      // renderer. No duplicated message formatting or Twitch event path.
       if (chatNeeded && chatHasMessages &&
           performance.now() - lastEmbeddedRefreshAt >= 1000) {
         try {
           const childFrame = chatLayer.querySelector("iframe");
           const childMessages = childFrame?.contentDocument
             ?.getElementById("messages");
-          const refresh = childFrame?.contentWindow?.IOLRefreshEmbeddedChat;
+          const render = childFrame?.contentWindow?.IOLRenderEmbeddedChatState;
           if (childMessages && childMessages.children.length === 0 &&
-              typeof refresh === "function") {
+              typeof render === "function") {
             lastEmbeddedRefreshAt = performance.now();
-            refresh();
+            fetch("/api/multichat", {cache:"no-store"})
+              .then(response => response.ok ? response.json() : null)
+              .then(snapshot => {
+                const frame = chatLayer.querySelector("iframe");
+                const rows = frame?.contentDocument?.getElementById("messages");
+                if (snapshot && chatAvailable && chatHasMessages &&
+                    rows && rows.children.length === 0) {
+                  frame.contentWindow?.IOLRenderEmbeddedChatState?.(snapshot);
+                }
+              })
+              .catch(() => { /* next bounded poll retries */ });
           }
         } catch (_) { /* iframe may be reloading; next poll retries */ }
       }
