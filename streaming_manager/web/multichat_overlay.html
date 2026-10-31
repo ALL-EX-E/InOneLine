@@ -252,11 +252,8 @@ body {color:#fff;font:18px/1.3 sans-serif}
     row.appendChild(body);
     root.appendChild(row);
   }
-  async function update() {
+  function renderState(state) {
     try {
-      const response = await fetch("/api/multichat", {cache:"no-store"});
-      if (!response.ok) return;
-      const state = await response.json();
       prewarmMedia(state.media_preload && state.media_preload.twitch);
       applyAppearance(state.appearance);
       const messages = Array.isArray(state.messages) ?
@@ -282,9 +279,18 @@ body {color:#fff;font:18px/1.3 sans-serif}
       }
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
-  // The shared List+chat parent can wake an embedded iframe after OBS/Qt
-  // throttles its timers while hidden. The standalone chat is unchanged.
-  if (embedded) window.IOLRefreshEmbeddedChat = update;
+  async function update() {
+    try {
+      const response = await fetch("/api/multichat", {cache:"no-store"});
+      if (response.ok) renderState(await response.json());
+    } catch (_) { /* operator diagnostics stay in InOneLine */ }
+  }
+  // The same renderer serves ordinary child polling and a targeted parent
+  // resync when Chromium suspends an embedded iframe's asynchronous timers.
+  if (embedded) {
+    window.IOLRefreshEmbeddedChat = update;
+    window.IOLRenderEmbeddedChatState = renderState;
+  }
   update();
   setInterval(update, 500);
 })();
