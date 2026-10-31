@@ -414,21 +414,19 @@ def download_external_image_as_png(
 CHAT_FEED_IMAGE_LIMIT_BYTES = 2 * 1024 * 1024
 
 
-def run_chat_image_fetch_helper(url: str) -> int:
-    """Write one bounded chat image to stdout (animation flag + image bytes).
+def run_chat_image_fetch_helper(url: str, destination: str) -> int:
+    """Write one bounded image to a private file owned by the parent process.
 
-    This private protocol is used only by a short-lived, supervised process.
-    Never print progress or errors to stdout, which carries binary image data.
+    The frozen Windows build uses console=False: sys.stdout is None in
+    PyInstaller GUI processes. A unique temporary file works in both modes.
     """
-    import sys
-
     try:
         result = download_external_image(url)
         if len(result.image_bytes) > CHAT_FEED_IMAGE_LIMIT_BYTES:
             return 1
         payload = (bytes((1,)) if result.animated else bytes((0,))) + result.image_bytes
-        sys.stdout.buffer.write(payload)
-        sys.stdout.buffer.flush()
+        with open(destination, "wb") as output:
+            output.write(payload)
         return 0
     except Exception:
         return 1
@@ -437,6 +435,6 @@ def run_chat_image_fetch_helper(url: str) -> int:
 if __name__ == "__main__":
     import sys
 
-    if len(sys.argv) == 3 and sys.argv[1] == "--chat-image-fetch":
-        raise SystemExit(run_chat_image_fetch_helper(sys.argv[2]))
+    if len(sys.argv) == 4 and sys.argv[1] == "--chat-image-fetch":
+        raise SystemExit(run_chat_image_fetch_helper(sys.argv[2], sys.argv[3]))
     raise SystemExit(2)
