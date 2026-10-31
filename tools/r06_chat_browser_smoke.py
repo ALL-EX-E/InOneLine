@@ -85,6 +85,7 @@ CHAT_METRICS = """JSON.stringify((() => {
     alwaysEntering: root?.classList.contains('r06-flow-enter') ||
       root?.classList.contains('r06-top-enter') ||
       root?.classList.contains('r06-always-resize'),
+    topEnterFinished: Number(root?.dataset.r06TopEnterFinished || 0),
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
     chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
@@ -663,7 +664,12 @@ def main():
             for p in pages:
                 until(p, lambda m: m["shown"] and m["height"] == 0,
                       "T02 no-chat saved state reached browser")
-            QTest.qWait(1850)
+            for p in pages:
+                baseline=evaluate(p, "JSON.stringify(window.__r06T02TopBaseline || {})")
+                until(p, lambda m, previous=baseline.get("finished", 0):
+                      m["topEnterFinished"] > previous and
+                      m["shown"] and not m["alwaysEntering"],
+                      "T02 no-chat compositor animation fully finished")
             for idx,p in enumerate(pages):
                 trace=evaluate(p,"JSON.stringify(window.__r06T02TopTrace || [])")
                 proof=evaluate(p, """JSON.stringify((() => {
