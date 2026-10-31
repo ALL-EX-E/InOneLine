@@ -1459,7 +1459,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             self._shared_xlsx_set_status("Синхронизировано", mtime=result.get("mtime"))
 
     def _shared_xlsx_force_import(self) -> None:
-        if self._shared_xlsx_path is None or self._shared_xlsx_worker is not None:
+        if (self._shared_xlsx_shutdown or self._shared_xlsx_path is None
+                or self._shared_xlsx_worker is not None):
             return
         signature = self._shared_xlsx_signature(self._shared_xlsx_path)
         if signature is None:
@@ -1492,7 +1493,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_start_import(signature)
 
     def _shared_xlsx_start_import(self, signature: tuple[int, int]) -> None:
-        if self._shared_xlsx_path is None or self._shared_xlsx_worker is not None:
+        if (self._shared_xlsx_shutdown or self._shared_xlsx_path is None
+                or self._shared_xlsx_worker is not None):
             return
         path = self._shared_xlsx_path
         expected_hash = self._shared_xlsx_last_hash
@@ -1587,6 +1589,8 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
     def _shared_xlsx_worker_finished(self) -> None:
         self._shared_xlsx_worker = None
         self._shared_xlsx_worker_kind = ""
+        if self._shared_xlsx_shutdown:
+            return  # Preserve completed import/write; do not plan a new one.
         self._shared_xlsx_update_controls()
         if self._shared_xlsx_write_pending and self._shared_xlsx_path is not None:
             delay = 1500 if self._shared_xlsx_write_retry else SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS
