@@ -764,23 +764,37 @@ def main():
                         evaluate(p, """(() => {
                           const root=document.getElementById('list-composition'),
                                 panel=document.getElementById('list-panel');
+                          window.__r06UniversalObserver?.disconnect();
                           window.__r06UniversalTrace=[];
                           const started=performance.now();
+                          const capture=()=>{
+                            if(!root.classList.contains('r06-shown')) return;
+                            const t=new DOMMatrixReadOnly(
+                              getComputedStyle(panel).transform);
+                            window.__r06UniversalTrace.push({
+                              x:t.m41, y:t.m42,
+                              opacity:+getComputedStyle(panel).opacity,
+                              flow:root.classList.contains('r06-flow-enter'),
+                              top:root.classList.contains('r06-top-enter')
+                            });
+                          };
+                          // Qt WebEngine throttles RAF for background OBS
+                          // windows. A class-change observer captures the
+                          // entry even when zero animation frames run.
+                          window.__r06UniversalObserver=
+                            new MutationObserver(capture);
+                          window.__r06UniversalObserver.observe(root,{
+                            attributes:true,attributeFilter:['class']});
+                          window.__r06UniversalObserver.observe(panel,{
+                            attributes:true,attributeFilter:['style']});
+                          const timer=setInterval(capture,60);
                           const tick=()=>{
-                            if(root.classList.contains('r06-shown')){
-                              const t=new DOMMatrixReadOnly(
-                                getComputedStyle(panel).transform);
-                              window.__r06UniversalTrace.push({
-                                x:t.m41, y:t.m42,
-                                opacity:+getComputedStyle(panel).opacity,
-                                flow:root.classList.contains('r06-flow-enter'),
-                                top:root.classList.contains('r06-top-enter')
-                              });
-                            }
-                            if(performance.now()-started<2800)
+                            capture();
+                            if(performance.now()-started<3800)
                               requestAnimationFrame(tick);
                           };
                           requestAnimationFrame(tick);
+                          setTimeout(()=>clearInterval(timer),4000);
                           return true;
                         })()""")
                     db.set_setting("list_overlay_show_mode", "always")
