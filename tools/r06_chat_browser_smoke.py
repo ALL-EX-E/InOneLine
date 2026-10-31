@@ -690,10 +690,39 @@ def main():
                         "T02 no-chat List content fades during entry",idx,trace)
                 print("R06_T02_NO_CHAT_TOP_ENTRY_PASS",idx,len(trace),flush=True)
             state.set_obs_enabled("twitch", True)
-            state.ingest(ChatMessage("twitch", "chan", "fresh", "alice", "new only"))
-            for p in pages:
-                until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
-                      "Fresh history after re-enabling chat")
+            fresh_ingested = state.ingest(
+                ChatMessage("twitch", "chan", "fresh", "alice", "new only"))
+            authoritative = state.snapshot(for_obs=True)
+            print("R06_REENABLE_CHAT_SERVER_STATE:",
+                  {"ingested": fresh_ingested,
+                   "obs_enabled": authoritative["obs_enabled"],
+                   "messages": [(m["platform"], m["external_id"])
+                                for m in authoritative["messages"]]},
+                  flush=True)
+            assert fresh_ingested and len(authoritative["messages"]) == 1, (
+                "Twitch server must admit exactly one fresh OBS message",
+                fresh_ingested, authoritative)
+            with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                print("R06_REENABLE_CHAT_HTTP_STATE:",
+                      response.read().decode("utf-8")[:500], flush=True)
+            for idx,p in enumerate(pages):
+                try:
+                    until(p, lambda m: m["count"] == 1 and m["height"] >= 8,
+                          "Fresh history after re-enabling chat")
+                except AssertionError:
+                    print("R06_REENABLE_CHAT_CLIENT_DIAG:", idx,
+                          evaluate(p, """JSON.stringify((() => {
+                            const r=document.getElementById('list-chat'),
+                                  frame=r?.querySelector('iframe'),
+                                  doc=frame?.contentDocument,
+                                  rows=doc?.getElementById('rows');
+                            return {frame:frame?.src, ready:doc?.readyState,
+                              childURL:doc?.URL, rows:rows?.children.length,
+                              text:rows?.textContent?.slice(0,150),
+                              iframeDisplay:frame&&getComputedStyle(frame).display,
+                              online:navigator.onLine};
+                          })())"""), flush=True)
+                    raise
             print("R06_BROWSER_FIX2_PASS", flush=True)
         finally:
             for v in views:
