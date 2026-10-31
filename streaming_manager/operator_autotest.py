@@ -283,6 +283,132 @@ def run_sandbox(output_file: str) -> int:
 
                 check("sandbox_list_duplicate_title_guard", duplicate_title_rejected)
 
+                # AUTO-TEST-002B: use the real CSV import button, worker,
+                # isolated-process safety backup, strict parser, result/error
+                # callbacks and table refresh, all inside the Qt temp root.
+                import sqlite3
+                from PySide6.QtWidgets import QFileDialog
+
+                def csv_import_via_ui(csv_name, csv_content, expect_success):
+                    csv_path = paths.root_dir / csv_name
+                    csv_path.write_text(csv_content, encoding="utf-8")
+                    info_messages = []
+                    error_messages = []
+                    original_picker = QFileDialog.getOpenFileName
+                    original_info = QMessageBox.information
+                    original_critical = QMessageBox.critical
+                    try:
+                        QFileDialog.getOpenFileName = staticmethod(
+                            lambda *args, **kwargs: (str(csv_path), "CSV (*.csv)")
+                        )
+                        QMessageBox.information = staticmethod(
+                            lambda *args, **kwargs:
+                            info_messages.append(str(args[2]) if len(args) > 2 else "")
+                            or QMessageBox.Ok
+                        )
+                        QMessageBox.critical = staticmethod(
+                            lambda *args, **kwargs:
+                            error_messages.append(str(args[2]) if len(args) > 2 else "")
+                            or QMessageBox.Ok
+                        )
+                        window._set_current_main_page(tab)
+                        app.processEvents()
+                        assert tab._import_worker is None, "previous CSV worker is running"
+                        assert tab.import_btn.isEnabled(), "CSV import button is disabled"
+                        tab.import_btn.click()
+                        assert tab._import_worker is not None, "no CSV worker was scheduled"
+                        deadline = time.monotonic() + 105.0
+                        while tab._import_worker is not None and time.monotonic() < deadline:
+                            app.processEvents()
+                            time.sleep(0.03)
+                        app.processEvents()
+                        assert tab._import_worker is None, "CSV import worker did not finish"
+                        assert tab.import_btn.isEnabled(), "CSV import button stayed disabled"
+                        if expect_success:
+                            assert len(info_messages) == 1, "completion dialog missing"
+                            assert not error_messages, "unexpected CSV error dialog"
+                        else:
+                            assert len(error_messages) == 1, "CSV error dialog missing"
+                            assert not info_messages, "invalid CSV was reported as success"
+                        return info_messages[0] if expect_success else error_messages[0]
+                    finally:
+                        QFileDialog.getOpenFileName = original_picker
+                        QMessageBox.information = original_info
+                        QMessageBox.critical = original_critical
+
+                def safety_backup_files():
+                    return tuple(sorted(paths.backups_dir.glob("streaming_*.db")))
+
+                def assert_backup_is_valid(before):
+                    after = safety_backup_files()
+                    new_files = set(after) - set(before)
+                    assert len(new_files) == 1, "safety backup not created"
+                    backup_file = next(iter(new_files))
+                    assert backup_file.stat().st_size > 0, "safety backup empty"
+                    with sqlite3.connect(str(backup_file)) as copied:
+                        assert copied.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                    return backup_file
+
+                def csv_normal_merge_with_backup():
+                    assert record_id is not None, "list create failed earlier"
+                    before = safety_backup_files()
+                    message = csv_import_via_ui(
+                        "autotest_valid.csv",
+                        "НАЗВАНИЕ;БАЛЛЫ;ДАТА;ОТЗЫВ\\n"
+                        + edited_title + ";0;;\\n"
+                        + "IOL CSV New;78;27.08.2019;\\n",
+                        expect_success=True,
+                    )
+                    assert "Добавлено: 1" in message and "Изменено: 1" in message
+                    assert_backup_is_valid(before)
+                    old = db.get_game(record_id)
+                    assert old.sm_points == 0, "explicit zero points not applied"
+                    assert old.review == "Synthetic review", "blank CSV erased review"
+                    new = db.find_game_by_title("IOL CSV New")
+                    assert new is not None and new.sm_points == 78
+                    assert new.release_date == "2019-08-27"
+                    assert db.count_all_games() == 2
+                    assert tab.table.rowCount() == 2, "list was not refreshed"
+
+                check("sandbox_csv_ui_merge_zero_and_safety_backup", csv_normal_merge_with_backup)
+
+                def csv_invalid_is_atomic():
+                    before = safety_backup_files()
+                    original = db.get_game(record_id)
+                    count = db.count_all_games()
+                    message = csv_import_via_ui(
+                        "autotest_invalid.csv",
+                        "НАЗВАНИЕ;БАЛЛЫ;СТАТУС\\n"
+                        "IOL CSV Atomic Good;99;НЕ ИГРАЛ\\n"
+                        "IOL CSV Atomic Bad;50;НЕИЗВЕСТНО\\n",
+                        expect_success=False,
+                    )
+                    assert "Импорт не выполнен" in message, "missing import error detail"
+                    assert "СТАТУС" in message and "строка 3" in message
+                    assert_backup_is_valid(before)
+                    assert db.count_all_games() == count, "invalid CSV changed database"
+                    assert db.find_game_by_title("IOL CSV Atomic Good") is None
+                    assert db.get_game(record_id) == original, "failed import changed record"
+                    assert tab.table.rowCount() == count
+
+                check("sandbox_csv_ui_error_atomicity_and_backup", csv_invalid_is_atomic)
+
+                def csv_legacy_pipe():
+                    before = safety_backup_files()
+                    message = csv_import_via_ui(
+                        "autotest_legacy.csv",
+                        "IOL CSV Legacy|125\\n",
+                        expect_success=True,
+                    )
+                    assert "Добавлено: 1" in message
+                    assert_backup_is_valid(before)
+                    record = db.find_game_by_title("IOL CSV Legacy")
+                    assert record is not None and record.sm_points == 125
+                    assert db.count_all_games() == 3
+                    assert tab.table.rowCount() == 3
+
+                check("sandbox_csv_ui_legacy_pipe_and_backup", csv_legacy_pipe)
+
             finally:
                 window.close()
                 app.processEvents()
