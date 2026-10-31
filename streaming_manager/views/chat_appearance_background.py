@@ -242,4 +242,8 @@ class ChatBackgroundFrame(QFrame):
             self._paint_media()
 
     def shutdown(self):
+        # The parent QWidget close does not deliver ChatRichFeed.closeEvent.
+        # Stop the feed and all of its network helpers explicitly, after the
+        # unsaved-appearance confirmation has accepted application exit.
+        self.feed.shutdown()
         self._stop_media()
