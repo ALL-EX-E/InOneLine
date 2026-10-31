@@ -56,6 +56,13 @@ CHAT_METRICS = """JSON.stringify((() => {
   const doc = chat?.querySelector('iframe')?.contentDocument;
   const cards = doc?.getElementById('messages');
   const panel = document.getElementById('list-panel');
+  const root = document.getElementById('list-composition');
+  if (root?.classList.contains('r06-flow-exit') &&
+      Array.isArray(window.__r06T01BoundaryTrace)) {
+    window.__r06T01BoundaryTrace.push(+(
+      chat.getBoundingClientRect().top -
+      panel.getBoundingClientRect().bottom).toFixed(3));
+  }
   if (!chat || !panel) return {
     ready: document.readyState, href: location.href, panel: !!panel,
     height: -1, count: -1, transition: 0, replace: false, shown: false
@@ -74,6 +81,7 @@ CHAT_METRICS = """JSON.stringify((() => {
     chatTop: +chat.getBoundingClientRect().top.toFixed(2),
     listTop: +document.getElementById('list-layer').getBoundingClientRect().top.toFixed(2),
     splitOutgoing: document.getElementById('list-composition')?.classList.contains('r06-split-exit'),
+    flowOutgoing: root?.classList.contains('r06-flow-exit'),
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
     chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
@@ -259,9 +267,15 @@ def main():
                     evaluate(p, T01_TRACE_SCRIPT)
                     db.set_setting("list_overlay_show_mode", "hidden")
                     api.configure_list_show("hidden", "!list", 30)
-                    until(p, lambda m: not m["shown"] and m["height"] > 40,
-                          "R06_T01_FOREGROUND_REPLAY: List exit")
-                    QTest.qWait(1850)
+                    until(p, lambda m: m["flowOutgoing"],
+                          "R06_T01_FOREGROUND_REPLAY: real flow exit started")
+                    # Host-driven CSS snapshots do not depend on RAF in an
+                    # occluded Qt Chromium page. This retains the same <=1px
+                    # true List/chat boundary requirement.
+                    for _ in range(12):
+                        evaluate(p, CHAT_METRICS)
+                        QTest.qWait(110)
+                    QTest.qWait(700)
                     trace = evaluate(p,
                         "JSON.stringify(window.__r06T01BoundaryTrace || [])")
                 assert len(trace) >= 5, (
