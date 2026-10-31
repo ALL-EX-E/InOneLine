@@ -82,6 +82,9 @@ CHAT_METRICS = """JSON.stringify((() => {
     listTop: +document.getElementById('list-layer').getBoundingClientRect().top.toFixed(2),
     splitOutgoing: document.getElementById('list-composition')?.classList.contains('r06-split-exit'),
     flowOutgoing: root?.classList.contains('r06-flow-exit'),
+    alwaysEntering: root?.classList.contains('r06-flow-enter') ||
+      root?.classList.contains('r06-top-enter') ||
+      root?.classList.contains('r06-always-resize'),
     replace: document.getElementById('list-composition')?.classList.contains('r06-replace'),
     shown: document.getElementById('list-composition')?.classList.contains('r06-shown'),
     chatSrc: chat?.querySelector('iframe')?.getAttribute('src'),
@@ -387,6 +390,11 @@ def main():
                 until(p, lambda m: m["count"] == 0 and m["height"] == 0,
                       "R06_T01_RESTORE: empty hide-empty chat hidden")
             QTest.qWait(1750)
+            for p in pages:
+                until(p, lambda m: m["shown"] and m["height"] == 0 and
+                      not m["alwaysEntering"] and not m["splitOutgoing"] and
+                      abs(m["transition"] - 1.5) < 0.03,
+                      "T02 restored Always completely before message height/speed tests")
 
             accepted = state.ingest(ChatMessage("twitch", "chan", "first", "alice", "short message"))
             print("R06_BROWSER_INGEST:", accepted, state.snapshot(for_obs=True)["messages"], flush=True)
