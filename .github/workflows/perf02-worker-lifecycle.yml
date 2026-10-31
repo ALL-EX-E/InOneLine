@@ -80,6 +80,8 @@ jobs:
 
       - name: Existing comprehensive GUI, public/shared XLSX and data safety smoke
         shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
         run: |
           python tools/gui_regression_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "GUI / XLSX regression failed" }
