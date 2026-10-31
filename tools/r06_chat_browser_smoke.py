@@ -488,10 +488,91 @@ def main():
                 until(p, lambda m: not m["replace"] and m["shown"] and m["height"] > 8,
                       "Return to split without resetting active list")
 
+            # T02: active Replace->Always never exits and re-enters.
+            # Instead, the already visible full-size List shrinks to its
+            # Always share while the chat grows underneath the SAME edge.
+            db.set_setting("list_chat_layout", "replace")
+            for p in pages:
+                until(p, lambda m: m["replace"] and m["shown"],
+                      "T02 prepare: visible full-size replacement List")
+                evaluate(p, """(() => {
+                  window.__r06T02ResizeTrace=[];
+                  const root=document.getElementById('list-composition'),
+                        list=document.getElementById('list-panel'),
+                        chat=document.getElementById('list-chat');
+                  const started=performance.now();
+                  const tick=()=>{
+                    if(root.classList.contains('r06-always-resize')){
+                      const a=list.getBoundingClientRect(),b=chat.getBoundingClientRect();
+                      window.__r06T02ResizeTrace.push({
+                        gap:+(b.top-a.bottom).toFixed(3),
+                        listHeight:+a.height.toFixed(3),
+                        chatHeight:+b.height.toFixed(3),
+                        alpha:+getComputedStyle(list).opacity,
+                        top:+a.top.toFixed(3)
+                      });
+                    }
+                    if(performance.now()-started<4200)requestAnimationFrame(tick);
+                  };
+                  requestAnimationFrame(tick);return true;
+                })()""")
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 30)
+            QTest.qWait(1900)
+            for idx,p in enumerate(pages):
+                trace=evaluate(p,"JSON.stringify(window.__r06T02ResizeTrace || [])")
+                assert len(trace)>=5, ("T02 visible resizing frames missing",idx,trace)
+                assert max(abs(row["gap"]) for row in trace)<=1.0, (
+                    "T02 resize List and chat edges diverged",idx,trace)
+                assert min(row["alpha"] for row in trace)>=0.99, (
+                    "T02 visible List must not fade during resize",idx,trace)
+                assert trace[0]["listHeight"]>trace[-1]["listHeight"]+30, (
+                    "T02 oversized visible List did not shrink",idx,trace)
+                assert trace[-1]["chatHeight"]>trace[0]["chatHeight"]+30, (
+                    "T02 chat did not grow under shrinking List",idx,trace)
+                print("R06_T02_VISIBLE_REPLACE_RESIZE_PASS",idx,len(trace),flush=True)
             state.set_obs_enabled("twitch", False)
             for p in pages:
                 until(p, lambda m: m["height"] == 0,
                       "Global OBS chat toggle releases area")
+            # T02: when no Twitch chat is visible, the List has the
+            # entire composition and must enter vertically from ABOVE.
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 30)
+            QTest.qWait(1850)
+            for p in pages:
+                evaluate(p, """(() => {
+                  window.__r06T02TopTrace=[];
+                  const r=document.getElementById('list-composition'),
+                        panel=document.getElementById('list-panel');
+                  const started=performance.now();
+                  const tick=()=>{
+                    const a=panel.getBoundingClientRect(),b=r.getBoundingClientRect();
+                    if(r.classList.contains('r06-top-enter') ||
+                       (r.classList.contains('r06-shown') && performance.now()-started<1450)){
+                      window.__r06T02TopTrace.push({
+                        top:+(a.top-b.top).toFixed(3),
+                        opacity:+getComputedStyle(panel).opacity,
+                        transform:getComputedStyle(panel).transform
+                      });
+                    }
+                    if(performance.now()-started<3500)requestAnimationFrame(tick);
+                  };
+                  requestAnimationFrame(tick);return true;
+                })()""")
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 30)
+            QTest.qWait(1850)
+            for idx,p in enumerate(pages):
+                trace=evaluate(p,"JSON.stringify(window.__r06T02TopTrace || [])")
+                assert len(trace)>=3,("T02 no-chat top entry not sampled",idx,trace)
+                assert min(row["top"] for row in trace)<-10,(
+                    "T02 no-chat List did not enter from above",idx,trace)
+                assert abs(trace[-1]["top"])<=2.0, (
+                    "T02 no-chat List not at final position",idx,trace)
+                assert min(row["opacity"] for row in trace)>=0.99, (
+                    "T02 no-chat List content fades",idx,trace)
+                print("R06_T02_NO_CHAT_TOP_ENTRY_PASS",idx,len(trace),flush=True)
             state.set_obs_enabled("twitch", True)
             state.ingest(ChatMessage("twitch", "chan", "fresh", "alice", "new only"))
             for p in pages:
