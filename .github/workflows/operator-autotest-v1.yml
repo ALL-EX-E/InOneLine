@@ -46,7 +46,7 @@ jobs:
           $code = $LASTEXITCODE
           if (!(Test-Path "$env:RUNNER_TEMP/operator_source.json")) { throw 'Sandbox JSON absent' }
           $j = Get-Content "$env:RUNNER_TEMP/operator_source.json" -Raw | ConvertFrom-Json
-          $j.tests | ForEach-Object { Write-Host ("AUTOTEST_SOURCE {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
+          $j.tests | ForEach-Object { Write-Host ("AUTOTEST_SOURCE {0} {1} {2}" -f $_.status,$_.name,($_.error_type + " " + $_.error_message)) }
           if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 14) { throw 'Source sandbox test failed' }
 
       - name: PowerShell 5.1 operator script parser
@@ -101,7 +101,7 @@ jobs:
           $code = $proc.ExitCode
           if (!(Test-Path $result)) { throw 'Frozen sandbox JSON absent' }
           $j = Get-Content $result -Raw | ConvertFrom-Json
-          $j.tests | ForEach-Object { Write-Host ("AUTOTEST_FROZEN {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
+          $j.tests | ForEach-Object { Write-Host ("AUTOTEST_FROZEN {0} {1} {2}" -f $_.status,$_.name,($_.error_type + " " + $_.error_message)) }
           if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 14) { throw 'Frozen sandbox test failed' }
 
       - name: Real Windows normal close without forced success
