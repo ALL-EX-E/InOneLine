@@ -282,9 +282,10 @@ def main():
                   const root = document.getElementById('list-composition');
                   const chat = document.getElementById('list-chat');
                   const panel = document.getElementById('list-panel');
-                  const started = performance.now();
+                  let started = null;
                   const tick = () => {
                     if (root.classList.contains('r06-flow-enter')) {
+                      if (started === null) started = performance.now();
                       const a = panel.getBoundingClientRect(), b = chat.getBoundingClientRect();
                       window.__r06T02Trace.push({
                         gap:+(b.top-a.bottom).toFixed(3),
@@ -295,7 +296,8 @@ def main():
                         transform:getComputedStyle(panel).transform
                       });
                     }
-                    if (performance.now()-started < 4200) requestAnimationFrame(tick);
+                    if (started === null || performance.now()-started < 4200)
+                      requestAnimationFrame(tick);
                   };
                   requestAnimationFrame(tick);
                   return true;
@@ -529,9 +531,10 @@ def main():
                   const root=document.getElementById('list-composition'),
                         list=document.getElementById('list-panel'),
                         chat=document.getElementById('list-chat');
-                  const started=performance.now();
+                  let started=null;
                   const tick=()=>{
                     if(root.classList.contains('r06-always-resize')){
+                      if(started===null)started=performance.now();
                       const a=list.getBoundingClientRect(),b=chat.getBoundingClientRect();
                       window.__r06T02ResizeTrace.push({
                         gap:+(b.top-a.bottom).toFixed(3),
@@ -541,7 +544,8 @@ def main():
                         top:+a.top.toFixed(3)
                       });
                     }
-                    if(performance.now()-started<7000)requestAnimationFrame(tick);
+                    if(started===null || performance.now()-started<3500)
+                      requestAnimationFrame(tick);
                   };
                   requestAnimationFrame(tick);return true;
                 })()""")
