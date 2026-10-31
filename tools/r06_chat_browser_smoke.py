@@ -247,6 +247,91 @@ def main():
                     "T01 hidden mode must use upward exit", idx, hidden_transform)
                 print("R06_T01_LOCKED_BOUNDARY_PASS", idx, len(trace),
                       max(abs(gap) for gap in trace), flush=True)
+            # T02: entering Always from a completely hidden List is the
+            # exact REVERSE of T01. The full-size List rides the shrinking
+            # chat's upper edge; it never grows from a zero-height panel or
+            # inherits a previously saved horizontal slide direction.
+            for p in pages:
+                evaluate(p, """(() => {
+                  window.__r06T02Trace = [];
+                  const root = document.getElementById('list-composition');
+                  const chat = document.getElementById('list-chat');
+                  const panel = document.getElementById('list-panel');
+                  const started = performance.now();
+                  const tick = () => {
+                    if (root.classList.contains('r06-flow-enter')) {
+                      const a = panel.getBoundingClientRect(), b = chat.getBoundingClientRect();
+                      window.__r06T02Trace.push({
+                        gap:+(b.top-a.bottom).toFixed(3),
+                        chatHeight:+b.height.toFixed(3),
+                        panelHeight:+a.height.toFixed(3),
+                        chatBottom:+b.bottom.toFixed(3),
+                        alpha:+getComputedStyle(panel).opacity,
+                        transform:getComputedStyle(panel).transform
+                      });
+                    }
+                    if (performance.now()-started < 4200) requestAnimationFrame(tick);
+                  };
+                  requestAnimationFrame(tick);
+                  return true;
+                })()""")
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 30)
+            for p in pages:
+                until(p, lambda m: m["shown"] and m["height"] > 40,
+                      "R06_T02_SHOW: reverse always-entry from hidden")
+            QTest.qWait(1850)
+            for idx, p in enumerate(pages):
+                trace = evaluate(p, "JSON.stringify(window.__r06T02Trace || [])")
+                assert len(trace) >= 5, ("T02 missing entering frames", idx, trace)
+                assert max(abs(row["gap"]) for row in trace) <= 1.0, (
+                    "T02 list/chat boundary desynchronized", idx, trace)
+                assert max(row["panelHeight"] for row in trace) - min(
+                    row["panelHeight"] for row in trace) <= 1.0, (
+                    "T02 List stretched during entry", idx, trace)
+                assert min(row["alpha"] for row in trace) >= 0.99, (
+                    "T02 must not fade List content", idx, trace)
+                assert trace[0]["chatHeight"] > trace[-1]["chatHeight"] + 30, (
+                    "T02 chat must shrink downward", idx, trace)
+                assert max(abs(row["chatBottom"] - trace[0]["chatBottom"])
+                           for row in trace) <= 1.0, (
+                    "T02 chat bottom jumped", idx, trace)
+                snapshot = evaluate(p, """JSON.stringify((() => {
+                  const root=document.getElementById('list-composition');
+                  const panel=document.getElementById('list-panel');
+                  const chat=document.getElementById('list-chat');
+                  return {show:root.classList.contains('r06-shown'),
+                    flow:root.classList.contains('r06-flow-enter'),
+                    gap:chat.getBoundingClientRect().top-panel.getBoundingClientRect().bottom,
+                    panelHeight:panel.getBoundingClientRect().height,
+                    chatHeight:chat.getBoundingClientRect().height
+                  };
+                })())""")
+                assert snapshot["show"] and not snapshot["flow"], (idx, snapshot)
+                assert abs(snapshot["gap"]) <= 1.0, (idx, snapshot)
+                print("R06_T02_REVERSE_GEOMETRY_PASS", idx, len(trace),
+                      max(abs(row["gap"]) for row in trace), flush=True)
+            # Re-saving Always while it is already occupying its target
+            # cannot retrigger entry or reset the visible content.
+            for p in pages:
+                before = evaluate(p, """JSON.stringify((() => {
+                  const root=document.getElementById('list-composition');
+                  return {cls:root.className,
+                    chat:document.getElementById('list-chat').offsetHeight,
+                    panel:document.getElementById('list-panel').offsetHeight};
+                })())""")
+                QTest.qWait(260)
+                after = evaluate(p, """JSON.stringify((() => {
+                  const root=document.getElementById('list-composition');
+                  return {cls:root.className,
+                    chat:document.getElementById('list-chat').offsetHeight,
+                    panel:document.getElementById('list-panel').offsetHeight};
+                })())""")
+                assert before == after, ("T02 stable Always must not animate", before, after)
+            # Return to T01's hidden state before subsequent chat modes.
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 30)
+            QTest.qWait(1900)
             db.set_setting("multichat_appearance_common",
                            json.dumps({"visibility": "hide_empty"}))
             db.set_setting("list_overlay_show_mode", "always")
