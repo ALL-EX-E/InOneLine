@@ -10,8 +10,13 @@ redemption fulfillment/refund semantics remain unchanged.
 """
 
 import json
+import os
 import re
+import subprocess
+import sys
+import tempfile
 import threading
+from pathlib import Path
 from time import monotonic
 from collections import OrderedDict
 from queue import Empty, Full, PriorityQueue
@@ -578,6 +583,7 @@ class TwitchEventSubRuntime:
         self._third_party_source = ""
         self._third_party_thread: threading.Thread | None = None
         self._third_party_next_refresh = 0.0
+        self._third_party_process: subprocess.Popen | None = None
 
     def _queue_media(self, task: tuple) -> bool:
         if self._media_thread is None or not self._media_thread.is_alive():
@@ -618,17 +624,96 @@ class TwitchEventSubRuntime:
             worker.start()
 
     def _load_third_party_catalog(self, source_id: str) -> None:
+        """Load the *existing* provider catalog in one killable helper process.
+
+        Nested ThreadPoolExecutor tasks in the GUI process previously blocked
+        Python's _python_exit while waiting for network DNS/connect. Keeping
+        that code in a child preserves the providers/parsers, but makes their
+        timeout/cancellation independent of Python thread shutdown.
+        """
+        from .emote_catalog import CHAT_CATALOG_MAX_BYTES, EmoteCatalogItem
+
         try:
-            from .emote_catalog import fetch_third_party_chat_emotes
-            catalog = make_catalog(fetch_third_party_chat_emotes(source_id))
-        except Exception:
+            fd, output_path = tempfile.mkstemp(prefix="iol-catalog-", suffix=".json")
+            os.close(fd)
+        except OSError:
             return
-        with self._media_lock:
-            if (self._stop.is_set()
-                    or self._chat_source_id != source_id
-                    or self._third_party_source != source_id):
+
+        process = None
+        try:
+            if getattr(sys, "frozen", False):
+                command = [sys.executable, "--fetch-chat-catalog", source_id, output_path]
+            else:
+                command = [
+                    sys.executable, "-m", "streaming_manager.emote_catalog",
+                    "--fetch-chat-catalog", source_id, output_path,
+                ]
+            with self._media_lock:
+                if self._stop.is_set():
+                    return
+                process = subprocess.Popen(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                self._third_party_process = process
+
+            # Whole helper deadline, including DNS and provider fallbacks.
+            process.communicate(timeout=45.0)
+            if process.returncode != 0 or self._stop.is_set():
                 return
-            self._third_party_catalog = catalog
+            with open(output_path, "rb") as stream:
+                raw = stream.read(CHAT_CATALOG_MAX_BYTES + 1)
+            if len(raw) > CHAT_CATALOG_MAX_BYTES:
+                return
+            payload = json.loads(raw.decode("utf-8"))
+            if not isinstance(payload, list):
+                return
+            items = []
+            for row in payload[:3000]:
+                if not isinstance(row, dict):
+                    continue
+                if not all(isinstance(row.get(k), str) for k in (
+                    "source", "emote_id", "name", "image_url", "preview_url"
+                )):
+                    continue
+                items.append(EmoteCatalogItem(
+                    source=row["source"],
+                    emote_id=row["emote_id"],
+                    name=row["name"],
+                    image_url=row["image_url"],
+                    preview_url=row["preview_url"],
+                    animated=bool(row.get("animated", False)),
+                ))
+            catalog = make_catalog(items)
+            with self._media_lock:
+                if (self._stop.is_set()
+                        or self._chat_source_id != source_id
+                        or self._third_party_source != source_id):
+                    return
+                self._third_party_catalog = catalog
+        except (OSError, ValueError, UnicodeError, subprocess.TimeoutExpired):
+            return
+        finally:
+            if process is not None:
+                if process.poll() is None:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    try:
+                        process.communicate(timeout=2)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+                with self._media_lock:
+                    if self._third_party_process is process:
+                        self._third_party_process = None
+            try:
+                os.unlink(output_path)
+            except OSError:
+                pass
 
     def _schedule_media_warmup(self, source_id: str) -> None:
         """Queue provider metadata before the first chat message, off EventSub."""
@@ -804,10 +889,19 @@ class TwitchEventSubRuntime:
         if media_thread is not None and media_thread.is_alive():
             media_thread.join(timeout=1.0)
         self._media_thread = None
-        # Never wait for external third-party endpoints during shutdown.
+        # A blocked resolver in the catalog child must not block Python exit.
         with self._media_lock:
+            catalog_process = self._third_party_process
             self._third_party_catalog = {}
             self._third_party_source = ""
+        if catalog_process is not None and catalog_process.poll() is None:
+            try:
+                catalog_process.kill()
+            except OSError:
+                pass
+        catalog_thread = self._third_party_thread
+        if catalog_thread is not None and catalog_thread.is_alive():
+            catalog_thread.join(timeout=1.0)
         self.connected = False
 
     def _wait(self, seconds: float) -> None:
