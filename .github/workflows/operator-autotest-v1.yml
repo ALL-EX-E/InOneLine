@@ -92,8 +92,11 @@ jobs:
         shell: pwsh
         run: |
           $result = "$env:RUNNER_TEMP/operator_frozen.json"
-          & "dist/InOneLine/InOneLine.exe" --autotest-sandbox "$result"
-          $code = $LASTEXITCODE
+          # InOneLine.exe is a Windows GUI-subsystem executable (console=False).
+          # PowerShell '&' does not wait for GUI processes; Start-Process -Wait
+          # is required or the JSON check races the running frozen helper.
+          $proc = Start-Process -FilePath (Resolve-Path "dist/InOneLine/InOneLine.exe").Path -ArgumentList @("--autotest-sandbox", ('"' + $result + '"')) -PassThru -Wait
+          $code = $proc.ExitCode
           if (!(Test-Path $result)) { throw 'Frozen sandbox JSON absent' }
           $j = Get-Content $result -Raw | ConvertFrom-Json
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_FROZEN {0} {1} {2}" -f $_.status,$_.name,$_.error_type) }
