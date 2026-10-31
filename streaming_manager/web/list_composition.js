@@ -565,12 +565,12 @@
         pendingAlwaysEntry = {
           wasVisible: previouslyVisible, wasReplace: previousReplace
         };
-        // T02 regression: a hidden command List may still carry the previous
-        // left/right/bottom transform. Prepare the universal top/flow entry
-        // BEFORE changeActive() makes it visible. Otherwise Chromium starts
-        // the old slide transition for one frame before layout() corrects it.
+        // T02 regression: ONLY a hidden command List needs the universal
+        // top/flow entry prepared before it is made visible. A List already
+        // on-screen (notably visible Replace -> Always) must retain the
+        // previously accepted layout-first in-place resize animation.
         // The zero-height /overlay slot is handled by layout() as before.
-        if (root.clientHeight > 0) {
+        if (!previouslyVisible && root.clientHeight > 0) {
           const pending = pendingAlwaysEntry;
           pendingAlwaysEntry = null;
           beginAlwaysEntry(pending.wasVisible, pending.wasReplace);
