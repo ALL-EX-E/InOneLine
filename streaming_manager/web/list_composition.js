@@ -50,8 +50,13 @@
     }
     /* No shrinking chat: enter from the top at the final List size, without
        fading the List items or painting an opaque background. */
+    @keyframes r06-always-enter-top {
+      from {transform:translateY(-100%)}
+      to {transform:translate3d(0,0,0)}
+    }
     .r06-compose.r06-top-enter .r06-list-layer > #list-panel {
-      opacity:1!important;transform:translateY(-100%)!important;
+      opacity:1!important;
+      animation:r06-always-enter-top var(--r06-list-transition,1000ms) ease both;
       transition:none!important
     }
     /* A List which is already visible NEVER leaves the stage and re-enters.
@@ -320,17 +325,10 @@
           listLayer.style.flex = "0 0 " + targetHeight + "px";
         } else {
           incomingAlways = {type:"top", targetHeight};
-          // The override is applied before layout makes the List visible.
+          // CSS keyframes use the final-size List's own height, from
+          // -100% through 0, and do not depend on requestAnimationFrame
+          // scheduling (OBS throttles inactive Chromium sources).
           root.classList.add("r06-top-enter");
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (!incomingAlways || incomingAlways.type !== "top") return;
-            root.classList.remove("r06-top-enter");
-            // Force a start/end transform under one saved duration; the
-            // class had transition:none, which avoids opacity fading.
-            listPanel.style.transition = "transform " + animationMs + "ms ease";
-            listPanel.style.opacity = "1";
-            listPanel.style.transform = "translate3d(0,0,0)";
-          }));
         }
       } else {
         // With a visible slide/replace List, no show-again animation. Move
