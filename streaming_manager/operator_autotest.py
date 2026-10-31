@@ -146,6 +146,134 @@ def run_sandbox(output_file: str) -> int:
                     window._set_current_main_page(page)
                     app.processEvents()
                     assert window._current_main_page() is page, "tab navigation failed"
+                # AUTO-TEST-002A: real GamesTab actions through the visible UI
+                # and actual GameDialog validation, never the user's database.
+                from PySide6.QtWidgets import QDialog, QMessageBox
+                from .views.games import GameDialog
+
+                tab = window.games_tab
+                test_title = "IOL Test List A"
+                edited_title = "IOL Test List Edited"
+                record_id = None
+
+                def use_dialog(**values):
+                    # The QDialog.exec() modal event loop is replaced ONLY in
+                    # this sandbox process. The original validator, payload,
+                    # button callback and database code still run unmodified.
+                    original_exec = GameDialog.exec
+
+                    def automated_exec(dialog):
+                        if "title" in values:
+                            dialog.title_edit.setText(values["title"])
+                        if "amount" in values:
+                            dialog.amount_edit.setValue(values["amount"])
+                        if "review" in values:
+                            dialog.review_edit.setPlainText(values["review"])
+                        if "date" in values:
+                            dialog.date_edit.setText(values["date"])
+                        dialog._ask_yes_no = lambda *args, **kwargs: True
+                        dialog._validate_and_accept()
+                        return dialog.result()
+
+                    GameDialog.exec = automated_exec
+                    return original_exec
+
+                def create_list_record():
+                    nonlocal record_id
+                    window._set_current_main_page(tab)
+                    original = use_dialog(
+                        title=test_title, amount=123, date="26.01.2010"
+                    )
+                    try:
+                        assert tab.add_btn.isEnabled(), "add button disabled"
+                        tab.add_btn.click()
+                    finally:
+                        GameDialog.exec = original
+                    saved = db.find_game_by_title(test_title)
+                    assert saved is not None, "record absent after Add"
+                    record_id = saved.id
+                    assert saved.sm_points == 123
+                    assert tab.table.rowCount() == 1
+                    assert tab.table.item(0, 2).text() == test_title
+
+                check("sandbox_list_add_dialog_and_persist", create_list_record)
+
+                def list_search_and_selection():
+                    assert record_id is not None, "Add test did not succeed"
+                    window._set_current_main_page(tab)
+                    tab.search.setText(test_title)
+                    app.processEvents()
+                    assert tab.table.rowCount() == 1, "exact search count"
+                    tab.activate_search()
+                    assert tab.selected_game_id() == record_id
+                    tab.search.setText("IOL_NOT_FOUND_98765")
+                    app.processEvents()
+                    assert tab.table.rowCount() == 0, "not-found query leaked rows"
+                    tab.search.clear()
+                    app.processEvents()
+                    assert tab.table.rowCount() == 1, "clear search did not restore rows"
+
+                check("sandbox_list_search_select_and_not_found", list_search_and_selection)
+
+                def edit_list_record():
+                    assert record_id is not None, "Add test did not succeed"
+                    window._set_current_main_page(tab)
+                    tab.focus_game(record_id)
+                    assert tab.selected_game_id() == record_id
+                    original = use_dialog(
+                        title=edited_title, amount=456, review="Synthetic review"
+                    )
+                    try:
+                        assert tab.edit_btn.isEnabled(), "edit button disabled"
+                        tab.edit_btn.click()
+                    finally:
+                        GameDialog.exec = original
+                    saved = db.get_game(record_id)
+                    assert saved.title == edited_title, "edit title not persisted"
+                    assert saved.sm_points == 456, "edit amount not persisted"
+                    assert saved.review == "Synthetic review"
+                    assert db.find_game_by_title(test_title) is None
+                    assert db.count_all_games() == 1
+
+                check("sandbox_list_edit_dialog_and_persist", edit_list_record)
+
+                def archive_restore_record():
+                    assert record_id is not None, "Add test did not succeed"
+                    window._set_current_main_page(tab)
+                    tab.focus_game(record_id)
+                    original_question = QMessageBox.question
+                    try:
+                        QMessageBox.question = staticmethod(
+                            lambda *args, **kwargs: QMessageBox.Yes
+                        )
+                        tab.archive_selected(True)
+                    finally:
+                        QMessageBox.question = original_question
+                    assert db.get_game(record_id).archived == 1
+                    tab.apply_stat_filter("archive")
+                    assert tab.table.rowCount() == 1
+                    assert tab._select_game_row(record_id)
+                    tab.archive_selected(False)
+                    assert db.get_game(record_id).archived == 0
+                    tab.apply_stat_filter("all")
+                    assert tab.table.rowCount() == 1
+
+                check("sandbox_list_archive_filter_and_restore", archive_restore_record)
+
+                def duplicate_title_rejected():
+                    assert record_id is not None, "Add test did not succeed"
+                    window._set_current_main_page(tab)
+                    original = use_dialog(title=edited_title, amount=999)
+                    try:
+                        tab.add_btn.click()
+                    finally:
+                        GameDialog.exec = original
+                    assert db.count_all_games() == 1, "duplicate created"
+                    assert tab.selected_game_id() == record_id
+                    assert db.get_game(record_id).sm_points == 456
+
+                check("sandbox_list_duplicate_title_guard", duplicate_title_rejected)
+
             finally:
                 window.close()
                 app.processEvents()
