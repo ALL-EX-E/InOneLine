@@ -74,13 +74,22 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertIn("IOLListComposition", composition)
                 self.assertIn("card.getBoundingClientRect().height", composition)
                 self.assertNotIn("messages.scrollHeight", composition)
-                self.assertIn("list_animation_seconds", composition)
-                self.assertIn("transition:height var(--r06-list-transition", composition)
-                self.assertIn("r06-chat-covered-clip", composition)
-                self.assertIn("updateOutgoingMask", composition)
-                self.assertIn("root.clientHeight + 12", composition)
-                self.assertIn("listLayer.offsetHeight", composition)
-                self.assertNotIn("listLayer.getBoundingClientRect().height", composition)
+                # R06 ZERO: historic animation-specific code must be gone.
+                # The saved duration/direction remain in the API for a later
+                # separately agreed animation redesign, but are inert here.
+                self.assertIn("transition:none!important", composition)
+                self.assertIn("animation:none!important", composition)
+                self.assertIn('mode === "slide"', composition)
+                self.assertIn("listLayer.style.flex", composition)
+                self.assertIn("IOLRenderEmbeddedChatState", composition)
+                for old_engine in (
+                    "--r06-list-transition", "r06-flow-enter",
+                    "r06-top-enter", "r06-always-resize",
+                    "r06-chat-covered-clip", "updateOutgoingMask",
+                    "freezeOutgoingListLayer", "incomingTopAnimation",
+                    "listPanel.animate(", "transition:height var("
+                ):
+                    self.assertNotIn(old_engine, composition)
                 self.assertNotIn("r06-shown .r06-chat-layer iframe {opacity:0}", composition)
                 self.assertIn('embedded=1', get("/list-overlay"))
 
