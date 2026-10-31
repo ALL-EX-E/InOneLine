@@ -408,3 +408,35 @@ def download_external_image_as_png(
         display_name=result.display_name,
         resolved_url=result.resolved_url,
     )
+
+# PERF-01/03: the child process deliberately performs the complete unmodified
+# secure fetch/decode path. The parent can kill it even during blocking DNS.
+CHAT_FEED_IMAGE_LIMIT_BYTES = 2 * 1024 * 1024
+
+
+def run_chat_image_fetch_helper(url: str) -> int:
+    """Write one bounded chat image to stdout (animation flag + image bytes).
+
+    This private protocol is used only by a short-lived, supervised process.
+    Never print progress or errors to stdout, which carries binary image data.
+    """
+    import sys
+
+    try:
+        result = download_external_image(url)
+        if len(result.image_bytes) > CHAT_FEED_IMAGE_LIMIT_BYTES:
+            return 1
+        payload = (b"\\x01" if result.animated else b"\\x00") + result.image_bytes
+        sys.stdout.buffer.write(payload)
+        sys.stdout.buffer.flush()
+        return 0
+    except Exception:
+        return 1
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) == 3 and sys.argv[1] == "--chat-image-fetch":
+        raise SystemExit(run_chat_image_fetch_helper(sys.argv[2]))
+    raise SystemExit(2)
