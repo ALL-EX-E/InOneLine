@@ -8,6 +8,7 @@ on:
       - "app.py"
       - "streaming_manager/**"
       - "tools/shutdown_lifecycle_smoke.py"
+      - "tools/exit_diagnostics_smoke.py"
       - "tools/graceful_frozen_exit_smoke.py"
       - "installer/**"
       - ".github/workflows/performance-shutdown-candidate.yml"
@@ -47,6 +48,12 @@ jobs:
           python -m tools.shutdown_lifecycle_smoke
           if ($LASTEXITCODE -ne 0) { throw "PERF-01 lifecycle failed" }
 
+      - name: PERF-01 trace data minimization and chronology smoke
+        shell: pwsh
+        run: |
+          python -m tools.exit_diagnostics_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Exit trace smoke failed" }
+
       - name: Existing chat graphics, appearance, Twitch and API regression
         shell: pwsh
         run: |
@@ -77,6 +84,33 @@ jobs:
         run: |
           python tools/graceful_frozen_exit_smoke.py "dist/InOneLine/InOneLine.exe"
           if ($LASTEXITCODE -ne 0) { throw "Frozen graceful exit failed" }
+
+      - name: PERF-01 frozen opt-in exit trace smoke
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+          INONELINE_EXIT_TRACE: "1"
+        run: |
+          python tools/graceful_frozen_exit_smoke.py "dist/InOneLine/InOneLine.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Frozen trace exit failed" }
+          @'
+          import json
+          from pathlib import Path
+          f = Path("dist/InOneLine/logs/exit_trace.jsonl")
+          if not f.is_file():
+              raise AssertionError("opt-in trace was not generated")
+          rows = [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines()]
+          events = [r["event"] for r in rows]
+          for required in ("trace_enabled","close_accepted","chat_stopped",
+                           "integrations_stopped","api_stopped","close_event_returned",
+                           "last_window_closed","about_to_quit","qt_exec_returned"):
+              if required not in events:
+                  raise AssertionError(f"missing expected trace phase {required}: {events}")
+          if events.index("close_accepted") > events.index("close_event_returned"):
+              raise AssertionError("wrong close chronology")
+          print("FROZEN_EXIT_TRACE=PASS")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Frozen trace verification failed" }
 
       - name: Install Inno Setup 7.1.0
         shell: pwsh
