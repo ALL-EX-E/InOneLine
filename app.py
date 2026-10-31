@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from datetime import datetime
@@ -117,6 +118,18 @@ def main() -> int:
         from streaming_manager.ui import MainWindow
 
         app = QApplication(sys.argv)
+        exit_trace = None
+        if os.environ.get("INONELINE_EXIT_TRACE") == "1":
+            from streaming_manager.exit_diagnostics import ExitTrace
+
+            exit_trace = ExitTrace(paths.logs_dir)
+            app._inone_line_exit_trace = exit_trace
+            app.lastWindowClosed.connect(
+                lambda: exit_trace.mark("last_window_closed")
+            )
+            app.aboutToQuit.connect(
+                lambda: exit_trace.mark("about_to_quit")
+            )
         app.setApplicationName(LEGACY_SETTINGS_APP_NAME)
         app.setApplicationDisplayName(APP_NAME)
         app.setOrganizationName("Local Streaming Tools")
@@ -148,7 +161,11 @@ def main() -> int:
 
         window = MainWindow(db, paths)
         window.show()
-        return app.exec()
+        try:
+            return app.exec()
+        finally:
+            if exit_trace is not None:
+                exit_trace.mark("qt_exec_returned")
 
     except BaseException as exc:
         log_path = write_startup_error(paths, exc)
