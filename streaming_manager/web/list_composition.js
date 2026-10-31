@@ -42,6 +42,26 @@
     .r06-compose.r06-flow-exit .r06-list-layer > #list-panel {
       opacity:1!important;transform:none!important;transition:none!important
     }
+    /* T02: the inverse of the accepted T01 exit. In Split, a fixed-size
+       List immediately precedes the shrinking chat in the SAME flex flow:
+       the two moving edges are identical at every animation frame. */
+    .r06-compose.r06-flow-enter .r06-list-layer > #list-panel {
+      opacity:1!important;transform:none!important;transition:none!important
+    }
+    /* No shrinking chat: enter from the top at the final List size, without
+       fading the List items or painting an opaque background. */
+    .r06-compose.r06-top-enter .r06-list-layer > #list-panel {
+      opacity:1!important;transform:translateY(-100%)!important;
+      transition:none!important
+    }
+    /* A List which is already visible NEVER leaves the stage and re-enters.
+       Only its reserved flex size changes, the chat stays bottom-anchored. */
+    .r06-compose.r06-always-resize .r06-list-layer {
+      transition:flex-basis var(--r06-list-transition,1000ms) ease
+    }
+    .r06-compose.r06-always-resize .r06-list-layer > #list-panel {
+      opacity:1!important;transform:none!important;transition:none!important
+    }
   `;
   const sheet = document.createElement("style");
   sheet.textContent = css;
@@ -71,6 +91,8 @@
     let intrinsicChatHeight = 0;
     let outgoingMaskFrame = null;
     let outgoingChatHeightHandler = null;
+    let incomingAlways = null;
+    let incomingAlwaysTimer = null;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -136,6 +158,15 @@
         chatLayer.style.borderRadius = panelStyle.borderRadius;
       }
     }
+    function resetAlwaysEntry() {
+      if (incomingAlwaysTimer !== null) clearTimeout(incomingAlwaysTimer);
+      incomingAlwaysTimer = null;
+      incomingAlways = null;
+      root.classList.remove("r06-flow-enter", "r06-top-enter",
+                            "r06-always-resize");
+      listLayer.style.flex = "";
+      listLayer.style.height = "";
+    }
     function layout() {
       const available = root.clientHeight;
       if (available <= 0) return;
@@ -155,6 +186,10 @@
       root.classList.toggle("r06-replace", replacing);
       if (outgoingFlowExit) {
         listLayer.style.flex = "0 0 " + outgoingFlowHeight + "px";
+      } else if (incomingAlways && incomingAlways.type === "flow") {
+        listLayer.style.flex = "0 0 " + incomingAlways.targetHeight + "px";
+      } else if (incomingAlways && incomingAlways.type === "resize") {
+        listLayer.style.flex = "0 0 " + incomingAlways.targetHeight + "px";
       } else if (!replacing) {
         listLayer.style.flex = listAllocated ? "1 1 auto" : "0 0 0px";
       } else {
@@ -263,14 +298,72 @@
       outgoingMaskFrame = requestAnimationFrame(updateOutgoingMask);
       return true;
     }
+    function beginAlwaysEntry(wasVisible, wasReplace) {
+      resetAlwaysEntry();
+      // The previous composition is still rendered here. Reading client
+      // sizes rather than bounding boxes avoids responsive double-scaling.
+      const available = root.clientHeight;
+      if (available <= 0) return;
+      const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      const currentChat = chatLayer.offsetHeight;
+      const targetChat = chatNeeded ? Math.min(
+        chatAlways ? available : measureChat(),
+        Math.floor((available - 12) / 2)) : 0;
+      const targetHeight = available - targetChat;
+      const currentList = listLayer.offsetHeight;
+      if (!wasVisible) {
+        if (currentChat > targetChat + 2) {
+          incomingAlways = {type:"flow", targetHeight};
+          root.classList.add("r06-flow-enter");
+          // The panel starts completely above the composition. As the chat
+          // contracts, its top edge pulls the fixed-height List into view.
+          listLayer.style.flex = "0 0 " + targetHeight + "px";
+        } else {
+          incomingAlways = {type:"top", targetHeight};
+          // The override is applied before layout makes the List visible.
+          root.classList.add("r06-top-enter");
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (!incomingAlways || incomingAlways.type !== "top") return;
+            root.classList.remove("r06-top-enter");
+            // Force a start/end transform under one saved duration; the
+            // class had transition:none, which avoids opacity fading.
+            listPanel.style.transition = "transform " + animationMs + "ms ease";
+            listPanel.style.opacity = "1";
+            listPanel.style.transform = "translate3d(0,0,0)";
+          }));
+        }
+      } else {
+        // With a visible slide/replace List, no show-again animation. Move
+        // its existing boundary to the Always destination through geometry.
+        if (Math.abs(currentList - targetHeight) <= 2 &&
+            !wasReplace) return;
+        incomingAlways = {type:"resize", targetHeight};
+        root.classList.add("r06-always-resize");
+        listLayer.style.flex = "0 0 " + currentList + "px";
+        // Install the initial flex-basis before the target is applied.
+        listLayer.offsetHeight;
+      }
+      const finish = () => {
+        if (mode !== "always") return;
+        listPanel.style.transition = "";
+        listPanel.style.opacity = "";
+        listPanel.style.transform = "";
+        resetAlwaysEntry();
+        layout();
+        if (onResize) onResize();
+      };
+      incomingAlwaysTimer = setTimeout(finish, animationMs + 180);
+    }
     function changeActive(next) {
       if (active === next) return;
       active = next;
       clearTransition();
       if (next) resetOutgoingOverlay();
+      else if (incomingAlways) resetAlwaysEntry();
       // "Не показывать" is a vertical collapse, not a command slide.
       // A saved earlier slide direction must never rotate this transition.
-      transitionDirection = mode === "hidden" ? "top" : direction;
+      transitionDirection = mode === "hidden" || mode === "always"
+        ? "top" : direction;
       const horizontalSplit = composeMode === "split" &&
         mode === "slide" && ["left","right"].includes(direction);
       const available = Math.max(0, root.clientHeight);
@@ -281,7 +374,7 @@
       const staged = horizontalSplit && needsResize;
       if (next) {
         reserved = true;
-        if (staged) {
+        if (staged && mode !== "always") {
           visualActive = false;
           layout();
           transitionTimer = setTimeout(() => {
@@ -362,6 +455,12 @@
       const nextAnimationMs = Math.round((Number.isFinite(seconds) && seconds > 0
         ? Math.max(0.25, Math.min(3, seconds)) : 1) * 1000);
       const changedGeometry = direction !== newDirection || composeMode !== newCompose;
+      const becomingAlways = newMode === "always" && mode !== "always";
+      const previouslyVisible = active && visualActive;
+      const previousReplace = composeMode === "replace" && mode === "slide";
+      if (becomingAlways && outgoingOverlay) {
+        resetOutgoingOverlay();
+      }
       mode = newMode;
       direction = newDirection;
       composeMode = newCompose;
@@ -398,6 +497,11 @@
       // not interrupt or teleport the current one.
       // Preview must follow the same state/timer as the real OBS source.
       const shouldShow = mode === "always" || (mode === "slide" && deadline > performance.now());
+      if (becomingAlways) {
+        beginAlwaysEntry(previouslyVisible, previousReplace);
+      } else if (incomingAlways && mode !== "always") {
+        resetAlwaysEntry();
+      }
       changeActive(shouldShow);
       layout();
       if (expiryTimer) clearTimeout(expiryTimer);
