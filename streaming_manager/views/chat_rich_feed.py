@@ -10,9 +10,11 @@ No remote HTML, JavaScript or user-provided local paths are interpreted.
 import base64
 import hashlib
 import html
+import os
 import subprocess
 import sys
 import threading
+import tempfile
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -70,22 +72,37 @@ class _ChatImageProcessRunner:
         with self._lock:
             if self._stopped:
                 return None
+            # mkstemp pre-creates a private unpredictable path. The child
+            # writes it and the parent always unlinks it, even on timeout.
+            try:
+                descriptor, output_path = tempfile.mkstemp(prefix="iol-chat-", suffix=".img")
+                os.close(descriptor)
+            except OSError:
+                return None
             try:
                 process = subprocess.Popen(
-                    command,
+                    [*command, output_path],
                     stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except OSError:
+                try:
+                    os.unlink(output_path)
+                except OSError:
+                    pass
                 return None
             self._children.add(process)
         try:
-            # communicate's timeout encompasses DNS, redirects and the body.
-            payload, _ = process.communicate(timeout=_CHAT_FETCH_DEADLINE_SECONDS)
+            # Includes blocking DNS, redirects and slow response bodies.
+            process.communicate(timeout=_CHAT_FETCH_DEADLINE_SECONDS)
+            if process.returncode != 0:
+                return None
+            with open(output_path, "rb") as source:
+                payload = source.read(CHAT_FEED_IMAGE_LIMIT_BYTES + 2)
             if (
-                process.returncode != 0 or len(payload) < 2
+                len(payload) < 2
                 or len(payload) > CHAT_FEED_IMAGE_LIMIT_BYTES + 1
                 or payload[0] not in (0, 1)
             ):
@@ -114,6 +131,10 @@ class _ChatImageProcessRunner:
         finally:
             with self._lock:
                 self._children.discard(process)
+            try:
+                os.unlink(output_path)
+            except OSError:
+                pass
 
     def shutdown(self):
         with self._lock:
