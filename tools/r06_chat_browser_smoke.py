@@ -12,6 +12,7 @@ import sys
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -113,7 +114,7 @@ def main():
         db.set_settings_bulk({
             "list_overlay_show_mode":"always",
             "list_slide_direction":"right",
-            "list_slide_duration":"6",
+            "list_slide_duration":"20",
             "list_animation_seconds":"1.5",
             "list_slide_command":"!list",
             "list_chat_layout":"split",
@@ -123,7 +124,7 @@ def main():
         api = LocalApiServer(db, port=free_port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("always", "!list", 6)
+        api.configure_list_show("always", "!list", 20)
         api.start()
         views = []
         try:
@@ -155,7 +156,7 @@ def main():
                 static_check(m, "always-chat split")
 
             db.set_setting("list_overlay_show_mode", "hidden")
-            api.configure_list_show("hidden", "!list", 6)
+            api.configure_list_show("hidden", "!list", 20)
             for page in pages:
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and
@@ -164,7 +165,7 @@ def main():
                 static_check(m, "hidden")
 
             db.set_setting("list_overlay_show_mode", "always")
-            api.configure_list_show("always", "!list", 6)
+            api.configure_list_show("always", "!list", 20)
             for page in pages:
                 m = until(page, lambda a: a["shown"] and
                           a["listHeight"] > 10 and
@@ -195,7 +196,7 @@ def main():
                     "list_chat_layout":"split",
                     "list_slide_direction":direction,
                 })
-                api.configure_list_show("slide", "!list", 6)
+                api.configure_list_show("slide", "!list", 20)
                 for page in pages:
                     m=until(page, lambda a: not a["shown"] and a["listHeight"] <= 2,
                             "hidden command List before "+direction)
@@ -203,6 +204,11 @@ def main():
                 result=state.ingest(ChatMessage("twitch", "chan",
                     "zero-command-"+direction, "alice", "!list"))
                 assert result, ("List command was rejected", direction)
+                with urlopen(api.base_url + "/api/data", timeout=5) as response:
+                    server = json.loads(response.read().decode("utf-8"))
+                assert server["list_show"]["remaining_ms"] > 0, (
+                    "R06 ZERO command did not activate server timer",
+                    direction, server["list_show"])
                 for page in pages:
                     m=until(page, lambda a: a["shown"] and not a["replace"] and
                             a["listHeight"] > 10,
@@ -211,12 +217,12 @@ def main():
                 for page in pages:
                     m=until(page, lambda a: not a["shown"] and
                             a["listHeight"] <= 2,
-                            "command expiration from "+direction, timeout=18)
+                            "command expiration from "+direction, timeout=27)
                     static_check(m, "expired "+direction)
 
             # Replacement covers chat while shown, then uncovers it at once.
             db.set_setting("list_chat_layout","replace")
-            api.configure_list_show("slide", "!list", 6)
+            api.configure_list_show("slide", "!list", 20)
             assert state.ingest(ChatMessage("twitch", "chan",
                                             "zero-replace", "alice", "!list"))
             for page in pages:
@@ -227,13 +233,13 @@ def main():
             for page in pages:
                 m=until(page, lambda a: not a["shown"] and not a["replace"] and
                         a["listHeight"] <= 2,
-                        "replacement timeout", timeout=18)
+                        "replacement timeout", timeout=27)
                 static_check(m, "replacement timeout")
 
             # The OBS switch must remove the chat without reserving empty space.
             state.set_obs_enabled("twitch", False)
             db.set_setting("list_overlay_show_mode","always")
-            api.configure_list_show("always", "!list", 6)
+            api.configure_list_show("always", "!list", 20)
             for page in pages:
                 m=until(page, lambda a: a["shown"] and a["chatHeight"] == 0 and
                         a["listHeight"] > 10,
