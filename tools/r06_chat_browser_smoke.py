@@ -84,6 +84,27 @@ CHAT_METRICS = """JSON.stringify((() => {
 })())"""
 
 
+# Foreground replay uses the exact same real-time boundary sampler.
+# Qt Chromium can suspend RAF in a covered OBS window on Windows runners.
+T01_TRACE_SCRIPT = """(() => {
+                  window.__r06T01BoundaryTrace = [];
+                  const root = document.getElementById('list-composition');
+                  const chat = document.getElementById('list-chat');
+                  const panel = document.getElementById('list-panel');
+                  const started = performance.now();
+                  const tick = () => {
+                    if (root.classList.contains('r06-flow-exit')) {
+                      const gap = chat.getBoundingClientRect().top -
+                        panel.getBoundingClientRect().bottom;
+                      window.__r06T01BoundaryTrace.push(+gap.toFixed(3));
+                    }
+                    if (performance.now() - started < 4500) requestAnimationFrame(tick);
+                  };
+                  requestAnimationFrame(tick);
+                  return true;
+                })()"""
+
+
 def until(page, predicate, label, timeout=50):
     end = time.monotonic() + timeout
     latest = None
@@ -192,23 +213,7 @@ def main():
             # T01: one animated chat height, List following in the very
             # same flex layout. Real edges must coincide in EVERY frame.
             for p in pages:
-                evaluate(p, """(() => {
-                  window.__r06T01BoundaryTrace = [];
-                  const root = document.getElementById('list-composition');
-                  const chat = document.getElementById('list-chat');
-                  const panel = document.getElementById('list-panel');
-                  const started = performance.now();
-                  const tick = () => {
-                    if (root.classList.contains('r06-flow-exit')) {
-                      const gap = chat.getBoundingClientRect().top -
-                        panel.getBoundingClientRect().bottom;
-                      window.__r06T01BoundaryTrace.push(+gap.toFixed(3));
-                    }
-                    if (performance.now() - started < 4500) requestAnimationFrame(tick);
-                  };
-                  requestAnimationFrame(tick);
-                  return true;
-                })()""")
+                evaluate(p, T01_TRACE_SCRIPT)
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 30)
             for p in pages:
@@ -237,8 +242,28 @@ def main():
             for idx, p in enumerate(pages):
                 trace = evaluate(p,
                     "JSON.stringify(window.__r06T01BoundaryTrace || [])")
+                if len(trace) < 5:
+                    # A covered Chromium window may get 0 RAF callbacks.
+                    # Re-play the SAME accepted T01 transition with that
+                    # source foregrounded, not weaken the geometry bound.
+                    views[idx].raise_()
+                    views[idx].activateWindow()
+                    QTest.qWait(160)
+                    db.set_setting("list_overlay_show_mode", "always")
+                    api.configure_list_show("always", "!list", 30)
+                    until(p, lambda m: m["shown"] and m["height"] > 30,
+                          "R06_T01_FOREGROUND_REPLAY: restore visible List")
+                    QTest.qWait(1850)
+                    evaluate(p, T01_TRACE_SCRIPT)
+                    db.set_setting("list_overlay_show_mode", "hidden")
+                    api.configure_list_show("hidden", "!list", 30)
+                    until(p, lambda m: not m["shown"] and m["height"] > 40,
+                          "R06_T01_FOREGROUND_REPLAY: List exit")
+                    QTest.qWait(1850)
+                    trace = evaluate(p,
+                        "JSON.stringify(window.__r06T01BoundaryTrace || [])")
                 assert len(trace) >= 5, (
-                    "T01 shared flex exit not observed", idx, trace)
+                    "T01 shared flex exit not observed even foregrounded", idx, trace)
                 assert max(abs(gap) for gap in trace) <= 1.0, (
                     "T01 List/Chat geometry diverged in a real frame", idx, trace)
                 hidden_transform = evaluate(p, """document.getElementById(
