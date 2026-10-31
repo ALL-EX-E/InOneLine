@@ -95,6 +95,7 @@
     let incomingAlwaysTimer = null;
     let incomingTopAnimation = null;
     let pendingAlwaysEntry = null;
+    let lastEmbeddedChatNeeded = false;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -188,6 +189,19 @@
       const replacing = composeMode === "replace" && mode === "slide";
       const listAllocated = mode === "always" || reserved;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      // Qt/OBS Chromium may suspend a nested iframe's 500ms polling while
+      // an empty Twitch chat has no allocated space. The /api/multichat
+      // response remains correct, but the child can stay stale after the
+      // first new message. Wake it ONCE on false->true visibility, rather
+      // than refreshing continuously or touching the Twitch event state.
+      if (chatNeeded && !lastEmbeddedChatNeeded && chatHasMessages) {
+        const embeddedFrame = chatLayer.querySelector('iframe');
+        if (embeddedFrame) {
+          const url = embeddedFrame.getAttribute('src');
+          if (url) embeddedFrame.setAttribute('src', url);
+        }
+      }
+      lastEmbeddedChatNeeded = chatNeeded;
       matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
       const splitCap = listAllocated ? Math.floor((available - 12) / 2) : available;
