@@ -70,6 +70,13 @@ def run_internal_helper_if_requested() -> int | None:
 
         return run_chat_image_fetch_helper(sys.argv[2], sys.argv[3])
 
+    if command == "--fetch-chat-catalog":
+        if len(sys.argv) != 4:
+            return 2
+        from streaming_manager.emote_catalog import run_chat_catalog_helper
+
+        return run_chat_catalog_helper(sys.argv[2], sys.argv[3])
+
     if command == "--create-backup":
         if len(sys.argv) != 5:
             return 2
