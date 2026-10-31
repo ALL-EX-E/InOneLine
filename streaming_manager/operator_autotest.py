@@ -264,10 +264,19 @@ def run_sandbox(output_file: str) -> int:
                     assert record_id is not None, "Add test did not succeed"
                     window._set_current_main_page(tab)
                     original = use_dialog(title=edited_title, amount=999)
+                    # The expected duplicate warning is a modal QMessageBox.
+                    # Record that it was shown, without blocking headless CI.
+                    original_warning = QMessageBox.warning
+                    warnings = []
                     try:
+                        QMessageBox.warning = staticmethod(
+                            lambda *args, **kwargs: warnings.append(True) or QMessageBox.Ok
+                        )
                         tab.add_btn.click()
                     finally:
+                        QMessageBox.warning = original_warning
                         GameDialog.exec = original
+                    assert len(warnings) == 1, "duplicate warning not shown"
                     assert db.count_all_games() == 1, "duplicate created"
                     assert tab.selected_game_id() == record_id
                     assert db.get_game(record_id).sm_points == 456
