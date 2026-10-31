@@ -341,8 +341,8 @@ def main():
                     "T02 List stretched during entry", idx, trace)
                 assert min(row["alpha"] for row in trace) >= 0.99, (
                     "T02 must not fade List content", idx, trace)
-                assert trace[0]["chatHeight"] > trace[-1]["chatHeight"] + 30, (
-                    "T02 chat must shrink downward", idx, trace)
+                assert trace[0]["chatHeight"] > min(row["chatHeight"] for row in trace) + 1, (
+                    "T02 chat must begin shrinking downward in sampled frames", idx, trace)
                 assert max(abs(row["chatBottom"] - trace[0]["chatBottom"])
                            for row in trace) <= 1.0, (
                     "T02 chat bottom jumped", idx, trace)
@@ -359,6 +359,14 @@ def main():
                 })())""")
                 assert snapshot["show"] and not snapshot["flow"], (idx, snapshot)
                 assert abs(snapshot["gap"]) <= 1.0, (idx, snapshot)
+                # Qt Chromium can provide only the first few RAF callbacks
+                # before the source is covered. The *full* 620->304 shrink
+                # is verified against a separately measured final DOM state,
+                # while every sampled moving frame still has <=1px gap.
+                assert trace[0]["chatHeight"] > snapshot["chatHeight"] + 30, (
+                    "T02 chat failed to shrink into final split geometry", idx, trace, snapshot)
+                assert abs(snapshot["panelHeight"] - trace[0]["panelHeight"]) <= 1.0, (
+                    "T02 List changed intrinsic size during entrance", idx, trace, snapshot)
                 print("R06_T02_REVERSE_GEOMETRY_PASS", idx, len(trace),
                       max(abs(row["gap"]) for row in trace), flush=True)
             # Re-saving Always while it is already occupying its target
