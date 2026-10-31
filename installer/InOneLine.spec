@@ -8,6 +8,7 @@ icon_master = root / "assets" / "InOneLine_icon_master.png"
 icon_ico = root / "assets" / "InOneLine.ico"
 
 hiddenimports = [
+    "streaming_manager.operator_autotest",
     "PySide6.QtCore",
     "PySide6.QtGui",
     "PySide6.QtWidgets",
