@@ -50,13 +50,8 @@
     }
     /* No shrinking chat: enter from the top at the final List size, without
        fading the List items or painting an opaque background. */
-    @keyframes r06-always-enter-top {
-      from {transform:translateY(-100%)}
-      to {transform:translate3d(0,0,0)}
-    }
     .r06-compose.r06-top-enter .r06-list-layer > #list-panel {
       opacity:1!important;
-      animation:r06-always-enter-top var(--r06-list-transition,1000ms) ease both;
       transition:none!important
     }
     /* A List which is already visible NEVER leaves the stage and re-enters.
@@ -98,6 +93,7 @@
     let outgoingChatHeightHandler = null;
     let incomingAlways = null;
     let incomingAlwaysTimer = null;
+    let incomingTopAnimation = null;
 
     function clearTransition() {
       if (transitionTimer !== null) clearTimeout(transitionTimer);
@@ -166,6 +162,9 @@
     function resetAlwaysEntry() {
       if (incomingAlwaysTimer !== null) clearTimeout(incomingAlwaysTimer);
       incomingAlwaysTimer = null;
+      if (incomingTopAnimation !== null) incomingTopAnimation.cancel();
+      incomingTopAnimation = null;
+      listPanel.style.transform = "";
       incomingAlways = null;
       root.classList.remove("r06-flow-enter", "r06-top-enter",
                             "r06-always-resize");
@@ -325,10 +324,29 @@
           listLayer.style.flex = "0 0 " + targetHeight + "px";
         } else {
           incomingAlways = {type:"top", targetHeight};
-          // CSS keyframes use the final-size List's own height, from
-          // -100% through 0, and do not depend on requestAnimationFrame
-          // scheduling (OBS throttles inactive Chromium sources).
+          // The old List flex slot can still be ZERO when mode changes.
+          // Prepare it off-screen now, but begin the animation in a
+          // microtask AFTER changeActive/layout assigns its final height.
+          // Web Animations run on the Chromium compositor even if inactive
+          // OBS pages throttle requestAnimationFrame and CSS keyframe starts.
           root.classList.add("r06-top-enter");
+          listPanel.style.transform = "translateY(-100%)";
+          Promise.resolve().then(() => {
+            if (!incomingAlways || incomingAlways.type !== "top" ||
+                mode !== "always") return;
+            // Force final layout before Web Animations resolves %-translation.
+            listPanel.offsetHeight;
+            incomingTopAnimation = listPanel.animate([
+              {transform:"translateY(-100%)"},
+              {transform:"translate3d(0,0,0)"},
+            ], {duration:animationMs, easing:"ease", fill:"both"});
+            root.dataset.r06TopEnterStarted = String(
+              Number(root.dataset.r06TopEnterStarted || 0) + 1);
+            incomingTopAnimation.onfinish = () => {
+              root.dataset.r06TopEnterFinished = String(
+                Number(root.dataset.r06TopEnterFinished || 0) + 1);
+            };
+          });
         }
       } else {
         // With a visible slide/replace List, no show-again animation. Move
