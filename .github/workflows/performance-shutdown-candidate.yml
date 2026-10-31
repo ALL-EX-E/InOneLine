@@ -9,6 +9,7 @@ on:
       - "streaming_manager/**"
       - "tools/shutdown_lifecycle_smoke.py"
       - "tools/exit_diagnostics_smoke.py"
+      - "tools/third_party_catalog_exit_smoke.py"
       - "tools/graceful_frozen_exit_smoke.py"
       - "installer/**"
       - ".github/workflows/performance-shutdown-candidate.yml"
@@ -53,6 +54,12 @@ jobs:
         run: |
           python -m tools.exit_diagnostics_smoke
           if ($LASTEXITCODE -ne 0) { throw "Exit trace smoke failed" }
+
+      - name: PERF-01 third-party catalog nested executor shutdown regression
+        shell: pwsh
+        run: |
+          python -m tools.third_party_catalog_exit_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Twitch catalog cleanup failed" }
 
       - name: Existing chat graphics, appearance, Twitch and API regression
         shell: pwsh
