@@ -80,6 +80,45 @@ class CatalogExitSmoke(unittest.TestCase):
                 fake.kill()
                 worker.join(2)
 
+    def test_real_os_child_is_reaped_after_runtime_stop(self):
+        import sys
+
+        runtime = runtime_for_test()
+        spawned = []
+        real_popen = subprocess.Popen
+
+        def spawn_stalled_child(_args, **kwargs):
+            child = real_popen(
+                [sys.executable, "-c", "import time;time.sleep(60)"],
+                **kwargs,
+            )
+            spawned.append(child)
+            return child
+
+        try:
+            with patch("streaming_manager.twitch_b4.subprocess.Popen", side_effect=spawn_stalled_child):
+                worker = threading.Thread(
+                    target=runtime._load_third_party_catalog,
+                    args=("12345",),
+                )
+                worker.start()
+                deadline = time.monotonic() + 5
+                while not spawned and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(spawned, "catalog helper not launched")
+                start = time.monotonic()
+                runtime.stop()
+                worker.join(timeout=3)
+                self.assertLess(time.monotonic() - start, 3)
+                self.assertFalse(worker.is_alive())
+                self.assertIsNotNone(spawned[0].poll(),
+                    "No orphaned catalog helper may survive application stop")
+        finally:
+            for process in spawned:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_existing_catalog_is_preserved_through_json_protocol(self):
         runtime = runtime_for_test()
         rows = [
