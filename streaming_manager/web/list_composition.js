@@ -339,6 +339,18 @@
             !wasReplace) return;
         incomingAlways = {type:"resize", targetHeight};
         root.classList.add("r06-always-resize");
+        if (wasReplace) {
+          // Replace had a full-screen absolute List and a covered full-size
+          // chat. The visible starting geometry is List=100%, chat=0.
+          // Convert to the SAME normal-flow geometry without changing
+          // pixels: only then animate the two shared boundaries to 50/50.
+          root.classList.remove("r06-replace");
+          chatLayer.style.transition = "none";
+          chatLayer.style.height = "0px";
+          chatLayer.offsetHeight;
+          chatLayer.style.transition = "";
+          lastChatHeight = 0;
+        }
         listLayer.style.flex = "0 0 " + currentList + "px";
         // Install the initial flex-basis before the target is applied.
         listLayer.offsetHeight;
