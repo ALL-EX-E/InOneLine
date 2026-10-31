@@ -329,8 +329,8 @@ def main():
             QTest.qWait(1850)
             for p in pages:
                 until(p, lambda m: m["shown"] and m["height"] > 30 and
-                      m["height"] < 360,
-                      "T02 Always final split state settled on both OBS sources")
+                      m["height"] < 360 and not m["alwaysEntering"],
+                      "T02 Always: entry finished and final split settled in both OBS sources")
             for idx, p in enumerate(pages):
                 trace = evaluate(p, "JSON.stringify(window.__r06T02Trace || [])")
                 assert len(trace) >= 5, ("T02 missing entering frames", idx, trace)
