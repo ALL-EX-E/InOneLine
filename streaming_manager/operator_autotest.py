@@ -575,6 +575,7 @@ def run_sandbox(output_file: str) -> int:
                 # AUTO-TEST-002D: destructive UI handlers are exercised only
                 # inside this independent temp DB, after XLSX is disconnected.
                 # Dialog confirmation is simulated, never backup or DB deletion.
+                from contextlib import closing
                 from PySide6.QtCore import QTimer
                 from .views.games import DeleteAllGamesDialog
 
