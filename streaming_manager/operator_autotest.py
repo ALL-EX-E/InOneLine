@@ -875,8 +875,8 @@ def run_sandbox(output_file: str) -> int:
                     app.processEvents()
                     assert db.find_game_by_title(test_title) is not None
                     assert any(
-                        window.games_tab.table.item(i, 1)
-                        and window.games_tab.table.item(i, 1).text() == test_title
+                        window.games_tab.table.item(i, 2)
+                        and window.games_tab.table.item(i, 2).text() == test_title
                         for i in range(window.games_tab.table.rowCount())
                     ), "hidden Games tab did not catch up on open"
                     window._set_current_main_page(window.log_tab)
