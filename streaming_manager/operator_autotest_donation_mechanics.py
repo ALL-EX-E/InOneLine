@@ -183,7 +183,11 @@ def run_donation_mechanic_checks(check):
             assert row and row["auction_only"] == 1, "new lot not auction-scoped"
         entries = db.list_auction_entries(auction_id)
         entry = next(e for e in entries if e["game_id"] == new_id)
-        assert entry["bid_sm_points"] == 10
+        # Newly created auction-only lots store their first credit as
+        # starting_sm_points; only subsequent credit increments bid_sm_points.
+        assert entry["starting_sm_points"] == 10
+        assert entry["bid_sm_points"] == 0
+        assert entry["total_sm_points"] == 10
         assert len(entries) == 3
         assert count(db, "contributions") == 1
 
