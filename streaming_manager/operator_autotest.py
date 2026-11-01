@@ -415,6 +415,163 @@ def run_sandbox(output_file: str) -> int:
 
                 check("sandbox_csv_ui_legacy_pipe_and_backup", csv_legacy_pipe)
 
+                # AUTO-TEST-002C: joint XLSX table UI and real worker file
+                # protocol. File dialogs return paths under ONLY this temp root.
+                # The "remote" client is another SQLite DB under the same root,
+                # not a Google Drive or Twitch connection.
+                from .constants import SHARED_XLSX_ENABLED_KEY, SHARED_XLSX_PATH_KEY
+                from .shared_xlsx import (
+                    main_games_rows, read_shared_xlsx, state_hash,
+                    write_shared_xlsx,
+                )
+
+                auction = window.auction_tab
+                xlsx_path = paths.root_dir / "inone_operator_shared_test.xlsx"
+                remote_title = "IOL XLSX External"
+                remote_record_id = None
+
+                def wait_xlsx_idle():
+                    deadline = time.monotonic() + 40.0
+                    while time.monotonic() < deadline:
+                        app.processEvents()
+                        if (
+                            auction._shared_xlsx_worker is None
+                            and not auction._shared_xlsx_write_timer.isActive()
+                            and not auction._shared_xlsx_write_pending
+                        ):
+                            app.processEvents()
+                            if auction._shared_xlsx_worker is None:
+                                return
+                        time.sleep(0.025)
+                    raise AssertionError("XLSX worker or debounce timer did not finish")
+
+                def assert_xlsx_matches_local():
+                    payload = read_shared_xlsx(xlsx_path)
+                    assert payload["hash"] == state_hash(main_games_rows(db))
+                    return payload
+
+                def xlsx_create_connected():
+                    window._set_current_main_page(tab)
+                    assert auction._shared_xlsx_path is None
+                    original = QFileDialog.getSaveFileName
+                    try:
+                        QFileDialog.getSaveFileName = staticmethod(
+                            lambda *args, **kwargs: (str(xlsx_path), "Excel (*.xlsx)")
+                        )
+                        assert auction.shared_xlsx_create_btn.isEnabled()
+                        auction.shared_xlsx_create_btn.click()
+                    finally:
+                        QFileDialog.getSaveFileName = original
+                    wait_xlsx_idle()
+                    assert xlsx_path.is_file(), "XLSX was not created"
+                    assert auction._shared_xlsx_path == xlsx_path
+                    assert db.get_setting(SHARED_XLSX_ENABLED_KEY) == "1"
+                    assert db.get_setting(SHARED_XLSX_PATH_KEY) == str(xlsx_path)
+                    assert auction.shared_xlsx_path_label.text() == str(xlsx_path)
+                    assert auction.shared_xlsx_disconnect_btn.isEnabled()
+                    assert len(assert_xlsx_matches_local()["rows"]) == 3
+                    assert "Синхронизировано" in auction.shared_xlsx_status_label.text()
+
+                check("sandbox_xlsx_ui_create_connect_and_persist", xlsx_create_connected)
+
+                def xlsx_local_write():
+                    assert auction._shared_xlsx_path == xlsx_path, "not connected"
+                    target = db.find_game_by_title("IOL CSV New")
+                    assert target is not None
+                    db.update_game(target.id, {"sm_points": 321})
+                    window.notify_game_data_changed()
+                    wait_xlsx_idle()
+                    payload = assert_xlsx_matches_local()
+                    exported = next(
+                        row for row in payload["rows"] if row["title"] == "IOL CSV New"
+                    )
+                    assert exported["sm_points"] == 321
+                    assert auction._shared_xlsx_worker is None
+                    assert "Синхронизировано" in auction.shared_xlsx_status_label.text()
+
+                check("sandbox_xlsx_local_change_syncs_to_file", xlsx_local_write)
+
+                def xlsx_external_file_import():
+                    nonlocal remote_record_id
+                    assert auction._shared_xlsx_path == xlsx_path, "not connected"
+                    # An external app/client produces a new valid XLSX file
+                    # through the same public exporter, from a different DB.
+                    external_db = Database(paths.root_dir / "external_xlsx_client.db")
+                    external_db.sync_main_games_state(main_games_rows(db))
+                    ext_record = external_db.find_game_by_title("IOL CSV New")
+                    assert ext_record is not None
+                    external_db.update_game(ext_record.id, {"sm_points": 654})
+                    external_db.add_game(
+                        Game(None, remote_title, None, 777, 0, "not_played", "")
+                    )
+                    before_backup = safety_backup_files()
+                    new_xlsx = write_shared_xlsx(external_db, xlsx_path)
+                    assert new_xlsx["hash"] != state_hash(main_games_rows(db))
+                    # Real stable-file poll: first observation, then confirmed
+                    # unchanged signature, then the real async import worker.
+                    auction._shared_xlsx_poll()
+                    auction._shared_xlsx_poll()
+                    wait_xlsx_idle()
+                    assert_backup_is_valid(before_backup)
+                    synced = db.find_game_by_title("IOL CSV New")
+                    assert synced is not None and synced.sm_points == 654
+                    new = db.find_game_by_title(remote_title)
+                    assert new is not None and new.sm_points == 777
+                    remote_record_id = new.id
+                    assert db.count_all_games() == 4
+                    assert_xlsx_matches_local()
+                    tab.refresh()
+                    assert tab.table.rowCount() == 4
+
+                check("sandbox_xlsx_external_replace_import_and_backup", xlsx_external_file_import)
+
+                def xlsx_disconnect_reconnect():
+                    assert remote_record_id is not None, "external import missing"
+                    assert auction.shared_xlsx_disconnect_btn.isEnabled()
+                    file_hash = read_shared_xlsx(xlsx_path)["hash"]
+                    auction.shared_xlsx_disconnect_btn.click()
+                    assert auction._shared_xlsx_path is None
+                    assert db.get_setting(SHARED_XLSX_ENABLED_KEY) == "0"
+                    assert db.get_setting(SHARED_XLSX_PATH_KEY) == ""
+                    assert xlsx_path.exists(), "disconnect deleted the XLSX file"
+
+                    # A detached local edit must NOT write the disk file.
+                    db.update_game(remote_record_id, {"sm_points": 888})
+                    window.notify_game_data_changed()
+                    app.processEvents()
+                    assert read_shared_xlsx(xlsx_path)["hash"] == file_hash
+                    assert db.get_game(remote_record_id).sm_points == 888
+
+                    before_backup = safety_backup_files()
+                    original = QFileDialog.getOpenFileName
+                    try:
+                        QFileDialog.getOpenFileName = staticmethod(
+                            lambda *args, **kwargs: (str(xlsx_path), "Excel (*.xlsx)")
+                        )
+                        assert auction.shared_xlsx_connect_btn.isEnabled()
+                        auction.shared_xlsx_connect_btn.click()
+                    finally:
+                        QFileDialog.getOpenFileName = original
+                    app.processEvents()  # QTimer.singleShot(0, force_import)
+                    wait_xlsx_idle()
+                    assert_backup_is_valid(before_backup)
+                    assert db.get_game(remote_record_id).sm_points == 777, (
+                        "reconnected file did not restore authoritative XLSX value"
+                    )
+                    assert auction._shared_xlsx_path == xlsx_path
+                    assert db.get_setting(SHARED_XLSX_ENABLED_KEY) == "1"
+                    assert db.get_setting(SHARED_XLSX_PATH_KEY) == str(xlsx_path)
+                    assert_xlsx_matches_local()
+                    tab.refresh()
+                    assert tab.table.rowCount() == 4
+
+                    # Sandbox cleanup never schedules a write to the old XLSX.
+                    auction.shared_xlsx_disconnect_btn.click()
+                    assert db.get_setting(SHARED_XLSX_ENABLED_KEY) == "0"
+                    assert xlsx_path.exists()
+
+                check("sandbox_xlsx_disconnect_preserve_and_reconnect", xlsx_disconnect_reconnect)
+
             finally:
                 window.close()
                 app.processEvents()
