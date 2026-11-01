@@ -96,7 +96,9 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 state.ingest(ChatMessage("twitch", "ch", "m2", "Автор", "Только локально"))
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     obs = json.load(response)
-                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1", "yt1"])
+                # R06: disabling OBS immediately clears earlier Twitch rows
+                # from every OBS presentation, preserving other platforms.
+                self.assertEqual([x["external_id"] for x in obs["messages"]], ["yt1"])
                 self.assertEqual(len(state.snapshot()["messages"]), 3)
 
                 # Invalid delay does not get persisted and is visibly restored.

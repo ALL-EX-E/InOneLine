@@ -88,6 +88,7 @@ class LocalApiServer:
         self._music_player_state_provider = None
         self._music_player_cover_provider = None
         self._multichat_state_provider = None
+        self._list_show_controller = None
 
     @property
     def running(self) -> bool:
@@ -139,6 +140,13 @@ class LocalApiServer:
     def set_multichat_state_provider(self, provider) -> None:
         self._multichat_state_provider = provider
 
+    def set_list_show_controller(self, controller) -> None:
+        self._list_show_controller = controller
+
+    def configure_list_show(self, mode: str, command: str, duration: int) -> None:
+        if self._list_show_controller is not None:
+            self._list_show_controller(mode, command, duration)
+
     def multichat_state(self, *, for_obs: bool = True) -> dict:
         provider = self._multichat_state_provider
         if provider is None:
@@ -173,6 +181,9 @@ class LocalApiServer:
         multichat_overlay_path = Path(__file__).resolve().parent / "web" / "multichat_overlay.html"
         obs_visibility_js = (
             Path(__file__).resolve().parent / "web" / "obs_visibility.js"
+        ).read_text(encoding="utf-8")
+        list_composition_js = (
+            Path(__file__).resolve().parent / "web" / "list_composition.js"
         ).read_text(encoding="utf-8")
         # Static HTML does not change while the program is running. Read once
         # instead of hitting disk for every browser-source navigation/refresh.
@@ -489,6 +500,12 @@ class LocalApiServer:
                         content_type="application/javascript; charset=utf-8",
                     )
                     return
+                if path == "/list-composition.js":
+                    self._send_text(
+                        list_composition_js,
+                        content_type="application/javascript; charset=utf-8",
+                    )
+                    return
                 query = parse_qs(parsed.query)
                 pretty = str(query.get("pretty", ["0"])[0]).lower() in (
                     "1", "true", "yes", "on"
@@ -625,7 +642,22 @@ class LocalApiServer:
                     )
                     return
                 if path in ("/api/data", "/data"):
-                    self._send_json(db.current_stream_payload(), pretty=pretty)
+                    payload = db.current_stream_payload()
+                    chat = api_server.multichat_state(for_obs=True)
+                    appearance = chat.get("appearance") or {}
+                    common = appearance.get("common") or {}
+                    obs_enabled = chat.get("obs_enabled") or {}
+                    chat_messages = chat.get("messages") or []
+                    payload["multichat"] = {
+                        "enabled": obs_enabled.get("twitch", True) is True,
+                        "has_messages": any(
+                            item.get("platform") == "twitch"
+                            for item in chat_messages if isinstance(item, dict)
+                        ),
+                        "visibility": common.get("visibility", "hide_empty"),
+                    }
+                    payload["list_show"] = chat.get("list_show", {})
+                    self._send_json(payload, pretty=pretty)
                     return
                 if path in ("/api/public", "/public"):
                     self._send_json(

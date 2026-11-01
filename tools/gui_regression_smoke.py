@@ -1018,8 +1018,12 @@ def assert_p09_api_ui_cleanup(window, db) -> None:
     for route in ("/health", "/api/health"):
         if read_json(route) != expected_health:
             raise AssertionError(f"P09 UI-043 health contract changed: {route}")
-    if read_json("/api/data") != db.current_stream_payload():
+    obs_payload = read_json("/api/data")
+    previous_payload = db.current_stream_payload()
+    if any(obs_payload.get(key) != value for key, value in previous_payload.items()):
         raise AssertionError("P09 UI-043 OBS data endpoint lost the existing snapshot")
+    if not {"multichat", "list_show"}.issubset(obs_payload):
+        raise AssertionError("R06 List/Chat presentation state missing from existing OBS route")
     if read_json("/api/public") != {"games": db.public_games()}:
         raise AssertionError("P09 UI-043 live public data contract changed")
     for route in ("/overlay", "/list-overlay"):
@@ -1261,8 +1265,19 @@ def assert_p09_list_group(app, stream, db) -> None:
         raise AssertionError("P10 obsolete second List switch remains")
     mode = stream.obs_show_modes["list"]
     fields = (mode, stream.overlay_list_side, stream.frame_color_row_widgets["list"])
-    if [form.getWidgetPosition(widget)[0] for widget in fields] != [2, 3, 4]:
-        raise AssertionError("P10 List show/position/frame grouping changed")
+    positions = [form.getWidgetPosition(widget)[0] for widget in fields]
+    if not (positions[0] == 2 and positions[0] < positions[1] < positions[2]):
+        raise AssertionError("P10 List show/position/frame order changed")
+    # R06 adds the operator-owned transition/command/chat settings between
+    # the existing List mode and position/frame; older fixed row numbers no
+    # longer apply. The original fields must retain their order and labels.
+    for widget in (
+        stream.list_slide_direction, stream.list_slide_duration,
+        stream.list_slide_command, stream.list_chat_layout,
+        stream.list_with_chat,
+    ):
+        if not (positions[0] < form.getWidgetPosition(widget)[0] < positions[1]):
+            raise AssertionError("R06 controls escaped the shared List group")
     if form.labelForField(mode).text() != "Показ виджета:":
         raise AssertionError("P10 common List show label changed")
     side_label = form.labelForField(stream.overlay_list_side)

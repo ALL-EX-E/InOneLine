@@ -87,6 +87,20 @@ jobs:
           python -m tools.multichat_windows_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-01 Qt/HTTP failed" }
 
+      - name: R06 shared List state and Twitch OBS API integration
+        shell: pwsh
+        run: |
+          python -m tools.r06_list_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 shared List / Twitch OBS API regression failed" }
+
+      - name: R06 FIX1 real Chromium both List sources, dynamic chat and speed
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_chat_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 FIX1 chat layout/animation browser regression failed" }
+
       - name: D41-02 Twitch chat EventSub and Channel Points isolated regression
         shell: pwsh
         run: |
@@ -1004,6 +1018,43 @@ jobs:
         with:
           name: InOneLine_D10_CANDIDATE_QA
           path: ${{ runner.temp }}\D10_QA\*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Package R06 candidate QA from tested installer
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\R06_QA"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "installer\output\InOneLine_Setup_1.0.8.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
+          Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
+          python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
+          if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
+          $installer = Get-Item "$out\InOneLine_R06_Setup_CANDIDATE.exe"
+          $source = Get-Item "$out\InOneLine_R06_Source.zip"
+          $installerSha = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceSha = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          status=R06 candidate ONLY; not accepted, merged or released
+          qa_pr=${{ github.event.pull_request.number }}
+          workflow_commit=$env:GITHUB_SHA
+          actual_candidate_head=${{ github.event.pull_request.head.sha }}
+          installer_bytes=$($installer.Length)
+          installer_sha256=$installerSha
+          source_bytes=$($source.Length)
+          source_sha256=$sourceSha
+          "@ | Set-Content "$out\BUILD_INFO.txt" -Encoding UTF8
+          Write-Host "R06_INSTALLER_SHA256=$installerSha"
+          Write-Host "R06_SOURCE_SHA256=$sourceSha"
+
+      - name: Upload R06 candidate QA bundle
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        uses: actions/upload-artifact@v7
+        with:
+          name: InOneLine_R06_CANDIDATE_QA
+          path: ${{ runner.temp }}\R06_QA\*
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
