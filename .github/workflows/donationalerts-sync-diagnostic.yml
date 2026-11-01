@@ -31,7 +31,7 @@ jobs:
       - name: Run synthetic DonationAlerts to Qt diagnostic
         shell: pwsh
         run: |
-          python tools/diagnostics/donationalerts_sync_probe.py > "$env:RUNNER_TEMP/da_sync.json"
+          python -m tools.diagnostics.donationalerts_sync_probe > "$env:RUNNER_TEMP/da_sync.json"
           $code = $LASTEXITCODE
           if (!(Test-Path "$env:RUNNER_TEMP/da_sync.json")) { throw "Diagnostic report absent" }
           $report = Get-Content "$env:RUNNER_TEMP/da_sync.json" -Raw | ConvertFrom-Json
