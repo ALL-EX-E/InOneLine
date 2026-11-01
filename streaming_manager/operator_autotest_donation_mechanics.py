@@ -89,7 +89,9 @@ def run_donation_mechanic_checks(check):
         assert first["status"] == "processed"
         new_id = first["game_id"]
         row = db.get_game(new_id)
-        assert row.title == title and row.sm_points == 12 and row.auction_only == 0
+        assert row.title == title and row.sm_points == 12
+        with db.connect() as conn:
+            assert conn.execute("SELECT auction_only FROM games WHERE id=?", (new_id,)).fetchone()[0] == 0
         second = service.process_donation(raw(98000202, title, amount="2"))
         assert second["status"] == "processed" and second["game_id"] == new_id
         assert db.get_game(new_id).sm_points == 16
