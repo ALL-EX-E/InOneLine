@@ -572,6 +572,246 @@ def run_sandbox(output_file: str) -> int:
 
                 check("sandbox_xlsx_disconnect_preserve_and_reconnect", xlsx_disconnect_reconnect)
 
+                # AUTO-TEST-002D: destructive UI handlers are exercised only
+                # inside this independent temp DB, after XLSX is disconnected.
+                # Dialog confirmation is simulated, never backup or DB deletion.
+                from PySide6.QtCore import QTimer
+                from .views.games import DeleteAllGamesDialog
+
+                def wait_destructive_idle(worker_name):
+                    deadline = time.monotonic() + 100.0
+                    while time.monotonic() < deadline:
+                        app.processEvents()
+                        if getattr(tab, worker_name) is None:
+                            app.processEvents()
+                            return
+                        time.sleep(0.025)
+                    raise AssertionError(f"{worker_name} did not complete in sandbox")
+
+                def click_delete_confirmation(label):
+                    original_exec = QMessageBox.exec
+
+                    def automated_exec(box):
+                        match = [button for button in box.buttons()
+                                 if button.text() == label]
+                        assert len(match) == 1, "delete confirmation button missing"
+                        QTimer.singleShot(0, match[0].click)
+                        return original_exec(box)
+
+                    QMessageBox.exec = automated_exec
+                    return original_exec
+
+                def delete_cancel_preserves_data():
+                    record = db.find_game_by_title("IOL CSV Legacy")
+                    assert record is not None, "test delete target absent"
+                    tab.focus_game(record.id)
+                    assert tab.selected_game_id() == record.id
+                    assert tab.delete_btn.isEnabled(), "Delete button unavailable"
+                    previous_count = db.count_all_games()
+                    previous_log = db.games_refresh_snapshot()["stats"]["total"]
+                    before_backup = safety_backup_files()
+                    original_exec = click_delete_confirmation("Нет")
+                    try:
+                        tab.delete_btn.click()
+                    finally:
+                        QMessageBox.exec = original_exec
+                    app.processEvents()
+                    assert tab._delete_worker is None, "cancel started destructive worker"
+                    assert db.get_game(record.id) is not None
+                    assert db.count_all_games() == previous_count
+                    assert db.games_refresh_snapshot()["stats"]["total"] == previous_log
+                    assert safety_backup_files() == before_backup
+
+                check("sandbox_delete_cancel_keeps_records_no_backup", delete_cancel_preserves_data)
+
+                def delete_confirmed_with_backup_and_audit():
+                    record = db.find_game_by_title("IOL CSV Legacy")
+                    assert record is not None
+                    survivor = db.find_game_by_title("IOL CSV New")
+                    assert survivor is not None
+                    db.set_setting("stream_current_game_id", str(record.id))
+                    previous_count = db.count_all_games()
+                    tab.focus_game(record.id)
+                    assert tab.delete_btn.isEnabled()
+                    info_messages = []
+                    error_messages = []
+                    original_info, original_error = QMessageBox.information, QMessageBox.critical
+                    original_exec = click_delete_confirmation("Да, удалить")
+                    before_backup = safety_backup_files()
+                    try:
+                        QMessageBox.information = staticmethod(
+                            lambda *args, **kwargs:
+                            info_messages.append(str(args[2]) if len(args)>2 else "")
+                            or QMessageBox.Ok
+                        )
+                        QMessageBox.critical = staticmethod(
+                            lambda *args, **kwargs:
+                            error_messages.append(str(args[2]) if len(args)>2 else "")
+                            or QMessageBox.Ok
+                        )
+                        tab.delete_btn.click()
+                        assert tab._delete_worker is not None, "delete worker not started"
+                        wait_destructive_idle("_delete_worker")
+                    finally:
+                        QMessageBox.exec = original_exec
+                        QMessageBox.information = original_info
+                        QMessageBox.critical = original_error
+                    assert not error_messages, "unexpected delete error"
+                    assert len(info_messages) == 1, "delete result message missing"
+                    backup_path = assert_backup_is_valid(before_backup)
+                    with closing(sqlite3.connect(str(backup_path))) as copied:
+                        assert copied.execute(
+                            "SELECT COUNT(*) FROM games WHERE id=?", (record.id,)
+                        ).fetchone()[0] == 1, "snapshot lacks deleted record"
+                        assert copied.execute(
+                            "SELECT COUNT(*) FROM games"
+                        ).fetchone()[0] == previous_count, "snapshot taken after delete"
+                    assert db.get_game(record.id) is None
+                    assert db.get_game(survivor.id) is not None
+                    assert db.count_all_games() == previous_count - 1
+                    assert db.get_setting("stream_current_game_id") == ""
+                    with db.connect() as conn:
+                        rows = conn.execute(
+                            "SELECT action FROM change_log "
+                            "WHERE entity_type='game' AND entity_id=?",
+                            (record.id,),
+                        ).fetchall()
+                        assert [str(row[0]) for row in rows] == ["delete"], (
+                            "previous record-specific log not pruned to delete event"
+                        )
+                    tab.refresh()
+                    assert tab.table.rowCount() == previous_count - 1
+                    assert tab.delete_btn.text() == "Удалить"
+
+                check("sandbox_delete_confirm_worker_backup_and_survivors", delete_confirmed_with_backup_and_audit)
+
+                def clear_cancel_without_backup():
+                    assert db.count_all_games() >= 2
+                    original_exec = DeleteAllGamesDialog.exec
+                    count = db.count_all_games()
+                    before_backup = safety_backup_files()
+
+                    def reject_dialog(dialog):
+                        assert not dialog.delete_button.isEnabled()
+                        dialog.confirm_edit.setText("неправильное подтверждение")
+                        assert not dialog.delete_button.isEnabled(), (
+                            "clear button unlocked by wrong phrase"
+                        )
+                        dialog.reject()
+                        return dialog.result()
+
+                    DeleteAllGamesDialog.exec = reject_dialog
+                    try:
+                        assert tab.clear_all_btn.isEnabled()
+                        tab.clear_all_btn.click()
+                    finally:
+                        DeleteAllGamesDialog.exec = original_exec
+                    assert tab._clear_all_worker is None
+                    assert db.count_all_games() == count
+                    assert safety_backup_files() == before_backup
+
+                check("sandbox_clear_cancel_requires_exact_phrase", clear_cancel_without_backup)
+
+                def clear_confirmed_preserves_history_and_backup():
+                    # Set up a closed local auction using the actual DB API;
+                    # do not insert an invented "closed" row in auction tables.
+                    assert auction._shared_xlsx_path is None, (
+                        "shared XLSX must be disconnected before deletion"
+                    )
+                    archived = db.add_game(
+                        Game(None, "IOL Clear Archived", None, 30, 0, "not_played", "")
+                    )
+                    db.archive_game(archived, True)
+                    closed_id = db.create_auction_session(
+                        "max_amount", duration_seconds=5
+                    )
+                    db.cancel_auction(closed_id)
+                    assert db.get_open_auction_session() is None
+                    with db.connect() as conn:
+                        entry_before = conn.execute(
+                            "SELECT COUNT(*) FROM auction_entries WHERE auction_id=?",
+                            (closed_id,),
+                        ).fetchone()[0]
+                    assert entry_before >= 2, "closed session lacks preserved entries"
+                    count_before = db.count_all_games()
+                    assert count_before >= 4
+                    target = db.find_game_by_title("IOL CSV New")
+                    assert target is not None
+                    db.set_setting("stream_current_game_id", str(target.id))
+                    db.set_setting("operator_autotest_unrelated_setting", "keep")
+                    tab.refresh()
+
+                    old_exec = DeleteAllGamesDialog.exec
+                    old_info = QMessageBox.information
+                    old_error = QMessageBox.critical
+                    info_messages = []
+                    error_messages = []
+                    backups_before = safety_backup_files()
+                    def accept_dialog(dialog):
+                        assert not dialog.delete_button.isEnabled()
+                        dialog.confirm_edit.setText("УДАЛИТЬ ЗАПИСИ")
+                        assert dialog.delete_button.isEnabled(), (
+                            "clear exact confirmation did not enable delete"
+                        )
+                        dialog.delete_button.click()
+                        return dialog.result()
+                    try:
+                        DeleteAllGamesDialog.exec = accept_dialog
+                        QMessageBox.information = staticmethod(
+                            lambda *args, **kwargs:
+                            info_messages.append(str(args[2]) if len(args)>2 else "")
+                            or QMessageBox.Ok
+                        )
+                        QMessageBox.critical = staticmethod(
+                            lambda *args, **kwargs:
+                            error_messages.append(str(args[2]) if len(args)>2 else "")
+                            or QMessageBox.Ok
+                        )
+                        tab.clear_all_btn.click()
+                        assert tab._clear_all_worker is not None, "clear worker absent"
+                        wait_destructive_idle("_clear_all_worker")
+                    finally:
+                        DeleteAllGamesDialog.exec = old_exec
+                        QMessageBox.information = old_info
+                        QMessageBox.critical = old_error
+                    assert not error_messages, "unexpected clear error"
+                    assert len(info_messages) == 1, "clear result message missing"
+                    assert f"Удалено записей: {count_before}" in info_messages[0]
+                    snapshot = assert_backup_is_valid(backups_before)
+                    with closing(sqlite3.connect(str(snapshot))) as copied:
+                        assert copied.execute(
+                            "SELECT COUNT(*) FROM games"
+                        ).fetchone()[0] == count_before, "backup missing pre-clear rows"
+                        assert copied.execute(
+                            "SELECT COUNT(*) FROM auction_entries WHERE auction_id=?",
+                            (closed_id,),
+                        ).fetchone()[0] == entry_before, "backup missing history"
+
+                    assert db.count_all_games() == 0, "clear kept live games"
+                    assert db.get_setting("stream_current_game_id") == ""
+                    assert db.get_setting("operator_autotest_unrelated_setting") == "keep"
+                    with db.connect() as conn:
+                        assert conn.execute(
+                            "SELECT COUNT(*) FROM contributions"
+                        ).fetchone()[0] == 0, "clear left live contributions"
+                        saved = conn.execute(
+                            "SELECT game_id,snapshot_title FROM auction_entries "
+                            "WHERE auction_id=?", (closed_id,)
+                        ).fetchall()
+                        assert len(saved) == entry_before, "closed history lost"
+                        assert all(row["game_id"] is None and row["snapshot_title"]
+                                   for row in saved), "closed history snapshots lost"
+                        assert conn.execute(
+                            "SELECT COUNT(*) FROM change_log "
+                            "WHERE entity_type='games' AND action='delete_all'"
+                        ).fetchone()[0] == 1, "clear missing journal audit"
+                    tab.refresh()
+                    assert tab.table.rowCount() == 0
+                    assert tab.clear_all_btn.text() == "Очистить список"
+                    assert not tab.clear_all_btn.isEnabled(), "empty list allows clear"
+
+                check("sandbox_clear_confirm_backup_empty_and_closed_history", clear_confirmed_preserves_history_and_backup)
+
             finally:
                 window.close()
                 app.processEvents()
