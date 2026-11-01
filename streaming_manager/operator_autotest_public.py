@@ -136,3 +136,24 @@ def run_public_checks(check, window, db, paths, app):
         assert "Синхронизировано" in public.public_xlsx_status_label.text()
 
     check("sandbox_public_mirror_create_and_persist", mirror_create)
+
+    def mirror_update_recover():
+        assert public._public_xlsx_path == mirror
+        db.update_game(ids["a"], {"sm_points": 203})
+        window.notify_game_data_changed()
+        idle()
+        rows = xlsx_rows(mirror)
+        assert next(row[2] for row in rows[1:] if row[1] == active) == 203
+        assert public._public_xlsx_last_hash == public_state_hash(public_mirror_rows(db))
+        moved = paths.root_dir / "parked_public_mirror.xlsx"
+        mirror.rename(moved)
+        assert not mirror.exists() and moved.exists()
+        public._public_xlsx_check_target_exists()
+        idle()
+        assert mirror.exists()
+        rows = xlsx_rows(mirror)
+        assert len(rows) == 3
+        assert next(row[2] for row in rows[1:] if row[1] == active) == 203
+        assert db.get_game(ids["a"]).sm_points == 203
+
+    check("sandbox_public_mirror_update_and_missing_recovery", mirror_update_recover)
