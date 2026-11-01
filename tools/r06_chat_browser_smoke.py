@@ -64,11 +64,15 @@ METRICS = """JSON.stringify((() => {
   if (!root || !layer || !panel || !chat) return {ready:false};
   const r=root.getBoundingClientRect(),
         l=layer.getBoundingClientRect(),
+        p=panel.getBoundingClientRect(),
         c=chat.getBoundingClientRect();
   return {
     ready:true, shown:root.classList.contains('r06-shown'),
     replace:root.classList.contains('r06-replace'),
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
+    listBottom:l.bottom, panelBottom:p.bottom,
+    rootTop:r.top, panelTop:p.top,
+    layerOverflow:getComputedStyle(layer).overflowY,
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
     count:cards?.children.length ?? -1,
     panelOpacity:+pc.opacity, panelTransform:pc.transform,
@@ -91,7 +95,7 @@ def until(page, predicate, label, timeout=32):
             return recent
         QTest.qWait(140)
     if "dynamic Twitch chat" in label:
-        print("R06_CHILD_DIAG=", evaluate(page, """(() => {const f=document.querySelector('#list-chat iframe');const d=f?.contentDocument;return {ready:d?.readyState,render:typeof f?.contentWindow?.IOLRenderEmbeddedChatState,refresh:typeof f?.contentWindow?.IOLRefreshEmbeddedChat,body:d?.body?.innerText?.slice(0,200),root:d?.getElementById('messages')?.outerHTML?.slice(0,500)}})()"""), flush=True)
+        print("R06_CHILD_DIAG=", evaluate(page, """JSON.stringify((() => {const f=document.querySelector('#list-chat iframe');const d=f?.contentDocument;return {ready:d?.readyState,render:typeof f?.contentWindow?.IOLRenderEmbeddedChatState,refresh:typeof f?.contentWindow?.IOLRefreshEmbeddedChat,body:d?.body?.innerText?.slice(0,200),root:d?.getElementById('messages')?.outerHTML?.slice(0,500)}})())"""), flush=True)
     raise AssertionError(f"{label} timeout: {recent!r}")
 
 
@@ -165,13 +169,27 @@ def main():
             db.set_setting("list_animation_seconds", "3")
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 20)
-            for page, before in zip(pages, before_hide):
-                until(page, lambda a: a["shown"] and
-                      2 < a["listHeight"] < before["listHeight"] - 5 and
-                      a["chatHeight"] > before["chatHeight"] + 5 and
-                      a["panelTransform"] != "none" and
-                      float(a["panelTransition"].split(",")[0].rstrip("s")) > 0,
-                      "synchronized upward List exit and chat growth")
+            # Sample both sources during the same finite transition. Waiting
+            # for one source first can miss all frames of the other source.
+            moving_states = [None] * len(pages)
+            last_states = [None] * len(pages)
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline and any(x is None for x in moving_states):
+                for index, (page, before) in enumerate(zip(pages, before_hide)):
+                    if moving_states[index] is not None:
+                        continue
+                    a = evaluate(page, METRICS)
+                    last_states[index] = a
+                    if (a["shown"] and
+                        2 < a["listHeight"] < before["listHeight"] - 5 and
+                        a["chatHeight"] > before["chatHeight"] + 5 and
+                        a["panelTop"] < a["rootTop"] - 5):
+                        moving_states[index] = a
+                QTest.qWait(35)
+            for moving in moving_states:
+                assert moving is not None, last_states
+                assert moving["layerOverflow"] == "visible", moving
+                assert abs(moving["panelBottom"]-moving["listBottom"]) <= 2, moving
             for page in pages:
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and

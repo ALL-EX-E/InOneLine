@@ -72,9 +72,12 @@
       hideTimer = null;
       listPanel.style.transition = "none";
       listPanel.style.transform = "none";
+      listPanel.style.position = "";
+      listPanel.style.bottom = "";
       listPanel.style.height = "";
       listLayer.style.transition = "none";
       listLayer.style.height = "";
+      listLayer.style.overflow = "";
       lastGeometry = "";
       layout();
     }
@@ -84,8 +87,13 @@
       hiding = true;
       hideHeight = listLayer.getBoundingClientRect().height;
       const duration = chatResizeSeconds * 1000;
+      // Anchor the full-size panel to the moving lower boundary. The layer
+      // itself shrinks while the parent clips only at the top of the source.
+      // Both the panel and chat therefore follow the same height transition.
+      listPanel.style.position = "absolute";
+      listPanel.style.bottom = "0";
       listPanel.style.height = hideHeight + "px";
-      listPanel.style.transition = `transform ${chatResizeSeconds}s ease`;
+      listLayer.style.overflow = "visible";
       listLayer.style.flex = "0 0 auto";
       listLayer.style.height = hideHeight + "px";
       listLayer.style.transition = `height ${chatResizeSeconds}s ease`;
@@ -94,7 +102,6 @@
       requestAnimationFrame(() => {
         if (!hiding) return;
         listLayer.style.height = "0px";
-        listPanel.style.transform = `translateY(-${root.clientHeight}px)`;
         layout();
       });
       hideTimer = setTimeout(finishHide, duration + 30);
