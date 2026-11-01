@@ -4,8 +4,11 @@ on:
   push:
     branches:
       - audit/operator-autotest-da-sync-20261101
+      - fix/donationalerts-qt-refresh-20261101
     paths:
       - "tools/diagnostics/donationalerts_sync_probe.py"
+      - "streaming_manager/donationalerts_runtime.py"
+      - "streaming_manager/views/main_window.py"
       - ".github/workflows/donationalerts-sync-diagnostic.yml"
   workflow_dispatch:
 
@@ -37,17 +40,12 @@ jobs:
           $report = Get-Content "$env:RUNNER_TEMP/da_sync.json" -Raw | ConvertFrom-Json
           Write-Host "DA_SYNC_DIAGNOSTIC=$($report | ConvertTo-Json -Compress)"
           if ($report.db_transaction -ne "PASS") { throw "Synthetic DB pipeline failed" }
-          if ($code -eq 2 -and $report.ui_auto_refresh -eq "FAIL") {
-            Write-Warning "CONFIRMED_DEFECT: SQLite updated, visible Public Qt view remained stale without F5"
-          } elseif ($code -eq 0 -and $report.ui_auto_refresh -eq "PASS") {
-            Write-Host "DA_SYNC_UI_REFRESH=PASS"
-          } else {
-            throw "Unexpected diagnostic exit or result"
+          if ($code -ne 0 -or $report.ui_auto_refresh -ne "PASS" -or $report.hidden_list_rows_after_open -ne 1 -or $report.log_event_visible_after_open -ne $true) {
+            throw "DonationAlerts UI synchronization acceptance gate failed"
           }
+          Write-Host "DA_SYNC_UI_REFRESH=PASS"
           Copy-Item "$env:RUNNER_TEMP/da_sync.json" "./da_sync_diagnostic.json"
-          # The probe returns 2 for a proven application defect. This is a
-          # diagnostic workflow, not an acceptance gate; publish its JSON.
-          exit 0
+
       - name: Attach machine-readable diagnostic
         uses: actions/upload-artifact@v4
         with:
