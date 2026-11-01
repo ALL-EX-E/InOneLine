@@ -165,9 +165,15 @@
 
     function layout() {
       const available = root.clientHeight;
+      // The main canvas can keep this composition in a zero-height slot
+      // (for example while the list is disabled). Visibility still has to
+      // follow the saved mode so it cannot retain a stale shown class.
+      const replacing = active && mode === "slide" && composeMode === "replace";
+      root.classList.toggle("r06-shown", active || hiding);
+      root.classList.toggle("r06-not-shown", !active && !hiding);
+      root.classList.toggle("r06-replace", replacing);
       if (available <= 0) return;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
-      const replacing = active && mode === "slide" && composeMode === "replace";
       recoverEmbeddedChat(chatNeeded);
       matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
@@ -180,9 +186,6 @@
 
       // List visibility and replacement remain immediate. Only a content-
       // sized chat in Split mode may animate its allocated height.
-      root.classList.toggle("r06-shown", active || hiding);
-      root.classList.toggle("r06-not-shown", !active && !hiding);
-      root.classList.toggle("r06-replace", replacing);
       if (!hiding) listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
       // Only a content-sized chat in Split mode animates its boundary. An
       // Always chat starts at its full allocated height and never rises from
@@ -278,7 +281,7 @@
       apply,
       hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
-      hasListArea: () => active,
+      hasListArea: () => active || hiding,
     };
   }
   window.IOLListComposition = Object.freeze({create});

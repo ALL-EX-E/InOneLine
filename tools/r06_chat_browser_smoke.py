@@ -90,6 +90,8 @@ def until(page, predicate, label, timeout=32):
             print("R06_ZERO_PASS:", label, recent, flush=True)
             return recent
         QTest.qWait(140)
+    if "dynamic Twitch chat" in label:
+        print("R06_CHILD_DIAG=", evaluate(page, """(() => {const f=document.querySelector('#list-chat iframe');const d=f?.contentDocument;return {ready:d?.readyState,render:typeof f?.contentWindow?.IOLRenderEmbeddedChatState,refresh:typeof f?.contentWindow?.IOLRefreshEmbeddedChat,body:d?.body?.innerText?.slice(0,200),root:d?.getElementById('messages')?.outerHTML?.slice(0,500)}})()"""), flush=True)
     raise AssertionError(f"{label} timeout: {recent!r}")
 
 
@@ -128,11 +130,16 @@ def main():
         views = []
         try:
             screen = app.primaryScreen().availableGeometry()
-            for i, (route, width) in enumerate((("/overlay", 1000),
-                                                ("/list-overlay", 380))):
+            # Keep both top-level sources unobscured. Chromium can suspend
+            # polling in the embedded chat of an occluded Qt window.
+            main_width = min(1000, max(400, screen.width() - 430))
+            list_width = min(380, max(200, screen.width() - main_width - 20))
+            for i, (route, width) in enumerate((("/overlay", main_width),
+                                                ("/list-overlay", list_width))):
                 view = QWebEngineView()
                 view.resize(width, 620)
-                view.move(screen.x() + 5 + i * 110, screen.y() + 5 + i * 35)
+                view.move(screen.x() + 5 + (main_width + 10 if i else 0),
+                          screen.y() + 5)
                 view.show()
                 view.load(QUrl(api.base_url + route))
                 views.append(view)
