@@ -12,7 +12,7 @@ $reportRoot = Join-Path $desktop ('InOneLine_AutoTest_' + $stamp)
 New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
 $results = New-Object 'System.Collections.Generic.List[object]'
 $exe = Join-Path $PSScriptRoot 'InOneLine.exe'
-$scriptVersion = 'v1.2-csv'
+$scriptVersion = 'v1.3-shared-xlsx'
 $started = [DateTime]::UtcNow
 $live = $null
 $base = $null
