@@ -27,3 +27,16 @@
 - Проверки визуальной отрисовки Google Sheets, конфликта реальных сетевых клиентов, блокировки Excel, больших файлов, очистки списка и любых денежных операций — отдельные задачи.
 
 **Статус на момент записи: план задокументирован до реализации, пользовательскую приёмку пока не заявлять.**
+
+
+## Windows CI, проверенный комплект и ручной контроль
+
+**Изменения:** в `streaming_manager/operator_autotest.py` добавлены четыре независимых проверки `sandbox_xlsx_ui_create_connect_and_persist`, `sandbox_xlsx_local_change_syncs_to_file`, `sandbox_xlsx_external_replace_import_and_backup`, `sandbox_xlsx_disconnect_preserve_and_reconnect`. Кнопки, асинхронный `FunctionWorker`, debounce, двухфазный poll, `read_shared_xlsx` и `write_shared_xlsx`, `sync_main_games_state`, **реальный safety-backup** сохранены. Файлы двух SQLite и общего XLSX находятся только в `TemporaryDirectory`, освобождаются после `MainWindow.close`. Реальные OAuth, Google Drive Desktop и XLSX пользователя не трогаются. Изменены только тестировщик, документация, `scriptVersion=v1.3-shared-xlsx` и Windows CI — **исходные функции XLSX InOneLine не изменялись**.
+
+**Windows CI:** [workflow run 41276185772](https://github.com/ALL-EX-E/InOneLine/actions/runs/41276185772) — `SUCCESS` для commit `73fbea13bffd904d9465a445b90a5a8cb106efa8`. Подтверждены **18/18 sandbox PASS** в исходном Python и **18/18 PASS** в frozen Windows EXE. PASS parser PowerShell 5.1, сохранённые PERF-01/PERF-02A regressions, native Windows GUI+XLSX regression, frozen обычное закрытие с освобождением порта (**0,781 с**, одиночный idle CI замер), Inno Setup и GitHub Actions artifact. Проверка Google Drive sync как внешнего сервиса и визуальных анимаций сюда не входит.
+
+**Кандидат для ручной проверки:** ZIP `InOneLine_Operator_AutoTest_v1_3_XLSX_73fbea1.zip` на [Google Диске](https://drive.google.com/file/d/131S59yafFh9IwmtTVMbHVp54RiG4lAUg/view?usp=drivesdk). Подтверждено чтением метаданных Google Drive: **47 025 734 байта**, MIME `application/zip`. ZIP SHA-256 `935225bbdf5a2649a1528869754eca876c3d9f957c446bf45b9a3e4fd7f54e53`, `ZipFile.testzip()` — PASS. Внутри четыре файла: `InOneLine_Setup_1.0.8.exe` **47 879 549 байт**, SHA-256 `199504546e4d20d20d626c0f943be44e7ff3340681ef8f7efd5565fd8b0607da` (совпадает с CI); `Start_InOneLine_AutoTest.cmd` (153 байта); `InOneLine_AutoTest.ps1` (10 119 байт); `README_RU.txt` (5 176 байт). В GitHub основной код других функций не обновлялся.
+
+**Порядок ручного gate:** создать внешний backup своих данных, установить этот кандидат, заменить два скрипта в папке с установленным `InOneLine.exe`, закрыть все экземпляры программы, запустить `.cmd`, при желании отправить сообщение Twitch, штатно закрыть окно по команде скрипта, прислать ZIP-отчёт с рабочего стола. Если необязательный Twitch выполнен и остальные проверки успешны, ожидается сводка **41 PASS / 0 FAIL / 2 SKIP** (v1.2 = 37 PASS + 4 XLSX). Это **ожидание**, пользовательский PASS ещё не получен, следующую функциональную группу не начинать до отчёта.
+
+**Ограничения:** XLSX-внешнее изменение смоделировано **второй локальной БД**, а не Google Sheets/Google Drive Desktop. Тесты не доказывают отсутствие гонок между тремя реальными клиентами, не проверяют большой объём, реальную блокировку файла в Excel, совместную работу Windows-сетевых директорий и иные случаи. `main`, PERF-02B и R06 не менялись.
