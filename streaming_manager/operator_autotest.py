@@ -813,6 +813,9 @@ def run_sandbox(output_file: str) -> int:
 
                 check("sandbox_clear_confirm_backup_empty_and_closed_history", clear_confirmed_preserves_history_and_backup)
 
+                from .operator_autotest_public import run_public_checks
+                run_public_checks(check, window, db, paths, app)
+
             finally:
                 window.close()
                 app.processEvents()
