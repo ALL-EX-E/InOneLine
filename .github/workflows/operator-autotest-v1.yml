@@ -1,4 +1,4 @@
-name: InOneLine Operator AutoTest v1.7 Donation Mechanics (Windows)
+name: InOneLine Operator AutoTest v1.8 Donation Mechanics B1 (Windows)
 
 on:
   push:
@@ -11,11 +11,13 @@ on:
       - audit/operator-autotest-public-20261101
       - fix/donationalerts-qt-refresh-20261101
       - audit/operator-autotest-donation-mechanics-20261101
+      - audit/da-mechanics-b1-20261101
     paths:
       - "app.py"
       - "streaming_manager/operator_autotest.py"
       - "streaming_manager/donationalerts_runtime.py"
       - "streaming_manager/operator_autotest_donation_mechanics.py"
+      - "streaming_manager/operator_autotest_da_b1.py"
       - "streaming_manager/views/main_window.py"
       - "installer/InOneLine.spec"
       - "tools/operator_autotest/**"
@@ -55,7 +57,7 @@ jobs:
           if (!(Test-Path "$env:RUNNER_TEMP/operator_source.json")) { throw 'Sandbox JSON absent' }
           $j = Get-Content "$env:RUNNER_TEMP/operator_source.json" -Raw | ConvertFrom-Json
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_SOURCE {0} {1} {2}" -f $_.status,$_.name,($_.error_type + " " + $_.error_message)) }
-          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 39) { throw 'Source sandbox test failed' }
+          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 46) { throw 'Source sandbox test failed' }
 
       - name: PowerShell 5.1 operator script parser
         shell: powershell
@@ -110,7 +112,7 @@ jobs:
           if (!(Test-Path $result)) { throw 'Frozen sandbox JSON absent' }
           $j = Get-Content $result -Raw | ConvertFrom-Json
           $j.tests | ForEach-Object { Write-Host ("AUTOTEST_FROZEN {0} {1} {2}" -f $_.status,$_.name,($_.error_type + " " + $_.error_message)) }
-          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 39) { throw 'Frozen sandbox test failed' }
+          if ($code -ne 0 -or $j.summary.fail -ne 0 -or $j.summary.pass -lt 46) { throw 'Frozen sandbox test failed' }
 
       - name: Real Windows normal close without forced success
         shell: pwsh
@@ -147,7 +149,7 @@ jobs:
       - name: Upload installer and runnable CMD / PowerShell scripts
         uses: actions/upload-artifact@v4
         with:
-          name: InOneLine_Operator_AutoTest_v1_7_Donation_Mechanics_Windows
+          name: InOneLine_Operator_AutoTest_v1_8_Donation_B1_Windows
           path: operator-autotest-output/*
           retention-days: 14
           if-no-files-found: error
