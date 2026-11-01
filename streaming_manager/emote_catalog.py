@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+import threading
+import time
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -12,6 +14,39 @@ from .integrations import IntegrationTemporaryError
 USER_AGENT = "InOneLine/1.0.6 emote-catalog"
 JSON_LIMIT = 2 * 1024 * 1024
 THUMB_LIMIT = 1024 * 1024
+
+
+def _run_parallel_daemon(functions, *, wait_timeout: float = 13.0) -> list:
+    """Run provider calls without creating non-daemon executor threads.
+
+    These calls are also made from the Twitch runtime's daemon worker.  The
+    standard ThreadPoolExecutor uses non-daemon threads, which can make Python
+    wait for a network timeout during process shutdown.  Daemon workers may
+    be abandoned safely because provider results are only an optional cache.
+    """
+    results = [None] * len(functions)
+    workers = []
+
+    def run(index, function):
+        try:
+            results[index] = function()
+        except Exception:
+            results[index] = None
+
+    for index, function in enumerate(functions):
+        worker = threading.Thread(
+            target=run,
+            args=(index, function),
+            name=f"InOneLineEmote-{index}",
+            daemon=True,
+        )
+        workers.append(worker)
+        worker.start()
+
+    deadline = time.monotonic() + max(0.0, float(wait_timeout))
+    for worker in workers:
+        worker.join(max(0.0, deadline - time.monotonic()))
+    return results
 
 
 @dataclass(frozen=True)
@@ -248,17 +283,11 @@ def fetch_third_party_channel_emotes(twitch_user_id: str) -> list[EmoteCatalogIt
             return []
 
     result: list[EmoteCatalogItem] = []
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        futures = [
-            pool.submit(load_7tv),
-            pool.submit(load_bttv),
-            pool.submit(load_ffz),
-        ]
-        for future in futures:
-            try:
-                result.extend(future.result())
-            except Exception:
-                continue
+    for provider_result in _run_parallel_daemon(
+        [load_7tv, load_bttv, load_ffz],
+    ):
+        if provider_result:
+            result.extend(provider_result)
 
     seen: set[tuple[str, str]] = set()
     unique: list[EmoteCatalogItem] = []
@@ -332,16 +361,13 @@ def fetch_third_party_chat_emotes(twitch_user_id: str) -> list[EmoteCatalogItem]
         except Exception:
             return []
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        jobs = [pool.submit(global_7tv), pool.submit(global_bttv),
-                pool.submit(global_ffz),
-                pool.submit(fetch_third_party_channel_emotes, channel)]
-        result = []
-        for job in jobs:
-            try:
-                result.extend(job.result())
-            except Exception:
-                continue
+    result = []
+    for provider_result in _run_parallel_daemon(
+        [global_7tv, global_bttv, global_ffz,
+         lambda: fetch_third_party_channel_emotes(channel)],
+    ):
+        if provider_result:
+            result.extend(provider_result)
     # A channel/global code may legitimately repeat, including collisions.
     # Do not deduplicate by code here: the chat resolver decides ambiguity.
     seen = set()
