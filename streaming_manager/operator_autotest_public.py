@@ -157,3 +157,45 @@ def run_public_checks(check, window, db, paths, app):
         assert db.get_game(ids["a"]).sm_points == 203
 
     check("sandbox_public_mirror_update_and_missing_recovery", mirror_update_recover)
+
+    def mirror_disconnect_and_reconnect():
+        assert public._public_xlsx_path == mirror
+        public.public_xlsx_disconnect_btn.click()
+        assert public._public_xlsx_path is None
+        assert db.get_setting(PUBLIC_XLSX_ENABLED_KEY) == "0"
+        assert db.get_setting(PUBLIC_XLSX_PATH_KEY) == ""
+        assert mirror.is_file()
+        expected = db.get_game(ids["a"]).sm_points
+        count = db.count_all_games()
+        book = load_workbook(mirror)
+        try:
+            book.active["B2"] = "IOL External Changed Row"
+            book.active["C2"] = 99999
+            book.save(mirror)
+        finally:
+            book.close()
+        assert any(row[1] == "IOL External Changed Row" for row in xlsx_rows(mirror)[1:])
+        old = QFileDialog.getOpenFileName
+        try:
+            QFileDialog.getOpenFileName = staticmethod(
+                lambda *a, **kw: (str(mirror), "Excel")
+            )
+            public.public_xlsx_connect_btn.click()
+        finally:
+            QFileDialog.getOpenFileName = old
+        idle()
+        assert public._public_xlsx_path == mirror
+        assert db.get_setting(PUBLIC_XLSX_ENABLED_KEY) == "1"
+        assert db.get_setting(PUBLIC_XLSX_PATH_KEY) == str(mirror)
+        rows = xlsx_rows(mirror)
+        assert {row[1] for row in rows[1:]} == {active, secondary}
+        assert next(row[2] for row in rows[1:] if row[1] == active) == expected
+        assert db.count_all_games() == count
+        assert db.get_game(ids["a"]).sm_points == expected
+        assert db.find_game_by_title("IOL External Changed Row") is None
+        public.public_xlsx_disconnect_btn.click()
+        assert public._public_xlsx_path is None
+        assert db.get_setting(PUBLIC_XLSX_ENABLED_KEY) == "0"
+        assert mirror.is_file()
+
+    check("sandbox_public_mirror_one_way_reconnect_no_import", mirror_disconnect_and_reconnect)
