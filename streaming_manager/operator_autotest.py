@@ -366,7 +366,22 @@ def run_sandbox(output_file: str) -> int:
                         expect_success=True,
                     )
                     assert "Добавлено: 1" in message and "Изменено: 1" in message
-                    assert_backup_is_valid(before)
+                    # Validate the exact backup reported by the real import
+                    # worker; a before/after filename count can race another
+                    # automatic backup on Windows.
+                    label = "Резервная копия перед импортом:\n"
+                    assert label in message, "CSV result missing backup path"
+                    from pathlib import Path
+                    snapshot = Path(message.split(label, 1)[1].strip())
+                    assert snapshot.resolve().parent == paths.backups_dir.resolve()
+                    assert snapshot.is_file() and snapshot.stat().st_size > 0
+                    from contextlib import closing
+                    with closing(sqlite3.connect(str(snapshot))) as copied:
+                        assert copied.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+                        row = copied.execute(
+                            "SELECT sm_points FROM games WHERE id=?", (record_id,)
+                        ).fetchone()
+                        assert row is not None and int(row[0]) == 456
                     old = db.get_game(record_id)
                     assert old.sm_points == 0, "explicit zero points not applied"
                     assert old.review == "Synthetic review", "blank CSV erased review"
