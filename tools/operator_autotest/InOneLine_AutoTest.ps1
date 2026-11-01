@@ -12,7 +12,7 @@ $reportRoot = Join-Path $desktop ('InOneLine_AutoTest_' + $stamp)
 New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
 $results = New-Object 'System.Collections.Generic.List[object]'
 $exe = Join-Path $PSScriptRoot 'InOneLine.exe'
-$scriptVersion = 'v1.5-public'
+$scriptVersion = 'v1.6-donation-sync'
 $started = [DateTime]::UtcNow
 $live = $null
 $base = $null
@@ -144,7 +144,60 @@ try {
         Record 'twitch_message_live' 'SKIP' 'Optional interactive step disabled'
     }
     Record 'twitch_channel_points_live' 'SKIP' 'Not available on this channel'
-    Record 'donationalerts_live_donation' 'SKIP' 'No real test donation event; sandbox tests used'
+
+    # Opt-in only. The operator creates a NON-PAID message using the
+    # DonationAlerts dashboard; we never access its account or API.
+    # This may create one ordinary record in the user's real InOneLine list.
+    if ($base -and -not $NoPrompt) {
+        Write-Host ''
+        Write-Host 'DONATIONALERTS: optional live dashboard MESSAGE test (not a paid donation).'
+        Write-Host 'This can add one new test entry to your REAL InOneLine list.'
+        Write-Host 'Take a data backup first. You may decline; no automatic provider actions.'
+        $choiceDa = Read-Host 'Create one non-paid DonationAlerts MESSAGE manually and measure it? (Y/N)'
+        if ($choiceDa -match '^[YyДд]') {
+            $markerDa = 'IOLDA-' + ([Guid]::NewGuid().ToString('N').Substring(0,8))
+            Write-Host ('Open Public List in InOneLine, then create a NON-PAID dashboard message with EXACT title: ' + $markerDa)
+            Write-Host 'Do NOT initiate real payment. Enter the title in the DonationAlerts message field.'
+            Read-Host 'Press Enter immediately BEFORE clicking Add message in DonationAlerts' | Out-Null
+            $daStart = [DateTime]::UtcNow
+            $daSeen = $false
+            $daElapsed = 0
+            $daDeadline = $daStart.AddSeconds(120)
+            while ([DateTime]::UtcNow -lt $daDeadline -and -not $daSeen) {
+                try {
+                    $daSnapshot = ApiJson ($base + '/api/public')
+                    foreach ($game in @($daSnapshot.games)) {
+                        if ($null -ne $game -and [string]$game.title -eq $markerDa) {
+                            $daSeen = $true; break
+                        }
+                    }
+                } catch { }
+                if (-not $daSeen) { Start-Sleep -Milliseconds 700 }
+            }
+            $daElapsed = [int]([DateTime]::UtcNow - $daStart).TotalMilliseconds
+            if ($daSeen) {
+                Record 'donationalerts_live_message_delivery' 'PASS' ('New test title visible in API after ' + $daElapsed + ' ms (includes human action)')
+                $uiChoice = Read-Host 'Without pressing F5, was that entry visible in the InOneLine Public List? (Y/N/?)'
+                if ($uiChoice -match '^[YyДд]') {
+                    Record 'donationalerts_live_message_public_ui' 'PASS' 'Operator confirmed automatic Public List update'
+                } elseif ($uiChoice -match '^[NnНн]') {
+                    Record 'donationalerts_live_message_public_ui' 'FAIL' 'API updated but Public List stale without F5'
+                } else {
+                    Record 'donationalerts_live_message_public_ui' 'SKIP' 'Operator did not verify the visible UI'
+                }
+            } else {
+                Record 'donationalerts_live_message_delivery' 'FAIL' 'No new test title in read-only API within 120 seconds; check provider connectivity'
+                Record 'donationalerts_live_message_public_ui' 'SKIP' 'Cannot check UI when delivery not confirmed'
+            }
+        } else {
+            Record 'donationalerts_live_message_delivery' 'SKIP' 'Operator declined optional dashboard message test'
+            Record 'donationalerts_live_message_public_ui' 'SKIP' 'Operator declined optional dashboard message test'
+        }
+    } else {
+        Record 'donationalerts_live_message_delivery' 'SKIP' 'Not interactive or API unavailable'
+        Record 'donationalerts_live_message_public_ui' 'SKIP' 'Not interactive or API unavailable'
+    }
+    Record 'donationalerts_live_donation' 'SKIP' 'No real PAID test donation; manual non-paid message is a separate test'
 
     if ($live -and -not $live.HasExited) {
         if ($NoPrompt) {
