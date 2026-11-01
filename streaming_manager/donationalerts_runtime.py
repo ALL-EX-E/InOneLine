@@ -46,10 +46,13 @@ class DonationAlertsDonationService:
         integration_manager: IntegrationManager,
         *,
         sleeper: Callable[[float], None] = time.sleep,
+        on_event_applied: Callable[[], None] | None = None,
     ):
         self.db = db
         self.integration_manager = integration_manager
         self.sleeper = sleeper
+        # Optional thread-safe UI notification. Never hand Qt widgets here.
+        self.on_event_applied = on_event_applied
         self._state_lock = threading.RLock()
 
     def connection_ready(self) -> bool:
@@ -210,6 +213,17 @@ class DonationAlertsDonationService:
         )
         result = self.integration_manager.accept_normalized_event(event)
         self.mark_seen(donation_id)
+        # The DB transaction is committed and the high-water cursor persisted.
+        # Dispatch only for a genuinely new event. The supplied callback must
+        # marshal into the GUI thread; never touch Qt widgets from this worker.
+        if not result.get("duplicate") and self.on_event_applied is not None:
+            try:
+                self.on_event_applied()
+            except Exception:
+                # UI notification failure must not retry or double-credit a
+                # donation already committed to SQLite. The window regression
+                # probe separately enforces successful delivery of the signal.
+                pass
         return result
 
     def catch_up(self, *, max_pages: int = 50) -> int:
