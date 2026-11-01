@@ -168,7 +168,7 @@ jobs:
           from streaming_manager.constants import APP_VERSION, SCHEMA_VERSION
           from streaming_manager.database import Database
 
-          assert APP_VERSION == "1.0.8"
+          assert APP_VERSION == "1.0.9"
           assert SCHEMA_VERSION == 21
           with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
@@ -179,7 +179,7 @@ jobs:
                   assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
                   assert int(conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]) == 21
                   assert int(conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]) == 17
-          print("FRESH_DB_1_0_8=PASS")
+          print("FRESH_DB_1_0_9=PASS")
           '@ | python -
 
       - name: P11-K Rules presentation schema-19 upgrade compatibility
@@ -594,7 +594,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Frozen API did not start" }
-            if ($health.version -ne "1.0.8") { throw "Wrong frozen version: $($health.version)" }
+            if ($health.version -ne "1.0.9") { throw "Wrong frozen version: $($health.version)" }
 
             $routes = @(
               "/overlay",
@@ -655,19 +655,19 @@ jobs:
             throw "Inno Setup administrative user-area warning returned"
           }
           Write-Host "INNO_USER_AREAS_WARNING=NONE"
-          $setup = "installer\output\InOneLine_Setup_1.0.8.exe"
+          $setup = "installer\output\InOneLine_Setup_1.0.9.exe"
           if (!(Test-Path $setup)) { throw "Installer output missing" }
           $item = Get-Item $setup
           Write-Host "REGRESSION_SETUP_BYTES=$($item.Length)"
           Write-Host "REGRESSION_SETUP_SHA256=$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant())"
-          if ($item.VersionInfo.FileVersion -notlike "1.0.8*") {
+          if ($item.VersionInfo.FileVersion -notlike "1.0.9*") {
             throw "Wrong installer FileVersion: $($item.VersionInfo.FileVersion)"
           }
 
       - name: Silent installer startup regression
         shell: pwsh
         run: |
-          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.8.exe").Path
+          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.9.exe").Path
           $install = "$env:RUNNER_TEMP\InOneLineRegressionInstalled"
           Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
@@ -690,7 +690,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Installed app API did not start" }
-            if ($health.version -ne "1.0.8") { throw "Wrong installed version: $($health.version)" }
+            if ($health.version -ne "1.0.9") { throw "Wrong installed version: $($health.version)" }
 
             $visibility = Invoke-WebRequest -Uri "http://127.0.0.1:8765/obs-visibility.js" -TimeoutSec 3
             if ($visibility.Content -notmatch "ObsVisibility") { throw "Installed visibility script missing" }
@@ -796,7 +796,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_1.0.8_WINDOWS_QA
-          path: installer/output/InOneLine_Setup_1.0.8.exe
+          path: installer/output/InOneLine_Setup_1.0.9.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -1028,7 +1028,7 @@ jobs:
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "installer\output\InOneLine_Setup_1.0.8.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
+          Copy-Item "installer\output\InOneLine_Setup_1.0.9.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
