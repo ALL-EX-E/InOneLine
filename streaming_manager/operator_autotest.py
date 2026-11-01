@@ -125,6 +125,9 @@ def run_sandbox(output_file: str) -> int:
     from .operator_autotest_donation_mechanics import run_donation_mechanic_checks
     run_donation_mechanic_checks(check)
 
+    from .operator_autotest_da_b1 import run_da_b1_checks
+    run_da_b1_checks(check)
+
     # A second clean sandbox: instantiated MainWindow uses only its own temp
     # SQLite. Port 0 asks Windows to allocate a sandbox-only local HTTP port.
     def navigate_tabs():
