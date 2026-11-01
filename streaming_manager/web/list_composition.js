@@ -1,6 +1,7 @@
-/* R06 ZERO. Static list + Twitch-chat composition shared by both OBS sources.
-   The old entrance/exit/resize animation engine was intentionally removed.
-   This module owns visibility and geometry only; unrelated widgets and the
+/* R06 List + Twitch-chat composition shared by both OBS sources.
+   Split-mode content-sized chat boundaries may resize smoothly; the old
+   list entrance/exit animation engine remains removed. This module owns
+   visibility and geometry only; unrelated widgets and the
    list's content scrolling retain their existing independent behavior. */
 (() => {
   "use strict";
@@ -21,7 +22,7 @@
     .r06-chat-layer {
       height:0;flex:0 0 auto;min-height:0;overflow:hidden;position:relative;
       box-sizing:border-box;border-radius:8px;
-      transition:none!important;animation:none!important
+      animation:none!important
     }
     .r06-chat-layer iframe {
       position:absolute;inset:0;width:100%;height:100%;
@@ -60,6 +61,7 @@
     let lastEmbeddedChatNeeded = false;
     let lastEmbeddedRefreshAt = -Infinity;
     let lastGeometry = "";
+    let chatResizeSeconds = 1;
 
     function measureChat() {
       if (!chatAvailable || !chatHasMessages) return 0;
@@ -132,16 +134,25 @@
       recoverEmbeddedChat(chatNeeded);
       matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
-      const chatCap = active ? Math.max(0, Math.floor((available - 12) / 2)) : available;
+      const split = active && !replacing && chatNeeded;
+      const gap = split ? 12 : 0;
+      const chatCap = active ? Math.max(0, Math.floor((available - gap) / 2)) : available;
       const desiredChat = !chatNeeded ? 0 :
         replacing ? available : Math.max(0, Math.min(natural, chatCap));
 
-      // ZERO baseline: visibility, size, and replacement change atomically;
-      // no old animation state can persist across mode changes.
+      // List visibility and replacement remain immediate. Only a content-
+      // sized chat in Split mode may animate its allocated height.
       root.classList.toggle("r06-shown", active);
       root.classList.toggle("r06-not-shown", !active);
       root.classList.toggle("r06-replace", replacing);
       listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
+      // Only a content-sized chat in Split mode animates its boundary. An
+      // Always chat starts at its full allocated height and never rises from
+      // the bottom when a message arrives.
+      const animateChat = split && !chatAlways && lastChatHeight >= 0;
+      chatLayer.style.transition = animateChat ?
+        `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
+      chatLayer.style.marginTop = gap + "px";
       if (desiredChat !== lastChatHeight) {
         chatLayer.style.height = desiredChat + "px";
         lastChatHeight = desiredChat;
@@ -181,6 +192,9 @@
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
+      const seconds = Number(cfg.list_animation_seconds);
+      chatResizeSeconds = Number.isFinite(seconds) ?
+        Math.max(0.25, Math.min(3, seconds)) : 1;
       if (!chatAvailable || !chatHasMessages) intrinsicChatHeight = 0;
 
       const sequence = Number(trigger.sequence || 0);
