@@ -34,7 +34,13 @@ def main() -> int:
         # This canonical internal decision ledger quotes user requirements and
         # counterexamples verbatim; it is not public product/marketing copy.
         # Keep scanning all other documentation and distributable source.
-        if path.as_posix() == "docs/Правила_и_дальнейший_распорядок_работ.md":
+        if path.as_posix() in {
+            "docs/Правила_и_дальнейший_распорядок_работ.md",
+            # Historical R06 matrix: preserves verbatim QA comparisons and
+            # rejected observations; it is an internal decision record, not
+            # public product or marketing wording.
+            "docs/qa/R06-combinations-manual-matrix.md",
+        }:
             continue
         try:
             text = path.read_text(encoding="utf-8")
