@@ -115,3 +115,24 @@ def run_public_checks(check, window, db, paths, app):
         assert db.count_all_games() == 3 and db.get_game(ids["c"]).archived == 1
 
     check("sandbox_public_csv_json_xlsx_exports", exports)
+
+    def mirror_create():
+        assert public._public_xlsx_path is None
+        old = QFileDialog.getSaveFileName
+        try:
+            QFileDialog.getSaveFileName = staticmethod(lambda *a, **kw: (str(mirror), "Excel"))
+            public.public_xlsx_create_btn.click()
+        finally:
+            QFileDialog.getSaveFileName = old
+        idle()
+        assert mirror.is_file() and public._public_xlsx_path == mirror
+        assert db.get_setting(PUBLIC_XLSX_ENABLED_KEY) == "1"
+        assert db.get_setting(PUBLIC_XLSX_PATH_KEY) == str(mirror)
+        rows = xlsx_rows(mirror)
+        assert rows[0] == ("ПОЗИЦИЯ", "НАЗВАНИЕ ИГРЫ", "БАЛЛЫ", "ОТЗЫВ", "СТАТУС")
+        assert len(rows) == 3
+        assert {row[1] for row in rows[1:]} == {active, secondary}
+        assert public._public_xlsx_last_hash == public_state_hash(public_mirror_rows(db))
+        assert "Синхронизировано" in public.public_xlsx_status_label.text()
+
+    check("sandbox_public_mirror_create_and_persist", mirror_create)
