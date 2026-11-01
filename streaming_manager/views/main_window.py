@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QThreadPool, QTimer, QUrl
+from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QThreadPool, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
@@ -83,6 +83,9 @@ _TAB_ICON_COLORS = {
 
 
 class MainWindow(QMainWindow):
+    # Safe cross-thread delivery from DonationAlerts network intake to Qt GUI.
+    donationEventApplied = Signal()
+
     def __init__(self, db: Database, paths: AppPaths):
         super().__init__()
         self.db = db
@@ -113,9 +116,14 @@ class MainWindow(QMainWindow):
         self.twitch_eventsub_runtime = TwitchEventSubRuntime(
             self.twitch_channel_points_service,
         )
+        self._donation_refresh_pending = False
+        self.donationEventApplied.connect(
+            self._schedule_donation_view_refresh, Qt.ConnectionType.QueuedConnection
+        )
         self.donationalerts_service = DonationAlertsDonationService(
             db,
             self.integration_manager,
+            on_event_applied=self.donationEventApplied.emit,
         )
         self.donationalerts_runtime = DonationAlertsRuntime(
             self.donationalerts_service,
@@ -1035,6 +1043,22 @@ class MainWindow(QMainWindow):
             )
         )
         self._update_status_bar()
+
+    @Slot()
+    def _schedule_donation_view_refresh(self):
+        # A burst of donation events can arrive from a non-Qt network thread.
+        # Collapse all notifications in one event-loop turn so heavy tables
+        # are neither rebuilt off-thread nor refreshed once per donation.
+        if self._exit_accepted or self._donation_refresh_pending:
+            return
+        self._donation_refresh_pending = True
+        QTimer.singleShot(0, self._apply_donation_view_refresh)
+
+    @Slot()
+    def _apply_donation_view_refresh(self):
+        self._donation_refresh_pending = False
+        if not self._exit_accepted:
+            self.notify_game_data_changed()
 
     def refresh_all(self):
         """Explicit F5 refresh remains eager by user request."""
