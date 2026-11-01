@@ -58,6 +58,7 @@ class ChatAppearanceEditor(QWidget):
         twitch_form.addRow(self.test)
 
         common_box, common_form = self._group(root, "Общий фон и контур")
+        self.common_form = common_form
         self.background = ScrollSafeComboBox()
         self.background.addItem("Прозрачный", "transparent")
         self.background.addItem("Цвет", "color")

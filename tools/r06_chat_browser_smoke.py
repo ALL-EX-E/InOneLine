@@ -97,7 +97,6 @@ def static_check(state, label):
     assert state["panelOpacity"] >= 0.99, (label, state)
     assert state["panelTransform"] == "none", (label, state)
     assert float(state["panelTransition"].split(",")[0].rstrip("s")) == 0, (label, state)
-    assert float(state["chatTransition"].split(",")[0].rstrip("s")) == 0, (label, state)
     assert state["panelAnimation"] == "none", (label, state)
     assert state["chatAnimation"] == "none", (label, state)
     assert not state["oldMovementClasses"], (label, state)
@@ -188,6 +187,7 @@ def main():
                           a["chatHeight"] > 15,
                           "dynamic Twitch chat gets message and intrinsic height")
                 static_check(m, "dynamic chat")
+                assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
 
             # Directional settings are retained but MUST NOT move the panel.
             for direction in ("left","right","top","bottom"):

@@ -81,7 +81,6 @@ class MultichatTab(QWidget):
         self.twitch_obs.setChecked(db.get_setting("multichat_twitch_obs", "1") == "1")
         self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
         self.twitch_obs.toggled.connect(self._on_twitch_obs)
-        connections_layout.addWidget(self.twitch_obs)
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -102,6 +101,18 @@ class MultichatTab(QWidget):
         self.appearance_editor = ChatAppearanceEditor(
             db, import_background=import_background
         )
+        visibility_group = QGroupBox("Чат Twitch в OBS")
+        visibility_form = QFormLayout(visibility_group)
+        visibility_form.addRow(self.twitch_obs)
+        visibility_row = self.appearance_editor.common_form.takeRow(
+            self.appearance_editor.visibility
+        )
+        visibility_form.addRow(
+            "Когда показывать:", visibility_row.fieldItem.widget()
+        )
+        self.twitch_obs.toggled.connect(self.appearance_editor.visibility.setEnabled)
+        self.appearance_editor.visibility.setEnabled(self.twitch_obs.isChecked())
+        settings.addWidget(visibility_group)
         self.appearance_editor.changed.connect(self._appearance_changed)
         self._appearance_draft = self.appearance_editor.values()
         settings.addWidget(self.appearance_editor)
