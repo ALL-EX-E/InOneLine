@@ -22,3 +22,20 @@
 - Это **не** проверка Google Drive Desktop, синхронизации двух реальных компьютеров, всех HTML/OBS анимаций и всех возможных форматов XLSX.
 
 **Статус при создании:** план записан до изменения кода, приёмка не проведена.
+
+
+## Реализация, Windows CI и кандидат для ручной приёмки
+
+**Реализовано:** создан `streaming_manager/operator_autotest_public.py` с пятью реальными UI-сценариями, вызов из `streaming_manager/operator_autotest.py`; PyInstaller `installer/InOneLine.spec` явно включает helper; сценарии используют только временную SQLite и файлы. Изменения функциональной логики `PublicTab`, `Database`, `public_xlsx`, пользовательского OBS, Twitch/DonationAlerts **отсутствуют**.
+
+Новые тесты `sandbox_public_projection_search_and_selection`, `sandbox_public_csv_json_xlsx_exports`, `sandbox_public_mirror_create_and_persist`, `sandbox_public_mirror_update_and_missing_recovery`, `sandbox_public_mirror_one_way_reconnect_no_import`. На синтетической базе проверяются исключение архива, Unicode-поиск, синхронизация поля/выделения, одноразовый экспорт из реальных кнопок, публичное одностороннее XLSX-зеркало с `FunctionWorker`, восстановление недоступного файла и перезапись постороннего содержимого при подключении без внесения данных в SQLite.
+
+**Отклонение и исправление перед выпуском:** один промежуточный CI (run `41278533615`) выявил нестабильную прежнюю проверку `sandbox_csv_ui_merge_zero_and_safety_backup`: сверка количества новых имен backup иногда возвращала ноль при успешном UI импорте. Проверка усилена: берётся реальный путь safety-backup из штатного сообщения импорта, сверяется расположение во временной backups-папке, SQLite `PRAGMA integrity_check` и значения баллов **до** импорта. Логика рабочего CSV импортера **не изменялась**. Все остальные 26 сценариев тогда прошли. Не интерпретировать это как доказанный дефект создания backup в InOneLine.
+
+**Приёмочный Windows CI:** [run 41278647879](https://github.com/ALL-EX-E/InOneLine/actions/runs/41278647879) — **SUCCESS** для кода `84055701f6508b93e7801bfde8e2df514599f908`: **27/27 PASS в исходном Python и 27/27 PASS внутри собранного Windows EXE**, Windows PowerShell 5.1 parser, прежние PERF-01/PERF-02A regressions, Native GUI/XLSX, PyInstaller, frozen обычное завершение с освобождением порта (**0,766 с**, однократный CI idle-замер), Inno Setup, GitHub artifact.
+
+**Отдельный исторический gate:** `Publication wording gate` остаётся красным из-за уже существующих формулировок документа `docs/qa/R06-combinations-manual-matrix.md` (сравнения «то же, что слева» и т. п.), что подтверждено логом. Этот файл относится к независимой незакрытой проверке R06, не менялся и не должен правиться автоматически в рамках автотестировщика. Не заявлять, что *все* проверки GitHub зелёные: целевой Windows CI — SUCCESS, publication gate — отдельно FAILURE.
+
+**Проверенный пакет:** [InOneLine_Operator_AutoTest_v1_5_Public_8405570.zip](https://drive.google.com/file/d/1zTDGh4BtkYXwB8CrpQY8nxmVrRFnT5Q1/view?usp=drivesdk). Архив **47 057 348 байт**, SHA-256 `be9cfcb24c7576c03f85d40590f9311a487b9fe59b2ed8d8b594f8e3ff63b054`, ZIP integrity `ZipFile.testzip()=None` — PASS. Внутри четыре файла: `InOneLine_Setup_1.0.8.exe` **47 910 910 байт**, SHA-256 `184ae30032951bca5af73824a428d57d0c5d1ef4755a63c94cd58ec519277f97` (совпадает с CI), `InOneLine_AutoTest.ps1` 10 114 байт, `Start_InOneLine_AutoTest.cmd` 153 байта, `README_RU.txt` 6 078 байт. Метаданные Google Drive прочитаны после загрузки, размер и URL подтверждены.
+
+**Ручной gate:** сохранить внешний бэкап рабочей БД и настроек; установить новый кандидат, заменить оба скрипта, закрыть программу, двойной клик CMD, по желанию реальный Twitch-маркер, штатное закрытие, прислать ZIP с рабочего стола. При выполнении Twitch и всех внутренних шагов ожидается **50 PASS / 0 FAIL / 2 SKIP** (45 PASS принятой v1.4 + 5 новых). Ручная приёмка v1.5 **ещё не получена**. Сохранить рабочие v1–v1.4, `main`, PERF-02B и R06 вне этого блока.
