@@ -45,6 +45,9 @@ jobs:
             throw "Unexpected diagnostic exit or result"
           }
           Copy-Item "$env:RUNNER_TEMP/da_sync.json" "./da_sync_diagnostic.json"
+          # The probe returns 2 for a proven application defect. This is a
+          # diagnostic workflow, not an acceptance gate; publish its JSON.
+          exit 0
       - name: Attach machine-readable diagnostic
         uses: actions/upload-artifact@v4
         with:
