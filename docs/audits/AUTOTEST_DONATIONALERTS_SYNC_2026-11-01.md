@@ -18,3 +18,18 @@
 6. До изучения регрессий — **не менять боевой runtime**, `main`, PERF-02B, R06 и принятую v1.5. Подтвержденные FAIL оформить с ожидаемым/фактическим, отдельным предложением исправления, затем только после согласованного поведения — исправление, Windows CI, установщик и ручная приёмка.
 
 **Статус:** план до кода; доказательство дефекта и данные локальных задержек ожидаются.
+
+
+## Воспроизведение DA-SYNC-001 (Windows, без сети)
+
+**Методика:** `tools/diagnostics/donationalerts_sync_probe.py` (commit `0204e95856125469d15b180f7461aebd07bd3c03`). Запускается Windows Python 3.12 в `TemporaryDirectory`: новый `MainWindow`, отдельный SQLite и локальный API на порту 0, настоящие Twitch и DonationAlerts runtime остановлены до подключения синтетического сервиса, `PublicTab` оставлена открытой. Настоящий `window.donationalerts_service.process_donation` принимает фиктивные 5 RUB для вымышленного названия; DB `games`, `external_events`, `contributions` проверяются по факту записи. Дублированный ID не начисляет повторно. Затем 1 000 мс Qt event loop и повторная проверка без F5; далее F5. Все данные только синтетические, no login/currency payment/provider network.
+
+**Первый исполняемый Windows run:** [41281021336](https://github.com/ALL-EX-E/InOneLine/actions/runs/41281021336). Локальный диагностический вывод:
+```json
+{"db_transaction":"PASS","db_commit_ms":125,"event_rows":1,"contribution_rows":1,"duplicate_credit_prevented":true,"visible_public_rows_before":0,"visible_public_rows_after_1000ms":0,"auto_refresh_ms":null,"visible_public_rows_after_F5":1,"ui_auto_refresh":"FAIL","provider_to_desktop_delivery":"NOT_TESTED"}
+```
+**DA-SYNC-001 подтверждён:** после успешного commit и обработки 1 секунды Qt events открытый Public не обновился, несмотря на наличие новой записи в SQLite. После F5 запись появилась. Ожидаемое — обновление видимых данных без ручного F5 после успешного применения внешнего события. Фактическое — отсутствие push-инвалидации от background DonationAlerts pipeline к `MainWindow.notify_game_data_changed`; остальные tabs с lazy dirty model не получают маркера. Причина подтверждена кодом `donationalerts_runtime.py`, `donationalerts_service.process_donation`, `MainWindow`. Запрещено утверждать, что этот тест измерил время сети DonationAlerts.
+
+**CI-пояснение:** первый запуск 41280946583 ошибался командой импорта пакета Python (не тест приложения). Run 41281021336 **правильно воспроизвёл дефект**, но исходно был помечен GitHub Actions failure из-за намеренного exit code 2. В последующем `donationalerts-sync-diagnostic.yml` этот код распознаётся как предупреждение `CONFIRMED_DEFECT`, публикуется machine-readable JSON, workflow для диагностики не становится формальной приёмкой исправления. Отдельный historical `Publication wording gate` красный из-за давно зарегистрированных записей R06, не относится к этому дефекту.
+
+**Следующее действие:** отдельно согласовать требуемую скорость/UI приёмку и безопасное Qt cross-thread уведомление. Добавить полноценную непрерывную локальную сверку и user-initiated DA test по этапам, затем исправлять runtime отдельно. `main` и принятая AutoTest v1.5 не менялись. Удаление сообщения в Dashboard не равно заявленному отменённому денежному событию; в DB нельзя автоматически откатывать начисление без доказанного корректирующего события/отдельного согласованного правила.
