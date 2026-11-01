@@ -54,3 +54,22 @@
 Обработка `awaiting_rate` с ручным применением, корректировки после истечения max_amount/закрытия, пауза/продление таймера, варианты колеса, дубли out-of-order ID, сценарии reconnect / REST gap, реальные задержки dashboard, журнал и повторная синхронизация XLSX между экземплярами. Порядок этой партии определить после приёмки первой.
 
 Статус: документ зафиксирован **до разработки новой партии**.
+
+
+## Реализация, полный Windows CI и кандидат v1.7
+
+**Исходный код:** `streaming_manager/operator_autotest_donation_mechanics.py` с 11 изолированными тестами `process_donation` и SQLite, вызываемыми `run_sandbox` из `streaming_manager/operator_autotest.py`. Каждый сценарий имеет собственный `TemporaryDirectory` и SQLite, независимый курс ID, фиктивный подключённый адаптер. Никакой запрос в DonationAlerts/Google Drive и никакое изменение рабочей базы не выполняются. PyInstaller `installer/InOneLine.spec` включает новый модуль; PS1 `scriptVersion=v1.7-donation-mechanics`; README обновлён; Windows CI требует **39 sandbox PASS**. Функции настоящей обработки DonationAlerts и Qt в этом блоке не изменены.
+
+**Промежуточная диагностика:** первые CI (41283258785 и предыдущий) обнаружили, что тест нового аукционного лота ожидал первых 10 баллов в `auction_entries.bid_sm_points`. По существующему коду `_add_or_increment_auction_lot_conn` совершенно новый `auction_only=1` лот хранит первую сумму в `starting_sm_points=10`, `bid_sm_points=0`, `total_sm_points=10`; **второе** начисление увеличивает `bid_sm_points`. Ожидание теста исправлено, поведение программы не менялось.
+
+**Приёмочный CI:** [Windows workflow run 41283374246](https://github.com/ALL-EX-E/InOneLine/actions/runs/41283374246) — **SUCCESS**, проверенная логика в commit `ec860998a47c25578738c1f34a2153f346516e89` (позднее изменения документационные). **39/39 PASS** source sandbox и **39/39 PASS** frozen Windows EXE. PASS: PowerShell 5.1 parser, PERF-01/PERF-02A regressions, native GUI/XLSX regression, штатное завершение frozen EXE (**0,688 с**, один CI замер без реальной нагрузки), PyInstaller/Inno Setup, проверенный установочный артефакт. Отдельная историческая `Publication wording gate` для R06 остаётся НЕ закрыта и не являлась частью этого CI.
+
+**Кандидат для ручной проверки:** [InOneLine_Operator_AutoTest_v1_7_Donation_Mechanics_ec86099.zip на Google Диске](https://drive.google.com/file/d/18dQRAVtmZjiq0-ZTohllEIvmPHN2xuIl/view?usp=drivesdk). Google Drive readback: **47 045 433 байта**, `application/zip`. Локальная целостность ZIP: `ZipFile.testzip()=None`, SHA256 архива `5e76020a30ef52d8f9179306e2e9b814631dc0fb8d2a68301ca8682a9adfe76c`. Содержит:
+- `InOneLine_Setup_1.0.8.exe` — **47 897 449 байт**, SHA256 `c3dc64af4b583bb1cbee4683b4b989f4fdf820a8e26c07e1e9b804de8ef6d96c` (совпадает с CI);
+- `InOneLine_AutoTest.ps1` — 13 676 байт;
+- `Start_InOneLine_AutoTest.cmd` — 153 байта;
+- `README_RU.txt` — 9 291 байт.
+
+**Ручной gate:** сначала отдельный backup рабочих данных; установка кандидата `1.0.8` и замена двух скриптов в каталоге `InOneLine.exe`; полное закрытие всех экземпляров до запуска `.cmd`; прежние необязательные Twitch и не-оплачиваемое Dashboard «Добавить сообщение» можно выполнить или пропустить с `N`; после штатного закрытия отправить ZIP с рабочего стола. При успешном выполнении двух прежних операторских живых сценариев ожидается **64 PASS / 0 FAIL / 2 SKIP** (v1.6 = 53 PASS плюс 11 B3), при их пропуске — иные PASS/SKIP. Настоящего оплаченного доната и live-анализа удаления Dashboard не было. Не принимать v1.7 до фактического пользовательского ZIP.
+
+**После ручной приёмки:** следующая партия `AUTO-TEST-002G B` должна охватить ручное применение накопленной конвертации, timeout/max_amount, колесо, пересечение поздних событий и несколько последовательных событий; с отдельным планом и ручным gate.
