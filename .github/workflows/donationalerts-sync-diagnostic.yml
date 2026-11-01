@@ -1,0 +1,54 @@
+name: DonationAlerts UI synchronization diagnostic (isolated Windows)
+
+on:
+  push:
+    branches:
+      - audit/operator-autotest-da-sync-20261101
+    paths:
+      - "tools/diagnostics/donationalerts_sync_probe.py"
+      - ".github/workflows/donationalerts-sync-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-ui-diagnostic:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+      - name: Install locked dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements-build-lock.txt
+          if ($LASTEXITCODE -ne 0) { throw "Install failed" }
+      - name: Run synthetic DonationAlerts to Qt diagnostic
+        shell: pwsh
+        run: |
+          python tools/diagnostics/donationalerts_sync_probe.py > "$env:RUNNER_TEMP/da_sync.json"
+          $code = $LASTEXITCODE
+          if (!(Test-Path "$env:RUNNER_TEMP/da_sync.json")) { throw "Diagnostic report absent" }
+          $report = Get-Content "$env:RUNNER_TEMP/da_sync.json" -Raw | ConvertFrom-Json
+          Write-Host "DA_SYNC_DIAGNOSTIC=$($report | ConvertTo-Json -Compress)"
+          if ($report.db_transaction -ne "PASS") { throw "Synthetic DB pipeline failed" }
+          if ($code -eq 2 -and $report.ui_auto_refresh -eq "FAIL") {
+            Write-Warning "CONFIRMED_DEFECT: SQLite updated, visible Public Qt view remained stale without F5"
+          } elseif ($code -eq 0 -and $report.ui_auto_refresh -eq "PASS") {
+            Write-Host "DA_SYNC_UI_REFRESH=PASS"
+          } else {
+            throw "Unexpected diagnostic exit or result"
+          }
+          Copy-Item "$env:RUNNER_TEMP/da_sync.json" "./da_sync_diagnostic.json"
+      - name: Attach machine-readable diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: DonationAlerts_synthetic_UI_diagnostic
+          path: da_sync_diagnostic.json
+          if-no-files-found: error
+          retention-days: 14
