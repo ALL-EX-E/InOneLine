@@ -831,6 +831,73 @@ def run_sandbox(output_file: str) -> int:
                 from .operator_autotest_public import run_public_checks
                 run_public_checks(check, window, db, paths, app)
 
+                def donation_background_ui_refresh():
+                    import threading
+                    # This is a synthetic donation in the isolated Qt DB.
+                    # It never uses real provider credentials or network.
+                    window.donationalerts_runtime.stop()
+                    db.upsert_integration_connection(
+                        "donationalerts", enabled=True, status="connected"
+                    )
+                    db.set_conversion_rate("RUB", "1")
+                    window._set_current_main_page(window.public_tab)
+                    app.processEvents()
+                    original_count = window.public_tab.table.rowCount()
+                    test_title = "IOL DA AUTO QT SYNTHETIC"
+                    raw = {
+                        "id": 760000001, "amount": "7", "currency": "RUB",
+                        "username": "Synthetic", "message": test_title,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    outcome = {}
+                    def network_thread():
+                        try:
+                            outcome["result"] = window.donationalerts_service.process_donation(raw)
+                            outcome["committed"] = time.monotonic()
+                        except Exception as exc:
+                            outcome["error"] = exc
+                    thread = threading.Thread(target=network_thread, name="SandboxDAPush")
+                    thread.start()
+                    thread.join(timeout=8)
+                    assert not thread.is_alive(), "synthetic DonationAlerts worker stalled"
+                    if "error" in outcome:
+                        raise outcome["error"]
+                    assert outcome["result"]["status"] == "processed"
+                    assert db.find_game_by_title(test_title).sm_points == 7
+                    deadline = time.monotonic() + 2.0
+                    while window.public_tab.table.rowCount() == original_count and time.monotonic() < deadline:
+                        app.processEvents()
+                        time.sleep(0.025)
+                    assert window.public_tab.table.rowCount() == original_count + 1, (
+                        "DonationAlerts DB commit did not refresh visible Public UI"
+                    )
+                    window._set_current_main_page(window.games_tab)
+                    app.processEvents()
+                    assert db.find_game_by_title(test_title) is not None
+                    assert any(
+                        window.games_tab.table.item(i, 1)
+                        and window.games_tab.table.item(i, 1).text() == test_title
+                        for i in range(window.games_tab.table.rowCount())
+                    ), "hidden Games tab did not catch up on open"
+                    window._set_current_main_page(window.log_tab)
+                    deadline = time.monotonic() + 5
+                    log_visible = False
+                    while time.monotonic() < deadline:
+                        app.processEvents()
+                        log_visible = any(
+                            "Интеграция" in str(item)
+                            for row in window.log_tab.model._rows for item in row
+                        )
+                        if log_visible:
+                            break
+                        time.sleep(0.02)
+                    assert log_visible, "hidden Log tab did not catch up"
+                    duplicate = window.donationalerts_service.process_donation(raw)
+                    assert duplicate["status"] == "duplicate_cursor"
+                    assert db.find_game_by_title(test_title).sm_points == 7
+
+                check("sandbox_donationalerts_background_qt_refresh", donation_background_ui_refresh)
+
             finally:
                 window.close()
                 app.processEvents()
