@@ -9,6 +9,7 @@ import json
 import os
 import tempfile
 import time
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,9 +52,22 @@ def main() -> int:
                 "message": title,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
+            # Exercise a real Python background thread, as Centrifugo does.
             started = time.monotonic()
-            result = window.donationalerts_service.process_donation(payload)
-            committed = time.monotonic()
+            outcome = {}
+            def apply_in_background():
+                try:
+                    outcome["result"] = window.donationalerts_service.process_donation(payload)
+                    outcome["committed"] = time.monotonic()
+                except Exception as exc:
+                    outcome["error"] = exc
+            thread = threading.Thread(target=apply_in_background, name="SyntheticDonationPush")
+            thread.start()
+            thread.join(timeout=8)
+            assert not thread.is_alive(), "Donation service blocked background thread"
+            if "error" in outcome:
+                raise outcome["error"]
+            result, committed = outcome["result"], outcome["committed"]
             assert result["status"] == "processed", result["status"]
             row = db.find_game_by_title(title)
             assert row and row.sm_points == 5
@@ -80,10 +94,35 @@ def main() -> int:
                     break
                 time.sleep(0.025)
             before_f5_count = window.public_tab.table.rowCount()
-            window.refresh_all()
+            # In the corrected implementation, all hidden tabs are marked
+            # dirty; opening them must catch up without F5.
+            window._set_current_main_page(window.games_tab)
             app.processEvents()
-            after_f5_count = window.public_tab.table.rowCount()
-            assert after_f5_count == 1, "F5 failed to refresh synthetic donation"
+            games_after_switch = window.games_tab.table.rowCount()
+            window._set_current_main_page(window.log_tab)
+            end_log = time.monotonic() + 5.0
+            log_found = False
+            while time.monotonic() < end_log:
+                app.processEvents()
+                log_found = any(
+                    "Интеграция" in str(item)
+                    for row in window.log_tab.model._rows for item in row
+                )
+                if log_found:
+                    break
+                time.sleep(0.02)
+            window._set_current_main_page(window.completed_history_tab)
+            app.processEvents()
+            completed_history_rows = window.completed_history_tab.table.rowCount()
+            assert completed_history_rows == 0, (
+                "outside-auction donation incorrectly created completed auction history"
+            )
+            after_f5_count = None
+            if before_f5_count != 1:
+                window.refresh_all()
+                app.processEvents()
+                after_f5_count = window.public_tab.table.rowCount()
+                assert after_f5_count == 1, "F5 failed to refresh synthetic donation"
             report = {
                 "schema": "inone-da-synthetic-ui-probe-v1",
                 "scope": "isolated_temporary_sqlite_no_provider_network",
@@ -96,11 +135,17 @@ def main() -> int:
                 "visible_public_rows_before": int(before),
                 "visible_public_rows_after_1000ms": int(before_f5_count),
                 "auto_refresh_ms": seen_after_ms,
-                "visible_public_rows_after_F5": int(after_f5_count),
-                "ui_auto_refresh": "PASS" if seen_after_ms is not None else "FAIL",
+                "visible_public_rows_after_F5": after_f5_count,
+                "hidden_list_rows_after_open": int(games_after_switch),
+                "log_event_visible_after_open": log_found,
+                "completed_history_rows_outside_auction": completed_history_rows,
+                "ui_auto_refresh": (
+                    "PASS" if seen_after_ms is not None and games_after_switch == 1 and log_found
+                    else "FAIL"
+                ),
             }
             print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-            return 0 if seen_after_ms is not None else 2
+            return 0 if report["ui_auto_refresh"] == "PASS" else 2
         finally:
             window.close()
             app.processEvents()
