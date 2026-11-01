@@ -22,7 +22,7 @@ from .common import (
 class ChatAppearanceEditor(QWidget):
     changed = Signal(object, object, bool)  # Twitch style, common style, test-visible
 
-    def __init__(self, db, *, import_background=None, parent=None):
+    def __init__(self, db, *, import_background=None, visibility_control=None, parent=None):
         super().__init__(parent)
         self.db = db
         self._import_background = import_background
@@ -58,7 +58,6 @@ class ChatAppearanceEditor(QWidget):
         twitch_form.addRow(self.test)
 
         common_box, common_form = self._group(root, "Общий фон и контур")
-        self.common_form = common_form
         self.background = ScrollSafeComboBox()
         self.background.addItem("Прозрачный", "transparent")
         self.background.addItem("Цвет", "color")
@@ -91,11 +90,12 @@ class ChatAppearanceEditor(QWidget):
         self.glow_color = self._color(common_form, "Цвет контура:")
         self.glow_color_control = self.glow_color.parentWidget()
         self.glow_color_label = common_form.labelForField(self.glow_color_control)
-        self.visibility = ScrollSafeComboBox()
+        self.visibility = visibility_control or ScrollSafeComboBox()
         self.visibility.addItem("Скрывать, когда чат пуст", "hide_empty")
         self.visibility.addItem("Показывать постоянно", "always")
         self.visibility.currentIndexChanged.connect(self._changed)
-        common_form.addRow("Видимость OBS:", self.visibility)
+        if visibility_control is None:
+            common_form.addRow("Видимость OBS:", self.visibility)
 
         # Keep the long Reset label from squeezing Save at narrow widths.
         foot = QVBoxLayout()

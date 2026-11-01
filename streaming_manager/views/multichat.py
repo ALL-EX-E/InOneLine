@@ -7,7 +7,7 @@ from math import isfinite
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QTextCursor
-from .common import make_wide_step_control
+from .common import ScrollSafeComboBox, make_wide_step_control
 
 from PySide6.QtWidgets import (
     QApplication, QBoxLayout, QCheckBox, QFormLayout, QFrame, QGroupBox,
@@ -98,17 +98,14 @@ class MultichatTab(QWidget):
         actions.addWidget(preview)
         connections_layout.addLayout(actions)
         settings.addWidget(connections)
-        self.appearance_editor = ChatAppearanceEditor(
-            db, import_background=import_background
-        )
         visibility_group = QGroupBox("Чат Twitch в OBS")
         visibility_form = QFormLayout(visibility_group)
         visibility_form.addRow(self.twitch_obs)
-        visibility_row = self.appearance_editor.common_form.takeRow(
-            self.appearance_editor.visibility
-        )
-        visibility_form.addRow(
-            "Когда показывать:", visibility_row.fieldItem.widget()
+        visibility_control = ScrollSafeComboBox()
+        visibility_form.addRow("Когда показывать:", visibility_control)
+        self.appearance_editor = ChatAppearanceEditor(
+            db, import_background=import_background,
+            visibility_control=visibility_control,
         )
         self.twitch_obs.toggled.connect(self.appearance_editor.visibility.setEnabled)
         self.appearance_editor.visibility.setEnabled(self.twitch_obs.isChecked())
