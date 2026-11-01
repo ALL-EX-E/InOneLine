@@ -120,6 +120,11 @@ def run_sandbox(output_file: str) -> int:
 
         check("sandbox_donation_history_and_isolated_data", audit_and_isolation)
 
+    # AUTO-TEST-002G: additional real DonationAlerts/B3 routing scenarios.
+    # Each operates in an independent temporary SQLite, not live user data.
+    from .operator_autotest_donation_mechanics import run_donation_mechanic_checks
+    run_donation_mechanic_checks(check)
+
     # A second clean sandbox: instantiated MainWindow uses only its own temp
     # SQLite. Port 0 asks Windows to allocate a sandbox-only local HTTP port.
     def navigate_tabs():
