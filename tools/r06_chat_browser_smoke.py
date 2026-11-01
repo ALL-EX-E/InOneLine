@@ -154,14 +154,24 @@ def main():
                           "fixed-height always-chat / split")
                 static_check(m, "always-chat split")
 
+            before_hide = [evaluate(page, METRICS) for page in pages]
+            db.set_setting("list_animation_seconds", "3")
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 20)
+            for page, before in zip(pages, before_hide):
+                until(page, lambda a: a["shown"] and
+                      2 < a["listHeight"] < before["listHeight"] - 5 and
+                      a["chatHeight"] > before["chatHeight"] + 5 and
+                      a["panelTransform"] != "none" and
+                      float(a["panelTransition"].split(",")[0].rstrip("s")) > 0,
+                      "synchronized upward List exit and chat growth")
             for page in pages:
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and
                           abs(a["chatHeight"]-a["rootHeight"]) <= 3,
                           "hidden List, full-height always-chat")
                 static_check(m, "hidden")
+            db.set_setting("list_animation_seconds", "1.5")
 
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 20)

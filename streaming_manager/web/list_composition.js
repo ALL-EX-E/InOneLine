@@ -16,8 +16,8 @@
     }
     .r06-compose .r06-list-layer > #list-panel {
       width:100%;height:100%;min-height:0;box-sizing:border-box;
-      opacity:1!important;transform:none!important;
-      transition:none!important;animation:none!important
+      opacity:1!important;
+      transition:none;animation:none!important
     }
     .r06-chat-layer {
       height:0;flex:0 0 auto;min-height:0;overflow:hidden;position:relative;
@@ -62,6 +62,43 @@
     let lastEmbeddedRefreshAt = -Infinity;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
+    let hiding = false;
+    let hideTimer = null;
+    let hideHeight = 0;
+
+    function finishHide() {
+      if (!hiding) return;
+      hiding = false;
+      hideTimer = null;
+      listPanel.style.transition = "none";
+      listPanel.style.transform = "none";
+      listPanel.style.height = "";
+      listLayer.style.transition = "none";
+      listLayer.style.height = "";
+      lastGeometry = "";
+      layout();
+    }
+
+    function startHide() {
+      if (hiding) return;
+      hiding = true;
+      hideHeight = listLayer.getBoundingClientRect().height;
+      const duration = chatResizeSeconds * 1000;
+      listPanel.style.height = hideHeight + "px";
+      listPanel.style.transition = `transform ${chatResizeSeconds}s ease`;
+      listLayer.style.flex = "0 0 auto";
+      listLayer.style.height = hideHeight + "px";
+      listLayer.style.transition = `height ${chatResizeSeconds}s ease`;
+      // Commit the current geometry before applying both synchronized targets.
+      listLayer.getBoundingClientRect();
+      requestAnimationFrame(() => {
+        if (!hiding) return;
+        listLayer.style.height = "0px";
+        listPanel.style.transform = `translateY(-${root.clientHeight}px)`;
+        layout();
+      });
+      hideTimer = setTimeout(finishHide, duration + 30);
+    }
 
     function measureChat() {
       if (!chatAvailable || !chatHasMessages) return 0;
@@ -134,22 +171,23 @@
       recoverEmbeddedChat(chatNeeded);
       matchEmbeddedChatFrame(chatNeeded);
       const natural = chatAlways ? available : measureChat();
-      const split = active && !replacing && chatNeeded;
+      const split = (active || hiding) && !replacing && chatNeeded;
       const gap = split ? 12 : 0;
       const chatCap = active ? Math.max(0, Math.floor((available - gap) / 2)) : available;
       const desiredChat = !chatNeeded ? 0 :
-        replacing ? available : Math.max(0, Math.min(natural, chatCap));
+        replacing ? available : hiding || mode === "hidden" ? available - gap :
+        Math.max(0, Math.min(natural, chatCap));
 
       // List visibility and replacement remain immediate. Only a content-
       // sized chat in Split mode may animate its allocated height.
-      root.classList.toggle("r06-shown", active);
-      root.classList.toggle("r06-not-shown", !active);
+      root.classList.toggle("r06-shown", active || hiding);
+      root.classList.toggle("r06-not-shown", !active && !hiding);
       root.classList.toggle("r06-replace", replacing);
-      listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
+      if (!hiding) listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
       // Only a content-sized chat in Split mode animates its boundary. An
       // Always chat starts at its full allocated height and never rises from
       // the bottom when a message arrives.
-      const animateChat = split && !chatAlways && lastChatHeight >= 0;
+      const animateChat = hiding || (split && !chatAlways && lastChatHeight >= 0);
       chatLayer.style.transition = animateChat ?
         `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
       chatLayer.style.marginTop = gap + "px";
@@ -167,6 +205,14 @@
 
     function changeActive(next) {
       if (active === next) return;
+      if (next && hiding) {
+        clearTimeout(hideTimer);
+        finishHide();
+      }
+      if (!next && mode === "hidden" && !hiding && active &&
+          composeMode === "split" && listLayer.getBoundingClientRect().height > 0) {
+        startHide();
+      }
       active = next;
       lastGeometry = "";
       layout();
