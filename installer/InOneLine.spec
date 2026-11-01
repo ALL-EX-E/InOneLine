@@ -11,6 +11,7 @@ hiddenimports = [
     "streaming_manager.operator_autotest",
     "streaming_manager.operator_autotest_public",
     "streaming_manager.operator_autotest_donation_mechanics",
+    "streaming_manager.operator_autotest_da_b1",
     "PySide6.QtCore",
     "PySide6.QtGui",
     "PySide6.QtWidgets",
