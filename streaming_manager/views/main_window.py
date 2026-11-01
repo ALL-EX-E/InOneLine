@@ -122,6 +122,12 @@ class MainWindow(QMainWindow):
         self._integration_health_timer = QTimer(self)
         self._integration_health_timer.setInterval(60 * 60 * 1000)
         self._integration_health_timer.timeout.connect(self._validate_active_integrations)
+        self._integration_data_refresh_timer = QTimer(self)
+        self._integration_data_refresh_timer.setInterval(1000)
+        self._integration_data_refresh_timer.timeout.connect(
+            self._refresh_integration_data_if_changed
+        )
+        self._last_integration_event_marker: tuple[tuple[str, str], ...] = ()
         self._startup_backup_worker = None
         self.setStyleSheet(APP_STYLE)
 
@@ -319,6 +325,8 @@ class MainWindow(QMainWindow):
         # work stays off the GUI thread.
         QTimer.singleShot(500, self._validate_active_integrations)
         self._integration_health_timer.start()
+        self._last_integration_event_marker = self._integration_event_marker()
+        self._integration_data_refresh_timer.start()
         self.twitch_eventsub_runtime.start()
         self.donationalerts_runtime.start()
 
@@ -1020,6 +1028,26 @@ class MainWindow(QMainWindow):
             )
         )
         self._update_status_bar()
+
+    def _integration_event_marker(self) -> tuple[tuple[str, str], ...]:
+        """Return the cheap cross-thread-safe marker for newly applied events."""
+        rows = self.db.list_integration_connections()
+        return tuple(
+            sorted(
+                (
+                    str(row.get("service_key") or ""),
+                    str(row.get("last_event_at") or ""),
+                )
+                for row in rows
+            )
+        )
+
+    def _refresh_integration_data_if_changed(self):
+        marker = self._integration_event_marker()
+        if marker == self._last_integration_event_marker:
+            return
+        self._last_integration_event_marker = marker
+        self.refresh_game_data_views()
 
     def refresh_all(self):
         """Explicit F5 refresh remains eager by user request."""
