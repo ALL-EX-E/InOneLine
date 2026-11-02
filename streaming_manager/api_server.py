@@ -649,7 +649,7 @@ class LocalApiServer:
                     obs_enabled = chat.get("obs_enabled") or {}
                     chat_messages = chat.get("messages") or []
                     payload["multichat"] = {
-                        "enabled": obs_enabled.get("twitch", True) is True,
+                        "enabled": obs_enabled.get("twitch", True) is True and common.get("visibility") != "hidden",
                         "has_messages": any(
                             item.get("platform") == "twitch"
                             for item in chat_messages if isinstance(item, dict)
