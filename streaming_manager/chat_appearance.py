@@ -85,7 +85,8 @@ def normalize_common(raw) -> dict:
     d["background_media_id"] = _integer(raw.get("background_media_id"), 0, 0, 2147483647) or None
     d["background_fit"] = "contain" if raw.get("background_fit") == "contain" else "cover"
     d["glow"] = raw.get("glow") is True
-    d["visibility"] = raw.get("visibility") if raw.get("visibility") in {"hidden", "hide_empty", "always"} else "hide_empty"
+    visibility = raw.get("visibility")
+    d["visibility"] = visibility if isinstance(visibility, str) and visibility in {"hidden", "hide_empty", "always"} else "hide_empty"
     return d
 
 
