@@ -59,6 +59,8 @@ METRICS = """JSON.stringify((() => {
         frame=chat?.querySelector('iframe'),
         doc=frame?.contentDocument,
         cards=doc?.getElementById('messages'),
+        shell=doc?.getElementById('shell'),
+        firstCard=cards?.firstElementChild,
         pc=panel&&getComputedStyle(panel),
         cc=chat&&getComputedStyle(chat);
   if (!root || !layer || !panel || !chat) return {ready:false};
@@ -71,6 +73,8 @@ METRICS = """JSON.stringify((() => {
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
     count:cards?.children.length ?? -1,
+    shellRadius:shell ? doc.defaultView.getComputedStyle(shell).borderRadius : null,
+    cardRadius:firstCard ? doc.defaultView.getComputedStyle(firstCard).borderRadius : null,
     panelOpacity:+pc.opacity, panelTransform:pc.transform,
     panelTransition:pc.transitionDuration, panelAnimation:pc.animationName,
     chatTransition:cc.transitionDuration, chatAnimation:cc.animationName,
@@ -188,6 +192,26 @@ def main():
                           "dynamic Twitch chat gets message and intrinsic height")
                 static_check(m, "dynamic chat")
                 assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
+                assert m["shellRadius"] == m["cardRadius"] == "8px", (
+                    "Original Twitch cards must match shell radius in both OBS sources", m)
+
+            # The CSS default must not override the saved custom card radius.
+            for radius in (0, 20):
+                db.set_setting(
+                    "multichat_appearance_twitch",
+                    json.dumps({"mode": "custom", "card_radius": radius}),
+                )
+                for page in pages:
+                    m = until(page, lambda a: a["count"] == 1 and
+                              a["cardRadius"] == f"{radius}px",
+                              f"custom Twitch card radius {radius}px")
+                    assert m["shellRadius"] == "8px", m
+            db.set_setting("multichat_appearance_twitch",
+                           json.dumps({"mode": "original"}))
+            for page in pages:
+                m = until(page, lambda a: a["count"] == 1 and
+                          a["cardRadius"] == a["shellRadius"] == "8px",
+                          "original Twitch corners restored after custom mode")
 
             # Directional settings are retained but MUST NOT move the panel.
             for direction in ("left","right","top","bottom"):
