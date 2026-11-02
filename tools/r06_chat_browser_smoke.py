@@ -219,9 +219,29 @@ def main():
             assert state.ingest(ChatMessage("twitch", "chan", "zero-message",
                                             "alice", "R06 ZERO visible chat"))
             for page in pages:
-                m = until(page, lambda a: a["shown"] and a["count"] == 1 and
-                          a["chatHeight"] > 15,
-                          "dynamic Twitch chat gets message and intrinsic height")
+                try:
+                    m = until(page, lambda a: a["shown"] and a["count"] == 1 and
+                              a["chatHeight"] > 15,
+                              "dynamic Twitch chat gets message and intrinsic height")
+                except AssertionError:
+                    provider = state.snapshot()
+                    print("R06_PROVIDER_DIAG", {
+                        "message_count": len(provider.get("messages", [])),
+                        "visibility": provider.get("appearance", {}).get("common", {}).get("visibility"),
+                        "obs_enabled": provider.get("obs_enabled"),
+                    }, flush=True)
+                    try:
+                        with urlopen(api.base_url + "/api/multichat", timeout=3) as response:
+                            payload = json.loads(response.read().decode("utf-8"))
+                        print("R06_HTTP_DIAG", {
+                            "status": response.status,
+                            "message_count": len(payload.get("messages", [])),
+                            "visibility": payload.get("appearance", {}).get("common", {}).get("visibility"),
+                            "obs_enabled": payload.get("obs_enabled"),
+                        }, flush=True)
+                    except Exception as error:
+                        print("R06_HTTP_DIAG_ERROR", repr(error), flush=True)
+                    raise
                 static_check(m, "dynamic chat")
                 assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
 
