@@ -1,7 +1,8 @@
-"""R06 ZERO: real Chromium static List+Twitch-chat geometry and commands.
+"""R06: Chromium List+Twitch-chat geometry and approved Hide transition.
 
-All previous movement animation tests are preserved in Git history. This new
-baseline deliberately checks there is NO List/chat transition, wipe or fade.
+The static baseline stays unchanged except for the explicitly agreed upward
+exit of an already visible List when switching to "Не показывать".
+Recheck the current main D41/Twitch styles on the synthetic PR merge.
 """
 from __future__ import annotations
 
