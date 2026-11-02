@@ -72,11 +72,30 @@ class AppearanceModelTests(unittest.TestCase):
             self.assertEqual(after["twitch"]["text_size"],29)
             self.assertEqual(after["common"]["background"],"color")
             self.assertNotIn("text"," ".join(db.values.keys()))
-            self.assertEqual(set(db.values), {TWITCH_KEY,COMMON_KEY})
+            self.assertEqual(set(db.values), {TWITCH_KEY,COMMON_KEY,"multichat_twitch_obs"})
             self.assertFalse(after["common"]["media_url"])
             self.assertEqual(saved_appearance(db)["twitch"],after["twitch"])
             db.set_setting(TWITCH_KEY,"{{INVALID")
             self.assertEqual(saved_appearance(db)["twitch"]["mode"],"original")
+
+    def test_legacy_checkbox_migration_and_new_visibility_persistence(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = StubDatabase(folder)
+            db.set_setting("multichat_twitch_obs", "0")
+            db.set_setting(COMMON_KEY, json.dumps({"visibility": "always"}))
+            self.assertEqual(saved_appearance(db)["common"]["visibility"], "hidden")
+            self.assertEqual(public_appearance(db)["common"]["visibility"], "hidden")
+            # Reading legacy settings must not silently rewrite the database.
+            self.assertEqual(json.loads(db.get_setting(COMMON_KEY))["visibility"], "always")
+            save_appearance(db, {}, {"visibility": "hidden"})
+            self.assertEqual(db.get_setting("multichat_twitch_obs"), "0")
+            self.assertEqual(saved_appearance(db)["common"]["visibility"], "hidden")
+            save_appearance(db, {}, {"visibility": "hide_empty"})
+            self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
+            self.assertEqual(saved_appearance(db)["common"]["visibility"], "hide_empty")
+            save_appearance(db, {}, {"visibility": "always"})
+            self.assertEqual(saved_appearance(db)["common"]["visibility"], "always")
+            self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
 
     def test_qt_control_draft_save_and_test_never_persist(self):
         os.environ.setdefault("QT_QPA_PLATFORM","offscreen")
@@ -87,6 +106,10 @@ class AppearanceModelTests(unittest.TestCase):
             db = StubDatabase(folder)
             editor = ChatAppearanceEditor(db)
             self.assertEqual(editor.values(), editor.saved)
+            self.assertEqual(
+                [editor.visibility.itemData(i) for i in range(editor.visibility.count())],
+                ["hidden", "hide_empty", "always"],
+            )
             editor.mode.setCurrentIndex(1)
             editor.text_size.setValue(31)
             self.assertTrue(editor.is_dirty())
