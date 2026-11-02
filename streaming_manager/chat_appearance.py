@@ -14,6 +14,7 @@ from .media import resolve_media_asset_path
 
 TWITCH_KEY = "multichat_appearance_twitch"
 COMMON_KEY = "multichat_appearance_common"
+LEGACY_OBS_KEY = "multichat_twitch_obs"
 
 TWITCH_DEFAULTS = {
     "mode": "original",
@@ -84,7 +85,7 @@ def normalize_common(raw) -> dict:
     d["background_media_id"] = _integer(raw.get("background_media_id"), 0, 0, 2147483647) or None
     d["background_fit"] = "contain" if raw.get("background_fit") == "contain" else "cover"
     d["glow"] = raw.get("glow") is True
-    d["visibility"] = "always" if raw.get("visibility") == "always" else "hide_empty"
+    d["visibility"] = raw.get("visibility") if raw.get("visibility") in {"hidden", "hide_empty", "always"} else "hide_empty"
     return d
 
 
@@ -97,9 +98,14 @@ def _load(db, key: str) -> dict:
 
 
 def saved_appearance(db) -> dict:
+    common = normalize_common(_load(db, COMMON_KEY))
+    # In older builds this separate checkbox overrode the saved visibility.
+    # Interpret its OFF state as Hidden until the first explicit new Save.
+    if db.get_setting(LEGACY_OBS_KEY, "1") == "0":
+        common["visibility"] = "hidden"
     return {
         "twitch": normalize_twitch(_load(db, TWITCH_KEY)),
-        "common": normalize_common(_load(db, COMMON_KEY)),
+        "common": common,
     }
 
 
@@ -108,6 +114,8 @@ def save_appearance(db, twitch: dict, common: dict) -> dict:
     # Existing settings persistence, no table, migration, account or message history.
     db.set_setting(TWITCH_KEY, json.dumps(result["twitch"], ensure_ascii=False, sort_keys=True))
     db.set_setting(COMMON_KEY, json.dumps(result["common"], ensure_ascii=False, sort_keys=True))
+    # Compatibility mirror: no additional database key or schema migration.
+    db.set_setting(LEGACY_OBS_KEY, "0" if result["common"]["visibility"] == "hidden" else "1")
     return result
 
 
