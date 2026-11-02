@@ -21,6 +21,7 @@ from .common import (
 
 class ChatAppearanceEditor(QWidget):
     changed = Signal(object, object, bool)  # Twitch style, common style, test-visible
+    saved_changed = Signal(object)  # Emitted only after the Save succeeded
 
     def __init__(self, db, *, import_background=None, visibility_control=None, parent=None):
         super().__init__(parent)
@@ -91,6 +92,7 @@ class ChatAppearanceEditor(QWidget):
         self.glow_color_control = self.glow_color.parentWidget()
         self.glow_color_label = common_form.labelForField(self.glow_color_control)
         self.visibility = visibility_control or ScrollSafeComboBox()
+        self.visibility.addItem("Не показывать", "hidden")
         self.visibility.addItem("Скрывать, когда чат пуст", "hide_empty")
         self.visibility.addItem("Показывать постоянно", "always")
         self.visibility.currentIndexChanged.connect(self._changed)
@@ -351,6 +353,7 @@ class ChatAppearanceEditor(QWidget):
             QMessageBox.warning(self,"Не удалось сохранить оформление",str(exc))
             return False
         self._changed()
+        self.saved_changed.emit(self.saved)
         return True
 
     def discard(self):

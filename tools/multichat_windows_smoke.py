@@ -91,7 +91,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 self.assertIn("/api/multichat", html)
                 self.assertIn('iol-version-handshake', html)
 
-                # Checkbox routing affects OBS, NOT the operator chat.
+                # Global OBS routing affects OBS, NOT the operator chat.
                 state.set_obs_enabled("twitch", False)
                 state.ingest(ChatMessage("twitch", "ch", "m2", "Автор", "Только локально"))
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
@@ -115,6 +115,50 @@ class MultichatWindowsSmoke(unittest.TestCase):
                     tab.close()
                 api.stop()
 
+    def test_visibility_menu_only_applies_to_obs_after_save(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            paths = AppPaths.from_root(Path(tmp))
+            paths.ensure_runtime_dirs()
+            db = Database(paths.database_path)
+            state = MultichatState()
+            api = LocalApiServer(db, "127.0.0.1", unused_local_port())
+            api.set_multichat_state_provider(state.snapshot)
+            tab = MultichatTab(db, state, api)
+            try:
+                combo = tab.appearance_editor.visibility
+                self.assertEqual(
+                    [combo.itemText(i) for i in range(combo.count())],
+                    ["Не показывать", "Скрывать, когда чат пуст", "Показывать постоянно"],
+                )
+                self.assertEqual(combo.currentData(), "hide_empty")
+                self.assertFalse(hasattr(tab, "twitch_obs"))
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
+                state.ingest(ChatMessage("twitch", "ch", "first", "Автор", "One"))
+                combo.setCurrentIndex(combo.findData("hidden"))
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
+                self.assertEqual(len(api.multichat_state()["messages"]), 1)
+                self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "hide_empty")
+                tab.appearance_editor.save_button.click()
+                self.assertEqual(db.get_setting("multichat_twitch_obs"), "0")
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], False)
+                self.assertEqual(api.multichat_state()["messages"], [])
+                self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "hidden")
+                state.ingest(ChatMessage("twitch", "ch", "second", "Автор", "Local"))
+                self.assertEqual(len(state.snapshot()["messages"]), 2)
+                self.assertEqual(api.multichat_state()["messages"], [])
+                # Saving a new enabled mode reopens OBS without resurrecting history.
+                combo.setCurrentIndex(combo.findData("always"))
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], False)
+                tab.appearance_editor.save_button.click()
+                self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
+                self.assertEqual(api.multichat_state()["messages"], [])
+                state.ingest(ChatMessage("twitch", "ch", "third", "Автор", "New"))
+                self.assertEqual([m["external_id"] for m in api.multichat_state()["messages"]], ["third"])
+                self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "always")
+            finally:
+                tab.refresh_timer.stop()
+                tab.close()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

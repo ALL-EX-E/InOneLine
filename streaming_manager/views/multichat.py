@@ -77,10 +77,6 @@ class MultichatTab(QWidget):
         self.connection_status = QLabel("Twitch: ожидание подключения чата через EventSub")
         self.connection_status.setWordWrap(True)
         connections_layout.addWidget(self.connection_status)
-        self.twitch_obs = QCheckBox("Отображать чат Twitch в OBS")
-        self.twitch_obs.setChecked(db.get_setting("multichat_twitch_obs", "1") == "1")
-        self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
-        self.twitch_obs.toggled.connect(self._on_twitch_obs)
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -100,15 +96,16 @@ class MultichatTab(QWidget):
         settings.addWidget(connections)
         visibility_group = QGroupBox("Чат Twitch в OBS")
         visibility_form = QFormLayout(visibility_group)
-        visibility_form.addRow(self.twitch_obs)
         visibility_control = ScrollSafeComboBox()
-        visibility_form.addRow("Когда показывать:", visibility_control)
+        visibility_form.addRow("Отображение:", visibility_control)
         self.appearance_editor = ChatAppearanceEditor(
             db, import_background=import_background,
             visibility_control=visibility_control,
         )
-        self.twitch_obs.toggled.connect(self.appearance_editor.visibility.setEnabled)
-        self.appearance_editor.visibility.setEnabled(self.twitch_obs.isChecked())
+        self.appearance_editor.saved_changed.connect(self._on_saved_appearance)
+        self.state.set_obs_enabled(
+            "twitch", self.appearance_editor.saved["common"]["visibility"] != "hidden"
+        )
         settings.addWidget(visibility_group)
         self.appearance_editor.changed.connect(self._appearance_changed)
         self._appearance_draft = self.appearance_editor.values()
@@ -136,9 +133,9 @@ class MultichatTab(QWidget):
         self._last_render = None
         self.refresh()
 
-    def _on_twitch_obs(self, enabled):
-        self.state.set_obs_enabled("twitch", enabled)
-        self.db.set_setting("multichat_twitch_obs", "1" if enabled else "0")
+    def _on_saved_appearance(self, saved):
+        # A draft selector change must never affect OBS until Save succeeds.
+        self.state.set_obs_enabled("twitch", saved["common"]["visibility"] != "hidden")
 
     def _on_delay(self):
         try:
