@@ -87,6 +87,14 @@ jobs:
           python -m tools.multichat_windows_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-01 Qt/HTTP failed" }
 
+      - name: D41 Twitch OBS HTTP out-of-order response Chromium regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.chat_response_order_smoke
+          if ($LASTEXITCODE -ne 0) { throw "D41 Twitch HTTP response ordering failed" }
+
       - name: R06 shared List state and Twitch OBS API integration
         shell: pwsh
         run: |
@@ -124,12 +132,6 @@ jobs:
         run: |
           python -m tools.chat_appearance_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-06 Twitch chat appearance failed" }
-
-      - name: D41 Twitch OBS HTTP out-of-order response Chromium regression
-        shell: pwsh
-        run: |
-          python -m tools.chat_response_order_smoke
-          if ($LASTEXITCODE -ne 0) { throw "D41 Twitch HTTP response ordering failed" }
 
       - name: GitHub Actions version regression
         shell: pwsh
