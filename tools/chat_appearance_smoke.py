@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,6 +25,11 @@ class StubDatabase:
 
     def set_setting(self, key, value):
         self.values[key] = value
+
+    def set_settings_bulk(self, values):
+        # Same all-or-none public contract as the production Database.
+        self.values.update({str(key): str(value) for key, value in values.items()})
+        return len(values)
 
     def get_media_asset(self, asset_id):
         return self.assets.get(asset_id)
@@ -96,6 +102,45 @@ class AppearanceModelTests(unittest.TestCase):
             save_appearance(db, {}, {"visibility": "always"})
             self.assertEqual(saved_appearance(db)["common"]["visibility"], "always")
             self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
+
+    def test_sqlite_appearance_save_rolls_back_on_failed_second_or_third_key(self):
+        """A failed Save must preserve all existing OBS and legacy values."""
+        from streaming_manager.database import Database
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            db = Database(Path(folder) / "streaming.db")
+            baseline = save_appearance(
+                db, {"mode": "original", "text_size": 18}, {"visibility": "always"}
+            )
+            keys = (TWITCH_KEY, COMMON_KEY, "multichat_twitch_obs")
+            before = db.get_settings(keys)
+            self.assertEqual(set(before), set(keys))
+            for failed_key in (COMMON_KEY, "multichat_twitch_obs"):
+                with self.subTest(failed_key=failed_key):
+                    with db.connect() as conn:
+                        conn.execute(
+                            """CREATE TRIGGER reject_appearance_write
+                            BEFORE UPDATE ON settings
+                            WHEN NEW.key = ?
+                            BEGIN SELECT RAISE(ABORT, 'forced appearance failure'); END""".replace("NEW.key = ?", f"NEW.key = '{failed_key}'")
+                        )
+                    try:
+                        with self.assertRaises(sqlite3.IntegrityError):
+                            save_appearance(
+                                db, {"mode": "custom", "text_size": 31},
+                                {"visibility": "hidden"},
+                            )
+                        self.assertEqual(db.get_settings(keys), before)
+                        self.assertEqual(saved_appearance(db), baseline)
+                        self.assertEqual(public_appearance(db)["common"]["visibility"], "always")
+                    finally:
+                        with db.connect() as conn:
+                            conn.execute("DROP TRIGGER IF EXISTS reject_appearance_write")
+            result = save_appearance(
+                db, {"mode": "custom", "text_size": 31}, {"visibility": "hidden"}
+            )
+            self.assertEqual(result["twitch"]["text_size"], 31)
+            self.assertEqual(db.get_setting("multichat_twitch_obs"), "0")
+            self.assertEqual(saved_appearance(db)["common"]["visibility"], "hidden")
 
     def test_qt_control_draft_save_and_test_never_persist(self):
         os.environ.setdefault("QT_QPA_PLATFORM","offscreen")

@@ -112,11 +112,14 @@ def saved_appearance(db) -> dict:
 
 def save_appearance(db, twitch: dict, common: dict) -> dict:
     result = {"twitch": normalize_twitch(twitch), "common": normalize_common(common)}
-    # Existing settings persistence, no table, migration, account or message history.
-    db.set_setting(TWITCH_KEY, json.dumps(result["twitch"], ensure_ascii=False, sort_keys=True))
-    db.set_setting(COMMON_KEY, json.dumps(result["common"], ensure_ascii=False, sort_keys=True))
-    # Compatibility mirror: no additional database key or schema migration.
-    db.set_setting(LEGACY_OBS_KEY, "0" if result["common"]["visibility"] == "hidden" else "1")
+    # One SQLite transaction: an error must not leave only part of the
+    # appearance saved while the operator still sees "Save failed".
+    # Keep the legacy checkbox mirror for migrations from older builds.
+    db.set_settings_bulk({
+        TWITCH_KEY: json.dumps(result["twitch"], ensure_ascii=False, sort_keys=True),
+        COMMON_KEY: json.dumps(result["common"], ensure_ascii=False, sort_keys=True),
+        LEGACY_OBS_KEY: "0" if result["common"]["visibility"] == "hidden" else "1",
+    })
     return result
 
 
