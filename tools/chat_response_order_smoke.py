@@ -6,6 +6,7 @@ for the standalone chat and the same embedded renderer.
 """
 from __future__ import annotations
 
+import json
 import os
 import socket
 import sys
@@ -158,7 +159,8 @@ def main():
                 deadline = time.monotonic() + 18
                 outcome = None
                 while time.monotonic() < deadline:
-                    outcome = evaluate(view.page(), "window.__iolResponseOrderQA")
+                    value = evaluate(view.page(), "JSON.stringify(window.__iolResponseOrderQA || null)")
+                    outcome = json.loads(value) if value else None
                     if outcome and outcome.get("stage") != "running":
                         break
                     QTest.qWait(60)
