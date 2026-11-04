@@ -101,6 +101,14 @@ jobs:
           python -m tools.chat_poll_order_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41 Twitch OBS stale poll regression failed" }
 
+      - name: D41 Unicode Twitch fonts real Chromium standalone and embedded
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.chat_unicode_fonts_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "D41 Twitch OBS Unicode font parity failed" }
+
       - name: R06 FIX1 real Chromium both List sources, dynamic chat and speed
         shell: pwsh
         env:

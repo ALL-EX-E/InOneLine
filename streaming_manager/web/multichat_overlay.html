@@ -140,7 +140,10 @@ body {color:#fff;font:18px/1.3 sans-serif}
     return Number.isInteger(n) ? Math.min(upper, Math.max(lower,n)) : fallback;
   }
   function safeFont(value) {
-    return /^[\w +,.()\-]{1,80}$/u.test(String(value)) ? value : "Segoe UI";
+    // Match Python chat_appearance._FONT: Unicode letters, numbers and the
+    // existing punctuation set, at most 80 Unicode code points after trim.
+    const font = String(value ?? "").trim();
+    return /^[\p{L}\p{N}_ +,.()\-]{1,80}$/u.test(font) ? font : "Segoe UI";
   }
   function rgba(hex, percent) {
     const c = safeColor(hex, "#000000");
