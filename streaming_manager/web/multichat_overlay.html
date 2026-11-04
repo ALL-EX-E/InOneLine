@@ -252,7 +252,14 @@ body {color:#fff;font:18px/1.3 sans-serif}
     row.appendChild(body);
     root.appendChild(row);
   }
-  function renderState(state) {
+  // Each poll owns a sequence number. A late response from an older poll
+  // must not overwrite a newer successful render (including a deletion).
+  // Direct parent resyncs also invalidate older in-flight child requests.
+  let nextStateSequence = 0;
+  let latestAppliedSequence = 0;
+  function renderState(state, sequence = ++nextStateSequence) {
+    if (sequence < latestAppliedSequence) return;
+    latestAppliedSequence = sequence;
     try {
       prewarmMedia(state.media_preload && state.media_preload.twitch);
       applyAppearance(state.appearance);
@@ -280,9 +287,10 @@ body {color:#fff;font:18px/1.3 sans-serif}
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
   async function update() {
+    const sequence = ++nextStateSequence;
     try {
       const response = await fetch("/api/multichat", {cache:"no-store"});
-      if (response.ok) renderState(await response.json());
+      if (response.ok) renderState(await response.json(), sequence);
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
   // The same renderer serves ordinary child polling and a targeted parent
