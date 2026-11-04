@@ -1,7 +1,8 @@
-"""R06 ZERO: real Chromium static List+Twitch-chat geometry and commands.
+"""R06: Chromium List+Twitch-chat geometry and approved Hide transition.
 
-All previous movement animation tests are preserved in Git history. This new
-baseline deliberately checks there is NO List/chat transition, wipe or fade.
+The static baseline stays unchanged except for the explicitly agreed upward
+exit of an already visible List when switching to "Не показывать".
+Recheck the current main D41/Twitch styles on the synthetic PR merge.
 """
 from __future__ import annotations
 
@@ -66,11 +67,15 @@ METRICS = """JSON.stringify((() => {
   if (!root || !layer || !panel || !chat) return {ready:false};
   const r=root.getBoundingClientRect(),
         l=layer.getBoundingClientRect(),
+        p=panel.getBoundingClientRect(),
         c=chat.getBoundingClientRect();
   return {
     ready:true, shown:root.classList.contains('r06-shown'),
     replace:root.classList.contains('r06-replace'),
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
+    listBottom:l.bottom, panelBottom:p.bottom,
+    rootTop:r.top, panelTop:p.top,
+    layerOverflow:getComputedStyle(layer).overflowY,
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
     count:cards?.children.length ?? -1,
     shellRadius:shell ? doc.defaultView.getComputedStyle(shell).borderRadius : null,
@@ -94,6 +99,8 @@ def until(page, predicate, label, timeout=32):
             print("R06_ZERO_PASS:", label, recent, flush=True)
             return recent
         QTest.qWait(140)
+    if "dynamic Twitch chat" in label:
+        print("R06_CHILD_DIAG=", evaluate(page, """JSON.stringify((() => {const f=document.querySelector('#list-chat iframe');const d=f?.contentDocument;return {ready:d?.readyState,render:typeof f?.contentWindow?.IOLRenderEmbeddedChatState,refresh:typeof f?.contentWindow?.IOLRefreshEmbeddedChat,body:d?.body?.innerText?.slice(0,200),root:d?.getElementById('messages')?.outerHTML?.slice(0,500)}})())"""), flush=True)
     raise AssertionError(f"{label} timeout: {recent!r}")
 
 
@@ -132,11 +139,16 @@ def main():
         views = []
         try:
             screen = app.primaryScreen().availableGeometry()
-            for i, (route, width) in enumerate((("/overlay", 1000),
-                                                ("/list-overlay", 380))):
+            # Keep both top-level sources unobscured. Chromium can suspend
+            # polling in the embedded chat of an occluded Qt window.
+            main_width = min(1000, max(400, screen.width() - 430))
+            list_width = min(380, max(200, screen.width() - main_width - 20))
+            for i, (route, width) in enumerate((("/overlay", main_width),
+                                                ("/list-overlay", list_width))):
                 view = QWebEngineView()
                 view.resize(width, 620)
-                view.move(screen.x() + 5 + i * 110, screen.y() + 5 + i * 35)
+                view.move(screen.x() + 5 + (main_width + 10 if i else 0),
+                          screen.y() + 5)
                 view.show()
                 view.load(QUrl(api.base_url + route))
                 views.append(view)
@@ -158,14 +170,38 @@ def main():
                           "fixed-height always-chat / split")
                 static_check(m, "always-chat split")
 
+            before_hide = [evaluate(page, METRICS) for page in pages]
+            db.set_setting("list_animation_seconds", "3")
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 20)
+            # Sample both sources during the same finite transition. Waiting
+            # for one source first can miss all frames of the other source.
+            moving_states = [None] * len(pages)
+            last_states = [None] * len(pages)
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline and any(x is None for x in moving_states):
+                for index, (page, before) in enumerate(zip(pages, before_hide)):
+                    if moving_states[index] is not None:
+                        continue
+                    a = evaluate(page, METRICS)
+                    last_states[index] = a
+                    if (a["shown"] and
+                        2 < a["listHeight"] < before["listHeight"] - 5 and
+                        a["chatHeight"] > before["chatHeight"] + 5 and
+                        a["panelTop"] < a["rootTop"] - 5):
+                        moving_states[index] = a
+                QTest.qWait(35)
+            for moving in moving_states:
+                assert moving is not None, last_states
+                assert moving["layerOverflow"] == "visible", moving
+                assert abs(moving["panelBottom"]-moving["listBottom"]) <= 2, moving
             for page in pages:
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and
                           abs(a["chatHeight"]-a["rootHeight"]) <= 3,
                           "hidden List, full-height always-chat")
                 static_check(m, "hidden")
+            db.set_setting("list_animation_seconds", "1.5")
 
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 20)
@@ -187,9 +223,29 @@ def main():
             assert state.ingest(ChatMessage("twitch", "chan", "zero-message",
                                             "alice", "R06 ZERO visible chat"))
             for page in pages:
-                m = until(page, lambda a: a["shown"] and a["count"] == 1 and
-                          a["chatHeight"] > 15,
-                          "dynamic Twitch chat gets message and intrinsic height")
+                try:
+                    m = until(page, lambda a: a["shown"] and a["count"] == 1 and
+                              a["chatHeight"] > 15,
+                              "dynamic Twitch chat gets message and intrinsic height")
+                except AssertionError:
+                    provider = state.snapshot()
+                    print("R06_PROVIDER_DIAG", {
+                        "message_count": len(provider.get("messages", [])),
+                        "visibility": provider.get("appearance", {}).get("common", {}).get("visibility"),
+                        "obs_enabled": provider.get("obs_enabled"),
+                    }, flush=True)
+                    try:
+                        with urlopen(api.base_url + "/api/multichat", timeout=3) as response:
+                            payload = json.loads(response.read().decode("utf-8"))
+                        print("R06_HTTP_DIAG", {
+                            "status": response.status,
+                            "message_count": len(payload.get("messages", [])),
+                            "visibility": payload.get("appearance", {}).get("common", {}).get("visibility"),
+                            "obs_enabled": payload.get("obs_enabled"),
+                        }, flush=True)
+                    except Exception as error:
+                        print("R06_HTTP_DIAG_ERROR", repr(error), flush=True)
+                    raise
                 static_check(m, "dynamic chat")
                 assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
                 assert m["shellRadius"] == m["cardRadius"] == "8px", (
