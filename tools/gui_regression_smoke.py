@@ -1469,10 +1469,19 @@ def assert_r06_combined_settings(app, stream, db) -> None:
         raise AssertionError("R06 combined selector leaked back into independent List")
     if form.indexOf(stream.combined_actions) < 0:
         raise AssertionError("R06 combined OBS source buttons outside combined form")
-    heading_index = stream.layout().indexOf(stream.combined_heading)
-    if not (stream.layout().indexOf(stream.info_heading) < heading_index
-            < stream.layout().indexOf(stream.combined_save_button)):
-        raise AssertionError("R06 combined section is not structurally separate")
+    # R06/UI-COMBINED-ORDER-004: keep the independent combined block
+    # directly after List and before Information, without mixing Saves.
+    page = stream.layout()
+    list_save_index = page.indexOf(stream.main_save_buttons["list"])
+    heading_index = page.indexOf(stream.combined_heading)
+    combined_save_index = page.indexOf(stream.combined_save_button)
+    info_heading_index = page.indexOf(stream.info_heading)
+    info_save_index = page.indexOf(stream.main_save_buttons["info"])
+    if not (0 <= list_save_index < heading_index < combined_save_index
+            < info_heading_index < info_save_index):
+        raise AssertionError(
+            "R06 combined section must follow List and precede Information"
+        )
     address = f"{stream.api.base_url}/combined-overlay"
     labels = [
         label for label in stream.findChildren(QLabel)
