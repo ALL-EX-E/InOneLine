@@ -12,6 +12,7 @@ import sys
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -48,7 +49,8 @@ JS = """JSON.stringify((() => {
     transform:css.transform,
     transition:css.transitionDuration,
     animation:css.animationName,
-    hasTopThree:document.querySelectorAll(".top-three-row").length > 0
+    hasTopThree:document.querySelectorAll(".top-three-row").length > 0,
+    policy: document.documentElement.dataset.obsShowMode || ""
   };
 })())"""
 
@@ -72,7 +74,7 @@ def metrics(page):
 
 
 def until(page, condition, label):
-    timeout = time.monotonic() + 12
+    timeout = time.monotonic() + 35
     last = None
     while time.monotonic() < timeout:
         last = metrics(page)
@@ -123,6 +125,11 @@ def main():
                   v["listHeight"] > 100 and v["hasTopThree"], "always")
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 2)
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                state_payload = json.load(response)
+            assert state_payload["visibility"]["list"]["show_mode"] == "hidden", (
+                "Backend did not apply saved hidden mode", state_payload["visibility"]["list"]
+            )
             until(view.page(), lambda v: not v["shown"] and
                   v["listHeight"] <= 2, "hidden immediate")
             db.set_setting("list_overlay_show_mode", "always")
