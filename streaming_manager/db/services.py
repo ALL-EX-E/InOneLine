@@ -2503,9 +2503,11 @@ class ServicesMixin:
                     else "right"
                 ),
                 "list_animation_seconds": setting("list_animation_seconds", "1.00"),
+                # The combined container owns this setting independently.
+                # Legacy list_chat_layout remains stored but no longer governs OBS.
                 "list_chat_layout": (
-                    setting("list_chat_layout", "split")
-                    if setting("list_chat_layout", "split") in ("split", "replace")
+                    setting("combined_list_chat_layout", "split")
+                    if setting("combined_list_chat_layout", "split") in ("split", "replace")
                     else "split"
                 ),
                 "list_with_chat": setting("list_with_chat", "0") == "1",
