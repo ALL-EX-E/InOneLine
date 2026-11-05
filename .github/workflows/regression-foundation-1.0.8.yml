@@ -133,6 +133,14 @@ jobs:
           python -m tools.r06_game_window_save_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 independent Game Window Save failed" }
 
+      - name: R06 Game Window 4-by-3 cutout real Chromium regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_game_window_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 Game Window Chromium regression failed" }
+
       - name: D41 chat poll order real Chromium standalone and embedded regression
         shell: pwsh
         env:
