@@ -40,7 +40,8 @@ class R06ListApiSmoke(unittest.TestCase):
                 "list_slide_duration": "30",
                 "list_animation_seconds": "1.50",
                 "list_slide_command": "!list",
-                "list_chat_layout": "replace",
+                "list_chat_layout": "split",  # historic value is no longer authoritative
+                "combined_list_chat_layout": "replace",
                 "list_with_chat": "1",
             })
             clock = Clock()
@@ -64,6 +65,7 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertEqual(current["overlay"]["list_slide_direction"], "top")
                 self.assertEqual(current["overlay"]["list_animation_seconds"], "1.50")
                 self.assertEqual(current["overlay"]["list_chat_layout"], "replace")
+                self.assertEqual(db.get_setting("list_chat_layout"), "split")
                 self.assertTrue(current["overlay"]["list_with_chat"])
                 self.assertEqual(current["list_show"]["remaining_ms"], 0)
                 self.assertFalse(current["multichat"]["has_messages"])
@@ -95,7 +97,10 @@ class R06ListApiSmoke(unittest.TestCase):
                 # even when legacy combined settings remain present in DB.
                 standalone = get("/list-overlay")
                 self.assertNotIn("<iframe", standalone)
-                self.assertIn("composer.apply(data, false)", standalone)
+                self.assertIn("composer.apply(data, isCombined)", standalone)
+                self.assertIn('location.pathname === "/combined-overlay"', standalone)
+                self.assertIn('frame.src = "/multichat-overlay?embedded=1"', standalone)
+                self.assertIn("/list-composition.js", get("/combined-overlay"))
                 self.assertIn('embedded=1', get("/overlay"))
 
                 state.ingest(ChatMessage("twitch", "ch", "first", "viewer", "!list"))

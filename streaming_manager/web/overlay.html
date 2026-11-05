@@ -414,7 +414,9 @@ body.preview .preview-label { display: flex; }
     document.getElementById("list-layer"),
     listPanel,
     document.getElementById("list-chat"),
-    () => requestAnimationFrame(() => rebuildInfiniteScroll(false))
+    () => requestAnimationFrame(() => rebuildInfiniteScroll(false)),
+    false,
+    true // Combined container has no transitions; behavior rules remain separate.
   );
   const topThree = document.getElementById("top-three");
   const topThreeDivider = document.getElementById("top-three-divider");

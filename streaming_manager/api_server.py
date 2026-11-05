@@ -535,6 +535,12 @@ class LocalApiServer:
                         )
                     return
 
+                # Separate combined List/Twitch OBS URL. Reuse the same renderer,
+                # but its pathname enables the chat child only in this source.
+                if path == "/combined-overlay":
+                    self._send_text(list_overlay_html)
+                    return
+
                 if path in ("/wheel-overlay", "/obs-wheel", "/overlay/wheel"):
                     try:
                         self._send_text(wheel_overlay_html)

@@ -432,7 +432,13 @@ class StreamTab(QWidget):
         self.list_slide_duration.setRange(1, 120)
         self.list_slide_duration.setValue(30)
         self.list_slide_duration.setSuffix(" сек.")
-        overlay_form.addRow("Время показа:", self.list_slide_duration)
+        self.list_slide_duration.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.list_slide_duration_control = make_wide_step_control(
+            self.list_slide_duration,
+            up_tooltip="Увеличить время показа списка",
+            down_tooltip="Уменьшить время показа списка",
+        )
+        overlay_form.addRow("Время показа:", self.list_slide_duration_control)
 
         self.list_slide_command = QLineEdit()
         self.list_slide_command.setPlaceholderText("Команда Twitch (необязательно)")
@@ -607,6 +613,67 @@ class StreamTab(QWidget):
             "Настройки шрифта информационного блока", 17, "#FFFFFF",
         )
         self.info_form.addRow("", self.info_typography_host)
+
+
+        combined_heading = QLabel("Совместный режим (список + чат)")
+        self.combined_heading = combined_heading
+        combined_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
+        layout.addWidget(combined_heading)
+
+        combined_form = QFormLayout()
+        self.combined_form = combined_form
+        combined_form.setVerticalSpacing(10)
+        combined_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
+        combined_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        combined_form.addRow(
+            overlay_url_label("Совместный список и чат OBS", "/combined-overlay")
+        )
+
+        combined_actions = QWidget()
+        self.combined_actions = combined_actions
+        combined_buttons = QHBoxLayout(combined_actions)
+        combined_buttons.setContentsMargins(0, 0, 0, 0)
+        combined_buttons.setSpacing(8)
+        copy_combined = QPushButton("Копировать URL совместного режима")
+        self.copy_combined_btn = copy_combined
+        copy_combined.clicked.connect(
+            lambda: QApplication.clipboard().setText(
+                f"{self.api.base_url}/combined-overlay"
+            )
+        )
+        preview_combined = QPushButton("Открыть предпросмотр совместного режима")
+        self.preview_combined_btn = preview_combined
+        preview_combined.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl(f"{self.api.base_url}/combined-overlay?preview=1")
+            )
+        )
+        combined_buttons.addWidget(copy_combined)
+        combined_buttons.addWidget(preview_combined)
+        combined_buttons.addStretch()
+        combined_form.addRow("", combined_actions)
+
+        self.combined_list_chat_layout = ScrollSafeComboBox()
+        self.combined_list_chat_layout.addItem("Разделение области", "split")
+        self.combined_list_chat_layout.addItem("Замещение области", "replace")
+        combined_form.addRow("Режим совмещения:", self.combined_list_chat_layout)
+
+        combined_hint = QLabel(
+            "Список и Twitch-чат сохраняют собственные настройки. "
+            "Замещение действует только при командном режиме списка «Выезд»."
+        )
+        combined_hint.setWordWrap(True)
+        combined_hint.setProperty("muted", True)
+        combined_form.addRow("", combined_hint)
+        layout.addLayout(combined_form)
+
+        self.combined_save_button = QPushButton("Сохранить совместный режим")
+        self.combined_save_button.setProperty("primary", True)
+        self.combined_save_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.combined_save_button.clicked.connect(
+            self._save_combined_list_chat_settings
+        )
+        layout.addWidget(self.combined_save_button, 0, Qt.AlignLeft)
 
         timer_line = QFrame()
         timer_line.setProperty("line", True)
@@ -2419,7 +2486,7 @@ class StreamTab(QWidget):
             )
         if hasattr(self, "list_slide_direction"):
             slide = self.obs_show_modes["list"].currentData() == "slide"
-            for control in (self.list_slide_direction, self.list_slide_duration,
+            for control in (self.list_slide_direction, self.list_slide_duration_control,
                             self.list_slide_command):
                 self._set_form_row_visible(self.overlay_form, control, slide)
             self._set_form_row_visible(
@@ -2571,6 +2638,10 @@ class StreamTab(QWidget):
             seconds = 30
         self.list_slide_duration.setValue(max(1, min(120, seconds)))
         self.list_slide_command.setText(setting("list_slide_command", ""))
+        self._set_combo_by_data(
+            self.combined_list_chat_layout,
+            setting("combined_list_chat_layout", "split"),
+        )
         self._set_combo_by_data(
             self.info_position,
             setting("overlay_info_position", "auto"),
@@ -2823,6 +2894,17 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_combined_list_chat_settings(self) -> None:
+        mode = str(self.combined_list_chat_layout.currentData() or "split")
+        if mode not in ("split", "replace"):
+            mode = "split"
+        self.db.set_settings_bulk({"combined_list_chat_layout": mode})
+        QMessageBox.information(
+            self,
+            "Совместный режим",
+            "Режим совмещения сохранён. Открытые OBS-источники обновятся автоматически.",
+        )
 
     def save(self):
         background_asset = self._selected_background_asset()

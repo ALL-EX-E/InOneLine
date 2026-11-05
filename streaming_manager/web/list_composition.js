@@ -45,7 +45,7 @@
   sheet.textContent = css;
   document.head.appendChild(sheet);
 
-  function create(root, listLayer, listPanel, chatLayer, onResize, previewEnabled = false) {
+  function create(root, listLayer, listPanel, chatLayer, onResize, previewEnabled = false, noMotion = false) {
     const iframe = chatLayer.querySelector("iframe");
     let mode = "always";
     let composeMode = "split";
@@ -149,7 +149,7 @@
       // Only a content-sized chat in Split mode animates its boundary. An
       // Always chat starts at its full allocated height and never rises from
       // the bottom when a message arrives.
-      const animateChat = split && !chatAlways && lastChatHeight >= 0;
+      const animateChat = !noMotion && split && !chatAlways && lastChatHeight >= 0;
       chatLayer.style.transition = animateChat ?
         `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
       chatLayer.style.marginTop = gap + "px";
