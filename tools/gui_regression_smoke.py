@@ -1268,16 +1268,24 @@ def assert_p09_list_group(app, stream, db) -> None:
     positions = [form.getWidgetPosition(widget)[0] for widget in fields]
     if not (positions[0] == 2 and positions[0] < positions[1] < positions[2]):
         raise AssertionError("P10 List show/position/frame order changed")
-    # R06 adds the operator-owned transition/command/chat settings between
-    # the existing List mode and position/frame; older fixed row numbers no
-    # longer apply. The original fields must retain their order and labels.
+    # The independent List keeps only its command timer and direction.
+    # Previously saved composition settings remain in SQLite but no longer
+    # have controls in the List section.
     for widget in (
         stream.list_slide_direction, stream.list_slide_duration,
-        stream.list_slide_command, stream.list_chat_layout,
-        stream.list_with_chat,
+        stream.list_slide_command,
     ):
         if not (positions[0] < form.getWidgetPosition(widget)[0] < positions[1]):
-            raise AssertionError("R06 controls escaped the shared List group")
+            raise AssertionError("R06 List command controls escaped their group")
+    for removed in ("list_animation_seconds", "list_chat_layout", "list_with_chat"):
+        if hasattr(stream, removed):
+            raise AssertionError(f"R06 obsolete independent List control remains: {removed}")
+    for label in stream.findChildren(QLabel):
+        if label.text() in ("Длительность анимации:", "Совмещение с чатом:"):
+            raise AssertionError("R06 obsolete List label remains in operator UI")
+    if any(isinstance(widget, QCheckBox) and widget.text() == "Показывать чат вместе со списком"
+           for widget in stream.findChildren(QCheckBox)):
+        raise AssertionError("R06 obsolete List chat switch remains")
     if form.labelForField(mode).text() != "Показ виджета:":
         raise AssertionError("P10 common List show label changed")
     side_label = form.labelForField(stream.overlay_list_side)
@@ -1369,10 +1377,17 @@ def assert_p09_list_group(app, stream, db) -> None:
         if open_url.call_count != 1 or open_url.call_args.args[0].toString() != f"{stream.api.base_url}/list-overlay?preview=1":
             raise AssertionError("P09 UI-041 standalone List preview URL changed")
 
+        # Removing the old controls must not destroy saved values; they are
+        # reserved for the separately agreed future combined container.
+        legacy_before = {"list_animation_seconds": "2.35",
+                         "list_chat_layout": "replace", "list_with_chat": "1"}
+        db.set_settings_bulk(legacy_before)
         with patch.object(QMessageBox, "information") as saved:
             list_save.click()
         if saved.call_count != 1 or db.get_settings(keys) != expected:
             raise AssertionError("P10 shared List Save lost visibility/appearance settings")
+        if db.get_settings(legacy_before.keys()) != legacy_before:
+            raise AssertionError("R06 independent List Save overwrote legacy composition settings")
         payload = db.current_stream_payload()
         if payload["visibility"]["list"]["show_mode"] != "hidden" or payload["overlay"]["list_enabled"]:
             raise AssertionError("P10 List hidden mode did not hide both OBS surfaces")
