@@ -99,7 +99,7 @@ def main():
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
             "list_slide_command": "!list",
-            "list_slide_duration": "3",
+            "list_slide_duration": "15",
             "list_chat_layout": "replace",  # legacy must not control new source
             "combined_list_chat_layout": "split",
             "multichat_appearance_common": json.dumps({"visibility": "always"}),
@@ -108,7 +108,7 @@ def main():
         api = LocalApiServer(db, port=free_port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("always", "!list", 3)
+        api.configure_list_show("always", "!list", 15)
         api.start()
         view = QWebEngineView()
         try:
@@ -131,7 +131,7 @@ def main():
 
             # First command idle, chat owns the whole region.
             db.set_setting("list_overlay_show_mode", "slide")
-            api.configure_list_show("slide", "!list", 3)
+            api.configure_list_show("slide", "!list", 15)
             until(view.page(), lambda a: not a["shown"] and
                   a["listHeight"] < 2 and
                   abs(a["chatHeight"]-a["rootHeight"]) < 3,
@@ -140,6 +140,14 @@ def main():
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "combined-command", "qa_user", "!list",
             ))
+            # Verify the command was accepted by the controller, not only
+            # that the chat renderer received the "!list" text.
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                command_data = json.load(response)
+            assert command_data["list_show"]["remaining_ms"] > 12000, (
+                "Combined command did not activate server timer",
+                command_data["list_show"],
+            )
             until(view.page(), lambda a: a["shown"] and a["replace"] and
                   a["listHeight"] >= a["rootHeight"] - 3,
                   "command replacement, instant without opacity animation")
@@ -150,7 +158,7 @@ def main():
                 "list_overlay_show_mode": "always",
                 "combined_list_chat_layout": "split",
             })
-            api.configure_list_show("always", "!list", 3)
+            api.configure_list_show("always", "!list", 15)
             until(view.page(), lambda a: a["shown"] and not a["replace"] and
                   a["chatHeight"] > 15 and a["listHeight"] > 15,
                   "saved split mode restored")
@@ -161,7 +169,7 @@ def main():
                   "chat off, list owns full area")
 
             db.set_setting("list_overlay_show_mode", "hidden")
-            api.configure_list_show("hidden", "!list", 3)
+            api.configure_list_show("hidden", "!list", 15)
             until(view.page(), lambda a: not a["shown"] and
                   a["chatHeight"] < 2 and a["listHeight"] < 2 and
                   a["obsVisible"] == "false",
