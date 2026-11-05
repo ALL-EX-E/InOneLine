@@ -1,4 +1,4 @@
-"""R06 ZERO: legacy main-overlay List+Twitch-chat geometry and commands.
+"""R06 combined main-overlay and dedicated OBS URL: static List/chat geometry.
 
 All previous movement animation tests are preserved in Git history. This new
 baseline deliberately checks there is NO List/chat transition, wipe or fade.
@@ -103,6 +103,7 @@ def static_check(state, label):
     assert float(state["panelTransition"].split(",")[0].rstrip("s")) == 0, (label, state)
     assert state["panelAnimation"] == "none", (label, state)
     assert state["chatAnimation"] == "none", (label, state)
+    assert state["chatTransition"] == "0s", (label, state)
     assert not state["oldMovementClasses"], (label, state)
     assert abs(state["chatBottomGap"]) <= 3, (label, state)
 
@@ -120,7 +121,7 @@ def main():
             "list_slide_duration":"20",
             "list_animation_seconds":"1.5",
             "list_slide_command":"!list",
-            "list_chat_layout":"split",
+            "combined_list_chat_layout":"split",
             "list_with_chat":"1",
         })
         state = MultichatState()
@@ -132,7 +133,8 @@ def main():
         views = []
         try:
             screen = app.primaryScreen().availableGeometry()
-            for i, (route, width) in enumerate((("/overlay", 1000),)):
+            for i, (route, width) in enumerate((("/overlay", 1000),
+                                                ("/combined-overlay", 380))):
                 view = QWebEngineView()
                 view.resize(width, 620)
                 view.move(screen.x() + 5 + i * 110, screen.y() + 5 + i * 35)
@@ -190,7 +192,7 @@ def main():
                           a["chatHeight"] > 15,
                           "dynamic Twitch chat gets message and intrinsic height")
                 static_check(m, "dynamic chat")
-                assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
+                assert float(m["chatTransition"].split(",")[0].rstrip("s")) == 0
                 assert m["shellRadius"] == m["cardRadius"] == "8px", (
                     "Original Twitch cards must match shell radius in the main OBS source", m)
 
@@ -216,7 +218,7 @@ def main():
             for direction in ("left","right","top","bottom"):
                 db.set_settings_bulk({
                     "list_overlay_show_mode":"slide",
-                    "list_chat_layout":"split",
+                    "combined_list_chat_layout":"split",
                     "list_slide_direction":direction,
                 })
                 api.configure_list_show("slide", "!list", 20)
@@ -244,7 +246,7 @@ def main():
                     static_check(m, "expired "+direction)
 
             # Replacement covers chat while shown, then uncovers it at once.
-            db.set_setting("list_chat_layout","replace")
+            db.set_setting("combined_list_chat_layout","replace")
             api.configure_list_show("slide", "!list", 20)
             assert state.ingest(ChatMessage("twitch", "chan",
                                             "zero-replace", "alice", "!list"))
