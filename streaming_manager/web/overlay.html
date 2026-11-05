@@ -764,11 +764,10 @@ body.preview .preview-label { display: flex; }
     const webcamEnabled = cfg.webcam_enabled !== false;
     const webcamPos = parseCorner(cfg.webcam_position || "top_right");
 
-    const listEnabled = cfg.list_enabled !== false;
-    // Keep a temporarily hidden sliding list's column reserved. When both
-    // elements are fully disabled, the old column-release rule still applies.
-    const listAreaNeeded = listEnabled || composer.hasChatSpace() ||
-      composer.hasListArea();
+    // The combined container is placed only while its independent List
+    // or Twitch-chat widget is actually visible. A saved "slide" mode
+    // without a current command must not reserve an empty OBS panel.
+    const listAreaNeeded = composer.hasChatSpace() || composer.hasListArea();
     let listSide = cfg.list_side || "auto";
     if (!["left", "right"].includes(listSide)) {
       listSide = webcamEnabled ? webcamPos.side : "right";

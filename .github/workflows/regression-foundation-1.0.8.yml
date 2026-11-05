@@ -117,6 +117,7 @@ jobs:
           python -m tools.r06_chat_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 main List/chat baseline regression failed" }
           python -m tools.r06_combined_browser_smoke
+          python -m tools.r06_main_empty_container_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 separate combined OBS source browser regression failed" }
           python -m tools.r06_independent_list_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 standalone List independence regression failed" }
