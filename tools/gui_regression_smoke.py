@@ -2491,8 +2491,8 @@ def main() -> int:
         assert_p09_list_group(app, stream, db)
         assert_r06_combined_settings(app, stream, db)
 
-        # UI-036: every current main-overlay section gets a compact Save
-        # button, all wired to the original atomic StreamTab.save() method.
+        # UI-036: every main-overlay section retains its compact Save.
+        # R06-007: the Information Save now persists only its own settings.
         section_names = (
             "current_game", "game_window", "background", "webcam",
             "list", "info",
@@ -2544,19 +2544,23 @@ def main() -> int:
             new_size = 21 + index
             stream.info_field.setText(new_info)
             title_size.setValue(new_size)
+            saved_title_size = db.get_setting("overlay_font_title_size", "30")
             with patch.object(QMessageBox, "information") as saved_message:
                 buttons[section].click()
+            expected_title_size = (
+                saved_title_size if section == "info" else str(new_size)
+            )
             if (
                 saved_message.call_count != 1
                 or db.get_setting("stream_info") != new_info
-                or db.get_setting("overlay_font_title_size") != str(new_size)
+                or db.get_setting("overlay_font_title_size") != expected_title_size
             ):
                 raise AssertionError(
-                    f"P09 UI-036 Save did not persist all groups: {section}"
+                    f"P09 UI-036 Save changed wrong settings: {section}"
                 )
         db.set_settings_bulk(settings_before)
         stream.refresh()
-        print("P09_UI036_LOCAL_BUTTONS_SHARED_BULK_SAVE=PASS")
+        print("P09_UI036_LOCAL_BUTTONS_INFO_INDEPENDENT_SAVE=PASS")
 
         # UI-037: the existing game-format and game-frame color controls
         # share one Game Window group, with its existing bulk Save action.
