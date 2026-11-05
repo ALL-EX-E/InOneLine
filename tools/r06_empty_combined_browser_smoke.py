@@ -90,10 +90,12 @@ def until(page, predicate, label: str, timeout: float = 25):
     latest = None
     while time.monotonic() < end:
         latest = inspect(page)
-        if latest and latest.get("ready") and predicate(latest):
-            assert latest["cameraParent"] == "right-top", (label, latest)
-            assert latest["infoParent"] == "right-bottom", (label, latest)
-            assert latest["rightVisible"], (label, latest)
+        if (latest and latest.get("ready") and predicate(latest) and
+                latest["cameraParent"] == "right-top" and
+                latest["infoParent"] == "right-bottom" and
+                latest["rightVisible"]):
+            # Do not accept the initial HTML state before the first /api/data
+            # layout pass has attached the independent camera/info widgets.
             assert latest["gameWidth"] > 0, (label, latest)
             assert latest["gameCutoutWidth"] > 0, (label, latest)
             assert latest["cameraCutoutWidth"] > 0, (label, latest)
