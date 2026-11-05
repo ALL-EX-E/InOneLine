@@ -236,15 +236,17 @@ class StreamTab(QWidget):
         # Main-overlay show mode remains in the shared policy registry but
         # is intentionally not editable: the primary canvas is always shown.
 
-        # UI-036: all main-overlay buttons reuse the same existing bulk
-        # save() handler; specialized widget saves are deliberately separate.
+        # UI-036: existing main-overlay sections retain their bulk Save.
+        # R06-007: the Information block saves only its own settings.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
             button = QPushButton("Сохранить")
             button.setProperty("primary", True)
             button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            button.clicked.connect(self.save)
+            button.clicked.connect(
+                self._save_info_settings if section == "info" else self.save
+            )
             self.main_save_buttons[section] = button
             layout.addWidget(button, 0, Qt.AlignLeft)
 
@@ -2895,6 +2897,28 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_info_settings(self) -> None:
+        """Save only Information block controls; leave other drafts untouched."""
+        info_font, info_size, info_color = self.typography_controls["info"]
+        self.db.set_settings_bulk({
+            "stream_info": self.info_field.text().strip(),
+            "stream_info_enabled": "1" if self.info_enabled.isChecked() else "0",
+            "overlay_info_position": str(self.info_position.currentData() or "auto"),
+            "overlay_frame_info_color": str(
+                self.frame_color_buttons["info"].property("fontColor") or "#FFFFFF"
+            ),
+            "overlay_font_info_family": info_font.currentFont().family(),
+            "overlay_font_info_size": str(info_size.value()),
+            "overlay_font_info_color": str(
+                info_color.property("fontColor") or "#FFFFFF"
+            ),
+        })
+        QMessageBox.information(
+            self, "Информационный блок",
+            "Настройки информационного блока сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
+        )
 
     def _save_combined_list_chat_settings(self) -> None:
         mode = str(self.combined_list_chat_layout.currentData() or "split")
