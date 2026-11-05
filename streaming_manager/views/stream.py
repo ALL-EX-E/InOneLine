@@ -597,24 +597,7 @@ class StreamTab(QWidget):
         layout.addLayout(overlay_form)
         add_main_save("list")
 
-        # Approved sidebar settings order: Webcam -> List -> Information.
-        layout.addWidget(info_heading)
-        layout.addLayout(info_form)
-        add_main_save("info")
-
-        # UI-035: keep the existing info typography control in the same
-        # thematic block as text, show/hide, placement and frame color.
-        self.info_typography_host = QWidget()
-        info_typography_layout = QVBoxLayout(self.info_typography_host)
-        info_typography_layout.setContentsMargins(0, 0, 0, 0)
-        info_typography_layout.setSpacing(8)
-        self._add_typography_row(
-            info_typography_layout, "info",
-            "Настройки шрифта информационного блока", 17, "#FFFFFF",
-        )
-        self.info_form.addRow("", self.info_typography_host)
-
-
+        # Approved sidebar settings order: Webcam -> List -> Combined -> Information.
         combined_heading = QLabel("Совместный режим (список + чат)")
         self.combined_heading = combined_heading
         combined_heading.setStyleSheet("font-size: 13pt; font-weight: 650;")
@@ -674,6 +657,24 @@ class StreamTab(QWidget):
             self._save_combined_list_chat_settings
         )
         layout.addWidget(self.combined_save_button, 0, Qt.AlignLeft)
+
+
+        layout.addWidget(info_heading)
+        layout.addLayout(info_form)
+        add_main_save("info")
+
+        # UI-035: keep the existing info typography control in the same
+        # thematic block as text, show/hide, placement and frame color.
+        self.info_typography_host = QWidget()
+        info_typography_layout = QVBoxLayout(self.info_typography_host)
+        info_typography_layout.setContentsMargins(0, 0, 0, 0)
+        info_typography_layout.setSpacing(8)
+        self._add_typography_row(
+            info_typography_layout, "info",
+            "Настройки шрифта информационного блока", 17, "#FFFFFF",
+        )
+        self.info_form.addRow("", self.info_typography_host)
+
 
         timer_line = QFrame()
         timer_line.setProperty("line", True)
