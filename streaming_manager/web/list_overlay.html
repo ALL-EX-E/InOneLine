@@ -133,6 +133,17 @@ html, body {
 </div>
 <script>
 (() => {
+  // One rendering engine, two independent OBS URLs. The standalone List must
+  // never load Twitch; only the dedicated combined route instantiates it.
+  const isCombined = location.pathname === "/combined-overlay";
+  if (isCombined) {
+    const frame = document.createElement("iframe");
+    frame.src = "/multichat-overlay?embedded=1";
+    frame.title = "Чат Twitch";
+    frame.tabIndex = -1;
+    frame.setAttribute("aria-hidden", "true");
+    document.getElementById("list-chat").appendChild(frame);
+  }
   const panel = document.getElementById("list-panel");
   const rootComposition = document.getElementById("list-composition");
   const composer = IOLListComposition.create(
@@ -141,7 +152,8 @@ html, body {
     panel,
     document.getElementById("list-chat"),
     () => requestAnimationFrame(() => rebuildInfiniteScroll(false)),
-    new URLSearchParams(location.search).get("preview") === "1"
+    new URLSearchParams(location.search).get("preview") === "1",
+    isCombined
   );
   const topThree = document.getElementById("top-three");
   const divider = document.getElementById("top-three-divider");
@@ -333,7 +345,7 @@ html, body {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const overlayConfig = data.overlay || {};
-      composer.apply(data, false);
+      composer.apply(data, isCombined);
       // Unlike other widgets, preview must exactly mirror the live List
       // event state. The list's temporary visibility is application-owned.
       document.documentElement.dataset.obsVisible = String(
