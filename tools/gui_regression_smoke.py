@@ -28,6 +28,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QBoxLayout,
     QApplication,
+    QCheckBox,
     QDialog,
     QFileDialog,
     QInputDialog,
