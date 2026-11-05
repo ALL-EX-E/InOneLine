@@ -40,6 +40,7 @@ JS = """JSON.stringify((() => {
   return {
     ready: true,
     shown:root.classList.contains("r06-shown"),
+    replace:root.classList.contains("r06-replace"),
     listHeight:layer.getBoundingClientRect().height,
     chatHeight:chat.getBoundingClientRect().height,
     iframes:document.querySelectorAll("iframe").length,
@@ -77,6 +78,7 @@ def until(page, condition, label):
         last = metrics(page)
         if last and last.get("ready") and condition(last):
             assert last["iframes"] == 0, (label, last)
+            assert last["replace"] is False, (label, last)
             assert last["chatHeight"] <= 2, (label, last)
             assert float(last["opacity"]) >= .99, (label, last)
             assert last["transform"] == "none", (label, last)
