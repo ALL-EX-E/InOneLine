@@ -237,7 +237,7 @@ class StreamTab(QWidget):
         # is intentionally not editable: the primary canvas is always shown.
 
         # UI-036: unconverted main-overlay sections retain their bulk Save.
-        # R06-007/008/009: Info, List and Webcam have independent saves.
+        # R06-007/008/009/010: Info, List, Webcam and Background save separately.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
@@ -248,6 +248,7 @@ class StreamTab(QWidget):
                 self._save_info_settings if section == "info"
                 else self._save_list_settings if section == "list"
                 else self._save_webcam_settings if section == "webcam"
+                else self._save_background_settings if section == "background"
                 else self.save
             )
             self.main_save_buttons[section] = button
@@ -2900,6 +2901,31 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_background_settings(self) -> None:
+        """Save only the main-overlay background asset and display mode."""
+        background_asset = self._selected_background_asset()
+        legacy_background_file = (
+            background_asset.managed_name
+            if background_asset is not None
+            and background_asset.storage_mode == MEDIA_STORAGE_MANAGED
+            else ""
+        )
+        self.db.set_settings_bulk({
+            "overlay_background_media_id": (
+                str(background_asset.id) if background_asset is not None else ""
+            ),
+            # Backward compatibility: never store an external absolute path.
+            "overlay_background_file": legacy_background_file,
+            "overlay_background_mode": str(
+                self.background_mode.currentData() or "stretch"
+            ),
+        })
+        QMessageBox.information(
+            self, "Фон оверлея",
+            "Настройки фона сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
+        )
 
     def _save_webcam_settings(self) -> None:
         """Save only Webcam visibility, position and frame color."""
