@@ -236,8 +236,8 @@ class StreamTab(QWidget):
         # Main-overlay show mode remains in the shared policy registry but
         # is intentionally not editable: the primary canvas is always shown.
 
-        # UI-036: existing main-overlay sections retain their bulk Save.
-        # R06-007: the Information block saves only its own settings.
+        # UI-036: unconverted main-overlay sections retain their bulk Save.
+        # R06-007/008: Info and List now save only their own settings.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
@@ -245,7 +245,9 @@ class StreamTab(QWidget):
             button.setProperty("primary", True)
             button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             button.clicked.connect(
-                self._save_info_settings if section == "info" else self.save
+                self._save_info_settings if section == "info"
+                else self._save_list_settings if section == "list"
+                else self.save
             )
             self.main_save_buttons[section] = button
             layout.addWidget(button, 0, Qt.AlignLeft)
@@ -2897,6 +2899,35 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_list_settings(self) -> None:
+        """Save only the List controls; apply its shared Twitch timer policy."""
+        mode = str(self.obs_show_modes["list"].currentData())
+        values = {
+            WIDGETS["list"].key: mode,
+            "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
+            "list_slide_duration": str(self.list_slide_duration.value()),
+            "list_slide_command": self.list_slide_command.text(),
+            # Keep the old on/off mirror for compatibility with older data.
+            "overlay_list_enabled": "0" if mode == "hidden" else "1",
+            "overlay_list_side": str(self.overlay_list_side.currentData() or "auto"),
+            "overlay_frame_list_color": str(
+                self.frame_color_buttons["list"].property("fontColor") or "#FFFFFF"
+            ),
+        }
+        typography = self._collect_typography_settings()
+        for key in ("top1", "top2", "top3", "list"):
+            for attribute in ("family", "size", "color"):
+                full_key = f"overlay_font_{key}_{attribute}"
+                values[full_key] = typography[full_key]
+        self.db.set_settings_bulk(values)
+        self.api.configure_list_show(
+            mode, values["list_slide_command"], int(values["list_slide_duration"])
+        )
+        QMessageBox.information(
+            self, "Список",
+            "Настройки списка сохранены. Открытые OBS-источники обновятся автоматически.",
+        )
 
     def _save_info_settings(self) -> None:
         """Save only Information block controls; leave other drafts untouched."""
