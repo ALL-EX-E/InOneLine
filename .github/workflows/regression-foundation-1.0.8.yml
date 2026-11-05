@@ -101,6 +101,14 @@ jobs:
           python -m tools.r06_info_save_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 info save native Qt regression failed" }
 
+      - name: R06 independent List Save native Qt and Twitch timer regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_list_save_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 independent List Save regression failed" }
+
       - name: D41 chat poll order real Chromium standalone and embedded regression
         shell: pwsh
         env:
