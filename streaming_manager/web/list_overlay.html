@@ -128,10 +128,8 @@ html, body {
   <div id="api-state">Нет связи с In one line</div>
     </div>
   </div>
-  <div id="list-chat" class="r06-chat-layer">
-    <iframe src="/multichat-overlay?embedded=1" title="Чат Twitch" tabindex="-1"
-            aria-hidden="true"></iframe>
-  </div>
+  <!-- Independent List source has no Twitch child; composition API stays reusable. -->
+  <div id="list-chat" class="r06-chat-layer"></div>
 </div>
 <script>
 (() => {
@@ -335,8 +333,8 @@ html, body {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       const overlayConfig = data.overlay || {};
-      composer.apply(data, overlayConfig.list_with_chat === true);
-      // Unlike other widgets, preview must exactly mirror the live list/chat
+      composer.apply(data, false);
+      // Unlike other widgets, preview must exactly mirror the live List
       // event state. The list's temporary visibility is application-owned.
       document.documentElement.dataset.obsVisible = String(
         composer.hasListArea() || composer.hasChatSpace()
@@ -359,7 +357,6 @@ html, body {
         width: viewport.clientWidth,
         height: viewport.clientHeight,
         list_mode: data.visibility?.list?.show_mode,
-        chat_layout: overlayConfig.list_chat_layout,
         chat_available: composer.hasChatSpace(),
       });
       if (rowsChanged || metricsKey !== lastMetricsKey) {

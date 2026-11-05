@@ -434,19 +434,6 @@ class StreamTab(QWidget):
         self.list_slide_duration.setSuffix(" сек.")
         overlay_form.addRow("Время показа:", self.list_slide_duration)
 
-        self.list_animation_seconds = ScrollSafeDoubleSpinBox()
-        self.list_animation_seconds.setDecimals(2)
-        self.list_animation_seconds.setRange(0.25, 3.00)
-        self.list_animation_seconds.setSingleStep(0.05)
-        self.list_animation_seconds.setValue(1.00)
-        self.list_animation_seconds.setSuffix(" сек.")
-        self.list_animation_seconds.setToolTip(
-            "Единая длительность появления и скрытия списка, а также "
-            "плавного изменения высоты чата в обоих OBS-оверлеях. "
-            "Не изменяет время показа списка."
-        )
-        overlay_form.addRow("Длительность анимации:", self.list_animation_seconds)
-
         self.list_slide_command = QLineEdit()
         self.list_slide_command.setPlaceholderText("Команда Twitch (необязательно)")
         overlay_form.addRow("Команда Twitch:", self.list_slide_command)
@@ -460,18 +447,6 @@ class StreamTab(QWidget):
         self.list_slide_command.textChanged.connect(
             self._update_main_overlay_conditional_visibility
         )
-
-        self.list_chat_layout = ScrollSafeComboBox()
-        self.list_chat_layout.addItem("Разделение области", "split")
-        self.list_chat_layout.addItem("Замещение области", "replace")
-        overlay_form.addRow("Совмещение с чатом:", self.list_chat_layout)
-
-        self.list_with_chat = QCheckBox("Показывать чат вместе со списком")
-        self.list_with_chat.setToolTip(
-            "Включить Twitch-чат в отдельном OBS-источнике списка. "
-            "В основном оверлее чат отображается независимо."
-        )
-        overlay_form.addRow("", self.list_with_chat)
 
         self.webcam_enabled = QCheckBox("Показывать на оверлее")
         self.webcam_position = ScrollSafeComboBox()
@@ -2595,19 +2570,7 @@ class StreamTab(QWidget):
         except (TypeError, ValueError):
             seconds = 30
         self.list_slide_duration.setValue(max(1, min(120, seconds)))
-        try:
-            animation_seconds = float(setting("list_animation_seconds", "1.00"))
-            if not 0.25 <= animation_seconds <= 3.00:
-                animation_seconds = 1.00
-        except (TypeError, ValueError):
-            animation_seconds = 1.00
-        self.list_animation_seconds.setValue(animation_seconds)
         self.list_slide_command.setText(setting("list_slide_command", ""))
-        self._set_combo_by_data(
-            self.list_chat_layout,
-            setting("list_chat_layout", "split"),
-        )
-        self.list_with_chat.setChecked(setting("list_with_chat", "0") == "1")
         self._set_combo_by_data(
             self.info_position,
             setting("overlay_info_position", "auto"),
@@ -2876,10 +2839,7 @@ class StreamTab(QWidget):
             WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
             "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
             "list_slide_duration": str(self.list_slide_duration.value()),
-            "list_animation_seconds": f"{self.list_animation_seconds.value():.2f}",
             "list_slide_command": self.list_slide_command.text(),
-            "list_chat_layout": str(self.list_chat_layout.currentData() or "split"),
-            "list_with_chat": "1" if self.list_with_chat.isChecked() else "0",
             "stream_current_game_id": str(self.game_combo.currentData() or ""),
             # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
             "stream_info": self.info_field.text().strip(),

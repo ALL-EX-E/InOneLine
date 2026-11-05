@@ -1,4 +1,4 @@
-"""R06 ZERO: real Chromium static List+Twitch-chat geometry and commands.
+"""R06 ZERO: legacy main-overlay List+Twitch-chat geometry and commands.
 
 All previous movement animation tests are preserved in Git history. This new
 baseline deliberately checks there is NO List/chat transition, wipe or fade.
@@ -132,8 +132,7 @@ def main():
         views = []
         try:
             screen = app.primaryScreen().availableGeometry()
-            for i, (route, width) in enumerate((("/overlay", 1000),
-                                                ("/list-overlay", 380))):
+            for i, (route, width) in enumerate((("/overlay", 1000),)):
                 view = QWebEngineView()
                 view.resize(width, 620)
                 view.move(screen.x() + 5 + i * 110, screen.y() + 5 + i * 35)
@@ -193,7 +192,7 @@ def main():
                 static_check(m, "dynamic chat")
                 assert float(m["chatTransition"].split(",")[0].rstrip("s")) > 0
                 assert m["shellRadius"] == m["cardRadius"] == "8px", (
-                    "Original Twitch cards must match shell radius in both OBS sources", m)
+                    "Original Twitch cards must match shell radius in the main OBS source", m)
 
             # The CSS default must not override the saved custom card radius.
             for radius in (0, 20):

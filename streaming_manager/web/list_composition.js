@@ -188,7 +188,8 @@
         vis.show_mode : "always";
       const previousMode = mode;
       mode = nextMode;
-      composeMode = cfg.list_chat_layout === "replace" ? "replace" : "split";
+      // Standalone List is not allowed to activate a legacy replacement layer.
+      composeMode = allowChat && cfg.list_chat_layout === "replace" ? "replace" : "split";
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";

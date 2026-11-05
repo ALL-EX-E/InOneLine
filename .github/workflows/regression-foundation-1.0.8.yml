@@ -109,13 +109,15 @@ jobs:
           python -m tools.chat_unicode_fonts_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41 Twitch OBS Unicode font parity failed" }
 
-      - name: R06 FIX1 real Chromium both List sources, dynamic chat and speed
+      - name: R06 main composer and independent List native Chromium regression
         shell: pwsh
         env:
           QT_QPA_PLATFORM: windows
         run: |
           python -m tools.r06_chat_browser_smoke
-          if ($LASTEXITCODE -ne 0) { throw "R06 FIX1 chat layout/animation browser regression failed" }
+          if ($LASTEXITCODE -ne 0) { throw "R06 main List/chat baseline regression failed" }
+          python -m tools.r06_independent_list_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 standalone List independence regression failed" }
 
       - name: D41-02 Twitch chat EventSub and Channel Points isolated regression
         shell: pwsh
