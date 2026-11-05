@@ -117,6 +117,14 @@ jobs:
           python -m tools.r06_webcam_save_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 independent Webcam Save regression failed" }
 
+      - name: R06 independent Background Save native Windows Qt and Twitch timer
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_background_save_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 independent Background Save regression failed" }
+
       - name: D41 chat poll order real Chromium standalone and embedded regression
         shell: pwsh
         env:
