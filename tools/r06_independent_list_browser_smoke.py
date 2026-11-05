@@ -101,7 +101,7 @@ def main():
                          10, 0, STATUS_NOT_PLAYED, ""))
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
-            "list_slide_duration": "2",
+            "list_slide_duration": "15",
             "list_slide_command": "!list",
             # Retained legacy settings must not affect the standalone List.
             "list_animation_seconds": "2.75",
@@ -114,7 +114,7 @@ def main():
         api = LocalApiServer(db, port=port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("always", "!list", 2)
+        api.configure_list_show("always", "!list", 15)
         api.start()
         view = QWebEngineView()
         try:
@@ -124,7 +124,7 @@ def main():
             until(view.page(), lambda v: v["shown"] and
                   v["listHeight"] > 100 and v["hasTopThree"], "always")
             db.set_setting("list_overlay_show_mode", "hidden")
-            api.configure_list_show("hidden", "!list", 2)
+            api.configure_list_show("hidden", "!list", 15)
             with urlopen(api.base_url + "/api/data", timeout=8) as response:
                 state_payload = json.load(response)
             assert state_payload["visibility"]["list"]["show_mode"] == "hidden", (
@@ -133,16 +133,22 @@ def main():
             until(view.page(), lambda v: not v["shown"] and
                   v["listHeight"] <= 2, "hidden immediate")
             db.set_setting("list_overlay_show_mode", "always")
-            api.configure_list_show("always", "!list", 2)
+            api.configure_list_show("always", "!list", 15)
             until(view.page(), lambda v: v["shown"] and
                   v["listHeight"] > 100, "always restored")
             db.set_setting("list_overlay_show_mode", "slide")
-            api.configure_list_show("slide", "!list", 2)
+            api.configure_list_show("slide", "!list", 15)
             until(view.page(), lambda v: not v["shown"] and
                   v["listHeight"] <= 2, "command idle")
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "standalone-show", "viewer", "!list"
             ))
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                command_payload = json.load(response)
+            assert command_payload["list_show"]["remaining_ms"] > 12000, (
+                "Standalone command did not start the server timer",
+                command_payload["list_show"],
+            )
             until(view.page(), lambda v: v["shown"] and
                   v["listHeight"] > 100, "command visible")
             until(view.page(), lambda v: not v["shown"] and
