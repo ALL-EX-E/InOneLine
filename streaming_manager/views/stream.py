@@ -237,7 +237,7 @@ class StreamTab(QWidget):
         # is intentionally not editable: the primary canvas is always shown.
 
         # UI-036: unconverted main-overlay sections retain their bulk Save.
-        # R06-007/008: Info and List now save only their own settings.
+        # R06-007/008/009: Info, List and Webcam have independent saves.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
@@ -247,6 +247,7 @@ class StreamTab(QWidget):
             button.clicked.connect(
                 self._save_info_settings if section == "info"
                 else self._save_list_settings if section == "list"
+                else self._save_webcam_settings if section == "webcam"
                 else self.save
             )
             self.main_save_buttons[section] = button
@@ -2899,6 +2900,23 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_webcam_settings(self) -> None:
+        """Save only Webcam visibility, position and frame color."""
+        self.db.set_settings_bulk({
+            "overlay_webcam_enabled": "1" if self.webcam_enabled.isChecked() else "0",
+            "overlay_webcam_position": str(
+                self.webcam_position.currentData() or "top_right"
+            ),
+            "overlay_frame_webcam_color": str(
+                self.frame_color_buttons["webcam"].property("fontColor") or "#FFFFFF"
+            ),
+        })
+        QMessageBox.information(
+            self, "Веб-камера",
+            "Настройки веб-камеры сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
+        )
 
     def _save_list_settings(self) -> None:
         """Save only the List controls; apply its shared Twitch timer policy."""
