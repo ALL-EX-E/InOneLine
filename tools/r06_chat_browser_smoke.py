@@ -133,8 +133,7 @@ def main():
         views = []
         try:
             screen = app.primaryScreen().availableGeometry()
-            for i, (route, width) in enumerate((("/overlay", 1000),
-                                                ("/combined-overlay", 380))):
+            for i, (route, width) in enumerate((("/overlay", 1000),)):
                 view = QWebEngineView()
                 view.resize(width, 620)
                 view.move(screen.x() + 5 + i * 110, screen.y() + 5 + i * 35)
