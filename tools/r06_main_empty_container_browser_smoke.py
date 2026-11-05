@@ -144,13 +144,14 @@ def main():
                          and not x["shown"], "idle slide + empty hide-empty chat")
             neighbors = (idle["webcamParent"], idle["infoParent"])
 
-            # A genuine first Twitch message reintroduces the shared source,
-            # with chat using the full area and the list still inactive.
+            # A genuine first Twitch message reintroduces the shared source.
+            # Hide-empty chat keeps its content-sized height (possibly <50px);
+            # list remains inactive without a reserved panel.
             assert state.ingest(ChatMessage(
                 "twitch", "channel", "hello-1", "alice", "A message"
             ))
             until(page, lambda x: x["parent"] in {"left-list", "right-list"}
-                  and not x["shown"] and x["chatHeight"] > 50
+                  and not x["shown"] and 10 < x["chatHeight"] <= x["rootHeight"]
                   and x["listHeight"] <= 2
                   and (x["webcamParent"], x["infoParent"]) == neighbors,
                   "first Twitch message, chat-only shared area")
