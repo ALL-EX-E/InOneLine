@@ -28,6 +28,7 @@ from PySide6.QtTest import QTest
 from PySide6.QtWidgets import (
     QBoxLayout,
     QApplication,
+    QAbstractSpinBox,
     QCheckBox,
     QDialog,
     QFileDialog,
@@ -1273,11 +1274,37 @@ def assert_p09_list_group(app, stream, db) -> None:
     # Previously saved composition settings remain in SQLite but no longer
     # have controls in the List section.
     for widget in (
-        stream.list_slide_direction, stream.list_slide_duration,
+        stream.list_slide_direction, stream.list_slide_duration_control,
         stream.list_slide_command,
     ):
         if not (positions[0] < form.getWidgetPosition(widget)[0] < positions[1]):
             raise AssertionError("R06 List command controls escaped their group")
+    # Windows native QSpinBox triangles are too small and have unreliable
+    # hitboxes. Reuse the existing external controls from the Timer widgets.
+    duration_control = stream.list_slide_duration_control
+    if form.indexOf(duration_control) < 0 or form.indexOf(stream.list_slide_duration) >= 0:
+        raise AssertionError("R06 duration row must own the arrow-wrapper widget")
+    if stream.list_slide_duration.buttonSymbols() != QAbstractSpinBox.ButtonSymbols.NoButtons:
+        raise AssertionError("R06 native List spinbox arrows were not disabled")
+    arrows = {
+        button.text(): button
+        for button in duration_control.findChildren(QPushButton)
+        if button.text() in ("▲", "▼")
+    }
+    if set(arrows) != {"▲", "▼"}:
+        raise AssertionError("R06 wide duration arrows are missing")
+    if any(button.width() < 36 or button.height() < 36
+           for button in arrows.values()):
+        raise AssertionError("R06 duration arrow hitboxes are too small")
+    previous_duration = stream.list_slide_duration.value()
+    stream.list_slide_duration.setValue(30)
+    arrows["▲"].click()
+    if stream.list_slide_duration.value() != 31:
+        raise AssertionError("R06 wider up arrow did not increment")
+    arrows["▼"].click()
+    if stream.list_slide_duration.value() != 30:
+        raise AssertionError("R06 wider down arrow did not decrement")
+    stream.list_slide_duration.setValue(previous_duration)
     for removed in ("list_animation_seconds", "list_chat_layout", "list_with_chat"):
         if hasattr(stream, removed):
             raise AssertionError(f"R06 obsolete independent List control remains: {removed}")
@@ -1427,6 +1454,86 @@ def assert_p09_list_group(app, stream, db) -> None:
         QApplication.clipboard().setText(clipboard_before)
     print("P10_UNIFIED_LIST_GROUP_SETTINGS_BOTH_SURFACES_AND_PREVIEW=PASS")
 
+
+
+def assert_r06_combined_settings(app, stream, db) -> None:
+    """A third OBS URL and a separately persisted combined-layout selector."""
+    form = stream.combined_form
+    mode = stream.combined_list_chat_layout
+    expected_values = tuple(mode.itemData(i) for i in range(mode.count()))
+    if expected_values != ("split", "replace"):
+        raise AssertionError("R06 combined layout options changed")
+    if form.labelForField(mode).text() != "Режим совмещения:":
+        raise AssertionError("R06 combined-layout label is missing")
+    if stream.overlay_form.indexOf(mode) >= 0:
+        raise AssertionError("R06 combined selector leaked back into independent List")
+    if form.indexOf(stream.combined_actions) < 0:
+        raise AssertionError("R06 combined OBS source buttons outside combined form")
+    heading_index = stream.layout().indexOf(stream.combined_heading)
+    if not (stream.layout().indexOf(stream.info_heading) < heading_index
+            < stream.layout().indexOf(stream.combined_save_button)):
+        raise AssertionError("R06 combined section is not structurally separate")
+    address = f"{stream.api.base_url}/combined-overlay"
+    labels = [
+        label for label in stream.findChildren(QLabel)
+        if label.text() == f"Совместный список и чат OBS: {address}"
+    ]
+    if len(labels) != 1:
+        raise AssertionError("R06 combined OBS URL is missing or duplicated")
+
+    original_settings = db.get_settings()
+    old_clipboard = QApplication.clipboard().text()
+    legacy_keys = ("list_chat_layout", "list_with_chat", "list_animation_seconds")
+    try:
+        original_combined = db.get_setting("combined_list_chat_layout", "split")
+        if original_combined not in ("split", "replace"):
+            original_combined = "split"
+        target = "replace" if original_combined == "split" else "split"
+        stream.copy_combined_btn.click()
+        if QApplication.clipboard().text() != address:
+            raise AssertionError("R06 combined copy button used incorrect URL")
+        with patch.object(QDesktopServices, "openUrl", return_value=True) as opened:
+            stream.preview_combined_btn.click()
+        if opened.call_count != 1 or opened.call_args.args[0].toString() != address + "?preview=1":
+            raise AssertionError("R06 combined preview URL is incorrect")
+
+        legacy_before = db.get_settings(legacy_keys)
+        mode.setCurrentIndex(mode.findData(target))
+        # A change in the UI must not silently modify the already active OBS.
+        if db.current_stream_payload()["overlay"]["list_chat_layout"] != original_combined:
+            raise AssertionError("R06 combined layout applied before explicit Save")
+        with patch.object(QMessageBox, "information") as notice:
+            stream.combined_save_button.click()
+        if notice.call_count != 1:
+            raise AssertionError("R06 combined Save did not confirm success")
+        if db.get_setting("combined_list_chat_layout") != target:
+            raise AssertionError("R06 combined selector was not persisted")
+        if db.current_stream_payload()["overlay"]["list_chat_layout"] != target:
+            raise AssertionError("R06 combined layout did not reach OBS payload")
+        if db.get_settings(legacy_keys) != legacy_before:
+            raise AssertionError("R06 combined Save overwrote old List legacy values")
+        stream.refresh()
+        if mode.currentData() != target:
+            raise AssertionError("R06 combined layout was not restored on Refresh")
+
+        # Saving List, webcam or info must not unexpectedly save the combined
+        # mode when its separate Save button was not clicked.
+        mode.setCurrentIndex(mode.findData(original_combined))
+        with patch.object(QMessageBox, "information"):
+            stream.save()
+        if db.get_setting("combined_list_chat_layout") != target:
+            raise AssertionError("R06 main Save committed an unsaved combined mode")
+    finally:
+        db.set_settings_bulk(original_settings)
+        extra_keys = set(db.get_settings()) - set(original_settings)
+        with db.connect() as conn:
+            conn.executemany(
+                "DELETE FROM settings WHERE key=?",
+                [(key,) for key in extra_keys],
+            )
+        stream.refresh()
+        QApplication.clipboard().setText(old_clipboard)
+    print("R06_SEPARATE_COMBINED_SETTINGS_URL_AND_SAVE=PASS")
 
 
 def assert_p08_background_media(app, window, root: Path) -> None:
@@ -2373,6 +2480,7 @@ def main() -> int:
         assert_p11_rules_text_and_obs_sections(window)
         assert_auction_conduct_compact_method_layout(window)
         assert_p09_list_group(app, stream, db)
+        assert_r06_combined_settings(app, stream, db)
 
         # UI-036: every current main-overlay section gets a compact Save
         # button, all wired to the original atomic StreamTab.save() method.
