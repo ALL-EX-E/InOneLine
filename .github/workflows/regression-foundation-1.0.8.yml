@@ -125,6 +125,14 @@ jobs:
           python -m tools.r06_background_save_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 independent Background Save regression failed" }
 
+      - name: R06 independent Game Window Save native Qt and Twitch timer
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_game_window_save_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 independent Game Window Save failed" }
+
       - name: D41 chat poll order real Chromium standalone and embedded regression
         shell: pwsh
         env:
