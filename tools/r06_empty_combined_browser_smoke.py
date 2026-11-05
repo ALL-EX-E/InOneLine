@@ -56,6 +56,11 @@ JS = """JSON.stringify((() => {
     listHeight:box(layer).height, chatHeight:box(chat).height,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
+    childURL:doc?.location?.href ?? null,
+    childReady:doc?.readyState ?? null,
+    childRenderType:typeof frame?.contentWindow?.IOLRenderEmbeddedChatState,
+    childRefreshType:typeof frame?.contentWindow?.IOLRefreshEmbeddedChat,
+    childShellHidden:doc?.getElementById("shell")?.classList.contains("hidden"),
     cameraParent:camera.parentElement?.id,
     infoParent:info.parentElement?.id,
     rightVisible:getComputedStyle(document.getElementById("right-column")).display !== "none",
@@ -149,6 +154,12 @@ def main() -> int:
             assert state.ingest(ChatMessage(
                 "twitch", "channel", "msg-1", "tester", "QA visible chat",
             ))
+            with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                state_snapshot = json.load(response)
+            assert any(
+                row.get("external_id") == "msg-1"
+                for row in state_snapshot.get("messages", [])
+            ), ("Twitch test message missing from server OBS snapshot", state_snapshot)
             message = until(
                 page,
                 lambda m: m["parent"] == "right-list" and
