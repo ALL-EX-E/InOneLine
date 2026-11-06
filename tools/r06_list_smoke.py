@@ -76,20 +76,26 @@ class R06ListApiSmoke(unittest.TestCase):
                 self.assertIn("IOLListComposition", composition)
                 self.assertIn("card.getBoundingClientRect().height", composition)
                 self.assertNotIn("messages.scrollHeight", composition)
-                # R06 ZERO: historic animation-specific code must be gone.
-                # The saved duration/direction remain in the API for a later
-                # separately agreed animation redesign, but are inert here.
+                # R06: the old, removed flow engine stays forbidden.
+                # New child-only motion is explicitly approved for the
+                # MAIN embedded composition, not standalone/combined URLs.
                 self.assertIn("transition:none!important", composition)
                 self.assertIn("animation:none!important", composition)
                 self.assertIn('mode === "slide"', composition)
                 self.assertIn("listLayer.style.flex", composition)
                 self.assertIn("IOLRenderEmbeddedChatState", composition)
+                self.assertIn('const mainMotion = noMotion && Boolean(root.closest("#overlay"));',
+                              composition)
+                self.assertIn("listPanel.animate(", composition)
+                self.assertIn("r06-split-motion", composition)
+                self.assertIn("r06-own-bottom", composition)
+                self.assertIn("visible ? \"translateY(0px)\"", composition)
                 for old_engine in (
                     "--r06-list-transition", "r06-flow-enter",
                     "r06-top-enter", "r06-always-resize",
                     "r06-chat-covered-clip", "updateOutgoingMask",
                     "freezeOutgoingListLayer", "incomingTopAnimation",
-                    "listPanel.animate(", "transition:height var("
+                    "transition:height var("
                 ):
                     self.assertNotIn(old_engine, composition)
                 self.assertNotIn("r06-shown .r06-chat-layer iframe {opacity:0}", composition)
