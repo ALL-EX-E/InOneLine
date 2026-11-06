@@ -255,6 +255,13 @@
       const timing = {duration: motionDurationMs, easing: "ease-in-out", fill: "both"};
 
       motion = "overlay";
+      if (entering) {
+        // Persistent native-Chromium diagnostic: short entrances must be
+        // observable even if a Qt JS callback arrives after the 650 ms motion.
+        root.dataset.r06LastEntrance = direction;
+        root.dataset.r06EntranceCount =
+          String((Number(root.dataset.r06EntranceCount) || 0) + 1);
+      }
       root.style.setProperty("--r06-overlay-list-height", height + "px");
       root.classList.add("r06-overlay-motion");
       root.classList.toggle("r06-shown", entering);
