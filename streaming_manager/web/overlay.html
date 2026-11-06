@@ -841,6 +841,10 @@ body.preview .preview-label { display: flex; }
 
     applyGameFrame(game?.format || "16:9", leftUsed, rightUsed);
 
+    // Complete an entrance only after reattaching a previously parked
+    // combined region, keeping the parent/container itself static.
+    composer.afterParentLayout();
+
     // Геометрия рамки и прозрачного выреза должна меняться атомарно.
     // getBoundingClientRect() принудительно завершает текущую раскладку, поэтому
     // первый вызов сразу синхронизирует маску с новой рамкой. Повтор в следующем

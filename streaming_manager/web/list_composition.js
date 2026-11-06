@@ -16,7 +16,7 @@
     }
     .r06-compose .r06-list-layer > #list-panel {
       width:100%;height:100%;min-height:0;box-sizing:border-box;
-      opacity:1!important;transform:none!important;
+      opacity:1!important;transform:none;
       transition:none!important;animation:none!important
     }
     .r06-chat-layer {
@@ -28,7 +28,7 @@
       position:absolute;inset:0;width:100%;height:100%;
       border:0;pointer-events:none
     }
-    .r06-compose.r06-not-shown .r06-list-layer {
+    .r06-compose.r06-not-shown:not(.r06-split-motion):not(.r06-overlay-motion) .r06-list-layer {
       flex:0 0 0px!important;height:0;overflow:hidden
     }
     /* Static replacement: the List covers the chat only while shown.
@@ -39,6 +39,27 @@
     }
     .r06-compose.r06-replace .r06-list-layer {
       position:absolute;inset:0;width:100%;height:100%;z-index:2;flex:none
+    }
+    /* Motion is confined to the two children, never to the composition. */
+    .r06-compose.r06-split-motion .r06-list-layer {
+      flex:0 0 auto!important
+    }
+    .r06-compose.r06-split-motion.r06-split-no-chat {
+      justify-content:flex-start
+    }
+    .r06-compose.r06-overlay-motion .r06-list-layer {
+      position:absolute!important;top:0;left:0;
+      width:100%!important;height:var(--r06-overlay-list-height)!important;
+      flex:none!important;z-index:2;overflow:visible
+    }
+    .r06-compose.r06-overlay-motion .r06-chat-layer {
+      position:absolute!important;inset:0;
+      width:100%;height:100%!important;margin-top:0!important;
+      flex:none!important;z-index:1;clip-path:none!important
+    }
+    /* "From bottom" starts at the bottom of the List's own upper region. */
+    .r06-compose.r06-overlay-motion.r06-own-bottom .r06-list-layer {
+      overflow:hidden!important
     }
   `;
   const sheet = document.createElement("style");
@@ -62,6 +83,17 @@
     let lastEmbeddedRefreshAt = -Infinity;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
+    // Only the composition embedded in the MAIN overlay gets the new
+    // preview motion. Both independent OBS URLs retain their accepted modes.
+    const mainMotion = noMotion && Boolean(root.closest("#overlay"));
+    const motionDurationMs = 650; // Provisional QA duration, not a new setting.
+    let seenSnapshot = false;
+    let motion = null;
+    let motionId = 0;
+    let motionTimeout = null;
+    let pendingEntrance = null;
+    let motionAnimations = [];
+
 
     function measureChat() {
       if (!chatAvailable || !chatHasMessages) return 0;
@@ -126,7 +158,144 @@
       } catch (_) { /* child can be navigating */ }
     }
 
+    function motionGeometry(visible) {
+      const available = root.clientHeight;
+      const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      const replacing = visible && mode === "slide" && composeMode === "replace";
+      const natural = chatAlways ? available : measureChat();
+      const gap = visible && !replacing && chatNeeded ? 12 : 0;
+      const cap = visible ? Math.max(0, Math.floor((available - gap) / 2)) : available;
+      const chat = !chatNeeded ? 0 :
+        replacing ? available : Math.max(0, Math.min(natural, cap));
+      return {
+        available, chatNeeded, chat, gap,
+        list: visible ? (replacing ? available : Math.max(0, available - chat - gap)) : 0,
+      };
+    }
+
+    function cancelMotion() {
+      motionId += 1;
+      pendingEntrance = null;
+      root.style.visibility = "";
+      if (motionTimeout !== null) clearTimeout(motionTimeout);
+      motionTimeout = null;
+      for (const animation of motionAnimations) animation.cancel();
+      motionAnimations = [];
+      motion = null;
+      root.classList.remove("r06-split-motion", "r06-split-no-chat", "r06-overlay-motion", "r06-own-bottom");
+      root.style.removeProperty("--r06-overlay-list-height");
+      listLayer.style.flex = "";
+      listLayer.style.height = "";
+      listLayer.style.overflow = "";
+      listPanel.style.height = "";
+      listPanel.style.flex = "";
+      chatLayer.style.transition = "none";
+    }
+
+    function finishMotion(id) {
+      if (motionId !== id) return;
+      cancelMotion();
+      lastGeometry = "";
+      layout();
+    }
+
+    function runMotion(animations) {
+      motionAnimations = animations;
+      const id = ++motionId;
+      motionTimeout = setTimeout(() => finishMotion(id), motionDurationMs + 50);
+    }
+
+    function beginSplitMotion(visible) {
+      // The main overlay is CSS-scaled. offsetHeight and clientHeight both
+      // use unscaled layout pixels; getBoundingClientRect does NOT.
+      const beforeList = listLayer.offsetHeight;
+      const beforeChat = chatLayer.offsetHeight;
+      const beforeGap = parseFloat(chatLayer.style.marginTop) || 0;
+      const target = motionGeometry(visible);
+      const maxList = Math.max(1, beforeList, target.list);
+      const timing = {duration: motionDurationMs, easing: "ease-in-out", fill: "both"};
+
+      motion = "split";
+      root.classList.add("r06-split-motion");
+      root.classList.toggle("r06-split-no-chat",
+        beforeChat <= 1 && target.chat <= 1);
+      root.classList.toggle("r06-shown", visible);
+      root.classList.toggle("r06-not-shown", !visible);
+      root.classList.remove("r06-replace");
+      listLayer.style.flex = "0 0 auto";
+      listLayer.style.height = target.list + "px";
+      listLayer.style.overflow = "hidden";
+      listPanel.style.height = maxList + "px";
+      listPanel.style.flex = "none";
+      chatLayer.style.transition = "none";
+      chatLayer.style.height = target.chat + "px";
+      chatLayer.style.marginTop = target.gap + "px";
+
+      // Equal timelines keep the shared boundary together. The panel slides
+      // while its viewport closes/opens; opacity remains unchanged.
+      runMotion([
+        listLayer.animate([
+          {height: beforeList + "px"}, {height: target.list + "px"},
+        ], timing),
+        chatLayer.animate([
+          {height: beforeChat + "px", marginTop: beforeGap + "px"},
+          {height: target.chat + "px", marginTop: target.gap + "px"},
+        ], timing),
+        listPanel.animate([
+          {transform: visible ? "translateY(" + (-maxList) + "px)" : "translateY(0px)"},
+          {transform: visible ? "translateY(0px)" : "translateY(" + (-maxList) + "px)"},
+        ], timing),
+      ]);
+    }
+
+    function beginOverlayMotion(entering, direction = "top") {
+      const target = motionGeometry(true);
+      const listHeight = entering ? target.list : listLayer.offsetHeight;
+      const width = root.clientWidth;
+      const height = Math.max(1, listHeight);
+      const timing = {duration: motionDurationMs, easing: "ease-in-out", fill: "both"};
+
+      motion = "overlay";
+      if (entering) {
+        // Persistent native-Chromium diagnostic: short entrances must be
+        // observable even if a Qt JS callback arrives after the 650 ms motion.
+        root.dataset.r06LastEntrance = direction;
+        root.dataset.r06EntranceCount =
+          String((Number(root.dataset.r06EntranceCount) || 0) + 1);
+      }
+      root.style.setProperty("--r06-overlay-list-height", height + "px");
+      root.classList.add("r06-overlay-motion");
+      root.classList.toggle("r06-shown", entering);
+      root.classList.toggle("r06-not-shown", !entering);
+      root.classList.remove("r06-replace");
+      chatLayer.style.transition = "none";
+
+      if (entering && direction === "bottom") {
+        root.classList.add("r06-own-bottom");
+        // The List is clipped at the bottom of its OWN destination region,
+        // so it does not start off-screen below the Twitch chat.
+        runMotion([
+          listPanel.animate([
+            {transform: "translateY(" + height + "px)"},
+            {transform: "translateY(0px)"},
+          ], timing),
+        ]);
+        return;
+      }
+
+      const initial = entering ? (
+        direction === "left" ? "translateX(" + (-width) + "px)" :
+        direction === "right" ? "translateX(" + width + "px)" :
+        "translateY(" + (-height) + "px)"
+      ) : "translateY(0px)";
+      const final = entering ? "translate(0px,0px)" : "translateY(" + (-height) + "px)";
+      runMotion([
+        listLayer.animate([{transform: initial}, {transform: final}], timing),
+      ]);
+    }
+
     function layout() {
+      if (motion !== null) return;
       const available = root.clientHeight;
       if (available <= 0) return;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
@@ -165,11 +334,57 @@
       }
     }
 
-    function changeActive(next) {
+    function changeActive(next, reason = "", previousReplacing = false, direction = "top") {
       if (active === next) return;
+      if (motion !== null) {
+        cancelMotion();
+        layout();
+      }
       active = next;
       lastGeometry = "";
+      if (mainMotion && next && (reason === "always" || reason === "command") &&
+          root.clientHeight <= 0) {
+        // The main overlay parks the combined region when both children are
+        // hidden. Defer the entrance until its parent layout re-attaches it.
+        // Never show one instantaneous frame before the entrance animation.
+        motion = "pending";
+        root.style.visibility = "hidden";
+        pendingEntrance = {reason, direction};
+        return;
+      }
+      if (mainMotion && root.clientHeight > 0) {
+        if (reason === "hide") {
+          if (previousReplacing) beginOverlayMotion(false, "top");
+          else beginSplitMotion(false);
+          return;
+        }
+        if (reason === "always") {
+          beginSplitMotion(true);
+          return;
+        }
+        if (reason === "command") {
+          beginOverlayMotion(true, direction);
+          return;
+        }
+      }
       layout();
+    }
+
+    function afterParentLayout() {
+      // The MAIN parent can park the whole composition while idle.  Starting
+      // a List animation before it has reattached the slot gives height=0.
+      // Run it immediately after the parent has placed the live container.
+      if (!mainMotion || motion !== "pending" || !pendingEntrance ||
+          root.clientHeight <= 0) return;
+      const {reason, direction} = pendingEntrance;
+      pendingEntrance = null;
+      root.style.visibility = "";
+      motion = null;
+      active = false;
+      layout();
+      active = true;
+      if (reason === "always") beginSplitMotion(true);
+      else beginOverlayMotion(true, direction);
     }
 
     function expire() {
@@ -184,6 +399,7 @@
       const vis = data.visibility && data.visibility.list || {};
       const chat = data.multichat || {};
       const trigger = data.list_show || {};
+      const previousReplacing = active && mode === "slide" && composeMode === "replace";
       const nextMode = ["hidden","always","slide"].includes(vis.show_mode) ?
         vis.show_mode : "always";
       const previousMode = mode;
@@ -215,8 +431,17 @@
       const shouldShow = mode === "always" ||
         (mode === "slide" && deadline > performance.now());
       if (mode !== previousMode) lastGeometry = "";
-      changeActive(shouldShow);
+      let reason = "";
+      if (mainMotion && seenSnapshot && shouldShow !== active) {
+        if (nextMode === "hidden" && active) reason = "hide";
+        else if (nextMode === "always" && !active) reason = "always";
+        else if (nextMode === "slide" && shouldShow && composeMode === "split")
+          reason = "command";
+      }
+      changeActive(shouldShow, reason, previousReplacing,
+        cfg.list_slide_direction || "top");
       layout();
+      seenSnapshot = true;
 
       if (expiryTimer !== null) clearTimeout(expiryTimer);
       expiryTimer = null;
@@ -233,7 +458,8 @@
       apply,
       hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
-      hasListArea: () => active,
+      hasListArea: () => active || motion !== null,
+      afterParentLayout,
     };
   }
   window.IOLListComposition = Object.freeze({create});

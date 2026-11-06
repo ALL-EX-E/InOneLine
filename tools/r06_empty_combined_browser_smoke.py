@@ -51,9 +51,13 @@ JS = """JSON.stringify((() => {
   const doc=frame?.contentDocument, messages=doc?.getElementById("messages");
   return {
     ready:true,
+    splitMotion:root.classList.contains("r06-split-motion"),
+    overlayMotion:root.classList.contains("r06-overlay-motion"),
+    pendingMotion:root.style.visibility === "hidden",
     parent:root.parentElement?.id,
     listShown:root.classList.contains("r06-shown"),
     listHeight:box(layer).height, chatHeight:box(chat).height,
+    listTop:box(layer).top, rootTop:box(root).top,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
     childURL:doc?.location?.href ?? null,
@@ -109,6 +113,7 @@ def until(page, predicate, label: str, timeout: float = 25, *, api=None):
     while time.monotonic() < end:
         latest = inspect(page)
         if (latest and latest.get("ready") and predicate(latest) and
+                not (latest["splitMotion"] or latest["overlayMotion"] or latest["pendingMotion"]) and
                 latest["cameraParent"] == "right-top" and
                 latest["infoParent"] == "right-bottom" and
                 latest["rightVisible"]):
@@ -142,6 +147,20 @@ def until(page, predicate, label: str, timeout: float = 25, *, api=None):
         except Exception as exc:
             print("R06_EMPTY_DIAGNOSTIC_API_ERROR", repr(exc), flush=True)
     raise AssertionError(f"R06 empty-container {label} timeout: {latest!r}")
+
+
+def observe_motion(page, key: str, label: str, timeout: float = 12):
+    """Actually observe the child-only transition in native Chromium."""
+    end = time.monotonic() + timeout
+    latest = None
+    while time.monotonic() < end:
+        latest = inspect(page)
+        if latest and latest.get("ready") and latest.get(key):
+            assert float(latest["panelOpacity"]) >= .99, (label, latest)
+            print("R06_CHILD_MOTION_PASS", label, latest, flush=True)
+            return latest
+        QTest.qWait(60)
+    raise AssertionError(f"R06 missing child motion {label}: {latest!r}")
 
 
 def main() -> int:
@@ -217,6 +236,7 @@ def main() -> int:
             # Removing the command message makes the chat genuinely empty
             # while the application-owned List timer keeps running.
             state.delete_message("twitch", "channel", "cmd-1")
+            observe_motion(page, "overlayMotion", "parked Twitch command enters with motion")
             shown = until(
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
@@ -241,6 +261,12 @@ def main() -> int:
             # Independent Always visibility means a real visible widget exists.
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 90)
+            parked_entrance = observe_motion(
+                page, "splitMotion", "parked always List enters with motion",
+            )
+            assert abs(parked_entrance["listTop"]-parked_entrance["rootTop"]) <= 3, (
+                "Without Twitch space, the List must unfold from TOP", parked_entrance,
+            )
             until(
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
@@ -253,6 +279,7 @@ def main() -> int:
                 "multichat_appearance_common": json.dumps({"visibility": "always"}),
             })
             api.configure_list_show("hidden", "!list", 90)
+            observe_motion(page, "splitMotion", "visible List exits on hidden Save")
             until(
                 page,
                 lambda m: m["parent"] == "right-list" and not m["listShown"] and
