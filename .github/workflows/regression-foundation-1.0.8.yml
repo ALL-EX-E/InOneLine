@@ -141,6 +141,22 @@ jobs:
           python -m tools.r06_game_window_browser_smoke
           if ($LASTEXITCODE -ne 0) { throw "R06 Game Window Chromium regression failed" }
 
+      - name: R06 independent Current Record Save native Qt SQLite Twitch and OBS HTTP
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_current_record_save_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 independent Current Record Save failed" }
+
+      - name: R06 Current Record title and typography real Chromium regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r06_current_record_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R06 Current Record title Chromium regression failed" }
+
       - name: D41 chat poll order real Chromium standalone and embedded regression
         shell: pwsh
         env:

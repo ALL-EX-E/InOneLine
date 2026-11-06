@@ -236,8 +236,7 @@ class StreamTab(QWidget):
         # Main-overlay show mode remains in the shared policy registry but
         # is intentionally not editable: the primary canvas is always shown.
 
-        # UI-036: Current Game retains the legacy bulk Save until its own review.
-        # R06-007/008/009/010/011: all other main-overlay sections save separately.
+        # R06-007/008/009/010/011/012: all main-overlay sections save independently.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
@@ -250,6 +249,7 @@ class StreamTab(QWidget):
                 else self._save_webcam_settings if section == "webcam"
                 else self._save_background_settings if section == "background"
                 else self._save_game_window_settings if section == "game_window"
+                else self._save_current_record_settings if section == "current_game"
                 else self.save
             )
             self.main_save_buttons[section] = button
@@ -290,7 +290,7 @@ class StreamTab(QWidget):
         self.format_combo.addItems(STREAM_FORMATS)
         self.format_combo.setMaximumWidth(180)
 
-        form.addRow("Текущая игра:", self.game_combo)
+        form.addRow("Запись в заголовке:", self.game_combo)
         # UI-034: move, do not recreate, the existing title typography row.
         # Same font/color widgets, handlers and overlay_font_title_* settings.
         self.title_typography_host = QWidget()
@@ -298,7 +298,7 @@ class StreamTab(QWidget):
         title_typography_layout.setContentsMargins(0, 0, 0, 0)
         title_typography_layout.setSpacing(8)
         self._add_typography_row(
-            title_typography_layout, "title", "Название текущей игры",
+            title_typography_layout, "title", "Заголовок над игровым окном",
             30, "#FFFFFF",
         )
         form.addRow("", self.title_typography_host)
@@ -2914,6 +2914,23 @@ class StreamTab(QWidget):
         QMessageBox.information(
             self, "Игровое окно",
             "Настройки игрового окна сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
+        )
+
+    def _save_current_record_settings(self) -> None:
+        """Save only the record used as the OBS title and its typography."""
+        title_font, title_size, title_color = self.typography_controls["title"]
+        self.db.set_settings_bulk({
+            "stream_current_game_id": str(self.game_combo.currentData() or ""),
+            "overlay_font_title_family": title_font.currentFont().family(),
+            "overlay_font_title_size": str(title_size.value()),
+            "overlay_font_title_color": str(
+                title_color.property("fontColor") or "#FFFFFF"
+            ),
+        })
+        QMessageBox.information(
+            self, "Заголовок над игровым окном",
+            "Настройки заголовка сохранены. "
             "Открытые OBS-источники обновятся автоматически.",
         )
 
