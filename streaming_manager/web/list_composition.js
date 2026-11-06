@@ -207,8 +207,10 @@
     }
 
     function beginSplitMotion(visible) {
-      const beforeList = listLayer.getBoundingClientRect().height;
-      const beforeChat = chatLayer.getBoundingClientRect().height;
+      // The main overlay is CSS-scaled. offsetHeight and clientHeight both
+      // use unscaled layout pixels; getBoundingClientRect does NOT.
+      const beforeList = listLayer.offsetHeight;
+      const beforeChat = chatLayer.offsetHeight;
       const beforeGap = parseFloat(chatLayer.style.marginTop) || 0;
       const target = motionGeometry(visible);
       const maxList = Math.max(1, beforeList, target.list);
@@ -249,7 +251,7 @@
 
     function beginOverlayMotion(entering, direction = "top") {
       const target = motionGeometry(true);
-      const listHeight = entering ? target.list : listLayer.getBoundingClientRect().height;
+      const listHeight = entering ? target.list : listLayer.offsetHeight;
       const width = root.clientWidth;
       const height = Math.max(1, listHeight);
       const timing = {duration: motionDurationMs, easing: "ease-in-out", fill: "both"};
