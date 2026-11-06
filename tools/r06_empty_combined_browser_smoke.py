@@ -73,6 +73,19 @@ JS = """JSON.stringify((() => {
 })())"""
 
 
+class ManualClock:
+    """Control only the command deadline; Chromium still uses real elapsed time."""
+
+    def __init__(self) -> None:
+        self.now = time.monotonic()
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
 def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -90,7 +103,7 @@ def inspect(page):
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
 
 
-def until(page, predicate, label: str, timeout: float = 25):
+def until(page, predicate, label: str, timeout: float = 25, *, api=None):
     end = time.monotonic() + timeout
     latest = None
     while time.monotonic() < end:
@@ -111,6 +124,23 @@ def until(page, predicate, label: str, timeout: float = 25):
             print("R06_EMPTY_CONTAINER_PASS", label, latest, flush=True)
             return latest
         QTest.qWait(130)
+    if api is not None:
+        # Do not heal the browser under test; report actual server snapshots.
+        try:
+            with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                server_chat = json.load(response)
+            with urlopen(api.base_url + "/api/data", timeout=5) as response:
+                server_data = json.load(response)
+            print("R06_EMPTY_DIAGNOSTIC", json.dumps({
+                "label": label,
+                "server_message_ids": [m.get("external_id") for m in server_chat.get("messages", [])],
+                "server_obs_enabled": server_chat.get("obs_enabled"),
+                "server_list_show": server_data.get("list_show"),
+                "server_multichat": server_data.get("multichat"),
+                "chromium": latest,
+            }, ensure_ascii=True), flush=True)
+        except Exception as exc:
+            print("R06_EMPTY_DIAGNOSTIC_API_ERROR", repr(exc), flush=True)
     raise AssertionError(f"R06 empty-container {label} timeout: {latest!r}")
 
 
@@ -123,18 +153,19 @@ def main() -> int:
         db.set_settings_bulk({
             "list_overlay_show_mode": "slide",
             "list_slide_command": "!list",
-            "list_slide_duration": "9",
+            "list_slide_duration": "90",
             "combined_list_chat_layout": "split",
             "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
             "overlay_webcam_enabled": "1",
             "overlay_webcam_position": "top_right",
             "overlay_info_position": "bottom_right",
         })
-        state = MultichatState()
+        clock = ManualClock()
+        state = MultichatState(clock=clock)
         api = LocalApiServer(db, port=free_port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("slide", "!list", 9)
+        api.configure_list_show("slide", "!list", 90)
         api.start()
         view = QWebEngineView()
         try:
@@ -165,7 +196,7 @@ def main() -> int:
                 lambda m: m["parent"] == "right-list" and
                 not m["listShown"] and m["chatHeight"] > 10 and
                 m["listHeight"] <= 2 and m["chatCount"] >= 1,
-                "new message restores chat only",
+                "new message restores chat only", api=api,
             )
             assert abs(message["gameWidth"] - idle["gameWidth"]) <= 1.0
 
@@ -182,7 +213,7 @@ def main() -> int:
             ))
             with urlopen(api.base_url + "/api/data", timeout=5) as response:
                 snapshot = json.load(response)
-            assert snapshot["list_show"]["remaining_ms"] > 0, snapshot["list_show"]
+            assert snapshot["list_show"]["remaining_ms"] >= 89000, snapshot["list_show"]
             # Removing the command message makes the chat genuinely empty
             # while the application-owned List timer keeps running.
             state.delete_message("twitch", "channel", "cmd-1")
@@ -190,20 +221,26 @@ def main() -> int:
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
                 m["listHeight"] > 20 and m["chatHeight"] < 2,
-                "command shows only list",
+                "command shows only list", api=api,
             )
             assert abs(shown["gameWidth"] - idle["gameWidth"]) <= 1.0
+            # Advance server-owned command time deterministically instead of
+            # letting a 9-second window expire during unrelated Chromium startup.
+            clock.advance(91)
+            with urlopen(api.base_url + "/api/data", timeout=5) as response:
+                expired = json.load(response)
+            assert expired["list_show"]["remaining_ms"] == 0, expired["list_show"]
             until(
                 page,
                 lambda m: m["parent"] == "movable-elements" and
                 not m["listShown"],
                 "command expiry parks empty combined container",
-                timeout=19,
+                timeout=25, api=api,
             )
 
             # Independent Always visibility means a real visible widget exists.
             db.set_setting("list_overlay_show_mode", "always")
-            api.configure_list_show("always", "!list", 9)
+            api.configure_list_show("always", "!list", 90)
             until(
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
@@ -215,7 +252,7 @@ def main() -> int:
                 "list_overlay_show_mode": "hidden",
                 "multichat_appearance_common": json.dumps({"visibility": "always"}),
             })
-            api.configure_list_show("hidden", "!list", 9)
+            api.configure_list_show("hidden", "!list", 90)
             until(
                 page,
                 lambda m: m["parent"] == "right-list" and not m["listShown"] and
