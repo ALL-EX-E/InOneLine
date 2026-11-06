@@ -236,8 +236,8 @@ class StreamTab(QWidget):
         # Main-overlay show mode remains in the shared policy registry but
         # is intentionally not editable: the primary canvas is always shown.
 
-        # UI-036: unconverted main-overlay sections retain their bulk Save.
-        # R06-007/008/009/010: Info, List, Webcam and Background save separately.
+        # UI-036: Current Game retains the legacy bulk Save until its own review.
+        # R06-007/008/009/010/011: all other main-overlay sections save separately.
         self.main_save_buttons: dict[str, QPushButton] = {}
 
         def add_main_save(section: str) -> None:
@@ -249,6 +249,7 @@ class StreamTab(QWidget):
                 else self._save_list_settings if section == "list"
                 else self._save_webcam_settings if section == "webcam"
                 else self._save_background_settings if section == "background"
+                else self._save_game_window_settings if section == "game_window"
                 else self.save
             )
             self.main_save_buttons[section] = button
@@ -2901,6 +2902,20 @@ class StreamTab(QWidget):
         self.api_label.setText(f"Состояние: {state}")
         for route, (label, title) in self.overlay_url_labels.items():
             label.setText(f"{title}: {self.api.base_url}{route}")
+
+    def _save_game_window_settings(self) -> None:
+        """Save only the game-frame aspect ratio and its border color."""
+        self.db.set_settings_bulk({
+            "stream_format": self.format_combo.currentText(),
+            "overlay_frame_game_color": str(
+                self.frame_color_buttons["game"].property("fontColor") or "#FFFFFF"
+            ),
+        })
+        QMessageBox.information(
+            self, "Игровое окно",
+            "Настройки игрового окна сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
+        )
 
     def _save_background_settings(self) -> None:
         """Save only the main-overlay background asset and display mode."""
