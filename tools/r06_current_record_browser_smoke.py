@@ -71,7 +71,7 @@ def until(page, text, size, rgb, family, label):
             assert last["opacity"] == "1", last
             assert all(float(x.strip().rstrip("s")) == 0
                        for x in last["transition"].split(",")), last
-            print("R06_CURRENT_RECORD_BROWSER_PASS", label, last, flush=True)
+            print("R06_CURRENT_RECORD_BROWSER_PASS", label, json.dumps(last, ensure_ascii=True), flush=True)
             return
         QTest.qWait(100)
     raise AssertionError(f"R06 current-title {label} timeout: {last!r}")
