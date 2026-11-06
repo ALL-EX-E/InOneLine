@@ -427,7 +427,8 @@
       if (mainMotion && seenSnapshot && shouldShow !== active) {
         if (nextMode === "hidden" && active) reason = "hide";
         else if (nextMode === "always" && !active) reason = "always";
-        else if (nextMode === "slide" && shouldShow) reason = "command";
+        else if (nextMode === "slide" && shouldShow && composeMode === "split")
+          reason = "command";
       }
       changeActive(shouldShow, reason, previousReplacing,
         cfg.list_slide_direction || "top");
