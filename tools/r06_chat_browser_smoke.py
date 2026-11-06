@@ -1,7 +1,7 @@
-"""R06 combined main-overlay and dedicated OBS URL: static List/chat geometry.
+"""R06 main OBS: approved child-only motion with unchanged final geometry.
 
-All previous movement animation tests are preserved in Git history. This new
-baseline deliberately checks there is NO List/chat transition, wipe or fade.
+The dedicated sources retain their own accepted static behavior.  Observe
+both a real Chromium transition and the settled List/chat state.
 """
 from __future__ import annotations
 
@@ -69,6 +69,10 @@ METRICS = """JSON.stringify((() => {
         c=chat.getBoundingClientRect();
   return {
     ready:true, shown:root.classList.contains('r06-shown'),
+    splitMotion:root.classList.contains('r06-split-motion'),
+    overlayMotion:root.classList.contains('r06-overlay-motion'),
+    ownBottom:root.classList.contains('r06-own-bottom'),
+    layerOverflow:getComputedStyle(layer).overflow,
     replace:root.classList.contains('r06-replace'),
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
@@ -85,12 +89,13 @@ METRICS = """JSON.stringify((() => {
 })())"""
 
 
-def until(page, predicate, label, timeout=32):
+def until(page, predicate, label, timeout=32, *, settled=True):
     end = time.monotonic() + timeout
     recent = None
     while time.monotonic() < end:
         recent = evaluate(page, METRICS)
-        if recent.get("ready") and predicate(recent):
+        if (recent.get("ready") and predicate(recent) and
+                (not settled or not (recent["splitMotion"] or recent["overlayMotion"]))):
             print("R06_ZERO_PASS:", label, recent, flush=True)
             return recent
         QTest.qWait(140)
@@ -99,6 +104,7 @@ def until(page, predicate, label, timeout=32):
 
 def static_check(state, label):
     assert state["panelOpacity"] >= 0.99, (label, state)
+    assert not state["splitMotion"] and not state["overlayMotion"], (label, state)
     assert state["panelTransform"] == "none", (label, state)
     assert float(state["panelTransition"].split(",")[0].rstrip("s")) == 0, (label, state)
     assert state["panelAnimation"] == "none", (label, state)
@@ -161,6 +167,12 @@ def main():
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 20)
             for page in pages:
+                moving = until(
+                    page, lambda a: a["splitMotion"] and not a["shown"],
+                    "List exits upward while chat expands", timeout=10,
+                    settled=False,
+                )
+                assert moving["panelOpacity"] >= .99, moving
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and
                           abs(a["chatHeight"]-a["rootHeight"]) <= 3,
@@ -170,6 +182,12 @@ def main():
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 20)
             for page in pages:
+                moving = until(
+                    page, lambda a: a["splitMotion"] and a["shown"],
+                    "List enters top-down while chat shrinks", timeout=10,
+                    settled=False,
+                )
+                assert moving["panelOpacity"] >= .99, moving
                 m = until(page, lambda a: a["shown"] and
                           a["listHeight"] > 10 and
                           a["chatHeight"] > 10,
@@ -213,7 +231,7 @@ def main():
                           a["cardRadius"] == a["shellRadius"] == "8px",
                           "original Twitch corners restored after custom mode")
 
-            # Directional settings are retained but MUST NOT move the panel.
+            # All four saved directions must animate the child List only.
             for direction in ("left","right","top","bottom"):
                 db.set_settings_bulk({
                     "list_overlay_show_mode":"slide",
@@ -234,9 +252,18 @@ def main():
                     "R06 ZERO command did not activate server timer",
                     direction, server["list_show"])
                 for page in pages:
+                    entering = until(
+                        page, lambda a: a["shown"] and a["overlayMotion"] and
+                        (direction != "bottom" or a["ownBottom"]),
+                        "command entrance "+direction, timeout=10,
+                        settled=False,
+                    )
+                    assert entering["panelOpacity"] >= .99, entering
+                    if direction == "bottom":
+                        assert entering["layerOverflow"] == "hidden", entering
                     m=until(page, lambda a: a["shown"] and not a["replace"] and
                             a["listHeight"] > 10,
-                            "instant command List from "+direction)
+                            "settled command List from "+direction)
                     static_check(m, "command "+direction)
                 for page in pages:
                     m=until(page, lambda a: not a["shown"] and
