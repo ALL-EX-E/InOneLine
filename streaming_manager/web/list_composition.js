@@ -88,6 +88,7 @@
     let motion = null;
     let motionId = 0;
     let motionTimeout = null;
+    let pendingFrame = null;
     let motionAnimations = [];
 
 
@@ -171,6 +172,9 @@
 
     function cancelMotion() {
       motionId += 1;
+      if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
+      pendingFrame = null;
+      root.style.visibility = "";
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = null;
       for (const animation of motionAnimations) animation.cancel();
@@ -325,6 +329,33 @@
       }
       active = next;
       lastGeometry = "";
+      if (mainMotion && next && (reason === "always" || reason === "command") &&
+          root.clientHeight <= 0) {
+        // The main overlay parks the combined region when both children are
+        // hidden. Defer the entrance until its parent layout re-attaches it.
+        // Never show one instantaneous frame before the entrance animation.
+        motion = "pending";
+        root.style.visibility = "hidden";
+        const ticket = ++motionId;
+        pendingFrame = requestAnimationFrame(() => {
+          pendingFrame = null;
+          if (ticket !== motionId || motion !== "pending") return;
+          root.style.visibility = "";
+          motion = null;
+          if (root.clientHeight <= 0) {
+            layout();
+            return;
+          }
+          // Reconstruct the genuinely hidden starting geometry in the
+          // reattached slot, then animate toward the newly visible List.
+          active = false;
+          layout();
+          active = true;
+          if (reason === "always") beginSplitMotion(true);
+          else beginOverlayMotion(true, direction);
+        });
+        return;
+      }
       if (mainMotion && root.clientHeight > 0) {
         if (reason === "hide") {
           if (previousReplacing) beginOverlayMotion(false, "top");
