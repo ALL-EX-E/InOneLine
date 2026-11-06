@@ -44,6 +44,9 @@
     .r06-compose.r06-split-motion .r06-list-layer {
       flex:0 0 auto!important
     }
+    .r06-compose.r06-split-motion.r06-split-no-chat {
+      justify-content:flex-start
+    }
     .r06-compose.r06-overlay-motion .r06-list-layer {
       position:absolute!important;top:0;left:0;
       width:100%!important;height:var(--r06-overlay-list-height)!important;
@@ -180,7 +183,7 @@
       for (const animation of motionAnimations) animation.cancel();
       motionAnimations = [];
       motion = null;
-      root.classList.remove("r06-split-motion", "r06-overlay-motion", "r06-own-bottom");
+      root.classList.remove("r06-split-motion", "r06-split-no-chat", "r06-overlay-motion", "r06-own-bottom");
       root.style.removeProperty("--r06-overlay-list-height");
       listLayer.style.flex = "";
       listLayer.style.height = "";
@@ -213,6 +216,8 @@
 
       motion = "split";
       root.classList.add("r06-split-motion");
+      root.classList.toggle("r06-split-no-chat",
+        beforeChat <= 1 && target.chat <= 1);
       root.classList.toggle("r06-shown", visible);
       root.classList.toggle("r06-not-shown", !visible);
       root.classList.remove("r06-replace");
