@@ -2492,7 +2492,7 @@ def main() -> int:
         assert_r06_combined_settings(app, stream, db)
 
         # UI-036: every main-overlay section retains its compact Save.
-        # R06-007/008/009/010/011: all except Current Game save separately.
+        # R06-007/008/009/010/011/012: all six main-overlay Save buttons are independent.
         section_names = (
             "current_game", "game_window", "background", "webcam",
             "list", "info",
@@ -2548,7 +2548,7 @@ def main() -> int:
             saved_title_size = db.get_setting("overlay_font_title_size", "30")
             with patch.object(QMessageBox, "information") as saved_message:
                 buttons[section].click()
-            expected_info = saved_info if section in {"list", "webcam", "background", "game_window"} else new_info
+            expected_info = new_info if section == "info" else saved_info
             expected_title_size = (
                 saved_title_size if section in {"list", "info", "webcam", "background", "game_window"} else str(new_size)
             )
@@ -2562,7 +2562,7 @@ def main() -> int:
                 )
         db.set_settings_bulk(settings_before)
         stream.refresh()
-        print("P09_UI036_LOCAL_BUTTONS_INFO_LIST_WEBCAM_BACKGROUND_GAME_WINDOW_INDEPENDENT_SAVE=PASS")
+        print("P09_UI036_ALL_SIX_MAIN_SECTIONS_INDEPENDENT_SAVE=PASS")
 
         # UI-037: the existing game-format and game-frame color controls
         # share one Game Window group, with its isolated R06-011 Save action.
