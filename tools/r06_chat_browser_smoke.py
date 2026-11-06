@@ -77,6 +77,7 @@ METRICS = """JSON.stringify((() => {
     layerOverflow:getComputedStyle(layer).overflow,
     replace:root.classList.contains('r06-replace'),
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
+    childGap:+(c.top-l.bottom).toFixed(2),
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
     count:cards?.children.length ?? -1,
     shellRadius:shell ? doc.defaultView.getComputedStyle(shell).borderRadius : null,
@@ -175,6 +176,10 @@ def main():
                     settled=False,
                 )
                 assert moving["panelOpacity"] >= .99, moving
+                assert abs(moving["listHeight"] + moving["chatHeight"] +
+                           moving["childGap"] - moving["rootHeight"]) <= 4, (
+                    "Split exit must have no empty region or overlapping layers", moving,
+                )
                 m = until(page, lambda a: not a["shown"] and
                           a["listHeight"] <= 2 and
                           abs(a["chatHeight"]-a["rootHeight"]) <= 3,
@@ -190,6 +195,10 @@ def main():
                     settled=False,
                 )
                 assert moving["panelOpacity"] >= .99, moving
+                assert abs(moving["listHeight"] + moving["chatHeight"] +
+                           moving["childGap"] - moving["rootHeight"]) <= 4, (
+                    "Split entrance must keep List/chat boundary continuous", moving,
+                )
                 m = until(page, lambda a: a["shown"] and
                           a["listHeight"] > 10 and
                           a["chatHeight"] > 10,
