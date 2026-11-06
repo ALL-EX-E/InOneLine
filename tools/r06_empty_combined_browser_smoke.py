@@ -57,6 +57,7 @@ JS = """JSON.stringify((() => {
     parent:root.parentElement?.id,
     listShown:root.classList.contains("r06-shown"),
     listHeight:box(layer).height, chatHeight:box(chat).height,
+    listTop:box(layer).top, rootTop:box(root).top,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
     childURL:doc?.location?.href ?? null,
@@ -260,7 +261,12 @@ def main() -> int:
             # Independent Always visibility means a real visible widget exists.
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 90)
-            observe_motion(page, "splitMotion", "parked always List enters with motion")
+            parked_entrance = observe_motion(
+                page, "splitMotion", "parked always List enters with motion",
+            )
+            assert abs(parked_entrance["listTop"]-parked_entrance["rootTop"]) <= 3, (
+                "Without Twitch space, the List must unfold from TOP", parked_entrance,
+            )
             until(
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
