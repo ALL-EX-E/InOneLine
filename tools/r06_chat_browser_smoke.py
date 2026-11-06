@@ -71,6 +71,8 @@ METRICS = """JSON.stringify((() => {
     ready:true, shown:root.classList.contains('r06-shown'),
     splitMotion:root.classList.contains('r06-split-motion'),
     overlayMotion:root.classList.contains('r06-overlay-motion'),
+    lastEntrance:root.dataset.r06LastEntrance || null,
+    entranceCount:Number(root.dataset.r06EntranceCount || 0),
     ownBottom:root.classList.contains('r06-own-bottom'),
     layerOverflow:getComputedStyle(layer).overflow,
     replace:root.classList.contains('r06-replace'),
@@ -243,6 +245,7 @@ def main():
                     m=until(page, lambda a: not a["shown"] and a["listHeight"] <= 2,
                             "hidden command List before "+direction)
                     static_check(m, "before "+direction)
+                last_entry_count = m["entranceCount"]
                 result=state.ingest(ChatMessage("twitch", "chan",
                     "zero-command-"+direction, "alice", "!list"))
                 assert result, ("List command was rejected", direction)
@@ -253,13 +256,19 @@ def main():
                     direction, server["list_show"])
                 for page in pages:
                     entering = until(
-                        page, lambda a: a["shown"] and a["overlayMotion"] and
-                        (direction != "bottom" or a["ownBottom"]),
-                        "command entrance "+direction, timeout=10,
+                        page, lambda a: a["shown"] and
+                        a["entranceCount"] > last_entry_count and
+                        a["lastEntrance"] == direction,
+                        "command animation invoked from "+direction, timeout=12,
                         settled=False,
                     )
                     assert entering["panelOpacity"] >= .99, entering
-                    if direction == "bottom":
+                    # Verify a Chromium-rendered motion frame whenever the
+                    # 650-ms window is still active; persistent sequence
+                    # counters catch an already finished frame without
+                    # mistaking a skipped transition for success.
+                    if entering["overlayMotion"] and direction == "bottom":
+                        assert entering["ownBottom"], entering
                         assert entering["layerOverflow"] == "hidden", entering
                     m=until(page, lambda a: a["shown"] and not a["replace"] and
                             a["listHeight"] > 10,
