@@ -277,6 +277,13 @@ def main():
             assert state.ingest(ChatMessage("twitch", "chan",
                                             "zero-replace", "alice", "!list"))
             for page in pages:
+                immediate = until(page, lambda a: a["shown"] and a["replace"] and
+                                  a["listHeight"] >= a["rootHeight"]-3,
+                                  "existing replacement remains instantaneous",
+                                  settled=False)
+                assert not immediate["overlayMotion"], (
+                    "Replacement entry has not been approved for animation", immediate,
+                )
                 m=until(page, lambda a: a["shown"] and a["replace"] and
                         a["listHeight"] >= a["rootHeight"]-3,
                         "static replacement")
