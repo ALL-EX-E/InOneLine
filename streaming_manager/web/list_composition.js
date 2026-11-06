@@ -91,7 +91,7 @@
     let motion = null;
     let motionId = 0;
     let motionTimeout = null;
-    let pendingFrame = null;
+    let pendingEntrance = null;
     let motionAnimations = [];
 
 
@@ -175,8 +175,7 @@
 
     function cancelMotion() {
       motionId += 1;
-      if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
-      pendingFrame = null;
+      pendingEntrance = null;
       root.style.visibility = "";
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = null;
@@ -350,24 +349,7 @@
         // Never show one instantaneous frame before the entrance animation.
         motion = "pending";
         root.style.visibility = "hidden";
-        const ticket = ++motionId;
-        pendingFrame = requestAnimationFrame(() => {
-          pendingFrame = null;
-          if (ticket !== motionId || motion !== "pending") return;
-          root.style.visibility = "";
-          motion = null;
-          if (root.clientHeight <= 0) {
-            layout();
-            return;
-          }
-          // Reconstruct the genuinely hidden starting geometry in the
-          // reattached slot, then animate toward the newly visible List.
-          active = false;
-          layout();
-          active = true;
-          if (reason === "always") beginSplitMotion(true);
-          else beginOverlayMotion(true, direction);
-        });
+        pendingEntrance = {reason, direction};
         return;
       }
       if (mainMotion && root.clientHeight > 0) {
@@ -386,6 +368,23 @@
         }
       }
       layout();
+    }
+
+    function afterParentLayout() {
+      // The MAIN parent can park the whole composition while idle.  Starting
+      // a List animation before it has reattached the slot gives height=0.
+      // Run it immediately after the parent has placed the live container.
+      if (!mainMotion || motion !== "pending" || !pendingEntrance ||
+          root.clientHeight <= 0) return;
+      const {reason, direction} = pendingEntrance;
+      pendingEntrance = null;
+      root.style.visibility = "";
+      motion = null;
+      active = false;
+      layout();
+      active = true;
+      if (reason === "always") beginSplitMotion(true);
+      else beginOverlayMotion(true, direction);
     }
 
     function expire() {
@@ -460,6 +459,7 @@
       hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
       hasListArea: () => active || motion !== null,
+      afterParentLayout,
     };
   }
   window.IOLListComposition = Object.freeze({create});
