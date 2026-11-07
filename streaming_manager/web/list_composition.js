@@ -66,7 +66,11 @@
     // contract, while the independent combined and main sources retain
     // their previously accepted behavior until their own review.
     const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
-    const motionDurationMs = 650; // Provisional QA duration; not a UI control.
+    let motionDurationMs = 650;
+    let showDurationMs = 30000;
+    let showUntil = 0;
+    let slidePhase = "idle"; // idle, enter, hold, exit
+    let commandDirection = "top";
     let seenSnapshot = false;
     let motion = null;
     let motionTimeout = null;
@@ -81,9 +85,27 @@
       root.classList.remove("r06-standalone-motion");
     }
 
+    function beginHold() {
+      // The visible-time countdown starts AFTER all entrance frames finish.
+      slidePhase = "hold";
+      showUntil = performance.now() + showDurationMs;
+      root.dataset.r06StandalonePhase = "hold";
+      if (expiryTimer !== null) clearTimeout(expiryTimer);
+      expiryTimer = setTimeout(expire, showDurationMs);
+    }
+
     function finishListMotion() {
       if (!motion) return;
+      const wasEntering = motion === "enter";
+      const wasExiting = motion === "exit";
       cancelListMotion();
+      if (standaloneMotion && mode === "slide") {
+        if (wasEntering && slidePhase === "enter" && active) beginHold();
+        else if (wasExiting && slidePhase === "exit") {
+          slidePhase = "idle";
+          root.dataset.r06StandalonePhase = "idle";
+        }
+      }
       lastGeometry = "";
       layout();
     }
@@ -99,7 +121,7 @@
         direction === "bottom" ? `translateY(${height}px)` :
         `translateY(${-height}px)`;
       const from = entering ? initial : "translate(0px,0px)";
-      const to = entering ? "translate(0px,0px)" : `translateY(${-height}px)`;
+      const to = entering ? "translate(0px,0px)" : initial;
 
       motion = entering ? "enter" : "exit";
       root.classList.add("r06-standalone-motion");
@@ -113,11 +135,20 @@
       }
       // Translate only the List layer. Root clipping hides its motion outside
       // the OBS source; opacity, panel background and border stay unchanged.
-      motionAnimation = listLayer.animate(
+      const animation = listLayer.animate(
         [{transform: from}, {transform: to}],
         {duration: motionDurationMs, easing: "ease-in-out", fill: "both"},
       );
-      motionTimeout = setTimeout(finishListMotion, motionDurationMs + 50);
+      motionAnimation = animation;
+      // In case WebEngine delays the finish callback while hidden, keep the
+      // same bounded fallback. The duration is captured for this transition:
+      // changing the UI will only affect the NEXT entrance/exit.
+      animation.onfinish = () => {
+        if (motionAnimation === animation) finishListMotion();
+      };
+      motionTimeout = setTimeout(() => {
+        if (motionAnimation === animation) finishListMotion();
+      }, motionDurationMs + 50);
     }
 
     function measureChat() {
@@ -232,7 +263,8 @@
       active = next;
       lastGeometry = "";
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
-          (reason === "hide" || reason === "always" || reason === "command")) {
+          (reason === "hide" || reason === "always" ||
+           reason === "command" || reason === "expiry")) {
         beginStandaloneListMotion(next, reason === "command" ? direction : "top");
         return;
       }
@@ -240,6 +272,20 @@
     }
 
     function expire() {
+      if (standaloneMotion) {
+        if (mode === "slide" && slidePhase === "hold" &&
+            showUntil && performance.now() >= showUntil) {
+          showUntil = 0;
+          slidePhase = "exit";
+          root.dataset.r06StandalonePhase = "exit";
+          changeActive(false, "expiry", commandDirection);
+          if (!motion) {
+            slidePhase = "idle";
+            root.dataset.r06StandalonePhase = "idle";
+          }
+        }
+        return;
+      }
       if (mode === "slide" && deadline && performance.now() >= deadline) {
         deadline = 0;
         changeActive(false);
@@ -265,16 +311,84 @@
         Math.max(0.25, Math.min(3, seconds)) : 1;
       if (!chatAvailable || !chatHasMessages) intrinsicChatHeight = 0;
 
+      if (standaloneMotion) {
+        // Independent List uses a local phase clock: entrance time never
+        // consumes the saved fully-visible hold time.
+        const requestedAnimation = Number(cfg.list_slide_animation_seconds);
+        motionDurationMs = Math.round(
+          Math.max(0.10, Math.min(10, Number.isFinite(requestedAnimation)
+            ? requestedAnimation : 0.65)) * 1000
+        );
+        const requestedShow = Number(cfg.list_slide_duration);
+        const nextShowDuration = Math.round(
+          Math.max(1, Math.min(120, Number.isFinite(requestedShow)
+            ? requestedShow : 30)) * 1000
+        );
+        const sequence = Number(trigger.sequence || 0);
+        const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
+        const sequenceChanged = lastSequence !== sequence;
+        if (sequenceChanged) lastSequence = sequence;
+
+        // A fast (e.g. one-second) command can have remaining_ms=0 by the
+        // next 1-second browser poll. A changed sequence after initial load
+        // is nevertheless a NEW authenticated Twitch event and must play.
+        const newCommand = mode === "slide" && sequenceChanged &&
+          (remaining > 0 || (seenSnapshot && sequence > 0));
+        if (mode !== "slide") {
+          slidePhase = "idle";
+          showUntil = 0;
+          root.dataset.r06StandalonePhase = "idle";
+          if (expiryTimer !== null) clearTimeout(expiryTimer);
+          expiryTimer = null;
+          const visible = mode === "always";
+          changeActive(visible, seenSnapshot ? (visible ? "always" : "hide") : "");
+        } else if (newCommand) {
+          // Capture duration and direction for this entire command. A later
+          // settings Save cannot redirect an exit half-way through the cycle.
+          if (expiryTimer !== null) clearTimeout(expiryTimer);
+          expiryTimer = null;
+          showDurationMs = nextShowDuration;
+          commandDirection = cfg.list_slide_direction || "top";
+          showUntil = 0;
+          if (!active) {
+            slidePhase = "enter";
+            root.dataset.r06StandalonePhase = "enter";
+            changeActive(true, seenSnapshot ? "command" : "",
+                         commandDirection);
+            // Initial page load may intentionally show without motion.
+            if (!motion) beginHold();
+          } else if (motion === "enter") {
+            slidePhase = "enter";
+            root.dataset.r06StandalonePhase = "enter";
+            // A second command during entrance continues the same entrance;
+            // a fresh full hold begins once the animation finishes.
+          } else {
+            // Already fully visible. Restart the hold timer, not the entrance.
+            beginHold();
+          }
+        } else if (mode !== previousMode) {
+          // Switching into Slide without a new command leaves it hidden.
+          slidePhase = "idle";
+          root.dataset.r06StandalonePhase = "idle";
+          showUntil = 0;
+          if (expiryTimer !== null) clearTimeout(expiryTimer);
+          expiryTimer = null;
+          changeActive(false);
+        }
+        layout();
+        seenSnapshot = true;
+        return;
+      }
+
+      // Main and independent combined sources retain their old server-owned
+      // expiry semantics until their separate interaction review.
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
       if (mode === "slide") {
         if (lastSequence !== sequence) {
           lastSequence = sequence;
           deadline = remaining > 0 ? performance.now() + remaining : 0;
-        } else if (!deadline && remaining > 0 && !standaloneMotion) {
-          // Preserve existing combined/main behavior until those sources are
-          // reviewed. Standalone must not replay an already-finished command
-          // with the SAME sequence merely because an API poll is delayed.
+        } else if (!deadline && remaining > 0) {
           deadline = performance.now() + remaining;
         } else if (remaining <= 0) {
           deadline = 0;
@@ -285,13 +399,7 @@
       const shouldShow = mode === "always" ||
         (mode === "slide" && deadline > performance.now());
       if (mode !== previousMode) lastGeometry = "";
-      let reason = "";
-      if (standaloneMotion && seenSnapshot && shouldShow !== active) {
-        if (nextMode === "hidden" && active) reason = "hide";
-        else if (nextMode === "always" && !active) reason = "always";
-        else if (nextMode === "slide" && shouldShow) reason = "command";
-      }
-      changeActive(shouldShow, reason, cfg.list_slide_direction || "top");
+      changeActive(shouldShow);
       layout();
       seenSnapshot = true;
 
