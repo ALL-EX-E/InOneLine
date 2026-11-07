@@ -70,7 +70,8 @@ def save_list(stream: StreamTab, db: Database, api: LocalApiServer) -> dict:
         written = write.call_args.args[0]
     expected_keys = {
         WIDGETS["list"].key,
-        "list_slide_direction", "list_slide_duration", "list_slide_command",
+        "list_slide_direction", "list_slide_duration",
+        "list_slide_animation_seconds", "list_slide_command",
         "overlay_list_enabled", "overlay_frame_list_color",
     }
     expected_keys.update({
@@ -78,7 +79,7 @@ def save_list(stream: StreamTab, db: Database, api: LocalApiServer) -> dict:
         for key in ("top1", "top2", "top3", "list")
         for part in ("family", "size", "color")
     })
-    assert len(expected_keys) == 18
+    assert len(expected_keys) == 19
     assert set(written) == expected_keys, set(written) ^ expected_keys
     assert timer.call_args.args == (
         written[WIDGETS["list"].key],
@@ -107,6 +108,7 @@ def main() -> int:
             WIDGETS["list"].key: "slide",
             "list_slide_direction": "right",
             "list_slide_duration": "10",
+            "list_slide_animation_seconds": "0.65",
             "list_slide_command": "!list",
             "overlay_list_enabled": "1",
             "overlay_list_side": "auto",
@@ -167,6 +169,7 @@ def main() -> int:
             stream.list_slide_direction.setCurrentIndex(
                 stream.list_slide_direction.findData("left")
             )
+            stream.list_slide_animation_seconds.setValue(1.25)
             stream.overlay_list_side.setCurrentIndex(
                 stream.overlay_list_side.findData("left")
             )
@@ -177,6 +180,7 @@ def main() -> int:
             )
             written = save_list(stream, db, api)
             assert written["list_slide_direction"] == "left"
+            assert written["list_slide_animation_seconds"] == "1.25"
             assert "overlay_list_side" not in written
             assert written["overlay_frame_list_color"] == "#ABCDEF"
             assert written["overlay_font_top1_size"] == "28"
@@ -193,6 +197,8 @@ def main() -> int:
             payload = get_data(api)
             assert payload["visibility"]["list"]["show_mode"] == "slide"
             assert payload["overlay"]["list_slide_direction"] == "left"
+            assert payload["overlay"]["list_slide_animation_seconds"] == "1.25"
+            assert payload["overlay"]["list_slide_duration"] == "10"
             assert payload["overlay"]["list_side"] == "auto"
             assert payload["overlay"]["info_position"] == "bottom_right"
             assert payload["game"]["reviews"] == baseline_other["stream_info"]
