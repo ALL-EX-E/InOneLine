@@ -82,6 +82,7 @@
       if (motionAnimation) motionAnimation.cancel();
       motionAnimation = null;
       motion = null;
+      root.dataset.r06StandaloneMotionKind = "idle";
       root.classList.remove("r06-standalone-motion");
     }
 
@@ -127,6 +128,7 @@
       const to = entering ? "translate(0px,0px)" : initial;
 
       motion = entering ? "enter" : "exit";
+      root.dataset.r06StandaloneMotionKind = motion;
       root.dataset.r06StandaloneLastMotionDurationMs = String(motionDurationMs);
       if (!entering) root.dataset.r06StandaloneLastExit = direction;
       root.classList.add("r06-standalone-motion");
