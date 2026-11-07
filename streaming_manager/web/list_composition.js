@@ -88,8 +88,11 @@
     function beginHold() {
       // The visible-time countdown starts AFTER all entrance frames finish.
       slidePhase = "hold";
-      showUntil = performance.now() + showDurationMs;
+      const holdStart = performance.now();
+      showUntil = holdStart + showDurationMs;
       root.dataset.r06StandalonePhase = "hold";
+      root.dataset.r06StandaloneHoldStartMs = String(holdStart);
+      root.dataset.r06StandaloneHoldDurationMs = String(showDurationMs);
       if (expiryTimer !== null) clearTimeout(expiryTimer);
       expiryTimer = setTimeout(expire, showDurationMs);
     }
@@ -124,6 +127,8 @@
       const to = entering ? "translate(0px,0px)" : initial;
 
       motion = entering ? "enter" : "exit";
+      root.dataset.r06StandaloneLastMotionDurationMs = String(motionDurationMs);
+      if (!entering) root.dataset.r06StandaloneLastExit = direction;
       root.classList.add("r06-standalone-motion");
       if (entering) {
         root.dataset.r06StandaloneLastEntrance = direction;
