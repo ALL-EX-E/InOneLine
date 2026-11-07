@@ -353,6 +353,12 @@ html, body {
       );
       document.documentElement.dataset.obsShowMode =
         String(data.visibility?.list?.show_mode || "always");
+      if (!isCombined) {
+        // Observe which saved command direction this Browser Source consumed.
+        // This is informational only; no extra command or UI control.
+        document.documentElement.dataset.obsSlideDirection =
+          String(overlayConfig.list_slide_direction || "right");
+      }
       document.documentElement.dataset.obsPolicyReady = "true";
 
       const rowsChanged = renderRows(data.auction_list || []);
