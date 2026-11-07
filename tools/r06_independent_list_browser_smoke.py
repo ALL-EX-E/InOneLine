@@ -181,7 +181,11 @@ def main():
                   v["listHeight"] <= 2, "command idle")
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                api.configure_list_show("slide", "!list", 5)
+                # Native WebEngine polling and QA callbacks can take several
+                # seconds under Windows CI. Keep the server window comfortably
+                # longer than the 650-ms entrance and the settled-frame check.
+                # This is a test fixture only, not an application default.
+                api.configure_list_show("slide", "!list", 15)
                 before = metrics(view.page())
                 assert not before["shown"] and not before["motion"], before
                 assert state.ingest(ChatMessage(
@@ -189,7 +193,7 @@ def main():
                 ))
                 with urlopen(api.base_url + "/api/data", timeout=8) as response:
                     command_payload = json.load(response)
-                assert command_payload["list_show"]["remaining_ms"] > 3000, (
+                assert command_payload["list_show"]["remaining_ms"] > 12000, (
                     "Standalone command timer did not start",
                     direction, command_payload["list_show"],
                 )
