@@ -271,7 +271,10 @@
         if (lastSequence !== sequence) {
           lastSequence = sequence;
           deadline = remaining > 0 ? performance.now() + remaining : 0;
-        } else if (!deadline && remaining > 0) {
+        } else if (!deadline && remaining > 0 && !standaloneMotion) {
+          // Preserve existing combined/main behavior until those sources are
+          // reviewed. Standalone must not replay an already-finished command
+          // with the SAME sequence merely because an API poll is delayed.
           deadline = performance.now() + remaining;
         } else if (remaining <= 0) {
           deadline = 0;
