@@ -191,8 +191,9 @@
     }
 
     function beginCombinedSplitAlwaysMotion(entering) {
-      // Empty Always-chat alone: synchronize the List's already accepted
-      // top-motion with only the Twitch-chat region's changing upper edge.
+      // Always-chat: synchronize the List's accepted top entrance for both
+      // empty and nonempty chats; reverse motion remains empty-only until
+      // its separate approval. Only the chat region's upper edge changes.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
       const gap = 12;
@@ -340,9 +341,10 @@
       active = next;
       lastGeometry = "";
       if (combinedMotion && seenSnapshot &&
-          ((next && reason === "always") || (!next && reason === "hide")) &&
+          ((next && reason === "always") ||
+           (!next && reason === "hide" && !chatHasMessages)) &&
           composeMode === "split" && chatAvailable && chatAlways &&
-          !chatHasMessages && root.clientHeight > 0) {
+          root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
