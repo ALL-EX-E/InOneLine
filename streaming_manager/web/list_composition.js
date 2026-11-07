@@ -190,11 +190,10 @@
       }, durationMs + 50);
     }
 
-    function beginCombinedSplitAlwaysEntry() {
-      // First approved interaction: empty Always-chat starts at 100% height,
-      // then makes room for a full-size List arriving from the TOP. Fix both
-      // layers to their actual source boundaries while the two WAAPI effects
-      // run with the identical easing/duration as the standalone List.
+    function beginCombinedSplitAlwaysMotion(entering) {
+      // Empty Always-chat alone: synchronize the List's already accepted
+      // top-motion with only the Twitch-chat region's changing upper edge.
+      // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
       const gap = 12;
       const targetChat = Math.floor((available - gap) / 2);
@@ -213,18 +212,20 @@
       chatLayer.style.bottom = "0px";
       chatLayer.style.left = "0px";
       chatLayer.style.right = "0px";
-      chatLayer.style.height = available + "px";
+      chatLayer.style.height = (entering ? available : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
-      root.dataset.r06CombinedSync = "split-enter";
+      root.dataset.r06CombinedSync = entering ? "split-enter" : "split-exit";
+      const startChat = entering ? available : targetChat;
+      const endChat = entering ? targetChat : available;
       chatMotionAnimation = chatLayer.animate(
-        [{height: available + "px"}, {height: targetChat + "px"}],
+        [{height: startChat + "px"}, {height: endChat + "px"}],
         {duration, easing: "ease-in-out", fill: "both"},
       );
-      // Reuse the SAME List entrance engine; don't invent an animation for
-      // combined mode. Animation and chat shrink finish on one shared clock.
-      beginStandaloneListMotion(true, "top", duration, targetList, true);
+      // The shared List engine owns the exact easing, direction and duration.
+      // Its completion restores the accepted static 50/50 or 0/100 layout.
+      beginStandaloneListMotion(entering, "top", duration, targetList, true);
     }
 
     function measureChat() {
@@ -338,10 +339,11 @@
       }
       active = next;
       lastGeometry = "";
-      if (combinedMotion && seenSnapshot && next && reason === "always" &&
+      if (combinedMotion && seenSnapshot &&
+          ((next && reason === "always") || (!next && reason === "hide")) &&
           composeMode === "split" && chatAvailable && chatAlways &&
           !chatHasMessages && root.clientHeight > 0) {
-        beginCombinedSplitAlwaysEntry();
+        beginCombinedSplitAlwaysMotion(next);
         return;
       }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
@@ -491,7 +493,8 @@
       const shouldShow = mode === "always" ||
         (mode === "slide" && deadline > performance.now());
       if (mode !== previousMode) lastGeometry = "";
-      changeActive(shouldShow, shouldShow && mode === "always" ? "always" : "");
+      changeActive(shouldShow,
+        mode === "always" ? "always" : mode === "hidden" ? "hide" : "");
       layout();
       seenSnapshot = true;
 

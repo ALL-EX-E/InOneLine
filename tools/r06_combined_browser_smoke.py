@@ -1,7 +1,7 @@
-"""Separate R06 combined OBS URL: static contracts and first approved motion.
+"""Separate R06 combined OBS URL: accepted empty Always-chat transitions.
 
-Verifies split/replace/visibility and the user-approved Hidden -> Always
-split entry with an empty Always Twitch chat in real native Chromium.
+Verifies split/replace/visibility and both Hidden <-> Always List motions
+with synchronized empty Twitch chat using native Chromium animation frames.
 """
 from __future__ import annotations
 
@@ -53,6 +53,7 @@ JS = """JSON.stringify((() => {
     motionKind:root.dataset.r06StandaloneMotionKind || "idle",
     motionDuration:Number(root.dataset.r06StandaloneLastMotionDurationMs || 0),
     entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
+    exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
     iframeCount:document.querySelectorAll("iframe").length,
     childUrl:doc?.location?.href || "",
     messageCount:cards?.children?.length ?? -1,
@@ -227,6 +228,46 @@ def main():
             QTest.qWait(1300)
             stable = inspect(view.page())
             assert stable["entranceCount"] == entrance_count, stable
+            assert stable["combinedSync"] == "idle", stable
+
+            # Second approved scenario: reverse the same top List motion.
+            # The chat's top edge rises simultaneously, never moving its
+            # bottom edge and never overlapping the departing List.
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 15)
+            started = until(
+                view.page(),
+                lambda a: a["combinedSync"] == "split-exit" and
+                          a["motionKind"] == "exit",
+                "shared list reverse exit and empty chat expansion started")
+            assert started["motionDuration"] == 2000, started
+            assert abs(started["chatBottom"] -
+                       (started["rootTop"] + started["rootHeight"])) < 2, started
+            frames = []
+            for _ in range(9):
+                frame = inspect(view.page())
+                if frame["combinedSync"] == "split-exit":
+                    frames.append(frame)
+                    assert -2 <= frame["chatTop"] - frame["listBottom"] <= 18, frame
+                    assert abs(frame["chatBottom"] -
+                               (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                    assert float(frame["panelOpacity"]) >= .99, frame
+                QTest.qWait(125)
+            assert frames, "No intermediate reverse List/chat frames"
+            done = until(
+                view.page(),
+                lambda a: not a["shown"] and a["combinedSync"] == "idle" and
+                          a["motionKind"] == "idle" and
+                          a["listHeight"] < 2 and
+                          abs(a["chatHeight"] - a["rootHeight"]) < 3 and
+                          abs(a["chatTop"] - a["rootTop"]) < 2,
+                "reverse exit completed with empty chat owning full area")
+            exit_count = done["exitCount"]
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 15)
+            QTest.qWait(1300)
+            stable = inspect(view.page())
+            assert stable["exitCount"] == exit_count, stable
             assert stable["combinedSync"] == "idle", stable
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
