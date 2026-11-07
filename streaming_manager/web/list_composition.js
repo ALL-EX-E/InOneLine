@@ -1,6 +1,6 @@
 /* R06 List + Twitch-chat composition shared by both OBS sources.
-   The standalone List motion is also reused by the approved first combined
-   split entry; only the chat/list geometry is coordinated for that scenario.
+   The standalone List motion is reused by the accepted combined split
+   transitions and the four-direction command entrance over Twitch chat.
    Unapproved combined transitions keep their previous behavior. */
 (() => {
   "use strict";
@@ -130,7 +130,7 @@
       const wasEntering = motion === "enter";
       const wasExiting = motion === "exit";
       cancelListMotion();
-      if (standaloneMotion && mode === "slide") {
+      if ((standaloneMotion || combinedMotion) && mode === "slide") {
         if (wasEntering && slidePhase === "enter" && active) beginHold();
         else if (wasExiting && slidePhase === "exit") {
           slidePhase = "idle";
@@ -190,10 +190,13 @@
       }, durationMs + 50);
     }
 
-    function beginCombinedSplitAlwaysMotion(entering) {
-      // Always-chat: reuse the List's accepted top motion for both entrance
-      // and reverse exit, with empty or nonempty chat. Only the chat region's
-      // upper edge changes; the iframe and its messages are preserved.
+    function beginCombinedSplitAlwaysMotion(
+      entering, direction = "top", commandOverChat = false
+    ) {
+      // Reuse the List's accepted motion. Settings-driven Always entrance and
+      // exit synchronize the chat edge; a command keeps chat full-height while
+      // the List passes above it, restoring static split only after entrance.
+      // Only child layers move; iframe and messages remain the same.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
       const gap = 12;
@@ -217,16 +220,19 @@
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
-      root.dataset.r06CombinedSync = entering ? "split-enter" : "split-exit";
-      const startChat = entering ? available : targetChat;
-      const endChat = entering ? targetChat : available;
-      chatMotionAnimation = chatLayer.animate(
-        [{height: startChat + "px"}, {height: endChat + "px"}],
-        {duration, easing: "ease-in-out", fill: "both"},
-      );
-      // The shared List engine owns the exact easing, direction and duration.
-      // Its completion restores the accepted static 50/50 or 0/100 layout.
-      beginStandaloneListMotion(entering, "top", duration, targetList, true);
+      root.dataset.r06CombinedSync = commandOverChat ?
+        "command-enter" : entering ? "split-enter" : "split-exit";
+      if (!commandOverChat) {
+        const startChat = entering ? available : targetChat;
+        const endChat = entering ? targetChat : available;
+        chatMotionAnimation = chatLayer.animate(
+          [{height: startChat + "px"}, {height: endChat + "px"}],
+          {duration, easing: "ease-in-out", fill: "both"},
+        );
+      }
+      // Shared List engine owns easing and duration. In command mode the full
+      // chat is not resized until the List is completely in its own region.
+      beginStandaloneListMotion(entering, direction, duration, targetList, true);
     }
 
     function measureChat() {
@@ -348,6 +354,12 @@
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
+      if (combinedMotion && next && reason === "command" &&
+          composeMode === "split" && chatAvailable && chatAlways &&
+          seenSnapshot && root.clientHeight > 0) {
+        beginCombinedSplitAlwaysMotion(true, direction, true);
+        return;
+      }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
           (reason === "hide" || reason === "always" ||
            reason === "command" || reason === "expiry")) {
@@ -361,7 +373,8 @@
     }
 
     function expire() {
-      if (standaloneMotion) {
+      if (standaloneMotion ||
+          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
         if (mode === "slide" && slidePhase === "hold" &&
             showUntil && performance.now() >= showUntil) {
           showUntil = 0;
@@ -408,9 +421,10 @@
         Math.max(0.10, Math.min(10, Number.isFinite(requestedAnimation)
           ? requestedAnimation : 0.65)) * 1000
       );
-      if (standaloneMotion) {
-        // Independent List uses a local phase clock: entrance time never
-        // consumes the saved fully-visible hold time.
+      if (standaloneMotion ||
+          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
+        // Share the local phase clock with the approved combined command
+        // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
         const nextShowDuration = Math.round(
           Math.max(1, Math.min(120, Number.isFinite(requestedShow)
@@ -476,8 +490,8 @@
         return;
       }
 
-      // Main and independent combined sources retain their old server-owned
-      // expiry semantics until their separate interaction review.
+      // Main and other combined modes retain server-owned expiry semantics;
+      // only the approved split Always-chat command entrance uses local hold.
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
       if (mode === "slide") {
