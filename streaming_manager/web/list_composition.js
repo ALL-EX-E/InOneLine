@@ -67,6 +67,7 @@
     // their previously accepted behavior until their own review.
     const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
     let motionDurationMs = 650;
+    let commandMotionDurationMs = 650;
     let showDurationMs = 30000;
     let showUntil = 0;
     let slidePhase = "idle"; // idle, enter, hold, exit
@@ -114,7 +115,7 @@
       layout();
     }
 
-    function beginStandaloneListMotion(entering, direction) {
+    function beginStandaloneListMotion(entering, direction, durationMs = motionDurationMs) {
       // The standalone List's own region is its whole Browser Source.
       // With no chat, the bottom entrance starts at this region's bottom.
       if (entering) layout();
@@ -129,7 +130,7 @@
 
       motion = entering ? "enter" : "exit";
       root.dataset.r06StandaloneMotionKind = motion;
-      root.dataset.r06StandaloneLastMotionDurationMs = String(motionDurationMs);
+      root.dataset.r06StandaloneLastMotionDurationMs = String(durationMs);
       if (!entering) root.dataset.r06StandaloneLastExit = direction;
       root.classList.add("r06-standalone-motion");
       if (entering) {
@@ -144,7 +145,7 @@
       // the OBS source; opacity, panel background and border stay unchanged.
       const animation = listLayer.animate(
         [{transform: from}, {transform: to}],
-        {duration: motionDurationMs, easing: "ease-in-out", fill: "both"},
+        {duration: durationMs, easing: "ease-in-out", fill: "both"},
       );
       motionAnimation = animation;
       // In case WebEngine delays the finish callback while hidden, keep the
@@ -155,7 +156,7 @@
       };
       motionTimeout = setTimeout(() => {
         if (motionAnimation === animation) finishListMotion();
-      }, motionDurationMs + 50);
+      }, durationMs + 50);
     }
 
     function measureChat() {
@@ -272,7 +273,10 @@
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
           (reason === "hide" || reason === "always" ||
            reason === "command" || reason === "expiry")) {
-        beginStandaloneListMotion(next, reason === "command" ? direction : "top");
+        beginStandaloneListMotion(
+          next, (reason === "command" || reason === "expiry") ? direction : "top",
+          reason === "expiry" ? commandMotionDurationMs : motionDurationMs,
+        );
         return;
       }
       layout();
@@ -285,6 +289,8 @@
           showUntil = 0;
           slidePhase = "exit";
           root.dataset.r06StandalonePhase = "exit";
+          // Reverse the command's actual entrance speed too. A settings Save
+          // while fully visible must not alter this already-running cycle.
           changeActive(false, "expiry", commandDirection);
           if (!motion) {
             slidePhase = "idle";
@@ -361,6 +367,7 @@
             // entered from. Repeated commands while visible refresh only
             // the hold, even if the user changed the direction meanwhile.
             commandDirection = cfg.list_slide_direction || "top";
+            commandMotionDurationMs = motionDurationMs;
             slidePhase = "enter";
             root.dataset.r06StandalonePhase = "enter";
             changeActive(true, seenSnapshot ? "command" : "",
