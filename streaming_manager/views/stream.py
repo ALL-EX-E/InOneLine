@@ -447,6 +447,24 @@ class StreamTab(QWidget):
         )
         overlay_form.addRow("Время показа:", self.list_slide_duration_control)
 
+        # Independent speed control. Do not repurpose legacy
+        # list_animation_seconds, which is used by old chat geometry.
+        self.list_slide_animation_seconds = ScrollSafeDoubleSpinBox()
+        self.list_slide_animation_seconds.setDecimals(2)
+        self.list_slide_animation_seconds.setRange(0.10, 10.00)
+        self.list_slide_animation_seconds.setSingleStep(0.10)
+        self.list_slide_animation_seconds.setValue(0.65)
+        self.list_slide_animation_seconds.setSuffix(" сек.")
+        self.list_slide_animation_seconds.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Fixed,
+        )
+        self.list_slide_animation_control = make_wide_step_control(
+            self.list_slide_animation_seconds,
+            up_tooltip="Увеличить время анимации списка",
+            down_tooltip="Уменьшить время анимации списка",
+        )
+        overlay_form.addRow("Время анимации:", self.list_slide_animation_control)
+
         self.list_slide_command = QLineEdit()
         self.list_slide_command.setPlaceholderText("Команда Twitch (необязательно)")
         overlay_form.addRow("Команда Twitch:", self.list_slide_command)
@@ -2500,7 +2518,7 @@ class StreamTab(QWidget):
         if hasattr(self, "list_slide_direction"):
             slide = self.obs_show_modes["list"].currentData() == "slide"
             for control in (self.list_slide_direction, self.list_slide_duration_control,
-                            self.list_slide_command):
+                            self.list_slide_animation_control, self.list_slide_command):
                 self._set_form_row_visible(self.overlay_form, control, slide)
             self._set_form_row_visible(
                 self.overlay_form, self.list_command_hint,
@@ -2646,6 +2664,13 @@ class StreamTab(QWidget):
         except (TypeError, ValueError):
             seconds = 30
         self.list_slide_duration.setValue(max(1, min(120, seconds)))
+        try:
+            animation_seconds = float(setting("list_slide_animation_seconds", "0.65"))
+        except (TypeError, ValueError):
+            animation_seconds = 0.65
+        self.list_slide_animation_seconds.setValue(
+            max(0.10, min(10.00, animation_seconds))
+        )
         self.list_slide_command.setText(setting("list_slide_command", ""))
         self._set_combo_by_data(
             self.combined_list_chat_layout,
@@ -2984,6 +3009,9 @@ class StreamTab(QWidget):
             WIDGETS["list"].key: mode,
             "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
             "list_slide_duration": str(self.list_slide_duration.value()),
+            "list_slide_animation_seconds": (
+                f"{self.list_slide_animation_seconds.value():.2f}"
+            ),
             "list_slide_command": self.list_slide_command.text(),
             # Keep the old on/off mirror for compatibility with older data.
             "overlay_list_enabled": "0" if mode == "hidden" else "1",
@@ -3061,6 +3089,9 @@ class StreamTab(QWidget):
             WIDGETS["list"].key: str(self.obs_show_modes["list"].currentData()),
             "list_slide_direction": str(self.list_slide_direction.currentData() or "right"),
             "list_slide_duration": str(self.list_slide_duration.value()),
+            "list_slide_animation_seconds": (
+                f"{self.list_slide_animation_seconds.value():.2f}"
+            ),
             "list_slide_command": self.list_slide_command.text(),
             "stream_current_game_id": str(self.game_combo.currentData() or ""),
             # Текст сохраняем даже при отключённом блоке, чтобы он не потерялся.
