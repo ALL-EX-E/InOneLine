@@ -143,7 +143,7 @@
 
     function beginStandaloneListMotion(
       entering, direction, durationMs = motionDurationMs,
-      travelDistance = null, skipInitialLayout = false
+      travelDistance = null, skipInitialLayout = false, revealWithinListSlot = false
     ) {
       // Shared List movement (same Web Animations timing and opacity contract).
       // Separate List travels across its whole source; in combined mode the
@@ -172,11 +172,15 @@
         root.dataset.r06StandaloneExitCount =
           String((Number(root.dataset.r06StandaloneExitCount) || 0) + 1);
       }
-      // Translate only the List layer. Root clipping hides its motion outside
-      // the OBS source; opacity, panel background and border stay unchanged.
+      // Translate the existing List layer, except for the accepted combined
+      // "bottom" variant: reveal upward WITHIN the upper List slot, never by
+      // translating the whole panel through the lower Twitch-chat region.
+      // Neither method changes opacity, background, or the panel's contents.
+      const frames = revealWithinListSlot && entering && direction === "bottom" ?
+        [{clipPath: "inset(100% 0 0 0)"}, {clipPath: "inset(0% 0 0 0)"}] :
+        [{transform: from}, {transform: to}];
       const animation = listLayer.animate(
-        [{transform: from}, {transform: to}],
-        {duration: durationMs, easing: "ease-in-out", fill: "both"},
+        frames, {duration: durationMs, easing: "ease-in-out", fill: "both"},
       );
       motionAnimation = animation;
       // In case WebEngine delays the finish callback while hidden, keep the
@@ -222,7 +226,39 @@
       chatLayer.style.transition = "none";
       root.dataset.r06CombinedSync = commandOverChat ?
         "command-enter" : entering ? "split-enter" : "split-exit";
-      if (!commandOverChat) {
+      if (commandOverChat) {
+        // Preserve the full-size iframe during entrance, but reveal the
+        // underlying overlay background wherever the List actually passes.
+        // Without this moving CHAT clip, transparent List backgrounds show
+        // Twitch messages beneath the List, followed by a sudden final cut.
+        // The clipping edge follows the List's shared ease-in-out clock and
+        // includes the accepted 12px separation between the final regions.
+        const edge = targetList + gap;
+        const topY = edge + "px";
+        let fromClip;
+        let toClip;
+        if (direction === "left") {
+          fromClip = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},0% ${topY})`;
+          toClip = `polygon(100% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},100% ${topY})`;
+        } else if (direction === "right") {
+          fromClip = `polygon(0% 0%,100% 0%,100% ${topY},100% ${topY},100% 100%,0% 100%)`;
+          toClip = `polygon(0% 0%,0% 0%,0% ${topY},100% ${topY},100% 100%,0% 100%)`;
+        } else if (direction === "bottom") {
+          // Two still-visible chat pieces: above the rising List and below
+          // its own slot. Both join without a jump when entrance finishes.
+          const bottomClip = y =>
+            `polygon(0% 0%,100% 0%,100% ${y}px,0% ${y}px,0% ${topY},100% ${topY},100% 100%,0% 100%)`;
+          fromClip = bottomClip(edge);
+          toClip = bottomClip(0);
+        } else {
+          fromClip = "inset(0px 0px 0px 0px)";
+          toClip = `inset(${topY} 0px 0px 0px)`;
+        }
+        chatMotionAnimation = chatLayer.animate(
+          [{clipPath: fromClip}, {clipPath: toClip}],
+          {duration, easing: "ease-in-out", fill: "both"},
+        );
+      } else {
         const startChat = entering ? available : targetChat;
         const endChat = entering ? targetChat : available;
         chatMotionAnimation = chatLayer.animate(
@@ -230,9 +266,13 @@
           {duration, easing: "ease-in-out", fill: "both"},
         );
       }
-      // Shared List engine owns easing and duration. In command mode the full
-      // chat is not resized until the List is completely in its own region.
-      beginStandaloneListMotion(entering, direction, duration, targetList, true);
+      // Shared List engine owns the exact same timing for both layers. The
+      // final static 50/50 flex geometry replaces the completely clipped
+      // full-size chat without an unmasked intermediate frame.
+      beginStandaloneListMotion(
+        entering, direction, duration, targetList, true,
+        commandOverChat && direction === "bottom",
+      );
     }
 
     function measureChat() {
