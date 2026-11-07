@@ -2518,7 +2518,9 @@ class StreamTab(QWidget):
         if hasattr(self, "list_slide_direction"):
             slide = self.obs_show_modes["list"].currentData() == "slide"
             for control in (self.list_slide_direction, self.list_slide_duration_control,
-                            self.list_slide_animation_control, self.list_slide_command):
+                            self.list_slide_command):
+                # The motion speed also governs Always/Hidden transitions.
+                # Keep its independent setting visible in every List mode.
                 self._set_form_row_visible(self.overlay_form, control, slide)
             self._set_form_row_visible(
                 self.overlay_form, self.list_command_hint,
