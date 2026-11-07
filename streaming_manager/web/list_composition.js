@@ -191,9 +191,9 @@
     }
 
     function beginCombinedSplitAlwaysMotion(entering) {
-      // Always-chat: synchronize the List's accepted top entrance for both
-      // empty and nonempty chats; reverse motion remains empty-only until
-      // its separate approval. Only the chat region's upper edge changes.
+      // Always-chat: reuse the List's accepted top motion for both entrance
+      // and reverse exit, with empty or nonempty chat. Only the chat region's
+      // upper edge changes; the iframe and its messages are preserved.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
       const gap = 12;
@@ -342,7 +342,7 @@
       lastGeometry = "";
       if (combinedMotion && seenSnapshot &&
           ((next && reason === "always") ||
-           (!next && reason === "hide" && !chatHasMessages)) &&
+           (!next && reason === "hide")) &&
           composeMode === "split" && chatAvailable && chatAlways &&
           root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next);
