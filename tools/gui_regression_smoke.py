@@ -1266,10 +1266,12 @@ def assert_p09_list_group(app, stream, db) -> None:
     if hasattr(stream, "overlay_list_enabled"):
         raise AssertionError("P10 obsolete second List switch remains")
     mode = stream.obs_show_modes["list"]
-    fields = (mode, stream.overlay_list_side, stream.frame_color_row_widgets["list"])
+    fields = (mode, stream.frame_color_row_widgets["list"])
     positions = [form.getWidgetPosition(widget)[0] for widget in fields]
-    if not (positions[0] == 2 and positions[0] < positions[1] < positions[2]):
-        raise AssertionError("P10 List show/position/frame order changed")
+    if not (positions[0] == 2 and positions[0] < positions[1]):
+        raise AssertionError("P10 List show/frame order changed")
+    if form.indexOf(stream.overlay_list_side) >= 0:
+        raise AssertionError("R06 combined position leaked into independent List settings")
     # The independent List keeps only its command timer and direction.
     # Previously saved composition settings remain in SQLite but no longer
     # have controls in the List section.
@@ -1316,10 +1318,11 @@ def assert_p09_list_group(app, stream, db) -> None:
         raise AssertionError("R06 obsolete List chat switch remains")
     if form.labelForField(mode).text() != "Показ виджета:":
         raise AssertionError("P10 common List show label changed")
-    side_label = form.labelForField(stream.overlay_list_side)
+    side_label = stream.combined_form.labelForField(stream.overlay_list_side)
     frame_label = form.labelForField(stream.frame_color_row_widgets["list"])
-    if side_label.text() != "Положение списка:" or frame_label.text() != "Рамка списка:":
-        raise AssertionError("P09 UI-041 List position/frame labels changed")
+    if (side_label.text() != "Положение совместной области (главный оверлей):"
+            or frame_label.text() != "Рамка списка:"):
+        raise AssertionError("R06 combined position or List frame label changed")
 
     host = stream.list_typography_host
     if form.indexOf(host) < 0:
@@ -1367,7 +1370,7 @@ def assert_p09_list_group(app, stream, db) -> None:
     if len(frame_row.findChildren(QPushButton)) != 2:
         raise AssertionError("P09 UI-041 original frame color/pipette was duplicated")
 
-    keys = ["list_overlay_show_mode", "overlay_list_enabled", "overlay_list_side",
+    keys = ["list_overlay_show_mode", "overlay_list_enabled",
             "overlay_frame_list_color"]
     keys += [f"overlay_font_{key}_{part}" for key, _, _, _ in fixtures
              for part in ("family", "size", "color")]
@@ -1375,8 +1378,7 @@ def assert_p09_list_group(app, stream, db) -> None:
     clipboard_before = QApplication.clipboard().text()
     expected = {
         "list_overlay_show_mode": "hidden",
-        "overlay_list_enabled": "0", "overlay_list_side": "left",
-        "overlay_frame_list_color": "#456ABC",
+        "overlay_list_enabled": "0", "overlay_frame_list_color": "#456ABC",
     }
     try:
         stream.overlay_list_side.setCurrentIndex(stream.overlay_list_side.findData("left"))
@@ -1392,8 +1394,10 @@ def assert_p09_list_group(app, stream, db) -> None:
         mode.setCurrentIndex(mode.findData("hidden"))
         app.processEvents()
         if not all(widget.isHidden() for widget in
-                   (stream.overlay_list_side, side_label, frame_row, frame_label, host)):
-            raise AssertionError("P10 hidden shared List leaves embedded decoration controls")
+                   (frame_row, frame_label, host)):
+            raise AssertionError("P10 hidden List leaves embedded List decoration controls")
+        if stream.overlay_list_side.isHidden() or side_label.isHidden():
+            raise AssertionError("R06 hiding List must not hide combined-region position")
         if any(widget.isHidden() or not widget.isEnabled() for widget in
                (mode, url, actions, copy, preview, list_save)):
             raise AssertionError("P10 hidden List lost settings or standalone actions")
@@ -1414,6 +1418,8 @@ def assert_p09_list_group(app, stream, db) -> None:
             list_save.click()
         if saved.call_count != 1 or db.get_settings(keys) != expected:
             raise AssertionError("P10 shared List Save lost visibility/appearance settings")
+        if db.get_setting("overlay_list_side") != original.get("overlay_list_side"):
+            raise AssertionError("Independent List Save committed unsaved combined position")
         if db.get_settings(legacy_before.keys()) != legacy_before:
             raise AssertionError("R06 independent List Save overwrote legacy composition settings")
         payload = db.current_stream_payload()
@@ -1423,8 +1429,10 @@ def assert_p09_list_group(app, stream, db) -> None:
             raise AssertionError("P10 hiding List also hid main canvas")
 
         stream.refresh()
-        if mode.currentData() != "hidden" or stream.overlay_list_side.currentData() != "left":
-            raise AssertionError("P10 unified List show mode/position not restored")
+        if mode.currentData() != "hidden":
+            raise AssertionError("P10 unified List show mode not restored")
+        if stream.overlay_list_side.currentData() != (original.get("overlay_list_side") or "auto"):
+            raise AssertionError("R06 combined position draft was unexpectedly saved")
         if stream.frame_color_buttons["list"].property("fontColor") != "#456ABC":
             raise AssertionError("P09 UI-041 List frame color not reloaded")
         for key, _, size_value, color_value in fixtures:
@@ -1436,8 +1444,10 @@ def assert_p09_list_group(app, stream, db) -> None:
         mode.setCurrentIndex(mode.findData("always"))
         app.processEvents()
         if any(widget.isHidden() for widget in
-               (stream.overlay_list_side, side_label, frame_row, frame_label, host)):
-            raise AssertionError("P10 visible shared List did not restore embedded controls")
+               (frame_row, frame_label, host)):
+            raise AssertionError("P10 visible List did not restore List controls")
+        if stream.overlay_list_side.isHidden() or side_label.isHidden():
+            raise AssertionError("R06 combined position is unavailable while List visible")
         with patch.object(QMessageBox, "information"):
             list_save.click()
         payload = db.current_stream_payload()
@@ -1465,6 +1475,11 @@ def assert_r06_combined_settings(app, stream, db) -> None:
         raise AssertionError("R06 combined layout options changed")
     if form.labelForField(mode).text() != "Режим совмещения:":
         raise AssertionError("R06 combined-layout label is missing")
+    side = stream.overlay_list_side
+    if (stream.overlay_form.indexOf(side) >= 0 or form.indexOf(side) < 0):
+        raise AssertionError("R06 combined position must belong to combined block")
+    if form.labelForField(side).text() != "Положение совместной области (главный оверлей):":
+        raise AssertionError("R06 combined position label incorrect")
     if stream.overlay_form.indexOf(mode) >= 0:
         raise AssertionError("R06 combined selector leaked back into independent List")
     if form.indexOf(stream.combined_actions) < 0:
@@ -1498,6 +1513,8 @@ def assert_r06_combined_settings(app, stream, db) -> None:
         if original_combined not in ("split", "replace"):
             original_combined = "split"
         target = "replace" if original_combined == "split" else "split"
+        original_side = db.get_setting("overlay_list_side", "auto")
+        target_side = "left" if original_side != "left" else "right"
         stream.copy_combined_btn.click()
         if QApplication.clipboard().text() != address:
             raise AssertionError("R06 combined copy button used incorrect URL")
@@ -1508,9 +1525,12 @@ def assert_r06_combined_settings(app, stream, db) -> None:
 
         legacy_before = db.get_settings(legacy_keys)
         mode.setCurrentIndex(mode.findData(target))
+        side.setCurrentIndex(side.findData(target_side))
         # A change in the UI must not silently modify the already active OBS.
         if db.current_stream_payload()["overlay"]["list_chat_layout"] != original_combined:
             raise AssertionError("R06 combined layout applied before explicit Save")
+        if db.current_stream_payload()["overlay"]["list_side"] != original_side:
+            raise AssertionError("R06 combined side applied before explicit Save")
         with patch.object(QMessageBox, "information") as notice:
             stream.combined_save_button.click()
         if notice.call_count != 1:
@@ -1519,19 +1539,25 @@ def assert_r06_combined_settings(app, stream, db) -> None:
             raise AssertionError("R06 combined selector was not persisted")
         if db.current_stream_payload()["overlay"]["list_chat_layout"] != target:
             raise AssertionError("R06 combined layout did not reach OBS payload")
+        if (db.get_setting("overlay_list_side") != target_side or
+                db.current_stream_payload()["overlay"]["list_side"] != target_side):
+            raise AssertionError("R06 combined position Save did not reach main OBS")
         if db.get_settings(legacy_keys) != legacy_before:
             raise AssertionError("R06 combined Save overwrote old List legacy values")
         stream.refresh()
-        if mode.currentData() != target:
-            raise AssertionError("R06 combined layout was not restored on Refresh")
+        if mode.currentData() != target or side.currentData() != target_side:
+            raise AssertionError("R06 combined layout/position not restored on Refresh")
 
         # Saving List, webcam or info must not unexpectedly save the combined
         # mode when its separate Save button was not clicked.
         mode.setCurrentIndex(mode.findData(original_combined))
+        side.setCurrentIndex(side.findData(original_side))
         with patch.object(QMessageBox, "information"):
             stream.save()
         if db.get_setting("combined_list_chat_layout") != target:
             raise AssertionError("R06 main Save committed an unsaved combined mode")
+        if db.get_setting("overlay_list_side") != target_side:
+            raise AssertionError("R06 main Save committed an unsaved combined position")
     finally:
         db.set_settings_bulk(original_settings)
         extra_keys = set(db.get_settings()) - set(original_settings)
