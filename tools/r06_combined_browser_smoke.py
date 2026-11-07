@@ -1,7 +1,7 @@
-"""Separate R06 combined OBS URL: approved empty and nonempty chat entrance.
+"""Separate R06 combined OBS URL: accepted empty/nonempty Always-chat motion.
 
-Verifies the accepted split/replace contracts, empty-chat transitions and
-nonempty Always-chat List entrance without message loss/iframe recreation.
+Verifies split/replace contracts, both empty-chat transitions, and both
+nonempty Always-chat transitions without message loss/iframe recreation.
 """
 from __future__ import annotations
 
@@ -352,6 +352,59 @@ def main():
             assert stable["messageCount"] == 4, stable
             assert stable["sameChatFrame"] and stable["sameChatDocument"], stable
             assert stable["combinedSync"] == "idle", stable
+            # Fourth approved scenario: hide the permanently visible List
+            # while a NONEMPTY Always chat preserves its rendered messages.
+            # Exact reverse of the previously tested entrance, not a new
+            # animation or reload of the existing embedded Twitch iframe.
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 15)
+            started = until(
+                view.page(),
+                lambda a: a["combinedSync"] == "split-exit" and
+                          a["motionKind"] == "exit",
+                "nonempty chat reused synchronized List reverse exit")
+            assert started["motionDuration"] == 2000, started
+            assert started["messageCount"] == 4, started
+            assert started["sameChatFrame"] and started["sameChatDocument"], started
+            assert abs(started["chatBottom"] -
+                       (started["rootTop"] + started["rootHeight"])) < 2, started
+            frames = []
+            for _ in range(9):
+                frame = inspect(view.page())
+                if frame["combinedSync"] == "split-exit":
+                    frames.append(frame)
+                    assert frame["messageCount"] == 4, frame
+                    assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                    assert all(any(message in row for row in frame["messageTexts"])
+                               for message in chat_lines), frame
+                    assert -2 <= frame["chatTop"] - frame["listBottom"] <= 18, frame
+                    assert abs(frame["chatBottom"] -
+                               (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                    assert float(frame["panelOpacity"]) >= .99, frame
+                QTest.qWait(125)
+            assert frames, "Missing nonempty split-exit intermediate frames"
+            done = until(
+                view.page(),
+                lambda a: not a["shown"] and a["combinedSync"] == "idle" and
+                          a["motionKind"] == "idle" and a["messageCount"] == 4 and
+                          a["sameChatFrame"] and a["sameChatDocument"] and
+                          a["listHeight"] < 2 and
+                          abs(a["chatHeight"] - a["rootHeight"]) < 3 and
+                          abs(a["chatTop"] - a["rootTop"]) < 2,
+                "nonempty chat keeps four messages and original iframe at 100 percent")
+            assert all(any(message in row for row in done["messageTexts"])
+                       for message in chat_lines), done
+            exit_count = done["exitCount"]
+            db.set_setting("list_overlay_show_mode", "hidden")
+            api.configure_list_show("hidden", "!list", 15)
+            QTest.qWait(1300)
+            stable = inspect(view.page())
+            assert stable["exitCount"] == exit_count, stable
+            assert stable["messageCount"] == 4, stable
+            assert stable["sameChatFrame"] and stable["sameChatDocument"], stable
+            assert stable["combinedSync"] == "idle", stable
+            assert all(any(message in row for row in stable["messageTexts"])
+                       for message in chat_lines), stable
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()
