@@ -1,7 +1,7 @@
-"""Separate R06 combined OBS URL: accepted empty Always-chat transitions.
+"""Separate R06 combined OBS URL: approved empty and nonempty chat entrance.
 
-Verifies split/replace/visibility and both Hidden <-> Always List motions
-with synchronized empty Twitch chat using native Chromium animation frames.
+Verifies the accepted split/replace contracts, empty-chat transitions and
+nonempty Always-chat List entrance without message loss/iframe recreation.
 """
 from __future__ import annotations
 
@@ -57,6 +57,9 @@ JS = """JSON.stringify((() => {
     iframeCount:document.querySelectorAll("iframe").length,
     childUrl:doc?.location?.href || "",
     messageCount:cards?.children?.length ?? -1,
+    messageTexts:[...(cards?.children || [])].map(node=>node.textContent),
+    sameChatFrame:!window.__r06QaChatFrame || frame===window.__r06QaChatFrame,
+    sameChatDocument:!window.__r06QaChatDoc || doc===window.__r06QaChatDoc,
     chatTransition:csStyle.transitionDuration,
     panelOpacity:ps.opacity, panelTransform:ps.transform,
     obsVisible:document.documentElement.dataset.obsVisible
@@ -268,6 +271,86 @@ def main():
             QTest.qWait(1300)
             stable = inspect(view.page())
             assert stable["exitCount"] == exit_count, stable
+            assert stable["combinedSync"] == "idle", stable
+
+            # Third approved scenario: a NONEMPTY permanent chat has the
+            # same geometry as the already accepted empty-chat entrance.
+            # Record the actual iframe and document identities before Save;
+            # resizing must not reload either or duplicate rendered cards.
+            chat_lines = ["QA Nonempty alpha", "QA Nonempty beta",
+                          "QA Nonempty gamma", "QA Nonempty delta"]
+            for index, message in enumerate(chat_lines):
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", f"nonempty-{index}", "qa_viewer",
+                    message,
+                )), message
+            before = until(
+                view.page(),
+                lambda a: not a["shown"] and a["messageCount"] == 4 and
+                          abs(a["chatHeight"] - a["rootHeight"]) < 3 and
+                          all(any(message in row for row in a["messageTexts"])
+                              for message in chat_lines),
+                "nonempty permanent Twitch chat fully visible before List")
+            assert before["childUrl"].endswith(
+                "/multichat-overlay?embedded=1"), before
+            capture = []
+            view.page().runJavaScript(
+                """(() => {
+                  window.__r06QaChatFrame =
+                    document.querySelector("#list-chat iframe");
+                  window.__r06QaChatDoc =
+                    window.__r06QaChatFrame.contentDocument;
+                  return !!window.__r06QaChatDoc;
+                })()""", capture.append,
+            )
+            capture_deadline = time.monotonic() + 8
+            while not capture and time.monotonic() < capture_deadline:
+                QTest.qWait(25)
+            assert capture == [True], capture
+
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 15)
+            started = until(
+                view.page(),
+                lambda a: a["combinedSync"] == "split-enter" and
+                          a["motionKind"] == "enter",
+                "nonempty chat reused synchronized List entrance")
+            assert started["motionDuration"] == 2000, started
+            assert started["messageCount"] == 4, started
+            assert started["sameChatFrame"] and started["sameChatDocument"], started
+            frames = []
+            for _ in range(9):
+                frame = inspect(view.page())
+                if frame["combinedSync"] == "split-enter":
+                    frames.append(frame)
+                    assert frame["messageCount"] == 4, frame
+                    assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                    assert all(any(message in row for row in frame["messageTexts"])
+                               for message in chat_lines), frame
+                    assert 0 <= frame["chatTop"] - frame["listBottom"] <= 18, frame
+                    assert abs(frame["chatBottom"] -
+                               (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                    assert float(frame["panelOpacity"]) >= .99, frame
+                QTest.qWait(125)
+            assert frames, "Missing nonempty split-entry intermediate frames"
+            done = until(
+                view.page(),
+                lambda a: a["shown"] and a["combinedSync"] == "idle" and
+                          a["motionKind"] == "idle" and a["messageCount"] == 4 and
+                          a["sameChatFrame"] and a["sameChatDocument"] and
+                          abs(a["listHeight"] - a["chatHeight"]) < 18 and
+                          9 <= a["chatTop"] - a["listBottom"] <= 15,
+                "nonempty chat keeps four messages and original iframe at 50/50")
+            assert all(any(message in row for row in done["messageTexts"])
+                       for message in chat_lines), done
+            entrance_count = done["entranceCount"]
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 15)
+            QTest.qWait(1300)
+            stable = inspect(view.page())
+            assert stable["entranceCount"] == entrance_count, stable
+            assert stable["messageCount"] == 4, stable
+            assert stable["sameChatFrame"] and stable["sameChatDocument"], stable
             assert stable["combinedSync"] == "idle", stable
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
