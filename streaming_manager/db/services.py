@@ -2503,6 +2503,12 @@ class ServicesMixin:
                     else "right"
                 ),
                 "list_animation_seconds": setting("list_animation_seconds", "1.00"),
+                # Standalone List entrance/exit duration and post-entry hold
+                # are intentionally separate from legacy combined-chat timing.
+                "list_slide_animation_seconds": setting(
+                    "list_slide_animation_seconds", "0.65"
+                ),
+                "list_slide_duration": setting("list_slide_duration", "30"),
                 # The combined container owns this setting independently.
                 # Legacy list_chat_layout remains stored but no longer governs OBS.
                 "list_chat_layout": (
