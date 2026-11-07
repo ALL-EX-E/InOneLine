@@ -1,7 +1,7 @@
-"""Separate R06 combined OBS URL, real native Chromium, static transitions.
+"""Separate R06 combined OBS URL: static contracts and first approved motion.
 
-Does not re-run the long legacy main-overlap browser test in parallel. Verifies
-new URL live DOM and the accepted split/replace/show/hide contracts.
+Verifies split/replace/visibility and the user-approved Hidden -> Always
+split entry with an empty Always Twitch chat in real native Chromium.
 """
 from __future__ import annotations
 
@@ -46,7 +46,13 @@ JS = """JSON.stringify((() => {
   return {
     ready:true, shown:root.classList.contains("r06-shown"),
     replace:root.classList.contains("r06-replace"),
-    rootHeight:rs.height, listHeight:ls.height, chatHeight:cs.height,
+    rootHeight:rs.height, rootTop:rs.top,
+    listHeight:ls.height, listTop:ls.top, listBottom:ls.bottom,
+    chatHeight:cs.height, chatTop:cs.top, chatBottom:cs.bottom,
+    combinedSync:root.dataset.r06CombinedSync || "idle",
+    motionKind:root.dataset.r06StandaloneMotionKind || "idle",
+    motionDuration:Number(root.dataset.r06StandaloneLastMotionDurationMs || 0),
+    entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
     iframeCount:document.querySelectorAll("iframe").length,
     childUrl:doc?.location?.href || "",
     messageCount:cards?.children?.length ?? -1,
@@ -174,6 +180,53 @@ def main():
                   a["chatHeight"] < 2 and a["listHeight"] < 2 and
                   a["obsVisible"] == "false",
                   "both hidden, no visible content")
+            # First agreed interaction: share the standalone List's top-down
+            # animation, and move the empty Always-chat's upper boundary with
+            # the List's lower edge. Neither loses opacity or moves the root.
+            state.set_obs_enabled("twitch", True)
+            db.set_settings_bulk({
+                "combined_list_chat_layout": "split",
+                "list_slide_animation_seconds": "2.00",
+            })
+            until(view.page(), lambda a: not a["shown"] and
+                  abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                  "hidden List, empty Always-chat takes 100 percent")
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 15)
+            started = until(
+                view.page(),
+                lambda a: a["combinedSync"] == "split-enter" and
+                          a["motionKind"] == "enter",
+                "first shared list entry and chat shrink started")
+            assert started["motionDuration"] == 2000, started
+            assert started["listTop"] < started["rootTop"] + 2, started
+            assert abs(started["chatBottom"] -
+                       (started["rootTop"] + started["rootHeight"])) < 2, started
+            frames = []
+            for _ in range(8):
+                frame = inspect(view.page())
+                if frame["combinedSync"] == "split-enter":
+                    frames.append(frame)
+                    assert 0 <= frame["chatTop"] - frame["listBottom"] <= 18, frame
+                    assert abs(frame["chatBottom"] -
+                               (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                    assert float(frame["panelOpacity"]) >= .99, frame
+                QTest.qWait(125)
+            assert frames, "No intermediate combined animation frames"
+            done = until(
+                view.page(),
+                lambda a: a["shown"] and a["combinedSync"] == "idle" and
+                          a["motionKind"] == "idle" and
+                          abs(a["listHeight"] - a["chatHeight"]) < 18 and
+                          9 <= a["chatTop"] - a["listBottom"] <= 15,
+                "split entry finished with aligned edges")
+            entrance_count = done["entranceCount"]
+            db.set_setting("list_overlay_show_mode", "always")
+            api.configure_list_show("always", "!list", 15)
+            QTest.qWait(1300)
+            stable = inspect(view.page())
+            assert stable["entranceCount"] == entrance_count, stable
+            assert stable["combinedSync"] == "idle", stable
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()
