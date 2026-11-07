@@ -1,8 +1,7 @@
 /* R06 List + Twitch-chat composition shared by both OBS sources.
-   Split-mode content-sized chat boundaries may resize smoothly; the old
-   list entrance/exit animation engine remains removed. This module owns
-   visibility and geometry only; unrelated widgets and the
-   list's content scrolling retain their existing independent behavior. */
+   The standalone List motion is also reused by the approved first combined
+   split entry; only the chat/list geometry is coordinated for that scenario.
+   Unapproved combined transitions keep their previous behavior. */
 (() => {
   "use strict";
 
@@ -66,6 +65,9 @@
     // contract, while the independent combined and main sources retain
     // their previously accepted behavior until their own review.
     const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
+    // Only the separate combined source is in first-scenario QA. The main
+    // embedded copy must follow after its primary source is accepted.
+    const combinedMotion = Boolean(iframe && noMotion && !root.closest("#overlay"));
     let motionDurationMs = 650;
     let commandMotionDurationMs = 650;
     let showDurationMs = 30000;
@@ -76,12 +78,36 @@
     let motion = null;
     let motionTimeout = null;
     let motionAnimation = null;
+    let chatMotionAnimation = null;
 
     function cancelListMotion() {
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = null;
       if (motionAnimation) motionAnimation.cancel();
+      if (chatMotionAnimation) chatMotionAnimation.cancel();
       motionAnimation = null;
+      chatMotionAnimation = null;
+      if (combinedMotion) {
+        // Restore the existing flex geometry on the same frame as the motion
+        // finishes. Neither source gets an independently animated container.
+        listLayer.style.position = "";
+        listLayer.style.top = "";
+        listLayer.style.left = "";
+        listLayer.style.right = "";
+        listLayer.style.height = "";
+        listLayer.style.zIndex = "";
+        listLayer.style.flex = "";
+        chatLayer.style.position = "";
+        chatLayer.style.bottom = "";
+        chatLayer.style.left = "";
+        chatLayer.style.right = "";
+        chatLayer.style.zIndex = "";
+        chatLayer.style.height = "";
+        chatLayer.style.marginTop = "";
+        chatLayer.style.transition = "";
+        lastChatHeight = -1;
+        root.dataset.r06CombinedSync = "idle";
+      }
       motion = null;
       root.dataset.r06StandaloneMotionKind = "idle";
       root.classList.remove("r06-standalone-motion");
@@ -115,12 +141,17 @@
       layout();
     }
 
-    function beginStandaloneListMotion(entering, direction, durationMs = motionDurationMs) {
-      // The standalone List's own region is its whole Browser Source.
-      // With no chat, the bottom entrance starts at this region's bottom.
-      if (entering) layout();
+    function beginStandaloneListMotion(
+      entering, direction, durationMs = motionDurationMs,
+      travelDistance = null, skipInitialLayout = false
+    ) {
+      // Shared List movement (same Web Animations timing and opacity contract).
+      // Separate List travels across its whole source; in combined mode the
+      // approved top entrance travels across the List's own target region.
+      if (entering && !skipInitialLayout) layout();
       const width = Math.max(1, root.clientWidth);
-      const height = Math.max(1, root.clientHeight);
+      const height = travelDistance === null ?
+        Math.max(1, root.clientHeight) : Math.max(1, travelDistance);
       const initial = direction === "left" ? `translateX(${-width}px)` :
         direction === "right" ? `translateX(${width}px)` :
         direction === "bottom" ? `translateY(${height}px)` :
@@ -157,6 +188,43 @@
       motionTimeout = setTimeout(() => {
         if (motionAnimation === animation) finishListMotion();
       }, durationMs + 50);
+    }
+
+    function beginCombinedSplitAlwaysEntry() {
+      // First approved interaction: empty Always-chat starts at 100% height,
+      // then makes room for a full-size List arriving from the TOP. Fix both
+      // layers to their actual source boundaries while the two WAAPI effects
+      // run with the identical easing/duration as the standalone List.
+      const available = Math.max(1, root.clientHeight);
+      const gap = 12;
+      const targetChat = Math.floor((available - gap) / 2);
+      const targetList = available - targetChat - gap;
+      const duration = motionDurationMs;
+      root.classList.add("r06-shown");
+      root.classList.remove("r06-not-shown", "r06-replace");
+      listLayer.style.flex = "none";
+      listLayer.style.position = "absolute";
+      listLayer.style.top = "0px";
+      listLayer.style.left = "0px";
+      listLayer.style.right = "0px";
+      listLayer.style.height = targetList + "px";
+      listLayer.style.zIndex = "2";
+      chatLayer.style.position = "absolute";
+      chatLayer.style.bottom = "0px";
+      chatLayer.style.left = "0px";
+      chatLayer.style.right = "0px";
+      chatLayer.style.height = available + "px";
+      chatLayer.style.marginTop = "0px";
+      chatLayer.style.zIndex = "1";
+      chatLayer.style.transition = "none";
+      root.dataset.r06CombinedSync = "split-enter";
+      chatMotionAnimation = chatLayer.animate(
+        [{height: available + "px"}, {height: targetChat + "px"}],
+        {duration, easing: "ease-in-out", fill: "both"},
+      );
+      // Reuse the SAME List entrance engine; don't invent an animation for
+      // combined mode. Animation and chat shrink finish on one shared clock.
+      beginStandaloneListMotion(true, "top", duration, targetList, true);
     }
 
     function measureChat() {
@@ -270,6 +338,12 @@
       }
       active = next;
       lastGeometry = "";
+      if (combinedMotion && seenSnapshot && next && reason === "always" &&
+          composeMode === "split" && chatAvailable && chatAlways &&
+          !chatHasMessages && root.clientHeight > 0) {
+        beginCombinedSplitAlwaysEntry();
+        return;
+      }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
           (reason === "hide" || reason === "always" ||
            reason === "command" || reason === "expiry")) {
@@ -324,14 +398,15 @@
         Math.max(0.25, Math.min(3, seconds)) : 1;
       if (!chatAvailable || !chatHasMessages) intrinsicChatHeight = 0;
 
+      // Both sources read exactly the SAME List animation control.
+      const requestedAnimation = Number(cfg.list_slide_animation_seconds);
+      motionDurationMs = Math.round(
+        Math.max(0.10, Math.min(10, Number.isFinite(requestedAnimation)
+          ? requestedAnimation : 0.65)) * 1000
+      );
       if (standaloneMotion) {
         // Independent List uses a local phase clock: entrance time never
         // consumes the saved fully-visible hold time.
-        const requestedAnimation = Number(cfg.list_slide_animation_seconds);
-        motionDurationMs = Math.round(
-          Math.max(0.10, Math.min(10, Number.isFinite(requestedAnimation)
-            ? requestedAnimation : 0.65)) * 1000
-        );
         const requestedShow = Number(cfg.list_slide_duration);
         const nextShowDuration = Math.round(
           Math.max(1, Math.min(120, Number.isFinite(requestedShow)
@@ -416,7 +491,7 @@
       const shouldShow = mode === "always" ||
         (mode === "slide" && deadline > performance.now());
       if (mode !== previousMode) lastGeometry = "";
-      changeActive(shouldShow);
+      changeActive(shouldShow, shouldShow && mode === "always" ? "always" : "");
       layout();
       seenSnapshot = true;
 
