@@ -355,9 +355,12 @@
           if (expiryTimer !== null) clearTimeout(expiryTimer);
           expiryTimer = null;
           showDurationMs = nextShowDuration;
-          commandDirection = cfg.list_slide_direction || "top";
           showUntil = 0;
           if (!active) {
+            // The reverse exit must use the boundary the List ACTUALLY
+            // entered from. Repeated commands while visible refresh only
+            // the hold, even if the user changed the direction meanwhile.
+            commandDirection = cfg.list_slide_direction || "top";
             slidePhase = "enter";
             root.dataset.r06StandalonePhase = "enter";
             changeActive(true, seenSnapshot ? "command" : "",
