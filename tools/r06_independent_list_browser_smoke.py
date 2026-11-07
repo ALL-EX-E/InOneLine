@@ -45,6 +45,7 @@ JS = """JSON.stringify((() => {
     entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
     exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
     lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
+    configuredDirection:document.documentElement.dataset.obsSlideDirection || "",
     replace:root.classList.contains("r06-replace"),
     listHeight:layer.getBoundingClientRect().height,
     chatHeight:chat.getBoundingClientRect().height,
@@ -57,6 +58,18 @@ JS = """JSON.stringify((() => {
     policy: document.documentElement.dataset.obsShowMode || ""
   };
 })())"""
+
+
+class Clock:
+    """Deterministic Twitch command time; no dependence on Windows CI load."""
+    def __init__(self):
+        self.t = 200.0
+
+    def __call__(self):
+        return self.t
+
+    def advance(self, seconds):
+        self.t += seconds
 
 
 def port():
@@ -136,7 +149,8 @@ def main():
         })
         old = db.get_settings(["list_animation_seconds",
                                "list_chat_layout", "list_with_chat"])
-        state = MultichatState()
+        clock = Clock()
+        state = MultichatState(clock=clock, wall_clock=clock)
         api = LocalApiServer(db, port=port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
@@ -181,11 +195,12 @@ def main():
                   v["listHeight"] <= 2, "command idle")
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                # Native WebEngine polling and QA callbacks can take several
-                # seconds under Windows CI. Keep the server window comfortably
-                # longer than the 650-ms entrance and the settled-frame check.
-                # This is a test fixture only, not an application default.
-                api.configure_list_show("slide", "!list", 15)
+                # Wait for the 1-second browser poll to consume the just-saved
+                # direction BEFORE triggering the next Twitch event.
+                api.configure_list_show("slide", "!list", 90)
+                until(view.page(), lambda v: (
+                    v["configuredDirection"] == direction and not v["shown"]
+                ), "new direction applied "+direction)
                 before = metrics(view.page())
                 assert not before["shown"] and not before["motion"], before
                 assert state.ingest(ChatMessage(
@@ -193,7 +208,7 @@ def main():
                 ))
                 with urlopen(api.base_url + "/api/data", timeout=8) as response:
                     command_payload = json.load(response)
-                assert command_payload["list_show"]["remaining_ms"] > 12000, (
+                assert command_payload["list_show"]["remaining_ms"] > 80000, (
                     "Standalone command timer did not start",
                     direction, command_payload["list_show"],
                 )
@@ -203,9 +218,20 @@ def main():
                                direction=direction)
                 until(view.page(), lambda v: v["shown"] and
                       v["listHeight"] > 100, "command shown "+direction)
+                visible = metrics(view.page())
+                assert visible["entranceCount"] == before["entranceCount"] + 1, (
+                    "One Twitch command must produce exactly one entrance",
+                    direction, before, visible,
+                )
+                # Expire the server-owned timer explicitly: no 90-second sleep.
+                clock.advance(91)
                 until(view.page(), lambda v: not v["shown"] and
                       v["listHeight"] <= 2, "command expired "+direction)
                 after = metrics(view.page())
+                assert after["entranceCount"] == before["entranceCount"] + 1, (
+                    "Expired command was replayed without a new sequence",
+                    direction, before, after,
+                )
                 assert after["exitCount"] == before["exitCount"], (
                     "Command expiry must retain current instant behavior", after
                 )
