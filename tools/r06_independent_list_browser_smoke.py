@@ -249,6 +249,11 @@ def main():
                 # before the 5-second *post-entrance* display has finished.
                 # The independent source must not disappear at that moment.
                 clock.advance(91)
+                if direction == "right":
+                    # A settings change during the hold must not change the
+                    # reversing speed of this already-started command cycle.
+                    db.set_setting("list_slide_animation_seconds", "3.00")
+                    QTest.qWait(1150)
                 with urlopen(api.base_url + "/api/data", timeout=8) as response:
                     expired_server = json.load(response)
                 assert expired_server["list_show"]["remaining_ms"] == 0, (
