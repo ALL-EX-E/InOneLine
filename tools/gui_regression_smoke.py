@@ -1272,12 +1272,12 @@ def assert_p09_list_group(app, stream, db) -> None:
         raise AssertionError("P10 List show/frame order changed")
     if form.indexOf(stream.overlay_list_side) >= 0:
         raise AssertionError("R06 combined position leaked into independent List settings")
-    # The independent List keeps only its command timer and direction.
-    # Previously saved composition settings remain in SQLite but no longer
-    # have controls in the List section.
+    # The independent List has a separate animation speed and show duration.
+    # Previously saved combined composition keys remain in SQLite but have
+    # no controls in the independent List section.
     for widget in (
         stream.list_slide_direction, stream.list_slide_duration_control,
-        stream.list_slide_command,
+        stream.list_slide_animation_control, stream.list_slide_command,
     ):
         if not (positions[0] < form.getWidgetPosition(widget)[0] < positions[1]):
             raise AssertionError("R06 List command controls escaped their group")
@@ -1307,6 +1307,30 @@ def assert_p09_list_group(app, stream, db) -> None:
     if stream.list_slide_duration.value() != 30:
         raise AssertionError("R06 wider down arrow did not decrement")
     stream.list_slide_duration.setValue(previous_duration)
+    motion_control = stream.list_slide_animation_control
+    speed = stream.list_slide_animation_seconds
+    if (form.indexOf(motion_control) < 0 or
+            form.indexOf(speed) >= 0 or
+            form.labelForField(motion_control).text() != "Время анимации:"):
+        raise AssertionError("R06 separate motion time belongs to List wrapper")
+    if speed.buttonSymbols() != QAbstractSpinBox.ButtonSymbols.NoButtons:
+        raise AssertionError("R06 native motion time arrows not disabled")
+    speed_buttons = {
+        button.text(): button
+        for button in motion_control.findChildren(QPushButton)
+        if button.text() in ("▲", "▼")
+    }
+    if set(speed_buttons) != {"▲", "▼"}:
+        raise AssertionError("R06 motion time wide arrows are missing")
+    old_motion = speed.value()
+    speed.setValue(1.20)
+    speed_buttons["▲"].click()
+    if abs(speed.value() - 1.30) > .001:
+        raise AssertionError("R06 motion duration up arrow failed")
+    speed_buttons["▼"].click()
+    if abs(speed.value() - 1.20) > .001:
+        raise AssertionError("R06 motion duration down arrow failed")
+    speed.setValue(old_motion)
     for removed in ("list_animation_seconds", "list_chat_layout", "list_with_chat"):
         if hasattr(stream, removed):
             raise AssertionError(f"R06 obsolete independent List control remains: {removed}")
@@ -1398,6 +1422,8 @@ def assert_p09_list_group(app, stream, db) -> None:
             raise AssertionError("P10 hidden List leaves embedded List decoration controls")
         if stream.overlay_list_side.isHidden() or side_label.isHidden():
             raise AssertionError("R06 hiding List must not hide combined-region position")
+        if motion_control.isHidden() or not motion_control.isEnabled():
+            raise AssertionError("R06 motion duration must remain editable while hidden")
         if any(widget.isHidden() or not widget.isEnabled() for widget in
                (mode, url, actions, copy, preview, list_save)):
             raise AssertionError("P10 hidden List lost settings or standalone actions")
