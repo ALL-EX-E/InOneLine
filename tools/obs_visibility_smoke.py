@@ -379,7 +379,14 @@ def ui_smoke() -> None:
             )
             app.processEvents()
             assert stream.obs_show_modes["list"].isVisible() and stream.obs_show_modes["list"].isEnabled()
-            assert stream.overlay_list_side.isHidden(), "Hidden List still exposes position"
+            # The setting now owns the whole combined List+Twitch region, not
+            # the independent List. Hiding the List must not hide its position.
+            assert not stream.overlay_list_side.isHidden(), (
+                "Hidden List must retain the independent combined-area position"
+            )
+            assert stream.combined_form.indexOf(stream.overlay_list_side) >= 0, (
+                "Combined-area position escaped Combined settings"
+            )
             assert_p09_api_ui_cleanup(window, db)
             assert_p09_obs_access(app, window, db)
             assert_p09_list_group(app, stream, db)
