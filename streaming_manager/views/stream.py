@@ -480,7 +480,8 @@ class StreamTab(QWidget):
         self.overlay_list_side.addItem("Справа", "right")
         self.overlay_list_side.addItem("Слева", "left")
         self.overlay_list_side.setMinimumWidth(190)
-        overlay_form.addRow("Положение списка:", self.overlay_list_side)
+        # The selector belongs to the shared List+Twitch region on main OBS.
+        # Attach its existing widget to the combined settings form below.
 
         self.info_position = ScrollSafeComboBox()
         self.info_position.addItem("Авто — за веб-камерой", "auto")
@@ -647,6 +648,10 @@ class StreamTab(QWidget):
         self.combined_list_chat_layout.addItem("Разделение области", "split")
         self.combined_list_chat_layout.addItem("Замещение области", "replace")
         combined_form.addRow("Режим совмещения:", self.combined_list_chat_layout)
+        combined_form.addRow(
+            "Положение совместной области (главный оверлей):",
+            self.overlay_list_side,
+        )
 
         combined_hint = QLabel(
             "Список и Twitch-чат сохраняют собственные настройки. "
@@ -1291,7 +1296,7 @@ class StreamTab(QWidget):
         # Moving existing actions between layouts must also move keyboard
         # access before the same section's original first settings control.
         for widget, copy_button, preview_button, first_control in (
-            ("list", copy_list, open_list, self.overlay_list_side),
+            ("list", copy_list, open_list, self.list_slide_direction),
             ("timer", copy_timer, open_timer, self.timer_overlay_font),
             ("music_player", copy_music, open_music, self.music_player_overlay_font),
             ("wheel", self.copy_wheel_url_btn, self.preview_wheel_btn, save_wheel),
@@ -2501,10 +2506,6 @@ class StreamTab(QWidget):
                 self.overlay_form, self.list_command_hint,
                 slide and not self.list_slide_command.text(),
             )
-        if hasattr(self, "overlay_list_side"):
-            self._set_form_row_visible(
-                self.overlay_form, self.overlay_list_side, list_enabled,
-            )
         if hasattr(self, "info_position"):
             self._set_form_row_visible(
                 self.info_form,
@@ -2986,7 +2987,6 @@ class StreamTab(QWidget):
             "list_slide_command": self.list_slide_command.text(),
             # Keep the old on/off mirror for compatibility with older data.
             "overlay_list_enabled": "0" if mode == "hidden" else "1",
-            "overlay_list_side": str(self.overlay_list_side.currentData() or "auto"),
             "overlay_frame_list_color": str(
                 self.frame_color_buttons["list"].property("fontColor") or "#FFFFFF"
             ),
@@ -3031,11 +3031,19 @@ class StreamTab(QWidget):
         mode = str(self.combined_list_chat_layout.currentData() or "split")
         if mode not in ("split", "replace"):
             mode = "split"
-        self.db.set_settings_bulk({"combined_list_chat_layout": mode})
+        side = str(self.overlay_list_side.currentData() or "auto")
+        if side not in ("auto", "left", "right"):
+            side = "auto"
+        self.db.set_settings_bulk({
+            "combined_list_chat_layout": mode,
+            # Legacy persisted key remains readable by main-overlay layout.
+            "overlay_list_side": side,
+        })
         QMessageBox.information(
             self,
             "Совместный режим",
-            "Режим совмещения сохранён. Открытые OBS-источники обновятся автоматически.",
+            "Режим совмещения и положение совместной области сохранены. "
+            "Открытые OBS-источники обновятся автоматически.",
         )
 
     def save(self):
@@ -3073,7 +3081,6 @@ class StreamTab(QWidget):
             "overlay_list_enabled": (
                 "0" if self.obs_show_modes["list"].currentData() == "hidden" else "1"
             ),
-            "overlay_list_side": str(self.overlay_list_side.currentData() or "auto"),
             "overlay_info_position": str(self.info_position.currentData() or "auto"),
         }
         for color_key, color_btn in self.frame_color_buttons.items():

@@ -1,7 +1,6 @@
-"""Standalone List: zero Twitch iframes, no List animations, saved-mode changes.
+"""Standalone List: approved child-only motion; no Twitch iframe or chat layout.
 
-The legacy main-overlay composition has a separate regression until the new
-third-container behavior is fully agreed and implemented.
+The main and dedicated combined composition retain their previous regressions.
 """
 from __future__ import annotations
 
@@ -41,6 +40,12 @@ JS = """JSON.stringify((() => {
   return {
     ready: true,
     shown:root.classList.contains("r06-shown"),
+    motion:root.classList.contains("r06-standalone-motion"),
+    layerTransform:getComputedStyle(layer).transform,
+    entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
+    exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
+    lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
+    configuredDirection:document.documentElement.dataset.obsSlideDirection || "",
     replace:root.classList.contains("r06-replace"),
     listHeight:layer.getBoundingClientRect().height,
     chatHeight:chat.getBoundingClientRect().height,
@@ -53,6 +58,18 @@ JS = """JSON.stringify((() => {
     policy: document.documentElement.dataset.obsShowMode || ""
   };
 })())"""
+
+
+class Clock:
+    """Deterministic Twitch command time; no dependence on Windows CI load."""
+    def __init__(self):
+        self.t = 200.0
+
+    def __call__(self):
+        return self.t
+
+    def advance(self, seconds):
+        self.t += seconds
 
 
 def port():
@@ -73,12 +90,13 @@ def metrics(page):
     return json.loads(value) if isinstance(value, str) else value
 
 
-def until(page, condition, label):
+def until(page, condition, label, *, settled=True):
     timeout = time.monotonic() + 35
     last = None
     while time.monotonic() < timeout:
         last = metrics(page)
-        if last and last.get("ready") and condition(last):
+        if (last and last.get("ready") and condition(last) and
+                (not settled or not last["motion"])):
             assert last["iframes"] == 0, (label, last)
             assert last["replace"] is False, (label, last)
             assert last["chatHeight"] <= 2, (label, last)
@@ -91,6 +109,27 @@ def until(page, condition, label):
             return
         QTest.qWait(100)
     raise AssertionError(f"{label} timed out: {last!r}")
+
+
+def observe_motion(page, label, *, entering, previous_count, direction="top"):
+    """See a real WebEngine animation frame, not merely its final geometry."""
+    timeout = time.monotonic() + 12
+    last = None
+    while time.monotonic() < timeout:
+        last = metrics(page)
+        if not last or not last.get("ready"):
+            QTest.qWait(30)
+            continue
+        count = last["entranceCount"] if entering else last["exitCount"]
+        if (last["motion"] and count > previous_count and
+                last["layerTransform"] != "none" and
+                (not entering or last["lastEntrance"] == direction)):
+            assert last["iframes"] == 0 and last["chatHeight"] <= 2, (label, last)
+            assert float(last["opacity"]) >= .99, (label, last)
+            print("R06_INDEPENDENT_LIST_MOTION_PASS", label, last, flush=True)
+            return last
+        QTest.qWait(30)
+    raise AssertionError(f"{label}: no Chromium motion frame: {last!r}")
 
 
 def main():
@@ -110,7 +149,8 @@ def main():
         })
         old = db.get_settings(["list_animation_seconds",
                                "list_chat_layout", "list_with_chat"])
-        state = MultichatState()
+        clock = Clock()
+        state = MultichatState(clock=clock, wall_clock=clock)
         api = LocalApiServer(db, port=port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
@@ -123,6 +163,8 @@ def main():
             view.load(QUrl(api.base_url + "/list-overlay"))
             until(view.page(), lambda v: v["shown"] and
                   v["listHeight"] > 100 and v["hasTopThree"], "always")
+            initial = metrics(view.page())
+            assert not initial["motion"] and initial["entranceCount"] == 0, initial
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
             with urlopen(api.base_url + "/api/data", timeout=8) as response:
@@ -130,29 +172,69 @@ def main():
             assert state_payload["visibility"]["list"]["show_mode"] == "hidden", (
                 "Backend did not apply saved hidden mode", state_payload["visibility"]["list"]
             )
+            observe_motion(view.page(), "save Hidden exits upward",
+                           entering=False, previous_count=0)
             until(view.page(), lambda v: not v["shown"] and
-                  v["listHeight"] <= 2, "hidden immediate")
+                  v["listHeight"] <= 2, "hidden after animation")
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 15)
+            observe_motion(view.page(), "save Always enters from top",
+                           entering=True, previous_count=0, direction="top")
             until(view.page(), lambda v: v["shown"] and
                   v["listHeight"] > 100, "always restored")
+            stable = metrics(view.page())
+            api.configure_list_show("always", "!list", 15)
+            QTest.qWait(1300)
+            assert not metrics(view.page())["motion"], "Repeated Always Save animated"
+            assert metrics(view.page())["entranceCount"] == stable["entranceCount"], (
+                "Repeated Always Save replayed entrance", stable, metrics(view.page())
+            )
             db.set_setting("list_overlay_show_mode", "slide")
             api.configure_list_show("slide", "!list", 15)
             until(view.page(), lambda v: not v["shown"] and
                   v["listHeight"] <= 2, "command idle")
-            assert state.ingest(ChatMessage(
-                "twitch", "ch", "standalone-show", "viewer", "!list"
-            ))
-            with urlopen(api.base_url + "/api/data", timeout=8) as response:
-                command_payload = json.load(response)
-            assert command_payload["list_show"]["remaining_ms"] > 12000, (
-                "Standalone command did not start the server timer",
-                command_payload["list_show"],
-            )
-            until(view.page(), lambda v: v["shown"] and
-                  v["listHeight"] > 100, "command visible")
-            until(view.page(), lambda v: not v["shown"] and
-                  v["listHeight"] <= 2, "command expiration")
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+                # Wait for the 1-second browser poll to consume the just-saved
+                # direction BEFORE triggering the next Twitch event.
+                api.configure_list_show("slide", "!list", 90)
+                until(view.page(), lambda v: (
+                    v["configuredDirection"] == direction and not v["shown"]
+                ), "new direction applied "+direction)
+                before = metrics(view.page())
+                assert not before["shown"] and not before["motion"], before
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "standalone-"+direction, "viewer", "!list"
+                ))
+                with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                    command_payload = json.load(response)
+                assert command_payload["list_show"]["remaining_ms"] > 80000, (
+                    "Standalone command timer did not start",
+                    direction, command_payload["list_show"],
+                )
+                observe_motion(view.page(), "command "+direction,
+                               entering=True,
+                               previous_count=before["entranceCount"],
+                               direction=direction)
+                until(view.page(), lambda v: v["shown"] and
+                      v["listHeight"] > 100, "command shown "+direction)
+                visible = metrics(view.page())
+                assert visible["entranceCount"] == before["entranceCount"] + 1, (
+                    "One Twitch command must produce exactly one entrance",
+                    direction, before, visible,
+                )
+                # Expire the server-owned timer explicitly: no 90-second sleep.
+                clock.advance(91)
+                until(view.page(), lambda v: not v["shown"] and
+                      v["listHeight"] <= 2, "command expired "+direction)
+                after = metrics(view.page())
+                assert after["entranceCount"] == before["entranceCount"] + 1, (
+                    "Expired command was replayed without a new sequence",
+                    direction, before, after,
+                )
+                assert after["exitCount"] == before["exitCount"], (
+                    "Command expiry must retain current instant behavior", after
+                )
             assert db.get_settings(old.keys()) == old, "Legacy values modified"
             print("R06_INDEPENDENT_LIST_BROWSER_ALL_PASS", flush=True)
         finally:

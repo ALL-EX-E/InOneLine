@@ -71,14 +71,14 @@ def save_list(stream: StreamTab, db: Database, api: LocalApiServer) -> dict:
     expected_keys = {
         WIDGETS["list"].key,
         "list_slide_direction", "list_slide_duration", "list_slide_command",
-        "overlay_list_enabled", "overlay_list_side", "overlay_frame_list_color",
+        "overlay_list_enabled", "overlay_frame_list_color",
     }
     expected_keys.update({
         f"overlay_font_{key}_{part}"
         for key in ("top1", "top2", "top3", "list")
         for part in ("family", "size", "color")
     })
-    assert len(expected_keys) == 19
+    assert len(expected_keys) == 18
     assert set(written) == expected_keys, set(written) ^ expected_keys
     assert timer.call_args.args == (
         written[WIDGETS["list"].key],
@@ -159,6 +159,7 @@ def main() -> int:
                     "stream_info", "stream_info_enabled", "overlay_info_position",
                     "overlay_frame_info_color", "overlay_webcam_enabled",
                     "overlay_webcam_position", "combined_list_chat_layout",
+                    "overlay_list_side",
                     "overlay_background_mode",
                 )
             }
@@ -176,7 +177,7 @@ def main() -> int:
             )
             written = save_list(stream, db, api)
             assert written["list_slide_direction"] == "left"
-            assert written["overlay_list_side"] == "left"
+            assert "overlay_list_side" not in written
             assert written["overlay_frame_list_color"] == "#ABCDEF"
             assert written["overlay_font_top1_size"] == "28"
             assert written["overlay_font_list_color"] == "#12ABCD"
@@ -192,7 +193,7 @@ def main() -> int:
             payload = get_data(api)
             assert payload["visibility"]["list"]["show_mode"] == "slide"
             assert payload["overlay"]["list_slide_direction"] == "left"
-            assert payload["overlay"]["list_side"] == "left"
+            assert payload["overlay"]["list_side"] == "auto"
             assert payload["overlay"]["info_position"] == "bottom_right"
             assert payload["game"]["reviews"] == baseline_other["stream_info"]
             print("R06_LIST_SAVE_SLIDE_TIMER_AND_DRAFTS_PASS", flush=True)
