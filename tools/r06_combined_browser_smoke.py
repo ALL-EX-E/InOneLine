@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -49,6 +50,8 @@ JS = """JSON.stringify((() => {
     rootHeight:rs.height, rootTop:rs.top, rootLeft:rs.left, rootWidth:rs.width,
     listHeight:ls.height, listTop:ls.top, listBottom:ls.bottom,
     listLeft:ls.left, listRight:ls.right, layerTransform:getComputedStyle(layer).transform,
+    listClipPath:getComputedStyle(layer).clipPath,
+    chatClipPath:csStyle.clipPath,
     lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
     phase:root.dataset.r06StandalonePhase || "idle",
     holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
@@ -454,7 +457,7 @@ def main():
                 assert abs(started["chatHeight"] - started["rootHeight"]) < 3, started
                 assert started["sameChatFrame"] and started["sameChatDocument"], started
                 frames = []
-                for _ in range(9):
+                for _ in range(16):
                     frame = inspect(view.page())
                     if frame["combinedSync"] == "command-enter":
                         frames.append(frame)
@@ -467,20 +470,57 @@ def main():
                                    for msg in chat_lines), frame
                         assert float(frame["panelOpacity"]) >= .99, frame
                         assert frame["motionKind"] == "enter", frame
+                        assert frame["chatClipPath"] != "none", frame
+                        # The masked chat edge must track the ACTUAL moving
+                        # List footprint, not just change after it arrives.
+                        own_slot = (frame["rootHeight"] - 12) / 2
+                        chat_clip = frame["chatClipPath"]
                         if direction == "left":
                             assert frame["listLeft"] <= frame["rootLeft"] + 3, frame
+                            match = re.search(r"polygon\\(\\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listRight"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "right":
                             assert frame["listLeft"] >= frame["rootLeft"] - 3, frame
+                            match = re.search(
+                                r"polygon\\(\\s*0% 0%,\\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listLeft"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "top":
                             assert frame["listTop"] <= frame["rootTop"] + 3, frame
+                            match = re.search(r"inset\\(([0-9.]+)px", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1))
+                            list_edge = frame["listBottom"] - frame["rootTop"]
+                            assert -3 <= mask_edge - list_edge <= 15, frame
                         elif direction == "bottom":
+                            # The old test checked only listTop and missed
+                            # that the entire translated List extended into
+                            # the lower CHAT region. Now its bottom never
+                            # extends beyond its own upper slot, at ANY frame.
                             assert frame["listTop"] >= frame["rootTop"] - 3, frame
-                            # "From below" starts at the bottom of the List's
-                            # own *upper-half* slot, not at the combined root.
-                            own_slot = (frame["rootHeight"] - 12) / 2
-                            assert frame["listTop"] - frame["rootTop"] <= own_slot + 3, frame
+                            assert frame["listBottom"] <= (
+                                frame["rootTop"] + own_slot + 3), frame
+                            assert frame["listClipPath"].startswith("inset("), frame
+                            mask_match = re.search(
+                                r"polygon\\(\\s*0% 0%,\\s*100% 0%,\\s*100% ([0-9.]+)px",
+                                chat_clip)
+                            list_match = re.search(
+                                r"inset\\(([0-9.]+)px", frame["listClipPath"])
+                            assert mask_match and list_match, frame
+                            # The dividing mask moves with the visible top of
+                            # the upward-revealed List, including the 12px gap.
+                            assert abs(float(mask_match.group(1)) -
+                                       float(list_match.group(1))) < 4, frame
                     QTest.qWait(125)
-                assert frames, "No intermediate combined command frames: " + direction
+                assert len(frames) >= 3, (
+                    "Insufficient intermediate combined command frames", direction, frames)
+                assert len({a["chatClipPath"] for a in frames}) >= 3, (
+                    "Chat cover did not continuously move with List", direction, frames)
                 done = until(
                     view.page(),
                     lambda a: a["shown"] and a["combinedSync"] == "idle" and
@@ -491,6 +531,9 @@ def main():
                     "combined command settled to split after " + direction)
                 assert done["holdAgeMs"] < 1000, done
                 assert done["sameChatFrame"] and done["sameChatDocument"], done
+                assert done["chatClipPath"] == "none", done
+                assert done["listClipPath"] == "none", done
+                assert 9 <= done["chatTop"] - done["listBottom"] <= 15, done
                 assert all(any(msg in row for row in done["messageTexts"])
                            for msg in chat_lines), done
                 QTest.qWait(600)
