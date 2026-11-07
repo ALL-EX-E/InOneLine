@@ -143,7 +143,7 @@
 
     function beginStandaloneListMotion(
       entering, direction, durationMs = motionDurationMs,
-      travelDistance = null, skipInitialLayout = false, revealWithinListSlot = false
+      travelDistance = null, skipInitialLayout = false, revealFromY = null
     ) {
       // Shared List movement (same Web Animations timing and opacity contract).
       // Separate List travels across its whole source; in combined mode the
@@ -176,8 +176,8 @@
       // "bottom" variant: reveal upward WITHIN the upper List slot, never by
       // translating the whole panel through the lower Twitch-chat region.
       // Neither method changes opacity, background, or the panel's contents.
-      const frames = revealWithinListSlot && entering && direction === "bottom" ?
-        [{clipPath: "inset(100% 0 0 0)"}, {clipPath: "inset(0% 0 0 0)"}] :
+      const frames = revealFromY !== null && entering && direction === "bottom" ?
+        [{clipPath: `inset(${revealFromY}px 0 0 0)`}, {clipPath: "inset(0px 0 0 0)"}] :
         [{transform: from}, {transform: to}];
       const animation = listLayer.animate(
         frames, {duration: durationMs, easing: "ease-in-out", fill: "both"},
@@ -271,7 +271,7 @@
       // full-size chat without an unmasked intermediate frame.
       beginStandaloneListMotion(
         entering, direction, duration, targetList, true,
-        commandOverChat && direction === "bottom",
+        commandOverChat && direction === "bottom" ? targetList + gap : null,
       );
     }
 
