@@ -41,6 +41,13 @@ JS = """JSON.stringify((() => {
     ready: true,
     shown:root.classList.contains("r06-shown"),
     motion:root.classList.contains("r06-standalone-motion"),
+    motionKind:root.dataset.r06StandaloneMotionKind || "idle",
+    motionDurationMs:Number(root.dataset.r06StandaloneLastMotionDurationMs || 0),
+    phase:root.dataset.r06StandalonePhase || "idle",
+    holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
+    holdAgeMs:Math.max(0,performance.now() -
+      Number(root.dataset.r06StandaloneHoldStartMs || performance.now())),
+    lastExit:root.dataset.r06StandaloneLastExit || "",
     layerTransform:getComputedStyle(layer).transform,
     entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
     exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
@@ -123,7 +130,8 @@ def observe_motion(page, label, *, entering, previous_count, direction="top"):
         count = last["entranceCount"] if entering else last["exitCount"]
         if (last["motion"] and count > previous_count and
                 last["layerTransform"] != "none" and
-                (not entering or last["lastEntrance"] == direction)):
+                last["motionKind"] == ("enter" if entering else "exit") and
+                (last["lastEntrance"] if entering else last["lastExit"]) == direction):
             assert last["iframes"] == 0 and last["chatHeight"] <= 2, (label, last)
             assert float(last["opacity"]) >= .99, (label, last)
             print("R06_INDEPENDENT_LIST_MOTION_PASS", label, last, flush=True)
@@ -140,7 +148,8 @@ def main():
                          10, 0, STATUS_NOT_PLAYED, ""))
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
-            "list_slide_duration": "15",
+            "list_slide_duration": "5",
+            "list_slide_animation_seconds": "0.65",
             "list_slide_command": "!list",
             # Retained legacy settings must not affect the standalone List.
             "list_animation_seconds": "2.75",
@@ -194,10 +203,15 @@ def main():
             until(view.page(), lambda v: not v["shown"] and
                   v["listHeight"] <= 2, "command idle")
             for direction in ("left", "right", "top", "bottom"):
-                db.set_setting("list_slide_direction", direction)
-                # Wait for the 1-second browser poll to consume the just-saved
-                # direction BEFORE triggering the next Twitch event.
-                api.configure_list_show("slide", "!list", 90)
+                # Two distinct durations verify that the new control actually
+                # changes Chromium animation timing (not the full-show hold).
+                animation_s = 1.50 if direction in ("top", "bottom") else 0.65
+                db.set_settings_bulk({
+                    "list_slide_direction": direction,
+                    "list_slide_animation_seconds": f"{animation_s:.2f}",
+                    "list_slide_duration": "5",
+                })
+                api.configure_list_show("slide", "!list", 5)
                 until(view.page(), lambda v: (
                     v["configuredDirection"] == direction and not v["shown"]
                 ), "new direction applied "+direction)
@@ -208,32 +222,67 @@ def main():
                 ))
                 with urlopen(api.base_url + "/api/data", timeout=8) as response:
                     command_payload = json.load(response)
-                assert command_payload["list_show"]["remaining_ms"] > 80000, (
+                assert command_payload["list_show"]["remaining_ms"] > 0, (
                     "Standalone command timer did not start",
                     direction, command_payload["list_show"],
                 )
-                observe_motion(view.page(), "command "+direction,
-                               entering=True,
-                               previous_count=before["entranceCount"],
-                               direction=direction)
-                until(view.page(), lambda v: v["shown"] and
-                      v["listHeight"] > 100, "command shown "+direction)
-                visible = metrics(view.page())
-                assert visible["entranceCount"] == before["entranceCount"] + 1, (
-                    "One Twitch command must produce exactly one entrance",
-                    direction, before, visible,
+                entrant = observe_motion(
+                    view.page(), "command "+direction, entering=True,
+                    previous_count=before["entranceCount"], direction=direction,
                 )
-                # Expire the server-owned timer explicitly: no 90-second sleep.
+                expected_ms = round(animation_s * 1000)
+                assert entrant["motionDurationMs"] == expected_ms, (
+                    "Saved animation duration not used by Chromium",
+                    direction, entrant,
+                )
+                # The full 5 seconds begin only after the transition is done.
+                until(view.page(), lambda v: (
+                    v["shown"] and v["phase"] == "hold" and
+                    v["listHeight"] > 100 and v["holdDurationMs"] == 5000
+                ), "full visible hold starts AFTER entrance "+direction)
+                held = metrics(view.page())
+                assert held["entranceCount"] == before["entranceCount"] + 1, (
+                    "One Twitch command produced duplicate entrances",
+                    direction, before, held,
+                )
+                # This simulates the old server-side timer reaching zero
+                # before the 5-second *post-entrance* display has finished.
+                # The independent source must not disappear at that moment.
                 clock.advance(91)
-                until(view.page(), lambda v: not v["shown"] and
-                      v["listHeight"] <= 2, "command expired "+direction)
+                with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                    expired_server = json.load(response)
+                assert expired_server["list_show"]["remaining_ms"] == 0, (
+                    "Manual server time advance failed", direction, expired_server,
+                )
+                QTest.qWait(1000)
+                still_held = metrics(view.page())
+                assert still_held["shown"] and still_held["phase"] == "hold", (
+                    "Server expiry ended the List hold before local five seconds",
+                    direction, still_held,
+                )
+                reverse = observe_motion(
+                    view.page(), "reverse exit "+direction, entering=False,
+                    previous_count=before["exitCount"], direction=direction,
+                )
+                assert reverse["motionDurationMs"] == expected_ms, (
+                    "Reverse exit duration differs from entrance",
+                    direction, reverse,
+                )
+                until(view.page(), lambda v: (
+                    not v["shown"] and v["phase"] == "idle" and
+                    v["listHeight"] <= 2
+                ), "reverse exit finished "+direction)
                 after = metrics(view.page())
                 assert after["entranceCount"] == before["entranceCount"] + 1, (
-                    "Expired command was replayed without a new sequence",
-                    direction, before, after,
+                    "Expired command replayed entrance", direction, after,
                 )
-                assert after["exitCount"] == before["exitCount"], (
-                    "Command expiry must retain current instant behavior", after
+                assert after["exitCount"] == before["exitCount"] + 1, (
+                    "One command must produce exactly one reverse exit",
+                    direction, after,
+                )
+                assert after["lastExit"] == direction, (
+                    "Exit did not use the reverse of the entrance direction",
+                    direction, after,
                 )
             assert db.get_settings(old.keys()) == old, "Legacy values modified"
             print("R06_INDEPENDENT_LIST_BROWSER_ALL_PASS", flush=True)
