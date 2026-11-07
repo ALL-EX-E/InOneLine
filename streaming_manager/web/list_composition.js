@@ -62,6 +62,63 @@
     let lastEmbeddedRefreshAt = -Infinity;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
+    // The standalone List has no Twitch layer. Reuse the same List motion
+    // contract, while the independent combined and main sources retain
+    // their previously accepted behavior until their own review.
+    const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
+    const motionDurationMs = 650; // Provisional QA duration; not a UI control.
+    let seenSnapshot = false;
+    let motion = null;
+    let motionTimeout = null;
+    let motionAnimation = null;
+
+    function cancelListMotion() {
+      if (motionTimeout !== null) clearTimeout(motionTimeout);
+      motionTimeout = null;
+      if (motionAnimation) motionAnimation.cancel();
+      motionAnimation = null;
+      motion = null;
+      root.classList.remove("r06-standalone-motion");
+    }
+
+    function finishListMotion() {
+      if (!motion) return;
+      cancelListMotion();
+      lastGeometry = "";
+      layout();
+    }
+
+    function beginStandaloneListMotion(entering, direction) {
+      // The standalone List's own region is its whole Browser Source.
+      // With no chat, the bottom entrance starts at this region's bottom.
+      if (entering) layout();
+      const width = Math.max(1, root.clientWidth);
+      const height = Math.max(1, root.clientHeight);
+      const initial = direction === "left" ? `translateX(${-width}px)` :
+        direction === "right" ? `translateX(${width}px)` :
+        direction === "bottom" ? `translateY(${height}px)` :
+        `translateY(${-height}px)`;
+      const from = entering ? initial : "translate(0px,0px)";
+      const to = entering ? "translate(0px,0px)" : `translateY(${-height}px)`;
+
+      motion = entering ? "enter" : "exit";
+      root.classList.add("r06-standalone-motion");
+      if (entering) {
+        root.dataset.r06StandaloneLastEntrance = direction;
+        root.dataset.r06StandaloneEntranceCount =
+          String((Number(root.dataset.r06StandaloneEntranceCount) || 0) + 1);
+      } else {
+        root.dataset.r06StandaloneExitCount =
+          String((Number(root.dataset.r06StandaloneExitCount) || 0) + 1);
+      }
+      // Translate only the List layer. Root clipping hides its motion outside
+      // the OBS source; opacity, panel background and border stay unchanged.
+      motionAnimation = listLayer.animate(
+        [{transform: from}, {transform: to}],
+        {duration: motionDurationMs, easing: "ease-in-out", fill: "both"},
+      );
+      motionTimeout = setTimeout(finishListMotion, motionDurationMs + 50);
+    }
 
     function measureChat() {
       if (!chatAvailable || !chatHasMessages) return 0;
@@ -127,6 +184,7 @@
     }
 
     function layout() {
+      if (motion !== null) return;
       const available = root.clientHeight;
       if (available <= 0) return;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
@@ -165,10 +223,19 @@
       }
     }
 
-    function changeActive(next) {
+    function changeActive(next, reason = "", direction = "top") {
       if (active === next) return;
+      if (motion !== null) {
+        cancelListMotion();
+        layout();
+      }
       active = next;
       lastGeometry = "";
+      if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
+          (reason === "hide" || reason === "always" || reason === "command")) {
+        beginStandaloneListMotion(next, reason === "command" ? direction : "top");
+        return;
+      }
       layout();
     }
 
@@ -215,8 +282,15 @@
       const shouldShow = mode === "always" ||
         (mode === "slide" && deadline > performance.now());
       if (mode !== previousMode) lastGeometry = "";
-      changeActive(shouldShow);
+      let reason = "";
+      if (standaloneMotion && seenSnapshot && shouldShow !== active) {
+        if (nextMode === "hidden" && active) reason = "hide";
+        else if (nextMode === "always" && !active) reason = "always";
+        else if (nextMode === "slide" && shouldShow) reason = "command";
+      }
+      changeActive(shouldShow, reason, cfg.list_slide_direction || "top");
       layout();
+      seenSnapshot = true;
 
       if (expiryTimer !== null) clearTimeout(expiryTimer);
       expiryTimer = null;
@@ -233,7 +307,7 @@
       apply,
       hasChatSpace: () => chatAvailable && (chatAlways || chatHasMessages),
       listActive: () => active,
-      hasListArea: () => active,
+      hasListArea: () => active || motion !== null,
     };
   }
   window.IOLListComposition = Object.freeze({create});
