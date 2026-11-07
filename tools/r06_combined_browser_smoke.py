@@ -183,6 +183,7 @@ def main():
             # First agreed interaction: share the standalone List's top-down
             # animation, and move the empty Always-chat's upper boundary with
             # the List's lower edge. Neither loses opacity or moves the root.
+            state.clear_chat("twitch", "ch")
             state.set_obs_enabled("twitch", True)
             db.set_settings_bulk({
                 "combined_list_chat_layout": "split",
