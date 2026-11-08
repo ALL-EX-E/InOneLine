@@ -299,8 +299,14 @@ class MultichatState:
                 "obs_enabled": dict(self._obs_enabled),
                 "list_show": {
                     "remaining_ms": int(remaining * 1000) if self._list_mode == "slide" else 0,
-                    "held": bool(self._list_held and self._list_mode == "slide"),
                     "sequence": self._list_sequence,
+                    # Preserve exact legacy timed snapshots (remaining_ms,
+                    # sequence). Only the new 0-second policy or an already
+                    # latched show needs the additional optional held field.
+                    **({"held": bool(self._list_held)} if (
+                        self._list_mode == "slide" and
+                        (self._list_duration == 0 or self._list_held)
+                    ) else {}),
                 },
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,
