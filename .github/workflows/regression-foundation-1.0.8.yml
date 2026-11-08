@@ -1167,13 +1167,16 @@ jobs:
           compression-level: 0
 
       - name: Package R06 candidate QA from tested installer
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108')
         shell: pwsh
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item "installer\output\InOneLine_Setup_1.0.9.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
+          if ($env:GITHUB_HEAD_REF -eq "candidate/r06-main-embedded-shared-composition-20261108") {
+            Copy-Item "docs\qa\R06-main-embedded-parity-checklist.md" "$out\CHECKLIST_MAIN_OBS_COMBINED.md"
+          }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
           $installer = Get-Item "$out\InOneLine_R06_Setup_CANDIDATE.exe"
@@ -1194,7 +1197,7 @@ jobs:
           Write-Host "R06_SOURCE_SHA256=$sourceSha"
 
       - name: Upload R06 candidate QA bundle
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108')
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_R06_CANDIDATE_QA
