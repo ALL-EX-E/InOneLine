@@ -641,6 +641,48 @@ def main():
                 stable_exit = inspect(view.page())
                 assert stable_exit["exitCount"] == expired["exitCount"], stable_exit
                 assert stable_exit["phase"] == "idle", stable_exit
+            # Zero-second List command: separate /combined-overlay must use
+            # the SAME server-owned latch and reverse motion as main /overlay.
+            db.set_settings_bulk({
+                "list_slide_duration": "0",
+                "list_slide_direction": "top",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            QTest.qWait(1600)
+            baseline = until(view.page(), lambda a: not a["shown"] and
+                             a["motionKind"] == "idle",
+                             "combined 0-second command idle")
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "combined-zero-on", "qa_viewer", "!list"
+            ))
+            zero_enter = until(view.page(), lambda a: a["motionKind"] == "enter" and
+                               a["lastEntrance"] == "top",
+                               "combined 0-second List enters")
+            assert zero_enter["sameChatFrame"] and zero_enter["sameChatDocument"], zero_enter
+            zero_hold = until(view.page(), lambda a: a["shown"] and
+                              a["phase"] == "hold" and a["holdDurationMs"] == 0 and
+                              a["combinedSync"] == "idle",
+                              "combined 0-second List stays visible")
+            assert zero_hold["sameChatFrame"] and zero_hold["sameChatDocument"], zero_hold
+            QTest.qWait(1800)
+            retained = inspect(view.page())
+            assert retained["shown"] and retained["exitCount"] == baseline["exitCount"], retained
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "combined-zero-off", "qa_viewer", "!list"
+            ))
+            zero_exit = until(view.page(), lambda a: a["motionKind"] == "exit" and
+                              a["lastExit"] == "top" and
+                              a["exitCount"] == baseline["exitCount"] + 1,
+                              "combined second 0-second command reverses")
+            assert zero_exit["chatClipPath"] != "none", zero_exit
+            zero_hidden = until(view.page(), lambda a: not a["shown"] and
+                                a["phase"] == "idle" and
+                                a["combinedSync"] == "idle" and
+                                abs(a["chatHeight"] - a["rootHeight"]) <= 3,
+                                "combined zero toggle returns full chat")
+            assert zero_hidden["sameChatFrame"] and zero_hidden["sameChatDocument"], zero_hidden
+            assert all(any(msg in row for row in zero_hidden["messageTexts"])
+                       for msg in chat_lines), zero_hidden
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()
