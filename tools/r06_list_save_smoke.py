@@ -240,6 +240,27 @@ def main() -> int:
                 "remaining_ms": 10000, "sequence": 3,
             }
             print("R06_LIST_SAVE_ALWAYS_RESET_AND_NEW_COMMAND_PASS", flush=True)
+
+            # The SAME existing List Save button persists the new duration 0;
+            # Qt refresh and API must agree, and unrelated drafts stay unsaved.
+            stream.list_slide_duration.setValue(0)
+            zero_saved = save_list(stream, db, api)
+            assert zero_saved["list_slide_duration"] == "0", zero_saved
+            assert db.get_setting("list_slide_duration") == "0"
+            assert get_data(api)["overlay"]["list_slide_duration"] == "0"
+            stream.refresh()
+            assert stream.list_slide_duration.value() == 0
+            assert stream.info_field.text() != "DO NOT PUBLISH THIS DRAFT"
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "r06-zero-open", "viewer", "!list"
+            ))
+            assert state.snapshot()["list_show"]["held"] is True
+            assert state.snapshot()["list_show"]["remaining_ms"] == 0
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "r06-zero-close", "viewer", "!list"
+            ))
+            assert state.snapshot()["list_show"]["held"] is False
+            print("R06_LIST_SAVE_ZERO_TOGGLE_QT_API_PASS", flush=True)
         finally:
             if stream is not None:
                 stream.close()

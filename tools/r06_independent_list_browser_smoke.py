@@ -62,6 +62,8 @@ JS = """JSON.stringify((() => {
     transition:css.transitionDuration,
     animation:css.animationName,
     hasTopThree:document.querySelectorAll(".top-three-row").length > 0,
+    scrollTransform:document.getElementById("game-list")?.style.transform || "",
+    scrollingRowCount:document.querySelectorAll("#game-list .game-row").length,
     policy: document.documentElement.dataset.obsShowMode || ""
   };
 })())"""
@@ -146,6 +148,9 @@ def main():
         db = Database(Path(tmp) / "list_only.db")
         db.add_game(Game(None, "QA standalone list", "2026-01-01",
                          10, 0, STATUS_NOT_PLAYED, ""))
+        for row in range(14):
+            db.add_game(Game(None, f"QA scrolling row {row:02d}", "2026-01-01",
+                             100 - row, 0, STATUS_NOT_PLAYED, ""))
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
             "list_slide_duration": "5",
@@ -289,6 +294,53 @@ def main():
                     "Exit did not use the reverse of the entrance direction",
                     direction, after,
                 )
+            # A 0-second command is a persistent server-owned toggle.
+            db.set_settings_bulk({
+                "list_slide_duration": "0",
+                "list_slide_direction": "left",
+                "list_slide_animation_seconds": "0.65",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            until(view.page(), lambda v: (v["configuredDirection"] == "left" and
+                  not v["shown"]), "0-second toggle idle")
+            QTest.qWait(1550)  # Virtual scroll clock advances behind the scene.
+            before_zero = metrics(view.page())
+            self_old_exit = before_zero["exitCount"]
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "zero-open", "viewer", "!list"
+            ))
+            observe_motion(view.page(), "0-second command enters", entering=True,
+                           previous_count=before_zero["entranceCount"], direction="left")
+            until(view.page(), lambda v: (v["shown"] and v["phase"] == "hold" and
+                  v["holdDurationMs"] == 0 and v["scrollingRowCount"] > 10),
+                  "zero held after entrance")
+            zero_active = metrics(view.page())
+            assert zero_active["scrollTransform"] not in ("", "translateY(0px)"), (
+                "Hidden List restarted its scrolling position", zero_active
+            )
+            QTest.qWait(1900)
+            still_zero = metrics(view.page())
+            assert still_zero["shown"] and still_zero["exitCount"] == self_old_exit, (
+                "0-second List expired without a repeated command", still_zero
+            )
+            assert not state.ingest(ChatMessage(
+                "twitch", "ch", "zero-open", "viewer", "!list"
+            )), "Duplicate Twitch event must not toggle the List"
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "zero-close", "viewer", "!list"
+            ))
+            observe_motion(view.page(), "0-second command exits", entering=False,
+                           previous_count=still_zero["exitCount"], direction="left")
+            until(view.page(), lambda v: (not v["shown"] and
+                  v["phase"] == "idle" and v["listHeight"] <= 2),
+                  "zero held off after second command")
+            QTest.qWait(1400)
+            assert not metrics(view.page())["shown"], "Toggle replayed old command"
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "zero-third", "viewer", "!list"
+            ))
+            until(view.page(), lambda v: (v["shown"] and v["phase"] == "hold" and
+                  v["holdDurationMs"] == 0), "third command restores held List")
             assert db.get_settings(old.keys()) == old, "Legacy values modified"
             print("R06_INDEPENDENT_LIST_BROWSER_ALL_PASS", flush=True)
         finally:

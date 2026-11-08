@@ -144,7 +144,7 @@ class MainWindow(QMainWindow):
         self.api.configure_list_show(
             show_mode(db.get_settings(), "list"),
             db.get_setting("list_slide_command", ""),
-            max(1, min(120, list_duration)),
+            max(0, min(120, list_duration)),
         )
         try:
             self.api.start()

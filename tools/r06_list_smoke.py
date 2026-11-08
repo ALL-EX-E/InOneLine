@@ -128,5 +128,63 @@ class R06ListApiSmoke(unittest.TestCase):
                 api.stop()
 
 
+    def test_zero_duration_toggles_once_per_distinct_twitch_event(self):
+        clock = Clock()
+        state = MultichatState(clock=clock, wall_clock=clock)
+        state.configure_list_show("slide", "!list", 0)
+        self.assertEqual(state.snapshot()["list_show"], {
+            "remaining_ms": 0, "held": False, "sequence": 0,
+        })
+
+        def receive(identifier, text="!list"):
+            return state.ingest(ChatMessage(
+                "twitch", "ch", identifier, "viewer", text,
+            ))
+
+        self.assertTrue(receive("unrelated", "not !list"))
+        self.assertFalse(state.snapshot()["list_show"]["held"])
+        self.assertTrue(receive("on"))
+        self.assertEqual(state.snapshot()["list_show"], {
+            "remaining_ms": 0, "held": True, "sequence": 1,
+        })
+        clock.advance(10000)
+        self.assertTrue(state.snapshot()["list_show"]["held"],
+                        "zero-duration command must have no deadline")
+        self.assertFalse(receive("on"), "duplicated Twitch event was accepted")
+        self.assertEqual(state.snapshot()["list_show"]["sequence"], 1)
+        self.assertTrue(receive("off"))
+        self.assertEqual(state.snapshot()["list_show"], {
+            "remaining_ms": 0, "held": False, "sequence": 2,
+        })
+        self.assertTrue(receive("again"))
+        self.assertTrue(state.snapshot()["list_show"]["held"])
+        self.assertEqual(state.snapshot(for_obs=True)["list_show"],
+                         state.snapshot()["list_show"])
+
+        # Saving a different duration must not cancel the already active
+        # command. The NEXT command follows the newly chosen policy.
+        state.configure_list_show("slide", "!list", 5)
+        self.assertTrue(state.snapshot()["list_show"]["held"])
+        self.assertTrue(receive("timed-on"))
+        self.assertEqual(state.snapshot()["list_show"], {
+            "remaining_ms": 5000, "sequence": 4,
+        })
+        clock.advance(1)
+        self.assertTrue(receive("timed-repeat"))
+        self.assertEqual(state.snapshot()["list_show"], {
+            "remaining_ms": 5000, "sequence": 5,
+        })
+        clock.advance(6)
+        self.assertEqual(state.snapshot()["list_show"]["remaining_ms"], 0)
+        self.assertFalse(state.snapshot()["list_show"].get("held", False))
+        state.configure_list_show("slide", "!list", 0)
+        self.assertTrue(receive("zero-again"))
+        self.assertTrue(state.snapshot()["list_show"]["held"])
+        state.configure_list_show("hidden", "!list", 0)
+        self.assertEqual(state.snapshot()["list_show"].get("held", False), False)
+        self.assertEqual(state.snapshot()["list_show"]["remaining_ms"], 0)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

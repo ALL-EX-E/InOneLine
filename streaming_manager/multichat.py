@@ -72,6 +72,7 @@ class MultichatState:
         self._list_command = ""
         self._list_duration = 30
         self._list_show_until = 0.0
+        self._list_held = False  # duration=0: persistent List until the next command
         self._list_sequence = 0
         self._seen: set[tuple[str, str, str]] = set()
         self._seen_order: deque[tuple[str, str, str]] = deque()
@@ -140,8 +141,8 @@ class MultichatState:
     def configure_list_show(self, mode: str, command: str, duration: int) -> None:
         """Configure one Twitch command timer shared by the two list sources."""
         seconds = int(duration)
-        if not 1 <= seconds <= 120:
-            raise ValueError("List display duration must be from 1 to 120 seconds")
+        if not 0 <= seconds <= 120:
+            raise ValueError("List display duration must be from 0 to 120 seconds")
         with self._lock:
             previous = self._list_mode
             self._list_mode = mode if mode in {"hidden", "always", "slide"} else "always"
@@ -149,6 +150,7 @@ class MultichatState:
             self._list_duration = seconds
             if self._list_mode != "slide" or previous != self._list_mode:
                 self._list_show_until = 0.0
+                self._list_held = False
 
     def set_media_preload(self, platform: str, urls) -> None:
         """Bounded session-only hint for Qt and local OBS image warm-up.
@@ -189,7 +191,16 @@ class MultichatState:
             ):
                 # Trigger at authenticated arrival, not after optional chat delay.
                 # Changing the command never activates previously queued text.
-                self._list_show_until = now + self._list_duration
+                if self._list_duration == 0:
+                    # A shared, server-owned toggle: all OBS URLs observe the
+                    # same state; a duplicated Twitch event cannot toggle twice.
+                    self._list_held = not self._list_held
+                    self._list_show_until = 0.0
+                else:
+                    # Keep the existing timed repeat contract unchanged:
+                    # the next command refreshes the deadline, never hides.
+                    self._list_held = False
+                    self._list_show_until = now + self._list_duration
                 self._list_sequence += 1
             received = self._wall_clock() if message.received_at is None else message.received_at
             item = replace(message, received_at=received)
@@ -289,6 +300,13 @@ class MultichatState:
                 "list_show": {
                     "remaining_ms": int(remaining * 1000) if self._list_mode == "slide" else 0,
                     "sequence": self._list_sequence,
+                    # Preserve exact legacy timed snapshots (remaining_ms,
+                    # sequence). Only the new 0-second policy or an already
+                    # latched show needs the additional optional held field.
+                    **({"held": bool(self._list_held)} if (
+                        self._list_mode == "slide" and
+                        (self._list_duration == 0 or self._list_held)
+                    ) else {}),
                 },
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,

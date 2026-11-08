@@ -1001,67 +1001,49 @@ body.preview .preview-label { display: flex; }
       list.appendChild(createListRow(row));
     });
 
-    scrollCycleHeight = 0;
-    scrollY = 0;
-    pauseUntil = performance.now() + 1800;
+    // Row changes no longer reset the virtual scroll's offscreen phase.
+    scrollY = scrollClock.position();
     applyScroll();
     return true;
   }
 
   function rebuildInfiniteScroll(resetPosition = false) {
-    if (
-      scrollingRows.length === 0 ||
-      listPanel.classList.contains("hidden") ||
-      listViewport.clientHeight <= 1
-    ) {
+    if (scrollingRows.length === 0) {
       scrollCycleHeight = 0;
+      scrollClock.setCycleHeight(0);
       scrollY = 0;
       list.innerHTML = "";
-      scrollingRows.forEach((row) => {
-        list.appendChild(createListRow(row));
-      });
       applyScroll();
       syncScrollLoop();
       return;
     }
+    if (listPanel.classList.contains("hidden") || listViewport.clientHeight <= 1) {
+      // The List is parked or masked: no measurable viewport, but do NOT
+      // reset its scroll phase. Logical time advances independently of rAF.
+      stopScrollLoop();
+      return;
+    }
 
-    const previousCycleHeight = scrollCycleHeight;
-    const previousScrollY = scrollY;
-
-    // Измеряем ровно один цикл уже после размещения панели и применения шрифтов.
+    // Re-measure one loop only when there is actual geometry. The shared
+    // clock carries the current phase across hidden/visible transitions.
     list.innerHTML = "";
-    scrollingRows.forEach((row) => {
-      list.appendChild(createListRow(row));
-    });
-
+    scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
     scrollCycleHeight = list.scrollHeight;
     if (scrollCycleHeight <= 1) {
+      scrollClock.setCycleHeight(0);
       scrollY = 0;
       applyScroll();
       syncScrollLoop();
       return;
     }
-
-    // Создаём запас копий ниже видимой области, чтобы прокрутка выглядела
-    // визуально бесконечной и продолжалась без скачка к началу.
-    const minCopies = Math.max(
-      2,
-      Math.ceil(listViewport.clientHeight / scrollCycleHeight) + 2
-    );
-    for (let i = 1; i < minCopies; i += 1) {
-      scrollingRows.forEach((row) => {
-        list.appendChild(createListRow(row));
-      });
+    const copies = Math.max(2,
+      Math.ceil(listViewport.clientHeight / scrollCycleHeight) + 2);
+    for (let i = 1; i < copies; i += 1) {
+      scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
     }
-
-    if (resetPosition || previousCycleHeight <= 1) {
-      scrollY = 0;
-      pauseUntil = performance.now() + 1800;
-    } else {
-      const progress = previousScrollY / previousCycleHeight;
-      scrollY = (progress * scrollCycleHeight) % scrollCycleHeight;
-    }
-
+    // Deliberately ignore resetPosition on the first visible measurement:
+    // the List may have spent minutes scrolling behind the scenes.
+    scrollY = scrollClock.setCycleHeight(scrollCycleHeight);
     applyScroll();
     syncScrollLoop();
   }
@@ -1107,6 +1089,9 @@ body.preview .preview-label { display: flex; }
         list_enabled: overlayConfig.list_enabled,
         list_side: overlayConfig.list_side,
         list_show_mode: data.visibility?.list?.show_mode,
+        // The saved mode stays "slide" for both hidden and commanded List.
+        // Re-measure on actual visibility changes BEFORE the entrance moves.
+        list_has_area: composer.hasListArea(),
         chat_layout: overlayConfig.list_chat_layout,
         chat_available: composer.hasChatSpace(),
         info_position: overlayConfig.info_position,
@@ -1127,12 +1112,10 @@ body.preview .preview-label { display: flex; }
     }
   }
 
+  const SPEED = 19; // unchanged List pixels per second
+  const scrollClock = IOLListComposition.createScrollClock(SPEED, 2500);
   let scrollY = 0;
-  let lastTime = performance.now();
-  let pauseUntil = performance.now() + 2500;
   let scrollRafId = null;
-  let scrollWakeTimer = null;
-  const SPEED = 19; // logical pixels per second
 
   function applyScroll() {
     list.style.transform = `translateY(${-scrollY}px)`;
@@ -1140,47 +1123,24 @@ body.preview .preview-label { display: flex; }
 
   function stopScrollLoop() {
     if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
-    if (scrollWakeTimer !== null) clearTimeout(scrollWakeTimer);
     scrollRafId = null;
-    scrollWakeTimer = null;
   }
 
   function syncScrollLoop() {
-    if (scrollCycleHeight <= 1) {
+    if (scrollCycleHeight <= 1 || listViewport.clientHeight <= 1) {
       stopScrollLoop();
-      scrollY = 0;
-      applyScroll();
       return;
     }
-    if (scrollRafId !== null || scrollWakeTimer !== null) return;
-    const now = performance.now();
-    if (now < pauseUntil) {
-      scrollWakeTimer = setTimeout(() => {
-        scrollWakeTimer = null;
-        syncScrollLoop();
-      }, Math.max(0, pauseUntil - now));
-      return;
-    }
-    lastTime = now;
-    scrollRafId = requestAnimationFrame(animate);
+    if (scrollRafId === null) scrollRafId = requestAnimationFrame(animate);
   }
 
   function animate(now) {
     scrollRafId = null;
-    if (scrollCycleHeight <= 1) {
-      syncScrollLoop();
+    if (scrollCycleHeight <= 1 || listViewport.clientHeight <= 1) {
+      stopScrollLoop();
       return;
     }
-    if (now < pauseUntil) {
-      syncScrollLoop();
-      return;
-    }
-    const dt = Math.min(0.05, (now - lastTime) / 1000);
-    lastTime = now;
-    scrollY += SPEED * dt;
-    if (scrollY >= scrollCycleHeight) {
-      scrollY = scrollY % scrollCycleHeight;
-    }
+    scrollY = scrollClock.position(now);
     applyScroll();
     scrollRafId = requestAnimationFrame(animate);
   }
