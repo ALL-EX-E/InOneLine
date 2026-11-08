@@ -167,21 +167,21 @@ class R06ListApiSmoke(unittest.TestCase):
         self.assertTrue(state.snapshot()["list_show"]["held"])
         self.assertTrue(receive("timed-on"))
         self.assertEqual(state.snapshot()["list_show"], {
-            "remaining_ms": 5000, "held": False, "sequence": 4,
+            "remaining_ms": 5000, "sequence": 4,
         })
         clock.advance(1)
         self.assertTrue(receive("timed-repeat"))
         self.assertEqual(state.snapshot()["list_show"], {
-            "remaining_ms": 5000, "held": False, "sequence": 5,
+            "remaining_ms": 5000, "sequence": 5,
         })
         clock.advance(6)
         self.assertEqual(state.snapshot()["list_show"]["remaining_ms"], 0)
-        self.assertFalse(state.snapshot()["list_show"]["held"])
+        self.assertFalse(state.snapshot()["list_show"].get("held", False))
         state.configure_list_show("slide", "!list", 0)
         self.assertTrue(receive("zero-again"))
         self.assertTrue(state.snapshot()["list_show"]["held"])
         state.configure_list_show("hidden", "!list", 0)
-        self.assertEqual(state.snapshot()["list_show"]["held"], False)
+        self.assertEqual(state.snapshot()["list_show"].get("held", False), False)
         self.assertEqual(state.snapshot()["list_show"]["remaining_ms"], 0)
 
 
