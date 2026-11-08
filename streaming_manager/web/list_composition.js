@@ -44,6 +44,46 @@
   sheet.textContent = css;
   document.head.appendChild(sheet);
 
+  // Shared monotonic scroll clock for both existing List renderers.
+  // The logical phase continues while an OBS source is hidden/parked or
+  // Chromium throttles its animation frames. Only visible rows need rAF.
+  function createScrollClock(speedPxPerSecond = 19, initialPauseMs = 0) {
+    const startAt = performance.now() + Math.max(0, Number(initialPauseMs) || 0);
+    let cycleHeight = 0;
+    let anchorAt = startAt;
+    let anchorOffset = 0;
+    const wrap = (value, cycle) => ((value % cycle) + cycle) % cycle;
+    function position(at = performance.now()) {
+      if (cycleHeight <= 1) return 0;
+      return wrap(anchorOffset +
+        (Math.max(0, at - anchorAt) / 1000) * speedPxPerSecond, cycleHeight);
+    }
+    function setCycleHeight(nextHeight) {
+      const now = performance.now();
+      const next = Number.isFinite(nextHeight) ? Math.max(0, nextHeight) : 0;
+      if (next <= 1) {
+        cycleHeight = 0;
+        anchorOffset = 0;
+        anchorAt = now;
+        return 0;
+      }
+      const previousOffset = position(now);
+      if (cycleHeight > 1) {
+        // Preserve the relative phase if text/font/rows change live.
+        anchorOffset = (previousOffset / cycleHeight) * next;
+        anchorAt = now;
+      } else {
+        // First visible measurement still includes ALL offscreen time since
+        // source load, instead of silently restarting at the first row.
+        anchorOffset = 0;
+        anchorAt = startAt;
+      }
+      cycleHeight = next;
+      return position(now);
+    }
+    return Object.freeze({position, setCycleHeight});
+  }
+
   function create(root, listLayer, listPanel, chatLayer, onResize, previewEnabled = false, noMotion = false) {
     const iframe = chatLayer.querySelector("iframe");
     let mode = "always";
@@ -589,5 +629,5 @@
       hasListArea: () => active || motion !== null,
     };
   }
-  window.IOLListComposition = Object.freeze({create});
+  window.IOLListComposition = Object.freeze({create, createScrollClock});
 })();
