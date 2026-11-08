@@ -595,12 +595,13 @@
               root.dataset.r06StandalonePhase = "idle";
             }
           } else if (!active) {
-            // The actual entrance direction/duration belong to this command.
-            commandDirection = cfg.list_slide_direction || "top";
-            commandMotionDurationMs = motionDurationMs;
             slidePhase = "enter";
             root.dataset.r06StandalonePhase = "enter";
             if (!reverseZeroCommandMotion(true)) {
+              // A new entrance takes current settings; a reversed in-flight
+              // exit MUST retain the original direction and duration.
+              commandDirection = cfg.list_slide_direction || "top";
+              commandMotionDurationMs = motionDurationMs;
               changeActive(true, seenSnapshot ? "command" : "", commandDirection);
               if (!motion) beginHold();
             }
