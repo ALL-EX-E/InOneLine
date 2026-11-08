@@ -53,6 +53,7 @@ JS = """JSON.stringify((() => {
     listClipPath:getComputedStyle(layer).clipPath,
     chatClipPath:csStyle.clipPath,
     lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
+    lastExit:root.dataset.r06StandaloneLastExit || "",
     phase:root.dataset.r06StandalonePhase || "idle",
     holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
     holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
@@ -413,11 +414,9 @@ def main():
             assert stable["combinedSync"] == "idle", stable
             assert all(any(message in row for row in stable["messageTexts"])
                        for message in chat_lines), stable
-            # Fifth approved scenario: all four Twitch-command directions
-            # reuse the accepted standalone List's motion while the existing
-            # iframe stays full-height until the List has completed entrance.
-            # The already accepted command replacement case above remains
-            # unchanged. Reverse command expiry is deliberately still static.
+            # Fifth accepted scenario: four command entrances. The next
+            # independently approved scenario reuses their precise reverse
+            # frames after the complete hold, leaving replacement untouched.
             db.set_settings_bulk({
                 "combined_list_chat_layout": "split",
                 "list_overlay_show_mode": "slide",
@@ -540,17 +539,97 @@ def main():
                 stable = inspect(view.page())
                 assert stable["entranceCount"] == done["entranceCount"], stable
                 assert stable["phase"] == "hold", stable
+                # The 5s hold begins AFTER the completed 2s entrance.
+                # Expiry must start the exact reverse of the accepted motion.
+                exiting = until(
+                    view.page(),
+                    lambda a: a["combinedSync"] == "command-exit" and
+                              a["motionKind"] == "exit" and
+                              a["phase"] == "exit" and
+                              a["exitCount"] == prior_exit + 1 and
+                              a["lastExit"] == direction,
+                    "reverse command expiry starts " + direction)
+                assert exiting["motionDuration"] == 2000, exiting
+                assert exiting["sameChatFrame"] and exiting["sameChatDocument"], exiting
+                assert exiting["messageCount"] == 4, exiting
+                assert abs(exiting["chatHeight"] - exiting["rootHeight"]) < 3, exiting
+                exit_frames = []
+                for _ in range(16):
+                    frame = inspect(view.page())
+                    if frame["combinedSync"] == "command-exit":
+                        exit_frames.append(frame)
+                        assert frame["motionKind"] == "exit", frame
+                        assert frame["phase"] == "exit", frame
+                        assert frame["exitCount"] == prior_exit + 1, frame
+                        assert frame["lastExit"] == direction, frame
+                        assert frame["messageCount"] == 4, frame
+                        assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                        assert all(any(msg in row for row in frame["messageTexts"])
+                                   for msg in chat_lines), frame
+                        assert float(frame["panelOpacity"]) >= .99, frame
+                        assert frame["panelTransform"] == "none", frame
+                        assert abs(frame["chatHeight"] - frame["rootHeight"]) < 3, frame
+                        assert abs(frame["chatBottom"] -
+                                   (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                        assert frame["chatClipPath"] != "none", frame
+                        own_slot = (frame["rootHeight"] - 12) / 2
+                        chat_clip = frame["chatClipPath"]
+                        if direction == "left":
+                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listRight"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
+                        elif direction == "right":
+                            match = re.search(
+                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listLeft"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
+                        elif direction == "top":
+                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1))
+                            list_edge = frame["listBottom"] - frame["rootTop"]
+                            assert -3 <= mask_edge - list_edge <= 15, frame
+                        else:  # bottom: reverse the reveal in the OWN upper slot.
+                            assert frame["listBottom"] <= (
+                                frame["rootTop"] + own_slot + 3), frame
+                            assert frame["listClipPath"].startswith("inset("), frame
+                            mask_match = re.search(
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                chat_clip)
+                            list_match = re.search(
+                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                            assert mask_match and list_match, frame
+                            assert abs(float(mask_match.group(1)) -
+                                       float(list_match.group(1))) < 4, frame
+                    QTest.qWait(125)
+                assert len(exit_frames) >= 3, (
+                    "Insufficient intermediate reverse expiry frames", direction, exit_frames)
+                assert len({a["chatClipPath"] for a in exit_frames}) >= 3, (
+                    "Reverse chat mask was not continuous", direction, exit_frames)
                 expired = until(
                     view.page(),
                     lambda a: not a["shown"] and a["phase"] == "idle" and
                               a["combinedSync"] == "idle" and
+                              a["motionKind"] == "idle" and
                               a["listHeight"] < 2 and
-                              abs(a["chatHeight"] - a["rootHeight"]) < 3,
-                    "command expiry stays separate and idle " + direction)
-                assert expired["exitCount"] == prior_exit, expired
+                              abs(a["chatHeight"] - a["rootHeight"]) < 3 and
+                              abs(a["chatTop"] - a["rootTop"]) < 2,
+                    "reverse command expiry leaves full chat " + direction)
+                assert expired["exitCount"] == prior_exit + 1, expired
+                assert expired["lastExit"] == direction, expired
+                assert expired["chatClipPath"] == "none", expired
+                assert expired["listClipPath"] == "none", expired
                 assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
                 assert all(any(msg in row for row in expired["messageTexts"])
                            for msg in chat_lines), expired
+                QTest.qWait(600)
+                stable_exit = inspect(view.page())
+                assert stable_exit["exitCount"] == expired["exitCount"], stable_exit
+                assert stable_exit["phase"] == "idle", stable_exit
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()
