@@ -719,8 +719,37 @@ jobs:
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
+          # Keep the accepted exact 7.1.0-x64 installer. The GitHub release
+          # CDN intermittently returns 504, so retry before the official mirror.
           $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
-          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $sources = @(
+            "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe",
+            "https://files.jrsoftware.org/is/7/innosetup-7.1.0-x64.exe"
+          )
+          $downloaded = $false
+          foreach ($source in $sources) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Remove-Item $setup -Force -ErrorAction SilentlyContinue
+                Invoke-WebRequest -Uri $source -OutFile $setup -ErrorAction Stop -TimeoutSec 90
+                if ((Get-Item $setup).Length -lt 1048576) {
+                  throw "Incomplete Inno Setup installer download"
+                }
+                $downloaded = $true
+                break
+              } catch {
+                Write-Warning "Inno Setup 7.1.0 download attempt $attempt failed: $($_.Exception.Message)"
+                if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
+              }
+            }
+            if ($downloaded) { break }
+          }
+          if (!$downloaded) { throw "Unable to download official Inno Setup 7.1.0 from either source" }
+          $signature = Get-AuthenticodeSignature -FilePath $setup
+          if ($signature.Status -ne "Valid" -or
+              $signature.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
+            throw "Inno Setup 7.1.0 publisher signature validation failed"
+          }
           $inno = "$env:RUNNER_TEMP\InnoSetup710"
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
