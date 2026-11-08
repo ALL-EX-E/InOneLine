@@ -65,9 +65,11 @@
     // contract, while the independent combined and main sources retain
     // their previously accepted behavior until their own review.
     const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
-    // Only the separate combined source is in first-scenario QA. The main
-    // embedded copy must follow after its primary source is accepted.
-    const combinedMotion = Boolean(iframe && noMotion && !root.closest("#overlay"));
+    // Both combined OBS placements instantiate the SAME List/chat component.
+    // Its Split + Always Twitch transitions were manually accepted in the
+    // standalone source and now also run in the already-embedded main slot.
+    // Other composition modes keep their separately agreed static behavior.
+    const combinedMotion = Boolean(iframe && noMotion);
     let motionDurationMs = 650;
     let commandMotionDurationMs = 650;
     let showDurationMs = 30000;
