@@ -1089,6 +1089,9 @@ body.preview .preview-label { display: flex; }
         list_enabled: overlayConfig.list_enabled,
         list_side: overlayConfig.list_side,
         list_show_mode: data.visibility?.list?.show_mode,
+        // The saved mode stays "slide" for both hidden and commanded List.
+        // Re-measure on actual visibility changes BEFORE the entrance moves.
+        list_has_area: composer.hasListArea(),
         chat_layout: overlayConfig.list_chat_layout,
         chat_available: composer.hasChatSpace(),
         info_position: overlayConfig.info_position,
