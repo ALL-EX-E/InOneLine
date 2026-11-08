@@ -432,6 +432,11 @@ def main():
                 "command split idle with existing four chat messages")
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
+                # /overlay and /combined-overlay apply saved settings via
+                # their existing 1-second /api/data poll. Wait for the next
+                # full poll before issuing a Twitch command, otherwise this
+                # test races a newly saved direction against the old one.
+                QTest.qWait(1600)
                 baseline = until(
                     view.page(),
                     lambda a: not a["shown"] and a["motionKind"] == "idle" and
