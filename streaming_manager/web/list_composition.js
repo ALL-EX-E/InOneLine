@@ -176,8 +176,10 @@
       // "bottom" variant: reveal upward WITHIN the upper List slot, never by
       // translating the whole panel through the lower Twitch-chat region.
       // Neither method changes opacity, background, or the panel's contents.
-      const frames = revealFromY !== null && entering && direction === "bottom" ?
-        [{clipPath: `inset(${revealFromY}px 0 0 0)`}, {clipPath: "inset(0px 0 0 0)"}] :
+      const frames = revealFromY !== null && direction === "bottom" ?
+        (entering ?
+          [{clipPath: `inset(${revealFromY}px 0 0 0)`}, {clipPath: "inset(0px 0 0 0)"}] :
+          [{clipPath: "inset(0px 0 0 0)"}, {clipPath: `inset(${revealFromY}px 0 0 0)`}]) :
         [{transform: from}, {transform: to}];
       const animation = listLayer.animate(
         frames, {duration: durationMs, easing: "ease-in-out", fill: "both"},
@@ -206,7 +208,9 @@
       const gap = 12;
       const targetChat = Math.floor((available - gap) / 2);
       const targetList = available - targetChat - gap;
-      const duration = motionDurationMs;
+      // Command entrance and reverse exit share the originally captured
+      // duration, even when settings change during the hold.
+      const duration = commandOverChat ? commandMotionDurationMs : motionDurationMs;
       root.classList.add("r06-shown");
       root.classList.remove("r06-not-shown", "r06-replace");
       listLayer.style.flex = "none";
@@ -220,12 +224,13 @@
       chatLayer.style.bottom = "0px";
       chatLayer.style.left = "0px";
       chatLayer.style.right = "0px";
-      chatLayer.style.height = (entering ? available : targetChat) + "px";
+      chatLayer.style.height = (commandOverChat || entering ? available : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
       root.dataset.r06CombinedSync = commandOverChat ?
-        "command-enter" : entering ? "split-enter" : "split-exit";
+        (entering ? "command-enter" : "command-exit") :
+        entering ? "split-enter" : "split-exit";
       if (commandOverChat) {
         // Preserve the full-size iframe during entrance, but reveal the
         // underlying overlay background wherever the List actually passes.
@@ -254,8 +259,11 @@
           fromClip = "inset(0px 0px 0px 0px)";
           toClip = `inset(${topY} 0px 0px 0px)`;
         }
+        // Replay the existing chat mask backwards on command expiry, without
+        // recreating messages or snapping at the split boundary.
         chatMotionAnimation = chatLayer.animate(
-          [{clipPath: fromClip}, {clipPath: toClip}],
+          entering ? [{clipPath: fromClip}, {clipPath: toClip}] :
+            [{clipPath: toClip}, {clipPath: fromClip}],
           {duration, easing: "ease-in-out", fill: "both"},
         );
       } else {
@@ -394,10 +402,11 @@
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
-      if (combinedMotion && next && reason === "command" &&
+      if (combinedMotion &&
+          ((next && reason === "command") || (!next && reason === "expiry")) &&
           composeMode === "split" && chatAvailable && chatAlways &&
           seenSnapshot && root.clientHeight > 0) {
-        beginCombinedSplitAlwaysMotion(true, direction, true);
+        beginCombinedSplitAlwaysMotion(next, direction, true);
         return;
       }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
