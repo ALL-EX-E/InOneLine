@@ -719,40 +719,70 @@ jobs:
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
-          # Keep the accepted exact 7.1.0-x64 installer. The GitHub release
-          # CDN intermittently returns 504, so retry before the official mirror.
+          # Use the accepted exact 7.1.0 compiler. The official release CDN
+          # has been returning HTTP 504; NuGet is a last-resort repackaged
+          # compiler source, never a silent version upgrade.
           $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
-          $sources = @(
-            "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe",
-            "https://files.jrsoftware.org/is/7/innosetup-7.1.0-x64.exe"
-          )
-          $downloaded = $false
-          foreach ($source in $sources) {
-            for ($attempt = 1; $attempt -le 3; $attempt++) {
-              try {
-                Remove-Item $setup -Force -ErrorAction SilentlyContinue
-                Invoke-WebRequest -Uri $source -OutFile $setup -ErrorAction Stop -TimeoutSec 90
-                if ((Get-Item $setup).Length -lt 1048576) {
-                  throw "Incomplete Inno Setup installer download"
-                }
-                $downloaded = $true
-                break
-              } catch {
-                Write-Warning "Inno Setup 7.1.0 download attempt $attempt failed: $($_.Exception.Message)"
-                if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
-              }
-            }
-            if ($downloaded) { break }
-          }
-          if (!$downloaded) { throw "Unable to download official Inno Setup 7.1.0 from either source" }
-          $signature = Get-AuthenticodeSignature -FilePath $setup
-          if ($signature.Status -ne "Valid" -or
-              $signature.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
-            throw "Inno Setup 7.1.0 publisher signature validation failed"
-          }
+          $officialUrl = "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe"
           $inno = "$env:RUNNER_TEMP\InnoSetup710"
-          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          $officialReady = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+              Remove-Item $setup -Force -ErrorAction SilentlyContinue
+              Invoke-WebRequest -Uri $officialUrl -OutFile $setup -ErrorAction Stop -TimeoutSec 90
+              if ((Get-Item $setup).Length -lt 1048576) {
+                throw "Incomplete official Inno Setup download"
+              }
+              $sig = Get-AuthenticodeSignature -FilePath $setup
+              if ($sig.Status -ne "Valid" -or
+                  $sig.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
+                throw "Official Inno Setup publisher signature validation failed"
+              }
+              $officialReady = $true
+              break
+            } catch {
+              Write-Warning "Inno Setup 7.1.0 official download attempt $attempt failed: $($_.Exception.Message)"
+              if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
+            }
+          }
+          if ($officialReady) {
+            $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          } else {
+            # Publicly documented third-party NuGet repack of Inno Setup
+            # 7.1.0 x64. Verify NuGet's SHA512 AND the compiler's upstream
+            # Windows Authenticode signature/version before using its files.
+            $nugetUrl = "https://api.nuget.org/v3-flatcontainer/tools.innosetup/7.1.0/tools.innosetup.7.1.0.nupkg"
+            $package = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.zip"
+            Write-Host "Official release unavailable: trying verified Tools.InnoSetup 7.1.0 NuGet package"
+            Invoke-WebRequest -Uri $nugetUrl -OutFile $package -ErrorAction Stop -TimeoutSec 120
+            $expectedHash = [string](Invoke-RestMethod -Uri "$nugetUrl.sha512" -ErrorAction Stop -TimeoutSec 30)
+            $expectedHash = $expectedHash.Trim()
+            $sha512 = (Get-FileHash -LiteralPath $package -Algorithm SHA512).Hash
+            $actualHash = [Convert]::ToBase64String([Convert]::FromHexString($sha512))
+            if (!$expectedHash -or $actualHash -ne $expectedHash) {
+              throw "Tools.InnoSetup 7.1.0 NuGet SHA512 mismatch"
+            }
+            $extract = "$env:RUNNER_TEMP\InnoSetup710Package"
+            Expand-Archive -LiteralPath $package -DestinationPath $extract -Force
+            $compilerFiles = @(Get-ChildItem -LiteralPath $extract -Recurse -File -Filter "ISCC.exe")
+            if ($compilerFiles.Count -ne 1) {
+              throw "Unexpected Tools.InnoSetup package compiler count: $($compilerFiles.Count)"
+            }
+            $compiler = $compilerFiles[0]
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($compiler.FullName).FileVersion
+            if (!$version -or !$version.StartsWith("7.1.0")) {
+              throw "Incorrect Tools.InnoSetup compiler file version: $version"
+            }
+            $signature = Get-AuthenticodeSignature -FilePath $compiler.FullName
+            if ($signature.Status -ne "Valid" -or
+                $signature.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
+              throw "Tools.InnoSetup compiler upstream signature validation failed"
+            }
+            New-Item -ItemType Directory -Path $inno -Force | Out-Null
+            Copy-Item -Path (Join-Path $compiler.DirectoryName "*") -Destination $inno -Recurse -Force
+            Write-Host "Verified Inno Setup $version compiler from pinned NuGet 7.1.0 package"
+          }
           if (!(Test-Path "$inno\ISCC.exe")) { throw "ISCC.exe missing" }
 
       - name: Build installer regression
