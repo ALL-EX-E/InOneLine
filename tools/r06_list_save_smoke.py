@@ -137,9 +137,28 @@ def main() -> int:
             assert stream.obs_show_modes["list"].currentData() == "slide"
             # Visible help uses the existing form and tracks its List slide field.
             hint = stream.list_slide_duration_hint
-            assert hint.isVisible() and hint.wordWrap()
+            host = stream.list_slide_duration_host
+            duration_control = stream.list_slide_duration_control
+            assert hint.isVisible() and hint.wordWrap() and host.isVisible()
             assert "0 сек." in hint.text() and "повторная скрывает" in hint.text()
             assert "1–120 сек." in hint.text() and "продлевает" in hint.text()
+            assert hint.parentWidget() is host
+            assert duration_control.parentWidget() is host
+            assert host.layout().count() == 2
+            assert host.layout().spacing() == 3
+            margins = host.layout().contentsMargins()
+            assert all(v == 0 for v in (
+                margins.left(), margins.top(), margins.right(), margins.bottom()
+            ))
+            assert stream.overlay_form.getWidgetPosition(hint)[0] == -1, (
+                "Help must not occupy an independently expanding form row"
+            )
+            row, _ = stream.overlay_form.getWidgetPosition(host)
+            assert row >= 0 and stream.overlay_form.labelForField(host).text() == (
+                "Время показа:"
+            )
+            vertical_gap = hint.y() - (duration_control.y() + duration_control.height())
+            assert 0 <= vertical_gap <= 5, vertical_gap
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "r06-cmd-1", "viewer", "!list"
             ))
