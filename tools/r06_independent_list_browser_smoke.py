@@ -150,7 +150,7 @@ def main():
                          10, 0, STATUS_NOT_PLAYED, ""))
         for row in range(14):
             db.add_game(Game(None, f"QA scrolling row {row:02d}", "2026-01-01",
-                             9 - row, 0, STATUS_NOT_PLAYED, ""))
+                             100 - row, 0, STATUS_NOT_PLAYED, ""))
         db.set_settings_bulk({
             "list_overlay_show_mode": "always",
             "list_slide_duration": "5",
