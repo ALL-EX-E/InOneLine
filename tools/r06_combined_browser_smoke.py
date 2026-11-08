@@ -551,7 +551,13 @@ def main():
                     "reverse command expiry starts " + direction)
                 assert exiting["motionDuration"] == 2000, exiting
                 assert exiting["sameChatFrame"] and exiting["sameChatDocument"], exiting
-                assert exiting["messageCount"] == 4, exiting
+                # Twitch commands are ordinary chat messages: the command
+                # itself can already be rendered as a fifth (or later) card.
+                # Preserve all four original texts and the iframe, without
+                # incorrectly interpreting an additional card as data loss.
+                assert exiting["messageCount"] >= 4, exiting
+                assert all(any(msg in row for row in exiting["messageTexts"])
+                           for msg in chat_lines), exiting
                 assert abs(exiting["chatHeight"] - exiting["rootHeight"]) < 3, exiting
                 exit_frames = []
                 for _ in range(16):
@@ -562,7 +568,7 @@ def main():
                         assert frame["phase"] == "exit", frame
                         assert frame["exitCount"] == prior_exit + 1, frame
                         assert frame["lastExit"] == direction, frame
-                        assert frame["messageCount"] == 4, frame
+                        assert frame["messageCount"] >= 4, frame
                         assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
                         assert all(any(msg in row for row in frame["messageTexts"])
                                    for msg in chat_lines), frame
