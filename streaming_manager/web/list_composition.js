@@ -160,12 +160,12 @@
       // The visible-time countdown starts AFTER all entrance frames finish.
       slidePhase = "hold";
       const holdStart = performance.now();
-      showUntil = holdStart + showDurationMs;
+      showUntil = showDurationMs > 0 ? holdStart + showDurationMs : 0;
       root.dataset.r06StandalonePhase = "hold";
       root.dataset.r06StandaloneHoldStartMs = String(holdStart);
       root.dataset.r06StandaloneHoldDurationMs = String(showDurationMs);
       if (expiryTimer !== null) clearTimeout(expiryTimer);
-      expiryTimer = setTimeout(expire, showDurationMs);
+      expiryTimer = showDurationMs > 0 ? setTimeout(expire, showDurationMs) : null;
     }
 
     function finishListMotion() {
@@ -182,6 +182,37 @@
       }
       lastGeometry = "";
       layout();
+    }
+
+    function reverseZeroCommandMotion(next) {
+      // Reuse the running WAAPI animations when a second 0-second Twitch
+      // command arrives mid-transition: reverse from the ACTUAL current
+      // frame instead of snapping to a target geometry first.
+      if (!motionAnimation || (next ? motion !== "exit" : motion !== "enter")) {
+        return false;
+      }
+      active = next;
+      motion = next ? "enter" : "exit";
+      slidePhase = motion;
+      root.dataset.r06StandalonePhase = motion;
+      root.dataset.r06StandaloneMotionKind = motion;
+      if (combinedMotion) root.dataset.r06CombinedSync = motion;
+      if (next) {
+        root.dataset.r06StandaloneLastEntrance = commandDirection;
+        root.dataset.r06StandaloneEntranceCount =
+          String((Number(root.dataset.r06StandaloneEntranceCount) || 0) + 1);
+      } else {
+        root.dataset.r06StandaloneLastExit = commandDirection;
+        root.dataset.r06StandaloneExitCount =
+          String((Number(root.dataset.r06StandaloneExitCount) || 0) + 1);
+      }
+      motionAnimation.reverse();
+      if (chatMotionAnimation) chatMotionAnimation.reverse();
+      if (motionTimeout !== null) clearTimeout(motionTimeout);
+      motionTimeout = setTimeout(() => {
+        if (motionAnimation) finishListMotion();
+      }, commandMotionDurationMs + 50);
+      return true;
     }
 
     function beginStandaloneListMotion(
@@ -524,9 +555,10 @@
         // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
         const nextShowDuration = Math.round(
-          Math.max(1, Math.min(120, Number.isFinite(requestedShow)
+          Math.max(0, Math.min(120, Number.isFinite(requestedShow)
             ? requestedShow : 30)) * 1000
         );
+        const serverHeld = trigger.held === true;
         const sequence = Number(trigger.sequence || 0);
         const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
         const sequenceChanged = lastSequence !== sequence;
@@ -536,7 +568,7 @@
         // next 1-second browser poll. A changed sequence after initial load
         // is nevertheless a NEW authenticated Twitch event and must play.
         const newCommand = mode === "slide" && sequenceChanged &&
-          (remaining > 0 || (seenSnapshot && sequence > 0));
+          (remaining > 0 || serverHeld || (seenSnapshot && sequence > 0));
         if (mode !== "slide") {
           slidePhase = "idle";
           showUntil = 0;
@@ -546,31 +578,38 @@
           const visible = mode === "always";
           changeActive(visible, seenSnapshot ? (visible ? "always" : "hide") : "");
         } else if (newCommand) {
-          // Capture duration and direction for this entire command. A later
-          // settings Save cannot redirect an exit half-way through the cycle.
+          // Duration 0 is a server-owned toggle, not a zero-length timer.
+          // For positive durations keep the accepted repeated-command hold.
           if (expiryTimer !== null) clearTimeout(expiryTimer);
           expiryTimer = null;
-          showDurationMs = nextShowDuration;
+          showDurationMs = serverHeld ? 0 : nextShowDuration;
           showUntil = 0;
-          if (!active) {
-            // The reverse exit must use the boundary the List ACTUALLY
-            // entered from. Repeated commands while visible refresh only
-            // the hold, even if the user changed the direction meanwhile.
+          if (nextShowDuration === 0 && !serverHeld) {
+            slidePhase = "exit";
+            root.dataset.r06StandalonePhase = "exit";
+            if (!reverseZeroCommandMotion(false)) {
+              changeActive(false, "expiry", commandDirection);
+            }
+            if (!motion) {
+              slidePhase = "idle";
+              root.dataset.r06StandalonePhase = "idle";
+            }
+          } else if (!active) {
+            // The actual entrance direction/duration belong to this command.
             commandDirection = cfg.list_slide_direction || "top";
             commandMotionDurationMs = motionDurationMs;
             slidePhase = "enter";
             root.dataset.r06StandalonePhase = "enter";
-            changeActive(true, seenSnapshot ? "command" : "",
-                         commandDirection);
-            // Initial page load may intentionally show without motion.
-            if (!motion) beginHold();
+            if (!reverseZeroCommandMotion(true)) {
+              changeActive(true, seenSnapshot ? "command" : "", commandDirection);
+              if (!motion) beginHold();
+            }
           } else if (motion === "enter") {
             slidePhase = "enter";
             root.dataset.r06StandalonePhase = "enter";
-            // A second command during entrance continues the same entrance;
-            // a fresh full hold begins once the animation finishes.
+            // Timed repeats continue their entrance; toggle repeats above
+            // reverse it without snapping or touching the Twitch iframe.
           } else {
-            // Already fully visible. Restart the hold timer, not the entrance.
             beginHold();
           }
         } else if (mode !== previousMode) {
@@ -604,7 +643,7 @@
         deadline = 0;
       }
       const shouldShow = mode === "always" ||
-        (mode === "slide" && deadline > performance.now());
+        (mode === "slide" && (trigger.held === true || deadline > performance.now()));
       if (mode !== previousMode) lastGeometry = "";
       changeActive(shouldShow,
         mode === "always" ? "always" : mode === "hidden" ? "hide" : "");
