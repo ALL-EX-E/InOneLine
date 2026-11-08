@@ -166,12 +166,10 @@ html, body {
   let scrollingRows = [];
   let lastRowsKey = "";
   let lastMetricsKey = "";
+  const scrollClock = IOLListComposition.createScrollClock(SPEED, 1800);
   let cycleHeight = 0;
   let scrollY = 0;
-  let pauseUntil = performance.now() + 1800;
-  let lastTime = performance.now();
   let scrollRafId = null;
-  let scrollWakeTimer = null;
 
   function normalizeHexColor(value, fallback = "#FFFFFF") {
     const text = String(value || "").trim();
@@ -292,45 +290,43 @@ html, body {
     // Не сбрасываем scrollY/cycleHeight/pauseUntil при live-обновлении данных.
     // rebuildInfiniteScroll(false) сохранит относительную позицию текущего цикла,
     // даже если после изменения баллов SM строки пересортировались.
+    scrollY = scrollClock.position();
     applyScroll();
     return true;
   }
 
   function rebuildInfiniteScroll(reset = false) {
-    if (scrollingRows.length === 0 || viewport.clientHeight <= 1) {
+    if (scrollingRows.length === 0) {
       cycleHeight = 0;
+      scrollClock.setCycleHeight(0);
       scrollY = 0;
       list.innerHTML = "";
-      scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
       applyScroll();
       syncScrollLoop();
       return;
     }
-
-    const oldHeight = cycleHeight;
-    const oldScroll = scrollY;
+    if (viewport.clientHeight <= 1) {
+      // Do not erase the virtual clock or loop height when the List is
+      // hidden. A new source can join at the current offscreen phase.
+      stopScrollLoop();
+      return;
+    }
 
     list.innerHTML = "";
     scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
     cycleHeight = list.scrollHeight;
     if (cycleHeight <= 1) {
+      scrollClock.setCycleHeight(0);
       scrollY = 0;
       applyScroll();
       syncScrollLoop();
       return;
     }
-
     const copies = Math.max(2, Math.ceil(viewport.clientHeight / cycleHeight) + 2);
     for (let i = 1; i < copies; i += 1) {
       scrollingRows.forEach((row) => list.appendChild(createListRow(row)));
     }
-
-    if (reset || oldHeight <= 1) {
-      scrollY = 0;
-      pauseUntil = performance.now() + 1800;
-    } else {
-      scrollY = ((oldScroll / oldHeight) * cycleHeight) % cycleHeight;
-    }
+    scrollY = scrollClock.setCycleHeight(cycleHeight);
     applyScroll();
     syncScrollLoop();
   }
@@ -398,45 +394,24 @@ html, body {
 
   function stopScrollLoop() {
     if (scrollRafId !== null) cancelAnimationFrame(scrollRafId);
-    if (scrollWakeTimer !== null) clearTimeout(scrollWakeTimer);
     scrollRafId = null;
-    scrollWakeTimer = null;
   }
 
   function syncScrollLoop() {
-    if (cycleHeight <= 1) {
+    if (cycleHeight <= 1 || viewport.clientHeight <= 1) {
       stopScrollLoop();
-      scrollY = 0;
-      applyScroll();
       return;
     }
-    if (scrollRafId !== null || scrollWakeTimer !== null) return;
-    const now = performance.now();
-    if (now < pauseUntil) {
-      scrollWakeTimer = setTimeout(() => {
-        scrollWakeTimer = null;
-        syncScrollLoop();
-      }, Math.max(0, pauseUntil - now));
-      return;
-    }
-    lastTime = now;
-    scrollRafId = requestAnimationFrame(animate);
+    if (scrollRafId === null) scrollRafId = requestAnimationFrame(animate);
   }
 
   function animate(now) {
     scrollRafId = null;
-    if (cycleHeight <= 1) {
-      syncScrollLoop();
+    if (cycleHeight <= 1 || viewport.clientHeight <= 1) {
+      stopScrollLoop();
       return;
     }
-    if (now < pauseUntil) {
-      syncScrollLoop();
-      return;
-    }
-    const dt = Math.min(.05, (now - lastTime) / 1000);
-    lastTime = now;
-    scrollY += SPEED * dt;
-    if (scrollY >= cycleHeight) scrollY %= cycleHeight;
+    scrollY = scrollClock.position(now);
     applyScroll();
     scrollRafId = requestAnimationFrame(animate);
   }
