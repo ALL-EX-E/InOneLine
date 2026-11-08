@@ -719,11 +719,74 @@ jobs:
       - name: Install Inno Setup 7.1.0
         shell: pwsh
         run: |
+          # Use the accepted exact 7.1.0 compiler. The official release CDN
+          # has been returning HTTP 504; NuGet is a last-resort repackaged
+          # compiler source, never a silent version upgrade.
           $setup = "$env:RUNNER_TEMP\innosetup-7.1.0-x64.exe"
-          Invoke-WebRequest -Uri "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe" -OutFile $setup
+          $officialUrl = "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe"
           $inno = "$env:RUNNER_TEMP\InnoSetup710"
-          $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          $officialReady = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+              Remove-Item $setup -Force -ErrorAction SilentlyContinue
+              Invoke-WebRequest -Uri $officialUrl -OutFile $setup -ErrorAction Stop -TimeoutSec 90
+              if ((Get-Item $setup).Length -lt 1048576) {
+                throw "Incomplete official Inno Setup download"
+              }
+              $sig = Get-AuthenticodeSignature -FilePath $setup
+              if ($sig.Status -ne "Valid" -or
+                  $sig.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
+                throw "Official Inno Setup publisher signature validation failed"
+              }
+              $officialReady = $true
+              break
+            } catch {
+              Write-Warning "Inno Setup 7.1.0 official download attempt $attempt failed: $($_.Exception.Message)"
+              if ($attempt -lt 3) { Start-Sleep -Seconds (2 * $attempt) }
+            }
+          }
+          if ($officialReady) {
+            $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$inno" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "Inno Setup install failed: $($p.ExitCode)" }
+          } else {
+            # Publicly documented third-party NuGet repack of Inno Setup
+            # 7.1.0 x64. Verify NuGet's SHA512 AND the compiler's upstream
+            # Windows Authenticode signature/version before using its files.
+            $nugetUrl = "https://api.nuget.org/v3-flatcontainer/tools.innosetup/7.1.0/tools.innosetup.7.1.0.nupkg"
+            $package = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.nupkg"
+            Write-Host "Official release unavailable: trying verified Tools.InnoSetup 7.1.0 NuGet package"
+            Invoke-WebRequest -Uri $nugetUrl -OutFile $package -ErrorAction Stop -TimeoutSec 120
+            if ((Get-Item $package).Length -lt 1048576) {
+              throw "Incomplete Tools.InnoSetup 7.1.0 NuGet package"
+            }
+            # NuGet.org repository-signs packages; verify the actual signed
+            # nupkg instead of relying on a missing .nupkg.sha512 sidecar.
+            & dotnet nuget verify $package --all --verbosity normal
+            if ($LASTEXITCODE -ne 0) {
+              throw "Tools.InnoSetup 7.1.0 NuGet package signature verification failed"
+            }
+            $zipCopy = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.zip"
+            Copy-Item $package $zipCopy -Force
+            $extract = "$env:RUNNER_TEMP\InnoSetup710Package"
+            Expand-Archive -LiteralPath $zipCopy -DestinationPath $extract -Force
+            $compilerFiles = @(Get-ChildItem -LiteralPath $extract -Recurse -File -Filter "ISCC.exe")
+            if ($compilerFiles.Count -ne 1) {
+              throw "Unexpected Tools.InnoSetup package compiler count: $($compilerFiles.Count)"
+            }
+            $compiler = $compilerFiles[0]
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($compiler.FullName).FileVersion
+            if (!$version -or !$version.StartsWith("7.1.0")) {
+              throw "Incorrect Tools.InnoSetup compiler file version: $version"
+            }
+            $signature = Get-AuthenticodeSignature -FilePath $compiler.FullName
+            if ($signature.Status -ne "Valid" -or
+                $signature.SignerCertificate.Subject -notmatch "Pyrsys B.V.") {
+              throw "Tools.InnoSetup compiler upstream signature validation failed"
+            }
+            New-Item -ItemType Directory -Path $inno -Force | Out-Null
+            Copy-Item -Path (Join-Path $compiler.DirectoryName "*") -Destination $inno -Recurse -Force
+            Write-Host "Verified Inno Setup $version compiler from pinned NuGet 7.1.0 package"
+          }
           if (!(Test-Path "$inno\ISCC.exe")) { throw "ISCC.exe missing" }
 
       - name: Build installer regression
@@ -1108,13 +1171,16 @@ jobs:
           compression-level: 0
 
       - name: Package R06 candidate QA from tested installer
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108')
         shell: pwsh
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item "installer\output\InOneLine_Setup_1.0.9.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
+          if ($env:GITHUB_HEAD_REF -eq "candidate/r06-main-embedded-shared-composition-20261108") {
+            Copy-Item "docs\qa\R06-main-embedded-parity-checklist.md" "$out\CHECKLIST_MAIN_OBS_COMBINED.md"
+          }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
           $installer = Get-Item "$out\InOneLine_R06_Setup_CANDIDATE.exe"
@@ -1135,7 +1201,7 @@ jobs:
           Write-Host "R06_SOURCE_SHA256=$sourceSha"
 
       - name: Upload R06 candidate QA bundle
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility'
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108')
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_R06_CANDIDATE_QA

@@ -181,6 +181,34 @@ body.preview .preview-label { display: flex; }
   flex-direction: column;
 }
 #list-panel.hidden { display: none; }
+/* Frame geometry shared by the main OBS side-column panels and camera.
+   Each panel still owns its existing independent user-selected color. */
+#overlay .side-column .panel {
+  border-width: 3px;
+  box-shadow:
+    0 0 7px var(--local-frame-glow-strong, var(--frame-glow-strong)),
+    0 0 20px var(--local-frame-glow-soft, var(--frame-glow-soft)),
+    inset 0 0 10px var(--local-frame-glow-inner, var(--frame-glow-inner));
+}
+/* One outer frame in the embedded Split + Always Twitch composition.
+   Eliminate the two inner glowing, rounded frames at the moving 12px seam.
+   Border/glow colors still come from the user's existing List controls;
+   background, content, typography and Twitch cards remain independent.
+   Do not affect standalone /combined-overlay or other main OBS modes. */
+#overlay #list-composition.r06-main-split-always-shell {
+  border: 3px solid var(--local-frame-border, var(--frame-border));
+  box-shadow:
+    0 0 7px var(--local-frame-glow-strong, var(--frame-glow-strong)),
+    0 0 20px var(--local-frame-glow-soft, var(--frame-glow-soft)),
+    inset 0 0 10px var(--local-frame-glow-inner, var(--frame-glow-inner));
+  border-radius: 8px;
+}
+#overlay #list-composition.r06-main-split-always-shell #list-panel,
+#overlay #list-composition.r06-main-split-always-shell #list-chat {
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
 #top-three {
   flex: 0 0 auto;
 }
@@ -638,6 +666,9 @@ body.preview .preview-label { display: flex; }
     applyElementGlowColor(frame, colors.game || legacy);
     applyElementGlowColor(webcamFrame, colors.webcam || legacy);
     applyElementGlowColor(listPanel, colors.list || legacy);
+    // The accepted main combined Shell draws the same user-selected List
+    // frame when the two internal outlines are suppressed.
+    applyElementGlowColor(listComposition, colors.list || legacy);
     applyElementGlowColor(infoPanel, colors.info || legacy);
   }
 
