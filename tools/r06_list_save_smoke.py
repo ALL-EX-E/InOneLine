@@ -135,6 +135,11 @@ def main() -> int:
             stream.show()
             app.processEvents()
             assert stream.obs_show_modes["list"].currentData() == "slide"
+            # Visible help uses the existing form and tracks its List slide field.
+            hint = stream.list_slide_duration_hint
+            assert hint.isVisible() and hint.wordWrap()
+            assert "0 сек." in hint.text() and "повторная скрывает" in hint.text()
+            assert "1–120 сек." in hint.text() and "продлевает" in hint.text()
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "r06-cmd-1", "viewer", "!list"
             ))
@@ -205,6 +210,7 @@ def main() -> int:
             print("R06_LIST_SAVE_SLIDE_TIMER_AND_DRAFTS_PASS", flush=True)
 
             set_mode(stream, "hidden")
+            assert not hint.isVisible()
             save_list(stream, db, api)
             assert state.snapshot()["list_show"]["remaining_ms"] == 0
             assert get_data(api)["visibility"]["list"]["show_mode"] == "hidden"
@@ -213,6 +219,7 @@ def main() -> int:
             print("R06_LIST_SAVE_HIDDEN_RESET_PASS", flush=True)
 
             set_mode(stream, "slide")
+            assert hint.isVisible()
             save_list(stream, db, api)
             assert state.snapshot()["list_show"]["remaining_ms"] == 0
             assert state.ingest(ChatMessage(
@@ -223,11 +230,13 @@ def main() -> int:
                 "remaining_ms": 7500, "sequence": 2,
             }
             set_mode(stream, "always")
+            assert not hint.isVisible()
             save_list(stream, db, api)
             assert state.snapshot()["list_show"]["remaining_ms"] == 0
             assert get_data(api)["visibility"]["list"]["show_mode"] == "always"
             assert get_data(api)["overlay"]["list_enabled"] is True
             set_mode(stream, "slide")
+            assert hint.isVisible()
             save_list(stream, db, api)
             assert state.snapshot()["list_show"]["remaining_ms"] == 0
             assert state.snapshot()["list_show"]["sequence"] == 2
