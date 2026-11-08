@@ -445,12 +445,33 @@ class StreamTab(QWidget):
             up_tooltip="Увеличить время показа списка",
             down_tooltip="Уменьшить время показа списка",
         )
-        overlay_form.addRow("Время показа:", self.list_slide_duration_control)
         self.list_slide_duration.setToolTip(
             "0 сек. — первая Twitch-команда показывает список до повторной команды; "
             "повторная команда скрывает его. 1–120 сек. — стандартный таймер: "
             "повторная команда продлевает показ, но не скрывает список."
         )
+        self.list_slide_duration_hint = QLabel(
+            "Режим «Выезд»: 0 сек. — первая команда Twitch показывает список "
+            "до повторной команды, повторная скрывает. "
+            "1–120 сек. — показ по таймеру; повторная команда продлевает показ, "
+            "но не скрывает список."
+        )
+        self.list_slide_duration_hint.setWordWrap(True)
+        self.list_slide_duration_hint.setProperty("muted", True)
+        self.list_slide_duration_hint.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Maximum
+        )
+        # One form row: avoid the excessive height of a separate wrapped QLabel row.
+        self.list_slide_duration_host = QWidget()
+        self.list_slide_duration_host.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Maximum
+        )
+        self.list_slide_duration_layout = QVBoxLayout(self.list_slide_duration_host)
+        self.list_slide_duration_layout.setContentsMargins(0, 0, 0, 0)
+        self.list_slide_duration_layout.setSpacing(3)
+        self.list_slide_duration_layout.addWidget(self.list_slide_duration_control)
+        self.list_slide_duration_layout.addWidget(self.list_slide_duration_hint)
+        overlay_form.addRow("Время показа:", self.list_slide_duration_host)
 
         # Independent speed control. Do not repurpose legacy
         # list_animation_seconds, which is used by old chat geometry.
@@ -2522,7 +2543,7 @@ class StreamTab(QWidget):
             )
         if hasattr(self, "list_slide_direction"):
             slide = self.obs_show_modes["list"].currentData() == "slide"
-            for control in (self.list_slide_direction, self.list_slide_duration_control,
+            for control in (self.list_slide_direction, self.list_slide_duration_host,
                             self.list_slide_command):
                 # The motion speed also governs Always/Hidden transitions.
                 # Keep its independent setting visible in every List mode.
