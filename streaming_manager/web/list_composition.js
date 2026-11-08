@@ -584,7 +584,7 @@
           expiryTimer = null;
           showDurationMs = serverHeld ? 0 : nextShowDuration;
           showUntil = 0;
-          if (nextShowDuration === 0 && !serverHeld) {
+          if (nextShowDuration === 0 && trigger.held === false) {
             slidePhase = "exit";
             root.dataset.r06StandalonePhase = "exit";
             if (!reverseZeroCommandMotion(false)) {
