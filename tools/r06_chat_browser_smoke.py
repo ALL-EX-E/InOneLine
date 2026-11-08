@@ -100,6 +100,8 @@ METRICS = """JSON.stringify((() => {
     iframeStable:!window.__r06MainQaFrame || frame === window.__r06MainQaFrame,
     documentStable:!window.__r06MainQaDocument || doc === window.__r06MainQaDocument,
     hasSentinel:[...(cards?.children || [])].some(x=>x.textContent.includes('R06 ZERO visible chat')),
+    scrollTransform:document.getElementById('game-list')?.style.transform || '',
+    scrollRows:document.querySelectorAll('#game-list .game-row').length,
     count:cards?.children.length ?? -1,
     shellRadius:shell ? doc.defaultView.getComputedStyle(shell).borderRadius : null,
     cardRadius:firstCard ? doc.defaultView.getComputedStyle(firstCard).borderRadius : null,
@@ -383,6 +385,65 @@ def main():
                     assert after["iframeStable"] and after["documentStable"], after
                     assert after["exitCount"] == previous_exit+1, after
                     assert_main_shared_shell(after, "main command restored 100% chat")
+
+            # New 0-second mode: server state stays ON until the next unique
+            # Twitch command; the same main compositor uses the accepted
+            # full chat mask and reversible 2-second entrance/exit.
+            db.set_settings_bulk({
+                "list_slide_duration":"0",
+                "list_slide_direction":"left",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            QTest.qWait(1600)
+            for page in pages:
+                idle = until(page, lambda a: not a["shown"] and
+                             a["combinedSync"] == "idle",
+                             "main zero toggle initially hidden")
+                prior_exit = idle["exitCount"]
+            QTest.qWait(1900)  # Offscreen clock must not reset on show.
+            assert state.ingest(ChatMessage(
+                "twitch", "chan", "main-zero-on", "qa_viewer", "!list"
+            ))
+            for page in pages:
+                opening = until(page, lambda a: a["motionKind"] == "enter" and
+                                a["lastEntrance"] == "left",
+                                "main zero command entrance")
+                assert_main_shared_shell(opening, "zero command entrance shell")
+                held_zero = until(page, lambda a: a["shown"] and
+                                  a["phase"] == "hold" and
+                                  a["combinedSync"] == "idle" and
+                                  a["scrollRows"] > 4,
+                                  "main zero command held indefinitely")
+                assert held_zero["iframeStable"] and held_zero["hasSentinel"], held_zero
+                assert held_zero["scrollTransform"] not in ("", "translateY(0px)"), (
+                    "Main hidden List restarted its scroll on command", held_zero
+                )
+                assert_main_shared_shell(held_zero, "zero held 50/50")
+            QTest.qWait(1800)
+            for page in pages:
+                still = evaluate(page, METRICS)
+                assert still["shown"] and still["exitCount"] == prior_exit, (
+                    "0-second command expired without second Twitch event", still
+                )
+            assert not state.ingest(ChatMessage(
+                "twitch", "chan", "main-zero-on", "qa_viewer", "!list"
+            ))
+            assert state.ingest(ChatMessage(
+                "twitch", "chan", "main-zero-off", "qa_viewer", "!list"
+            ))
+            for page in pages:
+                closing = until(page, lambda a: a["motionKind"] == "exit" and
+                                a["lastExit"] == "left" and
+                                a["exitCount"] == prior_exit+1,
+                                "main zero command reverse exit")
+                assert_main_shared_shell(closing, "zero command exit shell")
+                hidden_zero = until(page, lambda a: not a["shown"] and
+                                    a["phase"] == "idle" and
+                                    a["combinedSync"] == "idle" and
+                                    abs(a["chatHeight"]-a["rootHeight"]) <= 3,
+                                    "main zero command restored full Twitch chat")
+                assert hidden_zero["hasSentinel"] and hidden_zero["iframeStable"], hidden_zero
+                assert_main_shared_shell(hidden_zero, "zero hidden 100% chat")
 
             # Restore unchanged hide-empty mode for its original static
             # command tests; it is NOT part of the accepted combined motion.
