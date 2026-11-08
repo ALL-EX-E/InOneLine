@@ -70,6 +70,7 @@
     // standalone source and now also run in the already-embedded main slot.
     // Other composition modes keep their separately agreed static behavior.
     const combinedMotion = Boolean(iframe && noMotion);
+    const mainEmbedded = Boolean(root.closest("#overlay"));
     let motionDurationMs = 650;
     let commandMotionDurationMs = 650;
     let showDurationMs = 30000;
@@ -461,6 +462,11 @@
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
+      // Main OBS only: one visual outer frame for the accepted Split +
+      // permanent-Twitch composition. The standalone combined source and
+      // user-controlled List/chat contents retain their original styling.
+      root.classList.toggle("r06-main-split-always-shell",
+        mainEmbedded && composeMode === "split" && chatAvailable && chatAlways);
       const seconds = Number(cfg.list_animation_seconds);
       chatResizeSeconds = Number.isFinite(seconds) ?
         Math.max(0.25, Math.min(3, seconds)) : 1;
