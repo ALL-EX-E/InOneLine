@@ -436,7 +436,7 @@ class StreamTab(QWidget):
         overlay_form.addRow("Направление выезда:", self.list_slide_direction)
 
         self.list_slide_duration = ScrollSafeSpinBox()
-        self.list_slide_duration.setRange(1, 120)
+        self.list_slide_duration.setRange(0, 120)
         self.list_slide_duration.setValue(30)
         self.list_slide_duration.setSuffix(" сек.")
         self.list_slide_duration.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -446,6 +446,11 @@ class StreamTab(QWidget):
             down_tooltip="Уменьшить время показа списка",
         )
         overlay_form.addRow("Время показа:", self.list_slide_duration_control)
+        self.list_slide_duration.setToolTip(
+            "0 сек. — первая Twitch-команда показывает список до повторной команды; "
+            "повторная команда скрывает его. 1–120 сек. — стандартный таймер: "
+            "повторная команда продлевает показ, но не скрывает список."
+        )
 
         # Independent speed control. Do not repurpose legacy
         # list_animation_seconds, which is used by old chat geometry.
@@ -2665,7 +2670,7 @@ class StreamTab(QWidget):
             seconds = int(setting("list_slide_duration", "30"))
         except (TypeError, ValueError):
             seconds = 30
-        self.list_slide_duration.setValue(max(1, min(120, seconds)))
+        self.list_slide_duration.setValue(max(0, min(120, seconds)))
         try:
             animation_seconds = float(setting("list_slide_animation_seconds", "0.65"))
         except (TypeError, ValueError):
