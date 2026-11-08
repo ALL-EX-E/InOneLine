@@ -1,12 +1,13 @@
-"""Separate R06 combined OBS URL: accepted empty/nonempty Always-chat motion.
+"""Separate R06 combined OBS URL: accepted split and Twitch-command motions.
 
-Verifies split/replace contracts, both empty-chat transitions, and both
-nonempty Always-chat transitions without message loss/iframe recreation.
+Verifies split/replace contracts, both empty/nonempty Always-chat directions,
+plus four command entrance directions over chat without iframe/message loss.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -46,8 +47,15 @@ JS = """JSON.stringify((() => {
   return {
     ready:true, shown:root.classList.contains("r06-shown"),
     replace:root.classList.contains("r06-replace"),
-    rootHeight:rs.height, rootTop:rs.top,
+    rootHeight:rs.height, rootTop:rs.top, rootLeft:rs.left, rootWidth:rs.width,
     listHeight:ls.height, listTop:ls.top, listBottom:ls.bottom,
+    listLeft:ls.left, listRight:ls.right, layerTransform:getComputedStyle(layer).transform,
+    listClipPath:getComputedStyle(layer).clipPath,
+    chatClipPath:csStyle.clipPath,
+    lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
+    phase:root.dataset.r06StandalonePhase || "idle",
+    holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
+    holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
     chatHeight:cs.height, chatTop:cs.top, chatBottom:cs.bottom,
     combinedSync:root.dataset.r06CombinedSync || "idle",
     motionKind:root.dataset.r06StandaloneMotionKind || "idle",
@@ -405,6 +413,144 @@ def main():
             assert stable["combinedSync"] == "idle", stable
             assert all(any(message in row for row in stable["messageTexts"])
                        for message in chat_lines), stable
+            # Fifth approved scenario: all four Twitch-command directions
+            # reuse the accepted standalone List's motion while the existing
+            # iframe stays full-height until the List has completed entrance.
+            # The already accepted command replacement case above remains
+            # unchanged. Reverse command expiry is deliberately still static.
+            db.set_settings_bulk({
+                "combined_list_chat_layout": "split",
+                "list_overlay_show_mode": "slide",
+                "list_slide_animation_seconds": "2.00",
+                "list_slide_duration": "5",
+            })
+            api.configure_list_show("slide", "!list", 5)
+            until(
+                view.page(),
+                lambda a: not a["shown"] and a["messageCount"] == 4 and
+                          a["listHeight"] < 2 and
+                          abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                "command split idle with existing four chat messages")
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+                baseline = until(
+                    view.page(),
+                    lambda a: not a["shown"] and a["motionKind"] == "idle" and
+                              abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                    "command idle before " + direction)
+                prior_enter = baseline["entranceCount"]
+                prior_exit = baseline["exitCount"]
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "combined-cmd-" + direction, "qa_viewer", "!list"
+                )), direction
+                with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                    accepted = json.load(response)
+                assert accepted["list_show"]["remaining_ms"] > 3000, accepted
+                started = until(
+                    view.page(),
+                    lambda a: a["combinedSync"] == "command-enter" and
+                              a["motionKind"] == "enter" and
+                              a["entranceCount"] > prior_enter and
+                              a["lastEntrance"] == direction,
+                    "four-direction combined command entrance " + direction)
+                assert started["motionDuration"] == 2000, started
+                assert abs(started["chatHeight"] - started["rootHeight"]) < 3, started
+                assert started["sameChatFrame"] and started["sameChatDocument"], started
+                frames = []
+                for _ in range(16):
+                    frame = inspect(view.page())
+                    if frame["combinedSync"] == "command-enter":
+                        frames.append(frame)
+                        assert abs(frame["chatHeight"] - frame["rootHeight"]) < 3, frame
+                        assert abs(frame["chatTop"] - frame["rootTop"]) < 3, frame
+                        assert abs(frame["chatBottom"] -
+                                   (frame["rootTop"] + frame["rootHeight"])) < 2, frame
+                        assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                        assert all(any(msg in row for row in frame["messageTexts"])
+                                   for msg in chat_lines), frame
+                        assert float(frame["panelOpacity"]) >= .99, frame
+                        assert frame["motionKind"] == "enter", frame
+                        assert frame["chatClipPath"] != "none", frame
+                        # The masked chat edge must track the ACTUAL moving
+                        # List footprint, not just change after it arrives.
+                        own_slot = (frame["rootHeight"] - 12) / 2
+                        chat_clip = frame["chatClipPath"]
+                        if direction == "left":
+                            assert frame["listLeft"] <= frame["rootLeft"] + 3, frame
+                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listRight"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
+                        elif direction == "right":
+                            assert frame["listLeft"] >= frame["rootLeft"] - 3, frame
+                            match = re.search(
+                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
+                            list_edge = frame["listLeft"] - frame["rootLeft"]
+                            assert abs(mask_edge - list_edge) < 15, frame
+                        elif direction == "top":
+                            assert frame["listTop"] <= frame["rootTop"] + 3, frame
+                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            assert match, frame
+                            mask_edge = float(match.group(1))
+                            list_edge = frame["listBottom"] - frame["rootTop"]
+                            assert -3 <= mask_edge - list_edge <= 15, frame
+                        elif direction == "bottom":
+                            # The old test checked only listTop and missed
+                            # that the entire translated List extended into
+                            # the lower CHAT region. Now its bottom never
+                            # extends beyond its own upper slot, at ANY frame.
+                            assert frame["listTop"] >= frame["rootTop"] - 3, frame
+                            assert frame["listBottom"] <= (
+                                frame["rootTop"] + own_slot + 3), frame
+                            assert frame["listClipPath"].startswith("inset("), frame
+                            mask_match = re.search(
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                chat_clip)
+                            list_match = re.search(
+                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                            assert mask_match and list_match, frame
+                            # The dividing mask moves with the visible top of
+                            # the upward-revealed List, including the 12px gap.
+                            assert abs(float(mask_match.group(1)) -
+                                       float(list_match.group(1))) < 4, frame
+                    QTest.qWait(125)
+                assert len(frames) >= 3, (
+                    "Insufficient intermediate combined command frames", direction, frames)
+                assert len({a["chatClipPath"] for a in frames}) >= 3, (
+                    "Chat cover did not continuously move with List", direction, frames)
+                done = until(
+                    view.page(),
+                    lambda a: a["shown"] and a["combinedSync"] == "idle" and
+                              a["motionKind"] == "idle" and a["phase"] == "hold" and
+                              a["holdDurationMs"] == 5000 and
+                              abs(a["listHeight"] - a["chatHeight"]) < 18 and
+                              9 <= a["chatTop"] - a["listBottom"] <= 15,
+                    "combined command settled to split after " + direction)
+                assert done["holdAgeMs"] < 1000, done
+                assert done["sameChatFrame"] and done["sameChatDocument"], done
+                assert done["chatClipPath"] == "none", done
+                assert done["listClipPath"] == "none", done
+                assert 9 <= done["chatTop"] - done["listBottom"] <= 15, done
+                assert all(any(msg in row for row in done["messageTexts"])
+                           for msg in chat_lines), done
+                QTest.qWait(600)
+                stable = inspect(view.page())
+                assert stable["entranceCount"] == done["entranceCount"], stable
+                assert stable["phase"] == "hold", stable
+                expired = until(
+                    view.page(),
+                    lambda a: not a["shown"] and a["phase"] == "idle" and
+                              a["combinedSync"] == "idle" and
+                              a["listHeight"] < 2 and
+                              abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                    "command expiry stays separate and idle " + direction)
+                assert expired["exitCount"] == prior_exit, expired
+                assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
+                assert all(any(msg in row for row in expired["messageTexts"])
+                           for msg in chat_lines), expired
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()

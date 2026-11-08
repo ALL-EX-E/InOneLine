@@ -1,6 +1,6 @@
 /* R06 List + Twitch-chat composition shared by both OBS sources.
-   The standalone List motion is also reused by the approved first combined
-   split entry; only the chat/list geometry is coordinated for that scenario.
+   The standalone List motion is reused by the accepted combined split
+   transitions and the four-direction command entrance over Twitch chat.
    Unapproved combined transitions keep their previous behavior. */
 (() => {
   "use strict";
@@ -130,7 +130,7 @@
       const wasEntering = motion === "enter";
       const wasExiting = motion === "exit";
       cancelListMotion();
-      if (standaloneMotion && mode === "slide") {
+      if ((standaloneMotion || combinedMotion) && mode === "slide") {
         if (wasEntering && slidePhase === "enter" && active) beginHold();
         else if (wasExiting && slidePhase === "exit") {
           slidePhase = "idle";
@@ -143,7 +143,7 @@
 
     function beginStandaloneListMotion(
       entering, direction, durationMs = motionDurationMs,
-      travelDistance = null, skipInitialLayout = false
+      travelDistance = null, skipInitialLayout = false, revealFromY = null
     ) {
       // Shared List movement (same Web Animations timing and opacity contract).
       // Separate List travels across its whole source; in combined mode the
@@ -172,11 +172,15 @@
         root.dataset.r06StandaloneExitCount =
           String((Number(root.dataset.r06StandaloneExitCount) || 0) + 1);
       }
-      // Translate only the List layer. Root clipping hides its motion outside
-      // the OBS source; opacity, panel background and border stay unchanged.
+      // Translate the existing List layer, except for the accepted combined
+      // "bottom" variant: reveal upward WITHIN the upper List slot, never by
+      // translating the whole panel through the lower Twitch-chat region.
+      // Neither method changes opacity, background, or the panel's contents.
+      const frames = revealFromY !== null && entering && direction === "bottom" ?
+        [{clipPath: `inset(${revealFromY}px 0 0 0)`}, {clipPath: "inset(0px 0 0 0)"}] :
+        [{transform: from}, {transform: to}];
       const animation = listLayer.animate(
-        [{transform: from}, {transform: to}],
-        {duration: durationMs, easing: "ease-in-out", fill: "both"},
+        frames, {duration: durationMs, easing: "ease-in-out", fill: "both"},
       );
       motionAnimation = animation;
       // In case WebEngine delays the finish callback while hidden, keep the
@@ -190,10 +194,13 @@
       }, durationMs + 50);
     }
 
-    function beginCombinedSplitAlwaysMotion(entering) {
-      // Always-chat: reuse the List's accepted top motion for both entrance
-      // and reverse exit, with empty or nonempty chat. Only the chat region's
-      // upper edge changes; the iframe and its messages are preserved.
+    function beginCombinedSplitAlwaysMotion(
+      entering, direction = "top", commandOverChat = false
+    ) {
+      // Reuse the List's accepted motion. Settings-driven Always entrance and
+      // exit synchronize the chat edge; a command keeps chat full-height while
+      // the List passes above it, restoring static split only after entrance.
+      // Only child layers move; iframe and messages remain the same.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
       const gap = 12;
@@ -217,16 +224,55 @@
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
-      root.dataset.r06CombinedSync = entering ? "split-enter" : "split-exit";
-      const startChat = entering ? available : targetChat;
-      const endChat = entering ? targetChat : available;
-      chatMotionAnimation = chatLayer.animate(
-        [{height: startChat + "px"}, {height: endChat + "px"}],
-        {duration, easing: "ease-in-out", fill: "both"},
+      root.dataset.r06CombinedSync = commandOverChat ?
+        "command-enter" : entering ? "split-enter" : "split-exit";
+      if (commandOverChat) {
+        // Preserve the full-size iframe during entrance, but reveal the
+        // underlying overlay background wherever the List actually passes.
+        // Without this moving CHAT clip, transparent List backgrounds show
+        // Twitch messages beneath the List, followed by a sudden final cut.
+        // The clipping edge follows the List's shared ease-in-out clock and
+        // includes the accepted 12px separation between the final regions.
+        const edge = targetList + gap;
+        const topY = edge + "px";
+        let fromClip;
+        let toClip;
+        if (direction === "left") {
+          fromClip = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},0% ${topY})`;
+          toClip = `polygon(100% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},100% ${topY})`;
+        } else if (direction === "right") {
+          fromClip = `polygon(0% 0%,100% 0%,100% ${topY},100% ${topY},100% 100%,0% 100%)`;
+          toClip = `polygon(0% 0%,0% 0%,0% ${topY},100% ${topY},100% 100%,0% 100%)`;
+        } else if (direction === "bottom") {
+          // Two still-visible chat pieces: above the rising List and below
+          // its own slot. Both join without a jump when entrance finishes.
+          const bottomClip = y =>
+            `polygon(0% 0%,100% 0%,100% ${y}px,0% ${y}px,0% ${topY},100% ${topY},100% 100%,0% 100%)`;
+          fromClip = bottomClip(edge);
+          toClip = bottomClip(0);
+        } else {
+          fromClip = "inset(0px 0px 0px 0px)";
+          toClip = `inset(${topY} 0px 0px 0px)`;
+        }
+        chatMotionAnimation = chatLayer.animate(
+          [{clipPath: fromClip}, {clipPath: toClip}],
+          {duration, easing: "ease-in-out", fill: "both"},
+        );
+      } else {
+        const startChat = entering ? available : targetChat;
+        const endChat = entering ? targetChat : available;
+        chatMotionAnimation = chatLayer.animate(
+          [{height: startChat + "px"}, {height: endChat + "px"}],
+          {duration, easing: "ease-in-out", fill: "both"},
+        );
+      }
+      // Shared List engine owns the exact same timing for both layers. The
+      // final static 50/50 flex geometry replaces the completely clipped
+      // full-size chat without an unmasked intermediate frame.
+      beginStandaloneListMotion(
+        entering, direction, duration, targetList, true,
+        commandOverChat && direction === "bottom" ? targetList + gap : null,
       );
-      // The shared List engine owns the exact easing, direction and duration.
-      // Its completion restores the accepted static 50/50 or 0/100 layout.
-      beginStandaloneListMotion(entering, "top", duration, targetList, true);
     }
 
     function measureChat() {
@@ -348,6 +394,12 @@
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
+      if (combinedMotion && next && reason === "command" &&
+          composeMode === "split" && chatAvailable && chatAlways &&
+          seenSnapshot && root.clientHeight > 0) {
+        beginCombinedSplitAlwaysMotion(true, direction, true);
+        return;
+      }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
           (reason === "hide" || reason === "always" ||
            reason === "command" || reason === "expiry")) {
@@ -361,7 +413,8 @@
     }
 
     function expire() {
-      if (standaloneMotion) {
+      if (standaloneMotion ||
+          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
         if (mode === "slide" && slidePhase === "hold" &&
             showUntil && performance.now() >= showUntil) {
           showUntil = 0;
@@ -408,9 +461,10 @@
         Math.max(0.10, Math.min(10, Number.isFinite(requestedAnimation)
           ? requestedAnimation : 0.65)) * 1000
       );
-      if (standaloneMotion) {
-        // Independent List uses a local phase clock: entrance time never
-        // consumes the saved fully-visible hold time.
+      if (standaloneMotion ||
+          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
+        // Share the local phase clock with the approved combined command
+        // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
         const nextShowDuration = Math.round(
           Math.max(1, Math.min(120, Number.isFinite(requestedShow)
@@ -476,8 +530,8 @@
         return;
       }
 
-      // Main and independent combined sources retain their old server-owned
-      // expiry semantics until their separate interaction review.
+      // Main and other combined modes retain server-owned expiry semantics;
+      // only the approved split Always-chat command entrance uses local hold.
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
       if (mode === "slide") {
