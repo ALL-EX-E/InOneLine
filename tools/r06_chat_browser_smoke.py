@@ -62,7 +62,8 @@ METRICS = """JSON.stringify((() => {
         shell=doc?.getElementById('shell'),
         firstCard=cards?.firstElementChild,
         pc=panel&&getComputedStyle(panel),
-        cc=chat&&getComputedStyle(chat);
+        cc=chat&&getComputedStyle(chat),
+        rc=getComputedStyle(root);
   if (!root || !layer || !panel || !chat) return {ready:false};
   const r=root.getBoundingClientRect(),
         l=layer.getBoundingClientRect(),
@@ -84,6 +85,18 @@ METRICS = """JSON.stringify((() => {
     exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
     chatClipPath:cc.clipPath,
     listClipPath:getComputedStyle(layer).clipPath,
+    mainUnifiedShell:root.classList.contains('r06-main-split-always-shell'),
+    rootRadius:rc.borderRadius,
+    rootBorderWidth:rc.borderTopWidth,
+    rootBorderColor:rc.borderTopColor,
+    rootBoxShadow:rc.boxShadow,
+    panelBorderWidth:pc.borderTopWidth,
+    panelRadius:pc.borderRadius,
+    panelBoxShadow:pc.boxShadow,
+    chatBorderWidth:cc.borderTopWidth,
+    chatRadius:cc.borderRadius,
+    chatBoxShadow:cc.boxShadow,
+    panelBackground:pc.backgroundColor,
     iframeStable:!window.__r06MainQaFrame || frame === window.__r06MainQaFrame,
     documentStable:!window.__r06MainQaDocument || doc === window.__r06MainQaDocument,
     hasSentinel:[...(cards?.children || [])].some(x=>x.textContent.includes('R06 ZERO visible chat')),
@@ -110,6 +123,20 @@ def until(page, predicate, label, timeout=32):
             return recent
         QTest.qWait(140)
     raise AssertionError(f"{label} timeout: {recent!r}")
+
+
+def assert_main_shared_shell(state, label):
+    assert state['mainUnifiedShell'], (label, state)
+    assert state['rootRadius'] == '8px', (label, state)
+    assert state['rootBorderWidth'] == '1px', (label, state)
+    assert state['rootBoxShadow'] != 'none', (label, state)
+    # This removes competing outlines and rounded corners at the moving
+    # List/chat divider without changing separately customized contents.
+    assert state['panelBorderWidth'] == '0px', (label, state)
+    assert state['chatBorderWidth'] == '0px', (label, state)
+    assert state['panelRadius'] == state['chatRadius'] == '0px', (label, state)
+    assert state['panelBoxShadow'] == state['chatBoxShadow'] == 'none', (label, state)
+    assert state['panelOpacity'] >= 0.99, (label, state)
 
 
 def static_check(state, label):
@@ -173,6 +200,7 @@ def main():
                           0 < a["chatHeight"] < a["rootHeight"],
                           "fixed-height always-chat / split")
                 static_check(m, "always-chat split")
+                assert_main_shared_shell(m, "main static 50/50")
 
             # Main /overlay already embeds the shared List/chat component.
             # The accepted Save transitions must use that same engine here.
@@ -199,6 +227,7 @@ def main():
                     abs(a["chatHeight"]-a["rootHeight"]) <= 3,
                     "shared main Save exit leaves full chat")
                 static_check(m, "hidden")
+                assert_main_shared_shell(m, "main static 100% chat")
 
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 20)
@@ -215,6 +244,7 @@ def main():
                     a["listHeight"] > 10 and a["chatHeight"] > 10,
                     "shared main Save entrance settles")
                 static_check(m, "restore always")
+                assert_main_shared_shell(m, "main static restored split")
 
             # Hide-empty mode only reserves room when a message exists.
             db.set_setting("multichat_appearance_common",
@@ -223,6 +253,8 @@ def main():
                 m = until(page, lambda a: a["shown"] and a["chatHeight"] == 0,
                           "hide-empty chat releases its area")
                 static_check(m, "empty chat")
+                assert not m['mainUnifiedShell'], m
+                assert m['panelBorderWidth'] == '1px', m
 
             assert state.ingest(ChatMessage("twitch", "chan", "zero-message",
                                             "alice", "R06 ZERO visible chat"))
@@ -269,6 +301,7 @@ def main():
                              abs(a["chatHeight"]-a["rootHeight"]) <= 3,
                              "main combined command idle")
                 assert idle["hasSentinel"], idle
+                assert_main_shared_shell(idle, "main command before entrance")
                 evaluate(page,
                     "(window.__r06MainQaFrame=document.querySelector("
                     "'#list-chat iframe'),window.__r06MainQaDocument="
@@ -306,6 +339,7 @@ def main():
                             assert point["hasSentinel"], point
                             assert point["iframeStable"] and point["documentStable"], point
                             assert abs(point["chatBottomGap"]) <= 3, point
+                            assert_main_shared_shell(point, "main command moving seam")
                         QTest.qWait(125)
                     assert len(entry) >= 2, (direction, entry)
                     assert len({p["chatClipPath"] for p in entry}) >= 2, entry
@@ -317,6 +351,7 @@ def main():
                     assert held["chatClipPath"] == "none", held
                     assert held["iframeStable"] and held["documentStable"], held
                     assert held["chatHeight"] > 10 and held["listHeight"] > 10, held
+                    assert_main_shared_shell(held, "main command stable 50/50")
                     reverse = until(
                         page, lambda a: a["combinedSync"] == "command-exit"
                         and a["motionKind"] == "exit" and
@@ -333,6 +368,7 @@ def main():
                             assert point["hasSentinel"], point
                             assert point["iframeStable"] and point["documentStable"], point
                             assert abs(point["chatBottomGap"]) <= 3, point
+                            assert_main_shared_shell(point, "main command moving seam")
                         QTest.qWait(125)
                     assert len(retreat) >= 2, retreat
                     assert len({p["chatClipPath"] for p in retreat}) >= 2, retreat
@@ -346,6 +382,7 @@ def main():
                     assert after["hasSentinel"], after
                     assert after["iframeStable"] and after["documentStable"], after
                     assert after["exitCount"] == previous_exit+1, after
+                    assert_main_shared_shell(after, "main command restored 100% chat")
 
             # Restore unchanged hide-empty mode for its original static
             # command tests; it is NOT part of the accepted combined motion.
