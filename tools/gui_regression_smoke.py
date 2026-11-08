@@ -1276,7 +1276,7 @@ def assert_p09_list_group(app, stream, db) -> None:
     # Previously saved combined composition keys remain in SQLite but have
     # no controls in the independent List section.
     for widget in (
-        stream.list_slide_direction, stream.list_slide_duration_control,
+        stream.list_slide_direction, stream.list_slide_duration_host,
         stream.list_slide_animation_control, stream.list_slide_command,
     ):
         if not (positions[0] < form.getWidgetPosition(widget)[0] < positions[1]):
@@ -1284,8 +1284,14 @@ def assert_p09_list_group(app, stream, db) -> None:
     # Windows native QSpinBox triangles are too small and have unreliable
     # hitboxes. Reuse the existing external controls from the Timer widgets.
     duration_control = stream.list_slide_duration_control
-    if form.indexOf(duration_control) < 0 or form.indexOf(stream.list_slide_duration) >= 0:
-        raise AssertionError("R06 duration row must own the arrow-wrapper widget")
+    duration_host = stream.list_slide_duration_host
+    if (form.indexOf(duration_host) < 0
+            or form.indexOf(duration_control) >= 0
+            or form.indexOf(stream.list_slide_duration) >= 0
+            or not duration_host.isAncestorOf(duration_control)
+            or not duration_host.isAncestorOf(stream.list_slide_duration_hint)
+            or form.labelForField(duration_host).text() != "Время показа:"):
+        raise AssertionError("R06 compact duration row must own the arrow-wrapper and hint")
     if stream.list_slide_duration.buttonSymbols() != QAbstractSpinBox.ButtonSymbols.NoButtons:
         raise AssertionError("R06 native List spinbox arrows were not disabled")
     arrows = {
