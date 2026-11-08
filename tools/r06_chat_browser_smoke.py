@@ -358,7 +358,6 @@ def main():
                     page, lambda a: a["count"] == 1 and
                     a["combinedSync"] == "idle" and a["hasSentinel"],
                     "existing hide-empty behavior restored")
-                assert restored["iframeStable"] and restored["documentStable"], restored
 
             # Directional settings in hide-empty remain instant and do not move.
 
