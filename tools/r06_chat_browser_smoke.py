@@ -275,6 +275,11 @@ def main():
                     "window.__r06MainQaFrame.contentDocument,true)")
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
+                # /overlay and /combined-overlay apply saved settings via
+                # their existing 1-second /api/data poll. Wait for the next
+                # full poll before issuing a Twitch command, otherwise this
+                # test races a newly saved direction against the old one.
+                QTest.qWait(1600)
                 for page in pages:
                     idle = until(page, lambda a: not a["shown"] and
                                  a["combinedSync"] == "idle" and
