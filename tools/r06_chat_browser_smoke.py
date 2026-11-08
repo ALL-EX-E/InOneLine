@@ -128,7 +128,7 @@ def until(page, predicate, label, timeout=32):
 def assert_main_shared_shell(state, label):
     assert state['mainUnifiedShell'], (label, state)
     assert state['rootRadius'] == '8px', (label, state)
-    assert state['rootBorderWidth'] == '1px', (label, state)
+    assert state['rootBorderWidth'] == '3px', (label, state)
     assert state['rootBoxShadow'] != 'none', (label, state)
     # This removes competing outlines and rounded corners at the moving
     # List/chat divider without changing separately customized contents.
@@ -254,7 +254,7 @@ def main():
                           "hide-empty chat releases its area")
                 static_check(m, "empty chat")
                 assert not m['mainUnifiedShell'], m
-                assert m['panelBorderWidth'] == '1px', m
+                assert m['panelBorderWidth'] == '3px', m
 
             assert state.ingest(ChatMessage("twitch", "chan", "zero-message",
                                             "alice", "R06 ZERO visible chat"))
