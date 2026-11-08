@@ -753,18 +753,22 @@ jobs:
             # 7.1.0 x64. Verify NuGet's SHA512 AND the compiler's upstream
             # Windows Authenticode signature/version before using its files.
             $nugetUrl = "https://api.nuget.org/v3-flatcontainer/tools.innosetup/7.1.0/tools.innosetup.7.1.0.nupkg"
-            $package = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.zip"
+            $package = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.nupkg"
             Write-Host "Official release unavailable: trying verified Tools.InnoSetup 7.1.0 NuGet package"
             Invoke-WebRequest -Uri $nugetUrl -OutFile $package -ErrorAction Stop -TimeoutSec 120
-            $expectedHash = [string](Invoke-RestMethod -Uri "$nugetUrl.sha512" -ErrorAction Stop -TimeoutSec 30)
-            $expectedHash = $expectedHash.Trim()
-            $sha512 = (Get-FileHash -LiteralPath $package -Algorithm SHA512).Hash
-            $actualHash = [Convert]::ToBase64String([Convert]::FromHexString($sha512))
-            if (!$expectedHash -or $actualHash -ne $expectedHash) {
-              throw "Tools.InnoSetup 7.1.0 NuGet SHA512 mismatch"
+            if ((Get-Item $package).Length -lt 1048576) {
+              throw "Incomplete Tools.InnoSetup 7.1.0 NuGet package"
             }
+            # NuGet.org repository-signs packages; verify the actual signed
+            # nupkg instead of relying on a missing .nupkg.sha512 sidecar.
+            & dotnet nuget verify $package --all --verbosity normal
+            if ($LASTEXITCODE -ne 0) {
+              throw "Tools.InnoSetup 7.1.0 NuGet package signature verification failed"
+            }
+            $zipCopy = "$env:RUNNER_TEMP\Tools.InnoSetup.7.1.0.zip"
+            Copy-Item $package $zipCopy -Force
             $extract = "$env:RUNNER_TEMP\InnoSetup710Package"
-            Expand-Archive -LiteralPath $package -DestinationPath $extract -Force
+            Expand-Archive -LiteralPath $zipCopy -DestinationPath $extract -Force
             $compilerFiles = @(Get-ChildItem -LiteralPath $extract -Recurse -File -Filter "ISCC.exe")
             if ($compilerFiles.Count -ne 1) {
               throw "Unexpected Tools.InnoSetup package compiler count: $($compilerFiles.Count)"
