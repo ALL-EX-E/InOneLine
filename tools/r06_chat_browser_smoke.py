@@ -63,7 +63,7 @@ METRICS = """JSON.stringify((() => {
         firstCard=cards?.firstElementChild,
         pc=panel&&getComputedStyle(panel),
         cc=chat&&getComputedStyle(chat),
-        rc=getComputedStyle(root);
+        rc=root&&getComputedStyle(root);
   if (!root || !layer || !panel || !chat) return {ready:false};
   const r=root.getBoundingClientRect(),
         l=layer.getBoundingClientRect(),
