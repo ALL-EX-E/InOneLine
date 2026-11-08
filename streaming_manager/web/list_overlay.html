@@ -377,6 +377,7 @@ html, body {
         width: viewport.clientWidth,
         height: viewport.clientHeight,
         list_mode: data.visibility?.list?.show_mode,
+        list_has_area: composer.hasListArea(),
         chat_available: composer.hasChatSpace(),
       });
       if (rowsChanged || metricsKey !== lastMetricsKey) {
