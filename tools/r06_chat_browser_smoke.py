@@ -264,10 +264,10 @@ def main():
                                             "alice", "R06 ZERO visible chat"))
             for page in pages:
                 m = until(page, lambda a: a["shown"] and a["count"] == 1 and
-                          a["chatHeight"] > 15,
-                          "dynamic Twitch chat gets message and intrinsic height")
+                          a["chatHeight"] > 15 and not a["mainUnifiedShell"] and
+                          a["chatTransition"].startswith("1.5s"),
+                          "dynamic Twitch chat settles to hide-empty intrinsic height")
                 static_check(m, "dynamic chat", dynamic_chat=True)
-                assert m["chatTransition"].startswith("1.5s"), m
                 assert m["shellRadius"] == m["cardRadius"] == "8px", (
                     "Original Twitch cards must match shell radius in the main OBS source", m)
 
