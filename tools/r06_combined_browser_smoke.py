@@ -910,7 +910,14 @@ def main():
                     a["lastEntrance"] == direction,
                     "hide-empty Replace enters " + direction,
                     dynamic_chat=True)
-                assert entered["chatClipPath"].startswith("inset("), entered
+                expectedMask = "polygon(" if direction in ("left", "right") else "inset("
+                occluded = until(view.page(), lambda a:
+                    a["motionKind"] == "enter" and
+                    a["chatClipPath"].startswith(expectedMask) and
+                    0 < a["chatHeight"] <= a["rootHeight"] + 3,
+                    "Replace hides only chat beneath moving List " + direction,
+                    dynamic_chat=True)
+                assert occluded["sameChatFrame"] and occluded["sameChatDocument"], occluded
                 held = until(view.page(), lambda a:
                     a["shown"] and a["replace"] and a["phase"] == "hold" and
                     a["listHeight"] >= a["rootHeight"] - 3,
@@ -932,6 +939,79 @@ def main():
                     dynamic_chat=True)
                 assert exposed["sameChatFrame"] and exposed["sameChatDocument"], exposed
                 assert exposed["messageCount"] >= held["messageCount"], exposed
+
+            # Video regression: new Twitch messages arrive while the List is
+            # MOVING. The old composer froze layout() until motion finished,
+            # then snapped the chat frame to a new height. Explicitly assert
+            # live content-sized frames and bottom anchoring in both modes.
+            for composition in ("split", "replace"):
+                db.set_settings_bulk({
+                    "combined_list_chat_layout": composition,
+                    "list_slide_animation_seconds": "3.00",
+                    "list_slide_direction": "left",
+                    "list_slide_duration": "0",
+                })
+                api.configure_list_show("slide", "!list", 0)
+                state.clear_chat("twitch", "ch")
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-first-" + composition,
+                    "qa_viewer", "One short Twitch row before motion"))
+                before = until(view.page(), lambda a:
+                    not a["shown"] and a["messageCount"] == 1 and
+                    a["appliedComposeMode"] == composition and
+                    a["appliedDirection"] == "left" and
+                    10 < a["chatHeight"] < a["rootHeight"] / 2,
+                    "natural single-message chat before motion " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-on-" + composition,
+                    "qa_viewer", "!list"))
+                entry = until(view.page(), lambda a:
+                    a["motionKind"] == "enter" and a["motionDuration"] == 3000 and
+                    a["lastEntrance"] == "left",
+                    "three-second dynamic entrance " + composition,
+                    dynamic_chat=True)
+                assert entry["chatHeight"] < entry["rootHeight"] / 2, entry
+                for index in range(9):
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "video-grow-" + composition + str(index),
+                        "qa_viewer", "Chat row arrives WHILE List moves " + str(index)))
+                growing = until(view.page(), lambda a:
+                    a["motionKind"] == "enter" and a["messageCount"] >= 10 and
+                    a["chatHeight"] > entry["chatHeight"] + 25 and
+                    abs(a["chatBottom"] - (a["rootTop"] + a["rootHeight"])) <= 4,
+                    "chat grows continuously DURING List entrance " + composition,
+                    dynamic_chat=True)
+                assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
+                held = until(view.page(), lambda a:
+                    a["phase"] == "hold" and a["motionKind"] == "idle",
+                    "new live frame reaches List hold " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-off-" + composition,
+                    "qa_viewer", "!list"))
+                reverse = until(view.page(), lambda a:
+                    a["motionKind"] == "exit" and a["motionDuration"] == 3000 and
+                    a["lastExit"] == "left",
+                    "three-second reverse List exit " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-exit-grow-" + composition,
+                    "qa_viewer", "Additional message while List retreats"))
+                latest = until(view.page(), lambda a:
+                    a["motionKind"] == "exit" and a["messageCount"] >= 11 and
+                    abs(a["chatBottom"] - (a["rootTop"] + a["rootHeight"])) <= 4,
+                    "chat remains bottom-anchored during reverse exit " + composition,
+                    dynamic_chat=True)
+                assert latest["sameChatFrame"] and latest["sameChatDocument"], latest
+                settled = until(view.page(), lambda a:
+                    a["motionKind"] == "idle" and not a["shown"] and
+                    a["messageCount"] >= 11 and
+                    10 < a["chatHeight"] <= a["rootHeight"] + 3,
+                    "chat preserves natural height and messages after exit " + composition,
+                    dynamic_chat=True)
+                assert settled["sameChatFrame"] and settled["sameChatDocument"], settled
+            print("R06_COMBINED_VIDEO_LIVE_RESIZE_PASS", flush=True)
 
             # Positive hold is independent of 1-second motion; a repeat extends
             # the full hold instead of hiding as in zero-second toggle.
