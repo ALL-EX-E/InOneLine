@@ -200,8 +200,9 @@ def main():
                            json.dumps({"visibility":"always"}))
             for page in pages:
                 m = until(page, lambda a: a["shown"] and
-                          0 < a["chatHeight"] < a["rootHeight"],
-                          "fixed-height always-chat / split")
+                          0 < a["chatHeight"] < a["rootHeight"] and
+                          a["chatTransition"] == "0s" and a["mainUnifiedShell"],
+                          "fixed-height always-chat / split settled")
                 static_check(m, "always-chat split")
                 assert_main_shared_shell(m, "main static 50/50")
 
