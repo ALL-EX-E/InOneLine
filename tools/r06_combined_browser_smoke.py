@@ -167,11 +167,25 @@ def main():
                 "Combined command did not activate server timer",
                 command_data["list_show"],
             )
-            until(view.page(), lambda a: a["shown"] and a["replace"] and
-                  a["listHeight"] >= a["rootHeight"] - 3,
-                  "command replacement, instant without opacity animation")
+            entering = until(view.page(), lambda a:
+                             a["combinedSync"] == "replace-command-enter" and
+                             a["motionKind"] == "enter",
+                             "command replacement shares List entry clock")
+            assert entering["motionDuration"] >= 650, entering
+            assert entering["chatClipPath"].startswith("inset("), entering
+            shown = until(view.page(), lambda a: a["shown"] and a["replace"] and
+                          a["phase"] == "hold" and
+                          a["listHeight"] >= a["rootHeight"] - 3,
+                          "replacement fills whole area after its entrance")
+            assert shown["holdDurationMs"] == 15000, shown
+            exiting = until(view.page(), lambda a:
+                            a["combinedSync"] == "replace-command-exit" and
+                            a["motionKind"] == "exit",
+                            "command replacement reverse expiry")
+            assert exiting["chatClipPath"].startswith("inset("), exiting
             until(view.page(), lambda a: not a["shown"] and not a["replace"] and
-                  a["listHeight"] < 2, "command expiry restores chat")
+                  a["listHeight"] < 2 and
+                  a["motionKind"] == "idle", "command expiry restores chat")
 
             db.set_settings_bulk({
                 "list_overlay_show_mode": "always",
@@ -683,6 +697,110 @@ def main():
             assert zero_hidden["sameChatFrame"] and zero_hidden["sameChatDocument"], zero_hidden
             assert all(any(msg in row for row in zero_hidden["messageTexts"])
                        for msg in chat_lines), zero_hidden
+            # Newly approved Replace: preserve the Split List engine,
+            # but enter across 100% of the shared area, from all directions.
+            # Zero-second toggle also reverses with its original duration.
+            db.set_settings_bulk({
+                "combined_list_chat_layout": "replace",
+                "list_slide_duration": "0",
+                "list_slide_animation_seconds": "2.00",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            QTest.qWait(1600)
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+                QTest.qWait(1600)  # Snapshot poll must read the saved direction.
+                prior = until(
+                    view.page(), lambda a: not a["shown"] and
+                    a["motionKind"] == "idle" and
+                    abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                    "replace zero idle before " + direction)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "replace-on-" + direction, "qa_viewer", "!list"
+                )), direction
+                entering = until(view.page(), lambda a:
+                    a["combinedSync"] == "replace-command-enter" and
+                    a["motionKind"] == "enter" and
+                    a["entranceCount"] == prior["entranceCount"] + 1 and
+                    a["lastEntrance"] == direction,
+                    "replace full-size motion enters " + direction)
+                assert entering["motionDuration"] == 2000, entering
+                samples = []
+                for _ in range(9):
+                    frame = inspect(view.page())
+                    if frame["combinedSync"] == "replace-command-enter":
+                        samples.append(frame)
+                        assert abs(frame["listHeight"] - frame["rootHeight"]) < 3, frame
+                        assert abs(frame["chatHeight"] - frame["rootHeight"]) < 3, frame
+                        assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                        assert float(frame["panelOpacity"]) >= .99, frame
+                        assert frame["panelTransform"] == "none", frame
+                        assert frame["chatClipPath"].startswith("inset("), frame
+                        clip = re.search(
+                            r"inset\\(([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px\\)",
+                            frame["chatClipPath"])
+                        assert clip, frame
+                        top, right, bottom, left = map(float, clip.groups())
+                        if direction == "left":
+                            edge = frame["listRight"] - frame["rootLeft"]
+                            assert abs(left - edge) <= 16, frame
+                        elif direction == "right":
+                            edge = frame["rootWidth"] - (frame["listLeft"] - frame["rootLeft"])
+                            assert abs(right - edge) <= 16, frame
+                        elif direction == "top":
+                            edge = frame["listBottom"] - frame["rootTop"]
+                            assert abs(top - edge) <= 16, frame
+                        else:
+                            edge = frame["rootHeight"] - (frame["listTop"] - frame["rootTop"])
+                            assert abs(bottom - edge) <= 16, frame
+                        assert frame["messageCount"] >= 4, frame
+                        assert all(any(msg in row for row in frame["messageTexts"])
+                                   for msg in chat_lines), frame
+                    QTest.qWait(125)
+                assert len(samples) >= 3, (direction, samples)
+                assert len({a["chatClipPath"] for a in samples}) >= 3, samples
+                full = until(view.page(), lambda a:
+                             a["shown"] and a["replace"] and
+                             a["phase"] == "hold" and a["holdDurationMs"] == 0 and
+                             a["combinedSync"] == "idle" and
+                             abs(a["listHeight"] - a["rootHeight"]) < 3,
+                             "replace zero toggle holds full area " + direction)
+                assert full["sameChatFrame"] and full["sameChatDocument"], full
+                QTest.qWait(700)
+                retained = inspect(view.page())
+                assert retained["shown"] and retained["replace"], retained
+                assert retained["exitCount"] == prior["exitCount"], retained
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "replace-off-" + direction, "qa_viewer", "!list"
+                )), direction
+                exiting = until(view.page(), lambda a:
+                            a["combinedSync"] == "replace-command-exit" and
+                            a["motionKind"] == "exit" and
+                            a["lastExit"] == direction and
+                            a["exitCount"] == prior["exitCount"] + 1,
+                            "replace zero reverse exits " + direction)
+                assert exiting["motionDuration"] == 2000, exiting
+                exit_samples = []
+                for _ in range(9):
+                    frame = inspect(view.page())
+                    if frame["combinedSync"] == "replace-command-exit":
+                        exit_samples.append(frame)
+                        assert abs(frame["listHeight"] - frame["rootHeight"]) < 3, frame
+                        assert frame["chatClipPath"].startswith("inset("), frame
+                        assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
+                        assert all(any(msg in row for row in frame["messageTexts"])
+                                   for msg in chat_lines), frame
+                    QTest.qWait(125)
+                assert len(exit_samples) >= 3, (direction, exit_samples)
+                hidden = until(view.page(), lambda a:
+                               not a["shown"] and not a["replace"] and
+                               a["motionKind"] == "idle" and
+                               abs(a["chatHeight"] - a["rootHeight"]) < 3,
+                               "replace zero toggle restores chat " + direction)
+                assert hidden["sameChatFrame"] and hidden["sameChatDocument"], hidden
+                assert all(any(msg in row for row in hidden["messageTexts"])
+                           for msg in chat_lines), hidden
+            print("R06_REPLACE_ALL_DIRECTIONS_AND_ZERO_PASS", flush=True)
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
             view.close()
