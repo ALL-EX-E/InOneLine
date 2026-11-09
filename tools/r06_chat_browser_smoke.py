@@ -851,42 +851,81 @@ def main():
                         a["listHeight"] > 10,
                         "OBS Twitch disabled / full List")
                 static_check(m, "OBS chat disabled", dynamic_chat=True)
-            # R06/ORDERED-POLL-098: Chromium's 1-second /api/data timer
-            # must never overlap requests. A delayed old snapshot can carry
-            # held=false and replay a phantom OFF after a newer Twitch ON.
+            # R06/ORDERED-POLL-098: prove two independent invariants:
+            # (1) a stuck old /api/data reply cannot block a newer Save;
+            # (2) delivering that old reply AFTER the new Save cannot
+            # revert direction or replay the Twitch zero-second toggle.
+            db.set_setting("list_slide_direction", "left")
             for page in pages:
+                until(page, lambda a: a["appliedDirection"] == "left" and
+                      a["motionKind"] == "idle",
+                      "main ordered-poll baseline left saved direction")
                 assert evaluate(page, """(() => {
                   const original = window.fetch.bind(window);
-                  const state = {running:0, max:0, started:0, completed:0, original};
-                  window.__r06PollProbe = state;
+                  const p = {started:0, completed:0, running:0, max:0,
+                    firstReady:false, errors:0, release:null, original};
+                  window.__r06PollProbe = p;
                   window.fetch = (...args) => {
-                    const url = String(args[0]?.url || args[0] || "");
+                    const url=String(args[0]?.url || args[0] || "");
                     if (!url.includes("/api/data")) return original(...args);
-                    state.started++;
-                    state.running++;
-                    state.max = Math.max(state.max, state.running);
-                    return new Promise((resolve,reject) => {
-                      setTimeout(() => {
-                        original(...args).then(
-                          reply => { state.running--; state.completed++; resolve(reply); },
-                          error => { state.running--; state.completed++; reject(error); }
-                        );
-                      }, 1700);
+                    const id=++p.started;
+                    p.running++;
+                    p.max=Math.max(p.max,p.running);
+                    return original(...args).then(reply => {
+                      if (id === 1) {
+                        p.firstReady=true;
+                        return new Promise(resolve => {
+                          p.release=() => {
+                            p.running--;p.completed++;resolve(reply);
+                          };
+                        });
+                      }
+                      p.running--;p.completed++;
+                      return reply;
+                    }, error => {
+                      p.running--;p.errors++;throw error;
                     });
                   };
                   return true;
                 })()""") is True
-            QTest.qWait(5100)
+            # Do not change DB until the first HTTP response has ALREADY
+            # arrived (and is deliberately held in JS with old direction).
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline:
+                probes = [evaluate(page, """JSON.stringify((() => {
+                  const p=window.__r06PollProbe;
+                  return {started:p.started,completed:p.completed,
+                          firstReady:p.firstReady,errors:p.errors};
+                })())""") for page in pages]
+                if all(p["firstReady"] for p in probes):
+                    break
+                QTest.qWait(100)
+            assert all(p["firstReady"] for p in probes), probes
+            db.set_setting("list_slide_direction", "right")
             for page in pages:
+                new_state = until(page, lambda a:
+                    a["appliedDirection"] == "right" and
+                    a["motionKind"] == "idle",
+                    "main new Save applied despite older hung API response")
                 probe = evaluate(page, """JSON.stringify((() => {
-                  const p = window.__r06PollProbe;
-                  return {max:p.max,started:p.started,completed:p.completed};
+                  const p=window.__r06PollProbe;
+                  return {max:p.max,started:p.started,
+                          completed:p.completed,firstReady:p.firstReady};
                 })())""")
                 assert probe["started"] >= 2 and probe["completed"] >= 1, probe
-                assert probe["max"] == 1, (
-                    "Main OBS /api/data allowed out-of-order snapshot polls", probe)
+                assert probe["max"] >= 2, ("New Save was blocked by old request", probe)
                 assert evaluate(page, """(() => {
-                  window.fetch = window.__r06PollProbe.original;
+                  const p=window.__r06PollProbe;
+                  if (!p.release) return false;
+                  p.release();return true;
+                })()""") is True
+            QTest.qWait(700)
+            for page in pages:
+                stable = evaluate(page, METRICS)
+                assert stable["appliedDirection"] == "right", (
+                    "Stale reply reverted a newer applied saved direction", stable)
+                assert evaluate(page, """(() => {
+                  window.fetch=window.__r06PollProbe.original;
                   delete window.__r06PollProbe;
                   return true;
                 })()""") is True
