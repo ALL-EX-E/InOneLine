@@ -324,13 +324,10 @@
         const topY = edge + "px";
         let fromClip;
         let toClip;
-        if (!chatAlways) {
-          // Dynamic Twitch keeps its iframe alive during List motion. Clip
-          // only the actual bottom-anchored messages, not a fixed half.
-          // The mask reverses on exit and includes messages received in hold.
-          fromClip = `inset(${Math.max(0, available - naturalChat)}px 0px 0px 0px)`;
-          toClip = `inset(${Math.max(0, available - targetChat)}px 0px 0px 0px)`;
-        } else if (replaceFull) {
+        if (replaceFull) {
+          // Replacement masks the incoming List's moving directional edge
+          // across the whole source, including hide-empty Twitch messages.
+          // The List may have a transparent user-selected background.
           // The List crosses the entire shared source. Clip Twitch behind
           // the same moving List edge and preserve existing message nodes.
           fromClip = "inset(0px 0px 0px 0px)";
@@ -341,6 +338,12 @@
             direction === "bottom" ?
             `inset(0px 0px ${available}px 0px)` :
             `inset(${available}px 0px 0px 0px)`;
+        } else if (!chatAlways) {
+          // Split uses a content-sized, bottom-anchored Twitch area. Animate
+          // only the portion that must yield to the List, with no 50/50
+          // reservation for a single short message.
+          fromClip = `inset(${Math.max(0, available - naturalChat)}px 0px 0px 0px)`;
+          toClip = `inset(${Math.max(0, available - targetChat)}px 0px 0px 0px)`;
         } else if (direction === "left") {
           fromClip = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},0% ${topY})`;
           toClip = `polygon(100% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},100% ${topY})`;
