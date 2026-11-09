@@ -292,6 +292,7 @@ def main() -> int:
                 lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
                 not m["listShown"] and m["rootHeight"] < 2,
                 "hidden list and hidden chat collapse container",
+                dynamic_chat=True,
             )
             print("R06_EMPTY_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
