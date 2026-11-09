@@ -330,8 +330,10 @@ def main():
                 for page in pages:
                     idle = until(page, lambda a: not a["shown"] and
                                  a["combinedSync"] == "idle" and
-                                 a["motionKind"] == "idle",
-                                 "main before command "+direction)
+                                 a["motionKind"] == "idle" and
+                                 a["appliedDirection"] == direction and
+                                 a["appliedComposeMode"] == "split",
+                                 "main saved direction applied before command "+direction)
                     previous_exit = idle["exitCount"]
                 assert state.ingest(ChatMessage(
                     "twitch", "chan", "main-parity-"+direction, "qa_viewer", "!list"
@@ -409,8 +411,11 @@ def main():
             QTest.qWait(1600)
             for page in pages:
                 idle = until(page, lambda a: not a["shown"] and
-                             a["combinedSync"] == "idle",
-                             "main zero toggle initially hidden")
+                             a["combinedSync"] == "idle" and
+                             a["motionKind"] == "idle" and
+                             a["appliedDirection"] == "left" and
+                             a["appliedComposeMode"] == "split",
+                             "main zero toggle initially hidden after saved direction")
                 prior_exit = idle["exitCount"]
             QTest.qWait(1900)  # Offscreen clock must not reset on show.
             assert state.ingest(ChatMessage(
