@@ -64,6 +64,9 @@ JS = """JSON.stringify((() => {
     listHeight:box(layer).height, chatHeight:box(chat).height,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
+    chatText:messages?.textContent ?? "",
+    sameChildDocument:!window.__r06OriginalChildDocument ||
+      doc===window.__r06OriginalChildDocument,
     childURL:doc?.location?.href ?? null,
     childReady:doc?.readyState ?? null,
     childRenderType:typeof frame?.contentWindow?.IOLRenderEmbeddedChatState,
@@ -272,6 +275,37 @@ def main() -> int:
                 "new message restores chat only", api=api, dynamic_chat=True,
             )
             assert abs(message["gameWidth"] - idle["gameWidth"]) <= 1.0
+            assert "QA visible chat" in message["chatText"], message
+
+            # QA-GATE-107: verify the existing embedded renderer retries a
+            # *same* server snapshot if its DOM ever becomes inconsistent.
+            # This is a controlled DOM-loss regression, not a new message or
+            # a forced reload. The old signature short-circuit left rows
+            # permanently blank even though /api/multichat had msg-1.
+            removed = []
+            page.runJavaScript("""(() => {
+              const frame=document.querySelector("#list-chat iframe"),
+                    doc=frame?.contentDocument,
+                    rows=doc?.getElementById("messages");
+              if (!frame || !doc || !rows ||
+                  !rows.textContent.includes("QA visible chat")) return false;
+              window.__r06OriginalChildDocument=doc;
+              rows.replaceChildren();
+              return rows.children.length===0;
+            })()""", removed.append)
+            until_removed = time.monotonic() + 8
+            while not removed and time.monotonic() < until_removed:
+                QTest.qWait(25)
+            assert removed == [True], ("Controlled embedded DOM loss failed", removed)
+            recovered = until(
+                page,
+                lambda m: m["parent"] == "right-list" and
+                not m["listShown"] and m["chatCount"] >= 1 and
+                "QA visible chat" in m["chatText"] and m["sameChildDocument"],
+                "embedded Twitch rows recover same snapshot without iframe remount",
+                api=api, dynamic_chat=True,
+            )
+            assert recovered["sameChildDocument"], recovered
 
             state.delete_message("twitch", "channel", "msg-1")
             until(
