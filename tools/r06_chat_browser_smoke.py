@@ -588,13 +588,13 @@ def main():
                         a["chatHeight"] > 10 and a["hasSentinel"],
                         "hide-empty replacement restores messages "+direction)
                     assert restored["iframeStable"] and restored["documentStable"], restored
-            # Messages arriving in the MIDDLE of a three-second entrance or
+            # Messages arriving in the MIDDLE of a long entrance or
             # reverse exit must change the actual Twitch geometry, rather than
             # jump on the List's WAAPI finish. Test both real /overlay views.
             for composition in ("split", "replace"):
                 db.set_settings_bulk({
                     "combined_list_chat_layout": composition,
-                    "list_slide_animation_seconds": "3.00",
+                    "list_slide_animation_seconds": "6.00",
                     "list_slide_direction": "left",
                 })
                 state.clear_chat("twitch", "chan")
@@ -614,7 +614,7 @@ def main():
                 for page in pages:
                     entering = until(page, lambda a:
                         a["motionKind"] == "enter" and
-                        a["motionDuration"] == 3000 and
+                        a["motionDuration"] == 6000 and
                         a["lastEntrance"] == "left" and
                         (a["combinedSync"] == "command-enter" if composition == "split"
                          else a["combinedSync"] == "replace-command-enter"),
@@ -644,7 +644,7 @@ def main():
                     "alice", "!list"))
                 for page in pages:
                     exiting = until(page, lambda a:
-                        a["motionKind"] == "exit" and a["motionDuration"] == 3000 and
+                        a["motionKind"] == "exit" and a["motionDuration"] == 6000 and
                         a["lastExit"] == "left", "movie List exit starts " + composition)
                     assert abs(exiting["chatBottomGap"]) < 4, exiting
                 assert state.ingest(ChatMessage(
