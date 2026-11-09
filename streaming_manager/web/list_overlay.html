@@ -335,17 +335,23 @@ html, body {
     list.style.transform = `translateY(${-scrollY}px)`;
   }
 
-  // Reuse the already accepted standalone in-flight guard for the combined
-  // browser source too. Delayed responses must not reapply old Twitch command
-  // sequences and accidentally toggle the List a second time.
+  // Standalone keeps its manually accepted in-flight gate. Combined OBS
+  // uses the existing 1-second poll, without blocking future requests: only
+  // the newest completed snapshot may apply, never an out-of-order old
+  // Twitch zero-toggle or saved direction.
   let standalonePollInFlight = false;
+  let combinedRequestId = 0;
+  let combinedLastAppliedRequestId = 0;
   async function update() {
-    if (standalonePollInFlight) return;
-    standalonePollInFlight = true;
+    if (!isCombined && standalonePollInFlight) return;
+    if (!isCombined) standalonePollInFlight = true;
+    const requestId = isCombined ? ++combinedRequestId : 0;
     try {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      if (isCombined && requestId < combinedLastAppliedRequestId) return;
+      if (isCombined) combinedLastAppliedRequestId = requestId;
       const overlayConfig = data.overlay || {};
       composer.apply(data, isCombined);
       // Unlike other widgets, preview must exactly mirror the live List
@@ -387,9 +393,11 @@ html, body {
       }
       apiState.classList.remove("visible");
     } catch (err) {
-      apiState.classList.add("visible");
+      if (!isCombined || requestId >= combinedLastAppliedRequestId) {
+        apiState.classList.add("visible");
+      }
     } finally {
-      standalonePollInFlight = false;
+      if (!isCombined) standalonePollInFlight = false;
     }
   }
 
