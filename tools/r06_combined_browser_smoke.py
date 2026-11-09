@@ -498,7 +498,7 @@ def main():
                         chat_clip = frame["chatClipPath"]
                         if direction == "left":
                             assert frame["listLeft"] <= frame["rootLeft"] + 3, frame
-                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            match = re.search(r"polygon\(\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listRight"] - frame["rootLeft"]
@@ -506,14 +506,14 @@ def main():
                         elif direction == "right":
                             assert frame["listLeft"] >= frame["rootLeft"] - 3, frame
                             match = re.search(
-                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                                r"polygon\(\s*0% 0%,\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listLeft"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "top":
                             assert frame["listTop"] <= frame["rootTop"] + 3, frame
-                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            match = re.search(r"inset\(([0-9.eE+-]+)px", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1))
                             list_edge = frame["listBottom"] - frame["rootTop"]
@@ -528,10 +528,10 @@ def main():
                                 frame["rootTop"] + own_slot + 3), frame
                             assert frame["listClipPath"].startswith("inset("), frame
                             mask_match = re.search(
-                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.eE+-]+)px",
                                 chat_clip)
                             list_match = re.search(
-                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                                r"inset\(([0-9.eE+-]+)px", frame["listClipPath"])
                             assert mask_match and list_match, frame
                             # The dividing mask moves with the visible top of
                             # the upward-revealed List, including the 12px gap.
@@ -603,20 +603,20 @@ def main():
                         own_slot = (frame["rootHeight"] - 12) / 2
                         chat_clip = frame["chatClipPath"]
                         if direction == "left":
-                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            match = re.search(r"polygon\(\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listRight"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "right":
                             match = re.search(
-                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                                r"polygon\(\s*0% 0%,\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listLeft"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "top":
-                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            match = re.search(r"inset\(([0-9.eE+-]+)px", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1))
                             list_edge = frame["listBottom"] - frame["rootTop"]
@@ -626,10 +626,10 @@ def main():
                                 frame["rootTop"] + own_slot + 3), frame
                             assert frame["listClipPath"].startswith("inset("), frame
                             mask_match = re.search(
-                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.eE+-]+)px",
                                 chat_clip)
                             list_match = re.search(
-                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                                r"inset\(([0-9.eE+-]+)px", frame["listClipPath"])
                             assert mask_match and list_match, frame
                             assert abs(float(mask_match.group(1)) -
                                        float(list_match.group(1))) < 4, frame
