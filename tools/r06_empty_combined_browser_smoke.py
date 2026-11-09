@@ -52,9 +52,9 @@ JS = """JSON.stringify((() => {
   return {
     ready:true,
     parent:root.parentElement?.id,
-    slotCollapsed:(root.parentElement?.id==="left-list" ||
+    compositionHidden:(root.parentElement?.id==="left-list" ||
       root.parentElement?.id==="right-list") &&
-      getComputedStyle(root.parentElement).display==="none",
+      getComputedStyle(root).display==="none",
     listShown:root.classList.contains("r06-shown"),
     motionKind:root.dataset.r06StandaloneMotionKind || "idle",
     combinedSync:root.dataset.r06CombinedSync || "idle",
@@ -214,7 +214,7 @@ def main() -> int:
             state.delete_message("twitch", "channel", "msg-1")
             until(
                 page,
-                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
                 not m["listShown"] and m["rootHeight"] < 2,
                 "deleted final message collapses combined slot without iframe move", dynamic_chat=True,
             )
@@ -256,7 +256,7 @@ def main() -> int:
             assert expired["list_show"]["remaining_ms"] == 0, expired["list_show"]
             until(
                 page,
-                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
                 not m["listShown"] and m["rootHeight"] < 2,
                 "command expiry collapses empty combined slot",
                 timeout=25, api=api, dynamic_chat=True,
@@ -289,7 +289,7 @@ def main() -> int:
             )
             until(
                 page,
-                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
                 not m["listShown"] and m["rootHeight"] < 2,
                 "hidden list and hidden chat collapse container",
             )
