@@ -193,7 +193,7 @@ def main():
             for page in pages:
                 m = until(page, lambda a: a["shown"] and a["chatHeight"] == 0,
                           "initial always List, empty hide-empty chat")
-                static_check(m, "initial")
+                static_check(m, "initial", dynamic_chat=True)
 
             # Empty chat in Always reserves half the area when List is visible.
             db.set_setting("multichat_appearance_common",
