@@ -1205,7 +1205,14 @@ def main():
                   a["motionKind"] == "idle",
                   "combined ordered-poll baseline saved direction left",
                   dynamic_chat=True)
+            with urlopen(api.base_url + "/api/data", timeout=5) as response:
+                old_snapshot = json.load(response)
+            assert old_snapshot["overlay"]["list_slide_direction"] == "left"
+            old_json_literal = json.dumps(
+                json.dumps(old_snapshot, ensure_ascii=False), ensure_ascii=True
+            )
             assert evaluate(view.page(), """(() => {
+              const oldJson=__R06_OLD_JSON__;
               const original=window.fetch.bind(window);
               const p={started:0,completed:0,running:0,max:0,
                        firstReady:false,errors:0,release:null,original};
@@ -1216,20 +1223,24 @@ def main():
                 const id=++p.started;
                 p.running++;
                 p.max=Math.max(p.max,p.running);
+                if (id === 1) {
+                  p.firstReady=true;
+                  return new Promise(resolve => {
+                    p.release=() => {
+                      p.running--;p.completed++;
+                      resolve(new Response(oldJson, {
+                        status:200,
+                        headers:{"Content-Type":"application/json"}
+                      }));
+                    };
+                  });
+                }
                 return original(...args).then(reply => {
-                  if (id === 1) {
-                    p.firstReady=true;
-                    return new Promise(resolve => {
-                      p.release=() => {
-                        p.running--;p.completed++;resolve(reply);
-                      };
-                    });
-                  }
                   p.running--;p.completed++;return reply;
                 },error => {p.running--;p.errors++;throw error;});
               };
               return true;
-            })()""") is True
+            })()""".replace("__R06_OLD_JSON__", old_json_literal)) is True
             deadline = time.monotonic() + 12
             probe = {}
             while time.monotonic() < deadline:
