@@ -687,21 +687,45 @@ def main():
                             a["chatHeight"] > a["rootHeight"] * .90,
                             "full Twitch frame before List entry " +
                             composition + " " + direction)
+                    # At zero seconds, a command must toggle the shared
+                    # server-held bit ON exactly once. This is independent
+                    # from the List animation and catches a real unexpected
+                    # OFF rather than silently tolerating a missing phase.
+                    server_before = state.snapshot()["list_show"]
+                    assert server_before.get("held") is False, (
+                        "Unexpected zero-toggle server ON before command",
+                        composition, direction, server_before)
                     assert state.ingest(ChatMessage(
                         "twitch", "chan",
                         "fix092-show-" + composition + "-" + direction,
                         "alice", "!list"))
+                    server_on = state.snapshot()["list_show"]
+                    assert server_on.get("held") is True and (
+                        server_on["sequence"] == server_before["sequence"] + 1), (
+                        "Server failed to latch ONE zero-toggle command",
+                        composition, direction, server_before, server_on)
                     for page in pages:
-                        until(page, lambda a: a["motionKind"] == "enter" and
+                        entering = until(page, lambda a:
+                              a["motionKind"] == "enter" and
                               a["motionDuration"] == 2000 and
                               a["lastEntrance"] == direction,
                               "FIX-092 List begins over FULL chat " +
                               composition + " " + direction)
+                        assert state.snapshot()["list_show"].get("held") is True, (
+                            "Server unexpectedly toggled OFF during List entry",
+                            composition, direction, entering,
+                            state.snapshot()["list_show"])
                     # Sample an actual intermediate frame, not just endpoints.
                     QTest.qWait(350)
                     for page in pages:
                         m = evaluate(page, METRICS)
-                        assert m["motionKind"] == "enter", m
+                        server_mid = state.snapshot()["list_show"]
+                        assert server_mid.get("held") is True, (
+                            "Server toggled OFF without a second explicit command",
+                            composition, direction, server_on, server_mid, m)
+                        assert m["motionKind"] == "enter", (
+                            "Browser List left its entrance before 2 seconds",
+                            composition, direction, server_on, server_mid, m)
                         assert m["chatHeight"] >= m["rootHeight"] * .90, (
                             "Premature Twitch shrink", composition, direction, m)
                         assert abs(m["chatBottomGap"]) < 4, m
@@ -724,6 +748,11 @@ def main():
                         "twitch", "chan",
                         "fix092-hide-" + composition + "-" + direction,
                         "alice", "!list"))
+                    server_off = state.snapshot()["list_show"]
+                    assert server_off.get("held") is False and (
+                        server_off["sequence"] == server_on["sequence"] + 1), (
+                        "Server zero-toggle OFF must follow exactly one command",
+                        composition, direction, server_on, server_off)
                     for page in pages:
                         until(page, lambda a: a["motionKind"] == "exit" and
                               a["lastExit"] == direction,
