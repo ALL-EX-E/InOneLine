@@ -278,8 +278,15 @@
       // Only child layers move; iframe and messages remain the same.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
-      const gap = replaceFull ? 0 : 12;
-      const targetChat = replaceFull ? 0 : Math.floor((available - gap) / 2);
+      const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      const naturalChat = !chatNeeded ? 0 : chatAlways ? available :
+        Math.max(0, Math.min(available, measureChat()));
+      const gap = replaceFull || !chatNeeded ? 0 : 12;
+      const targetChat = replaceFull ? 0 : chatAlways ?
+        Math.floor((available - gap) / 2) :
+        Math.min(naturalChat, Math.floor((available - gap) / 2));
+      // Hide-empty chat never reserves a fixed half; the List fills
+      // everything above its current bottom-anchored messages.
       const targetList = available - targetChat - gap;
       // Command entrance and reverse exit share the originally captured
       // duration, even when settings change during the hold.
@@ -297,7 +304,8 @@
       chatLayer.style.bottom = "0px";
       chatLayer.style.left = "0px";
       chatLayer.style.right = "0px";
-      chatLayer.style.height = (commandOverChat || entering ? available : targetChat) + "px";
+      chatLayer.style.height = (commandOverChat ? available :
+        entering ? naturalChat : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
@@ -316,7 +324,13 @@
         const topY = edge + "px";
         let fromClip;
         let toClip;
-        if (replaceFull) {
+        if (!chatAlways) {
+          // Dynamic Twitch keeps its iframe alive during List motion. Clip
+          // only the actual bottom-anchored messages, not a fixed half.
+          // The mask reverses on exit and includes messages received in hold.
+          fromClip = `inset(${Math.max(0, available - naturalChat)}px 0px 0px 0px)`;
+          toClip = `inset(${Math.max(0, available - targetChat)}px 0px 0px 0px)`;
+        } else if (replaceFull) {
           // The List crosses the entire shared source. Clip Twitch behind
           // the same moving List edge and preserve existing message nodes.
           fromClip = "inset(0px 0px 0px 0px)";
@@ -352,8 +366,8 @@
           {duration, easing: "ease-in-out", fill: "both"},
         );
       } else {
-        const startChat = entering ? available : targetChat;
-        const endChat = entering ? targetChat : available;
+        const startChat = entering ? naturalChat : targetChat;
+        const endChat = entering ? targetChat : naturalChat;
         chatMotionAnimation = chatLayer.animate(
           [{height: startChat + "px"}, {height: endChat + "px"}],
           {duration, easing: "ease-in-out", fill: "both"},
@@ -406,10 +420,16 @@
 
     function recoverEmbeddedChat(chatNeeded) {
       if (chatNeeded && !lastEmbeddedChatNeeded && chatHasMessages) {
-        // If the child was suspended while its space was zero, re-open it
-        // once, as in the previously tested non-animation chat recovery.
-        const src = iframe.getAttribute("src");
-        if (src) iframe.setAttribute("src", src);
+        // First message expands the existing child; avoid resetting its DOM.
+        // Recover only if no chat renderer was initialized.
+        let ready = false;
+        try {
+          ready = typeof iframe.contentWindow?.IOLRenderEmbeddedChatState === "function";
+        } catch (_) { /* child not initialized */ }
+        if (!ready) {
+          const src = iframe.getAttribute("src");
+          if (src) iframe.setAttribute("src", src);
+        }
       }
       lastEmbeddedChatNeeded = chatNeeded;
       if (!chatNeeded || !chatHasMessages ||
@@ -447,8 +467,9 @@
       const desiredChat = !chatNeeded ? 0 :
         replacing ? available : Math.max(0, Math.min(natural, chatCap));
 
-      // Settle into the static layout when no command movement is active;
-      // a content-sized chat in Split mode keeps its old height behavior.
+      // Settle into static layout; dynamic chat grows upward from the bottom
+      // in both the main and the independent combined Browser Source.
+      const wasReplacing = root.classList.contains("r06-replace");
       root.classList.toggle("r06-shown", active);
       root.classList.toggle("r06-not-shown", !active);
       root.classList.toggle("r06-replace", replacing);
@@ -456,7 +477,8 @@
       // Only a content-sized chat in Split mode animates its boundary. An
       // Always chat starts at its full allocated height and never rises from
       // the bottom when a message arrives.
-      const animateChat = !noMotion && split && !chatAlways && lastChatHeight >= 0;
+      const animateChat = combinedMotion && !chatAlways && lastChatHeight >= 0 &&
+        !replacing && !wasReplacing;
       chatLayer.style.transition = animateChat ?
         `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
       chatLayer.style.marginTop = gap + "px";
@@ -483,15 +505,13 @@
       if (combinedMotion && seenSnapshot &&
           ((next && reason === "always") ||
            (!next && reason === "hide")) &&
-          composeMode === "split" && chatAvailable && chatAlways &&
-          root.clientHeight > 0) {
+          composeMode === "split" && root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
       if (combinedMotion &&
           ((next && reason === "command") || (!next && reason === "expiry")) &&
-          (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)) &&
+          (composeMode === "replace" || composeMode === "split") &&
           seenSnapshot && root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next, direction, true,
           composeMode === "replace");
@@ -511,8 +531,7 @@
 
     function expire() {
       if (standaloneMotion ||
-          (combinedMotion && (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)))) {
+          (combinedMotion && (composeMode === "replace" || composeMode === "split"))) {
         if (mode === "slide" && slidePhase === "hold" &&
             showUntil && performance.now() >= showUntil) {
           showUntil = 0;
@@ -565,8 +584,7 @@
           ? requestedAnimation : 0.65)) * 1000
       );
       if (standaloneMotion ||
-          (combinedMotion && (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)))) {
+          (combinedMotion && (composeMode === "replace" || composeMode === "split"))) {
         // Share the local phase clock with the approved combined command
         // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
