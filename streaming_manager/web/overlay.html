@@ -818,14 +818,13 @@ body.preview .preview-label { display: flex; }
 
     // Отключённые элементы убираются из рабочих колонок полностью.
     if (!webcamEnabled) parking.appendChild(webcamFrame);
-    // Once the embedded Twitch iframe has loaded in a visible List slot,
-    // never re-parent it back into the display:none parking container.
-    // A display:none slot removes the same layout space and empty frame,
-    // without re-navigating the iframe or losing its message document.
+    // Keep the already loaded Twitch iframe in its previous List slot.
+    // Hide only its composition, not the flex spacer: removing the spacer
+    // would shift the independent webcam/info panels in the side column.
     if (!listAreaNeeded) {
       const currentSlot = listComposition.parentElement;
       if (currentSlot === slots.left.list || currentSlot === slots.right.list) {
-        currentSlot.style.display = "none";
+        listComposition.style.display = "none";
       }
     }
     if (!infoEnabled) parking.appendChild(infoPanel);
@@ -842,7 +841,7 @@ body.preview .preview-label { display: flex; }
       // Reuse the already mounted iframe. Reparent only for a genuine
       // side change (or its first placement from the initial parking).
       const targetSlot = slots[listSide].list;
-      targetSlot.style.display = "";
+      listComposition.style.display = "";
       if (listComposition.parentElement !== targetSlot) {
         targetSlot.appendChild(listComposition);
       }
@@ -1098,7 +1097,7 @@ body.preview .preview-label { display: flex; }
         (twitch.visibility === "always" || twitch.has_messages === true);
       const oldSlot = listComposition.parentElement;
       if ((listWillShow || chatWillShow) &&
-          (oldSlot === parking || oldSlot.style.display === "none")) {
+          (oldSlot === parking || listComposition.style.display === "none")) {
         const webcamOn = overlayConfig.webcam_enabled !== false;
         const preferredSide = parseCorner(overlayConfig.webcam_position || "top_right").side;
         const configuredSide = overlayConfig.list_side;
@@ -1106,9 +1105,9 @@ body.preview .preview-label { display: flex; }
           configuredSide : webcamOn ? preferredSide : "right";
         const slot = slots[side].list;
         (side === "left" ? leftColumn : rightColumn).classList.remove("hidden");
-        slot.style.display = "";
-        // After the first placement, ordinary hide-empty events only toggle
-        // this slot's display; the Twitch iframe stays in its original DOM.
+        listComposition.style.display = "";
+        // After first placement, hide-empty toggles composition visibility
+        // inside the same flex slot; the iframe document remains untouched.
         if (listComposition.parentElement !== slot) {
           slot.appendChild(listComposition);
         }
