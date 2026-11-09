@@ -457,8 +457,10 @@ def main():
                 baseline = until(
                     view.page(),
                     lambda a: not a["shown"] and a["motionKind"] == "idle" and
+                              a["appliedDirection"] == direction and
+                              a["appliedComposeMode"] == "split" and
                               abs(a["chatHeight"] - a["rootHeight"]) < 3,
-                    "command idle before " + direction)
+                    "command idle after saved Split direction " + direction)
                 prior_enter = baseline["entranceCount"]
                 prior_exit = baseline["exitCount"]
                 assert state.ingest(ChatMessage(
@@ -716,8 +718,10 @@ def main():
                 prior = until(
                     view.page(), lambda a: not a["shown"] and
                     a["motionKind"] == "idle" and
+                    a["appliedDirection"] == direction and
+                    a["appliedComposeMode"] == "replace" and
                     abs(a["chatHeight"] - a["rootHeight"]) < 3,
-                    "replace zero idle before " + direction)
+                    "replace zero idle after saved direction " + direction)
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "replace-on-" + direction, "qa_viewer", "!list"
                 )), direction
