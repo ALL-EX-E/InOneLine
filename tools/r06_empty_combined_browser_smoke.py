@@ -76,9 +76,71 @@ JS = """JSON.stringify((() => {
     gameCutoutWidth:Number(gameCutout?.getAttribute("width")||0),
     cameraCutoutWidth:Number(cameraCutout?.getAttribute("width")||0),
     panelOpacity:s.opacity, panelTransform:s.transform, panelTransition:s.transitionDuration,
-    chatTransition:c.transitionDuration
+    chatTransition:c.transitionDuration,
+    observedHold:(window.__r06EmptyTrace?.frames || []).some(
+      p => p.phase==="hold" && p.shown && p.listHeight>20 &&
+           p.chatHeight<2 && p.rootHeight>50 && p.panelOpacity>=0.99),
+    observedHoldAgeMs:(window.__r06EmptyTrace?.frames || []).find(
+      p => p.phase==="hold" && p.shown && p.listHeight>20 &&
+           p.chatHeight<2 && p.rootHeight>50 && p.panelOpacity>=0.99)?.holdAge ?? null,
+    traceFrames:(window.__r06EmptyTrace?.frames || []).length,
+    traceTail:(window.__r06EmptyTrace?.frames || []).slice(-12)
   };
 })())"""
+
+
+def enable_browser_phase_trace(page) -> None:
+    """Record real Chromium phase changes even when Qt polls are delayed.
+
+    The trace never changes List state, CSS, timers or network requests.
+    It only samples the already accepted Browser Source's painted geometry.
+    """
+    done = []
+    page.runJavaScript("""(() => {
+      const root=document.getElementById("list-composition"),
+            list=document.getElementById("list-layer"),
+            chat=document.getElementById("list-chat"),
+            panel=document.getElementById("list-panel");
+      if (!root || !list || !chat || !panel) return false;
+      window.__r06EmptyTrace?.stop?.();
+      const trace={frames:[], stop:null}, started=performance.now();
+      window.__r06EmptyTrace=trace;
+      let last="";
+      const record=() => {
+        const phase=root.dataset.r06StandalonePhase || "idle";
+        const shown=root.classList.contains("r06-shown");
+        const visible=getComputedStyle(root).display!=="none";
+        const signature=phase+":"+shown+":"+visible;
+        const phaseChanged=signature!==last;
+        if (!phaseChanged && phase!=="hold" && phase!=="enter") return;
+        last=signature;
+        const holdStart=Number(root.dataset.r06StandaloneHoldStartMs||0);
+        const row={
+          t:performance.now()-started, phase, shown, visible,
+          listHeight:list.getBoundingClientRect().height,
+          chatHeight:chat.getBoundingClientRect().height,
+          rootHeight:root.getBoundingClientRect().height,
+          panelOpacity:Number(getComputedStyle(panel).opacity),
+          holdDuration:Number(root.dataset.r06StandaloneHoldDurationMs||0),
+          holdAge:holdStart?performance.now()-holdStart:null
+        };
+        trace.frames.push(row);
+        if (trace.frames.length>800) trace.frames.shift();
+      };
+      const observer=new MutationObserver(record);
+      observer.observe(root, {
+        attributes:true,
+        attributeFilter:["class","style","data-r06-standalone-phase"]
+      });
+      const tick=setInterval(record,75);
+      trace.stop=()=>{clearInterval(tick);observer.disconnect();};
+      record();
+      return true;
+    })()""", done.append)
+    deadline = time.monotonic() + 8
+    while not done and time.monotonic() < deadline:
+        QTest.qWait(25)
+    assert done == [True], ("Chromium phase trace was not installed", done)
 
 
 class ManualClock:
@@ -219,6 +281,9 @@ def main() -> int:
                 "deleted final message collapses combined slot without iframe move", dynamic_chat=True,
             )
 
+            # QA-GATE-105: record all actual browser phases first. The
+            # three-second hold must not be lost if Qt observation is slow.
+            enable_browser_phase_trace(page)
             assert state.ingest(ChatMessage(
                 "twitch", "channel", "cmd-1", "tester", "!list",
             ))
@@ -240,13 +305,19 @@ def main() -> int:
             assert entering["motionDuration"] == 2000, entering
             shown = until(
                 page,
-                lambda m: m["parent"] == "right-list" and m["listShown"] and
-                m["motionKind"] == "idle" and m["phase"] == "hold" and
-                m["listHeight"] > 20 and m["chatHeight"] < 2,
+                lambda m: m["parent"] == "right-list" and
+                ((m["listShown"] and m["motionKind"] == "idle" and
+                  m["phase"] == "hold" and m["listHeight"] > 20 and
+                  m["chatHeight"] < 2) or m["observedHold"]),
                 "command shows only list after full entrance",
                 api=api, dynamic_chat=True,
             )
-            assert shown["holdAgeMs"] < 1100, shown
+            # Browser-native observations prove the painted List was on air
+            # even if the Qt client missed a short hold while rendering.
+            assert shown["observedHold"], shown
+            assert shown["observedHoldAgeMs"] is not None and (
+                -200 < shown["observedHoldAgeMs"] < 1100
+            ), shown
             assert abs(shown["gameWidth"] - idle["gameWidth"]) <= 1.0
             # Server time expires deterministically, while the accepted local
             # Browser Source phase clock finishes its independent 3-second hold.
@@ -261,6 +332,30 @@ def main() -> int:
                 "command expiry collapses empty combined slot",
                 timeout=25, api=api, dynamic_chat=True,
             )
+            # Do not merely accept a transient hold frame: the List must
+            # stay visible for the independent full three seconds after the
+            # completed entrance. Browser timestamps avoid Qt scheduling lag.
+            trace_results = []
+            page.runJavaScript("""(() => {
+              const frames=window.__r06EmptyTrace?.frames || [];
+              const onAir=frames.find(p=>p.phase==="hold" && p.shown &&
+                p.listHeight>20 && p.chatHeight<2 && p.rootHeight>50);
+              const exit=onAir && frames.find(p=>p.phase==="exit" && p.t>onAir.t);
+              window.__r06EmptyTrace?.stop?.();
+              return {
+                onAir:onAir || null, exit:exit || null,
+                total:frames.length, tail:frames.slice(-22)
+              };
+            })()""", trace_results.append)
+            deadline = time.monotonic() + 8
+            while not trace_results and time.monotonic() < deadline:
+                QTest.qWait(25)
+            assert trace_results, "Missing native Chromium hold duration trace"
+            timeline = trace_results[0]
+            assert timeline["onAir"] and timeline["exit"], timeline
+            assert timeline["onAir"]["holdDuration"] == 3000, timeline
+            assert timeline["exit"]["t"] - timeline["onAir"]["t"] >= 2750, timeline
+            print("R06_EMPTY_NATIVE_HOLD_DURATION_PASS", timeline, flush=True)
 
             # Independent Always visibility means a real visible widget exists.
             db.set_setting("list_overlay_show_mode", "always")
