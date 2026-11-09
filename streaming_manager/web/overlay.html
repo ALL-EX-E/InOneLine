@@ -1066,7 +1066,13 @@ body.preview .preview-label { display: flex; }
     }
   }
 
+  // Reuse the independent List's accepted in-flight gate: the embedded
+  // combined source must never apply an OLDER /api/data snapshot after a
+  // newer Twitch zero-second toggle and accidentally reverse the List.
+  let overlayPollInFlight = false;
   async function update() {
+    if (overlayPollInFlight) return;
+    overlayPollInFlight = true;
     try {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1145,6 +1151,8 @@ body.preview .preview-label { display: flex; }
       apiState.classList.remove("visible");
     } catch (err) {
       apiState.classList.add("visible");
+    } finally {
+      overlayPollInFlight = false;
     }
   }
 
