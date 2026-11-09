@@ -662,6 +662,80 @@ def main():
                         abs(a["chatBottomGap"]) < 4,
                         "natural Twitch height survives reverse exit " + composition)
                     assert settled["iframeStable"] and settled["documentStable"], settled
+            # FIX-092: the previous browser test only entered with a SHORT
+            # one-message Twitch frame, which could not detect the user's
+            # regression: a fully populated chat SHRANK before the moving
+            # List finished entering. Exercise all directions in combined
+            # modes on the real main OBS page, with chat at full height.
+            db.set_setting("list_slide_animation_seconds", "2.00")
+            state.clear_chat("twitch", "chan")
+            for index in range(24):
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "full-chat-fix092-" + str(index),
+                    "alice", "FULL Twitch message " + str(index)))
+            for composition in ("split", "replace"):
+                for direction in ("left", "right", "top", "bottom"):
+                    db.set_settings_bulk({
+                        "combined_list_chat_layout": composition,
+                        "list_slide_direction": direction,
+                    })
+                    for page in pages:
+                        before = until(page, lambda a:
+                            not a["shown"] and a["motionKind"] == "idle" and
+                            a["appliedComposeMode"] == composition and
+                            a["appliedDirection"] == direction and
+                            a["chatHeight"] > a["rootHeight"] * .90,
+                            "full Twitch frame before List entry " +
+                            composition + " " + direction)
+                    assert state.ingest(ChatMessage(
+                        "twitch", "chan",
+                        "fix092-show-" + composition + "-" + direction,
+                        "alice", "!list"))
+                    for page in pages:
+                        until(page, lambda a: a["motionKind"] == "enter" and
+                              a["motionDuration"] == 2000 and
+                              a["lastEntrance"] == direction,
+                              "FIX-092 List begins over FULL chat " +
+                              composition + " " + direction)
+                    # Sample an actual intermediate frame, not just endpoints.
+                    QTest.qWait(350)
+                    for page in pages:
+                        m = evaluate(page, METRICS)
+                        assert m["motionKind"] == "enter", m
+                        assert m["chatHeight"] >= m["rootHeight"] * .90, (
+                            "Premature Twitch shrink", composition, direction, m)
+                        assert abs(m["chatBottomGap"]) < 4, m
+                        assert m["chatClipPath"] == "none" or (
+                            m["chatClipPath"].startswith('path(evenodd, ')), (
+                            "Twitch clip must subtract real painted List rectangle",
+                            composition, direction, m)
+                        assert m["iframeStable"] and m["documentStable"], m
+                    for page in pages:
+                        hold = until(page, lambda a:
+                            a["motionKind"] == "idle" and a["phase"] == "hold" and
+                            a["listHeight"] >= a["rootHeight"] *
+                                (.47 if composition == "split" else .97) and
+                            (a["chatHeight"] < a["rootHeight"] * .56
+                             if composition == "split" else True),
+                            "List remains painted after full-chat entrance " +
+                            composition + " " + direction)
+                        assert hold["panelOpacity"] > .99, hold
+                    assert state.ingest(ChatMessage(
+                        "twitch", "chan",
+                        "fix092-hide-" + composition + "-" + direction,
+                        "alice", "!list"))
+                    for page in pages:
+                        until(page, lambda a: a["motionKind"] == "exit" and
+                              a["lastExit"] == direction,
+                              "FIX-092 reverse exit " + composition + " " + direction)
+                        end = until(page, lambda a:
+                            a["motionKind"] == "idle" and not a["shown"] and
+                            a["chatHeight"] > a["rootHeight"] * .90,
+                            "full Twitch chat restored " +
+                            composition + " " + direction)
+                        assert end["iframeStable"] and end["documentStable"], end
+            print("R06_FIX092_FULL_CHAT_ALL_DIRECTIONS_PASS", flush=True)
+
             print("R06_MAIN_LIVE_MOTION_RESIZE_VIDEO_PASS", flush=True)
             print("R06_MAIN_HIDE_EMPTY_SPLIT_REPLACE_MOTION_PASS", flush=True)
 
