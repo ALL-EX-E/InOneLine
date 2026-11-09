@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
 import sys
 import time
 from pathlib import Path
@@ -851,97 +852,68 @@ def main():
                         a["listHeight"] > 10,
                         "OBS Twitch disabled / full List")
                 static_check(m, "OBS chat disabled", dynamic_chat=True)
-            # R06/ORDERED-POLL-098: prove two independent invariants:
-            # (1) a stuck old /api/data reply cannot block a newer Save;
-            # (2) delivering that old reply AFTER the new Save cannot
-            # revert direction or replay the Twitch zero-second toggle.
+            # R06/ORDERED-POLL-098: force REAL HTTP responses out of order.
+            # The threaded test API snapshots the first old state, holds its
+            # response, then serves a newer Save on a different request.
+            # No JS fetch replacement: this exercises the actual page poll.
             db.set_setting("list_slide_direction", "left")
             for page in pages:
                 until(page, lambda a: a["appliedDirection"] == "left" and
                       a["motionKind"] == "idle",
                       "main ordered-poll baseline left saved direction")
-                # Snapshot the OLD actual API state before replacing the
-                # browser fetch. A synthetic Response lets Chromium hold one
-                # stale reply without consuming/stalling HTTP connections.
-                with urlopen(api.base_url + "/api/data", timeout=5) as response:
-                    old_snapshot = json.load(response)
-                assert old_snapshot["overlay"]["list_slide_direction"] == "left"
-                old_json_literal = json.dumps(
-                    json.dumps(old_snapshot, ensure_ascii=False), ensure_ascii=True
-                )
-                assert evaluate(page, """(() => {
-                  const oldJson = __R06_OLD_JSON__;
-                  const original = window.fetch.bind(window);
-                  const p = {started:0, completed:0, running:0, max:0,
-                    firstReady:false, errors:0, release:null, original};
-                  window.__r06PollProbe = p;
-                  window.fetch = (...args) => {
-                    const url=String(args[0]?.url || args[0] || "");
-                    if (!url.includes("/api/data")) return original(...args);
-                    const id=++p.started;
-                    p.running++;
-                    p.max=Math.max(p.max,p.running);
-                    if (id === 1) {
-                      p.firstReady=true;
-                      return new Promise(resolve => {
-                        p.release=() => {
-                          p.running--;p.completed++;
-                          resolve(new Response(oldJson, {
-                            status:200,
-                            headers:{"Content-Type":"application/json"}
-                          }));
-                        };
-                      });
-                    }
-                    return original(...args).then(reply => {
-                      p.running--;p.completed++;return reply;
-                    }, error => {
-                      p.running--;p.errors++;throw error;
-                    });
-                  };
-                  return true;
-                })()""".replace("__R06_OLD_JSON__", old_json_literal)) is True
-            # Do not change DB until the OLD API snapshot is already held
-            # in the browser; the next real request must apply NEW Save.
-            deadline = time.monotonic() + 12
-            while time.monotonic() < deadline:
-                probes = [evaluate(page, """JSON.stringify((() => {
-                  const p=window.__r06PollProbe;
-                  return {started:p.started,completed:p.completed,
-                          firstReady:p.firstReady,errors:p.errors};
-                })())""") for page in pages]
-                if all(p["firstReady"] for p in probes):
-                    break
-                QTest.qWait(100)
-            assert all(p["firstReady"] for p in probes), probes
-            db.set_setting("list_slide_direction", "right")
-            for page in pages:
-                new_state = until(page, lambda a:
-                    a["appliedDirection"] == "right" and
-                    a["motionKind"] == "idle",
-                    "main new Save applied despite older hung API response")
-                probe = evaluate(page, """JSON.stringify((() => {
-                  const p=window.__r06PollProbe;
-                  return {max:p.max,started:p.started,
-                          completed:p.completed,firstReady:p.firstReady};
-                })())""")
-                assert probe["started"] >= 2 and probe["completed"] >= 1, probe
-                assert probe["max"] >= 2, ("New Save was blocked by old request", probe)
-                assert evaluate(page, """(() => {
-                  const p=window.__r06PollProbe;
-                  if (!p.release) return false;
-                  p.release();return true;
-                })()""") is True
-            QTest.qWait(700)
-            for page in pages:
-                stable = evaluate(page, METRICS)
-                assert stable["appliedDirection"] == "right", (
-                    "Stale reply reverted a newer applied saved direction", stable)
-                assert evaluate(page, """(() => {
-                  window.fetch=window.__r06PollProbe.original;
-                  delete window.__r06PollProbe;
-                  return true;
-                })()""") is True
+            original_stream_payload = db.current_stream_payload
+            first_ready = threading.Event()
+            first_release = threading.Event()
+            first_returned = threading.Event()
+            counter_lock = threading.Lock()
+            request_state = {"started": 0, "completed": 0, "old_direction": None}
+
+            def delayed_stream_payload():
+                with counter_lock:
+                    request_state["started"] += 1
+                    first = request_state["started"] == 1
+                payload = original_stream_payload()
+                if first:
+                    request_state["old_direction"] = payload["overlay"]["list_slide_direction"]
+                    first_ready.set()
+                    if not first_release.wait(45):
+                        raise AssertionError("R06 main old HTTP reply was never released")
+                    first_returned.set()
+                with counter_lock:
+                    request_state["completed"] += 1
+                return payload
+
+            db.current_stream_payload = delayed_stream_payload
+            try:
+                deadline = time.monotonic() + 12
+                while not first_ready.is_set() and time.monotonic() < deadline:
+                    QTest.qWait(100)
+                assert first_ready.is_set(), request_state
+                assert request_state["old_direction"] == "left", request_state
+                db.set_setting("list_slide_direction", "right")
+                for page in pages:
+                    until(page, lambda a:
+                          a["appliedDirection"] == "right" and
+                          a["motionKind"] == "idle",
+                          "main real HTTP new Save with older reply blocked")
+                assert request_state["started"] >= 2, request_state
+                assert request_state["completed"] >= 1, request_state
+                first_release.set()
+                deadline = time.monotonic() + 8
+                while not first_returned.is_set() and time.monotonic() < deadline:
+                    QTest.qWait(50)
+                assert first_returned.is_set(), request_state
+                # A stale response must not flip the saved direction even
+                # for a single observed frame before the next poll repairs it.
+                for _ in range(28):
+                    for page in pages:
+                        stable = evaluate(page, METRICS)
+                        assert stable["appliedDirection"] == "right", (
+                            "Old main HTTP reply reverted newer Save", stable)
+                    QTest.qWait(60)
+            finally:
+                first_release.set()
+                db.current_stream_payload = original_stream_payload
             print("R06_MAIN_ORDERED_POLL_GATE_PASS", flush=True)
             print("R06_ZERO_BROWSER_ALL_PASS", flush=True)
         finally:
