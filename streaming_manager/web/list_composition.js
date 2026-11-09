@@ -94,7 +94,9 @@
     let lastSequence = null;
     let deadline = 0;
     let expiryTimer = null;
-    let lastChatHeight = -1;
+    // A newly populated hide-empty chat must animate from 0 even if the
+    // main OBS composition was previously parked while both were hidden.
+    let lastChatHeight = 0;
     let intrinsicChatHeight = 0;
     let lastEmbeddedChatNeeded = false;
     let lastEmbeddedRefreshAt = -Infinity;
