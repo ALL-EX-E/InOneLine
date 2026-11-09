@@ -132,11 +132,13 @@
     let dynamicMaskFrame = null;
     let motionChatTarget = -1;
     let motionListTarget = -1;
+    let settlingChatMask = false;
 
     function stopDynamicMask() {
       if (dynamicMaskFrame !== null) cancelAnimationFrame(dynamicMaskFrame);
       dynamicMaskFrame = null;
       dynamicCommandMotion = false;
+      settlingChatMask = false;
       chatLayer.style.clipPath = "";
       listLayer.style.transition = "";
       motionChatTarget = -1;
@@ -157,11 +159,12 @@
     function syncDynamicMotionGeometry() {
       if (!dynamicCommandMotion || !motion) return;
       const {natural, targetChat, targetList} = currentDynamicTargets();
-      // Replacement keeps the live, bottom-anchored chat at its true content
-      // height even when it is fully hidden behind the List. Split smoothly
-      // yields only its needed upper region and re-expands on reverse exit.
-      const wantedChat = dynamicMotionFull ? natural :
-        motion === "enter" ? targetChat : natural;
+      // A command entrance moves the List OVER the existing Twitch frame.
+      // Do not shrink a populated hide-empty chat before the List reaches its
+      // destination; this was the regression visible on all four directions.
+      // New messages may still grow the bottom-anchored frame during motion.
+      // The Split height cap is applied only after the entrance completes.
+      const wantedChat = natural;
       if (wantedChat !== motionChatTarget) {
         if (motionChatTarget >= 0) {
           // A newly arrived message must resize both boundaries together.
@@ -182,41 +185,45 @@
 
     function paintDynamicChatMask() {
       dynamicMaskFrame = null;
-      if (!dynamicCommandMotion || !motion) return;
+      if (!(dynamicCommandMotion && motion) && !settlingChatMask) return;
       const list = listLayer.getBoundingClientRect();
       const chat = chatLayer.getBoundingClientRect();
+      // Intersection of the ACTUALLY painted List surface with the Twitch
+      // frame. A Split/Bottom List is revealed by a WAAPI inset, not by
+      // translation: its unrevealed upper part must NOT cover Twitch yet.
       let listTop = list.top;
-      // The accepted Split/bottom entrance reveals the List within its own
-      // upper slot. Its clip is part of the REAL visible List footprint.
-      if (!dynamicMotionFull && dynamicMotionDirection === "bottom") {
-        const clip = getComputedStyle(listLayer).clipPath;
-        const match = /^inset\(\s*([\d.]+)px/.exec(clip);
-        if (match) listTop += Number(match[1]) || 0;
+      let listBottom = list.bottom;
+      const listClip = getComputedStyle(listLayer).clipPath;
+      const inset = /^inset\(\s*([\d.]+)px(?:\s+([\d.]+)px)?(?:\s+([\d.]+)px)?/.exec(listClip);
+      if (inset) {
+        listTop += Number(inset[1]) || 0;
+        if (inset[3]) listBottom -= Number(inset[3]) || 0;
       }
       const l = Math.max(0, list.left - chat.left);
       const r = Math.min(chat.width, list.right - chat.left);
       const t = Math.max(0, listTop - chat.top);
-      const b = Math.min(chat.height, list.bottom - chat.top);
+      const b = Math.min(chat.height, listBottom - chat.top);
       const w = chat.width;
       const h = chat.height;
       let mask = "none";
       if (chatAvailable && chatHasMessages && r > l && b > t && w > 0 && h > 0) {
-        // Only the part actually behind the translated List is hidden. The
-        // chat frame now has its NATURAL height, never an artificial 100%
-        // column whose glow gets sliced into a moving vertical stripe.
-        if (dynamicMotionDirection === "left") {
-          mask = `polygon(${r}px 0px,100% 0px,100% 100%,0px 100%,0px ${b}px,${r}px ${b}px)`;
-        } else if (dynamicMotionDirection === "right") {
-          mask = `polygon(0px 0px,${l}px 0px,${l}px ${b}px,100% ${b}px,100% 100%,0px 100%)`;
-        } else if (dynamicMotionDirection === "bottom" && dynamicMotionFull) {
-          mask = `inset(0px 0px ${Math.max(0, h - t)}px 0px)`;
-        } else {
-          // Top entrance and Split/bottom reveal overlap the chat from its
-          // upper edge; keep the lower content visible throughout movement.
-          mask = `inset(${b}px 0px 0px 0px)`;
-        }
+        // Even-odd subtraction clips the entire rectangle under the List,
+        // including transparent pixels. Unlike direction-specific inset /
+        // polygon masks it handles Split/Bottom's TWO exposed chat regions,
+        // horizontal entrances and full-size Replace with one exact edge.
+        // The outer rectangle keeps the unoccupied frame and iframe intact.
+        mask = `path(evenodd, "M 0 0 H ${w} V ${h} H 0 Z ` +
+          `M ${l} ${t} H ${r} V ${b} H ${l} Z")`;
       }
       if (chatLayer.style.clipPath !== mask) chatLayer.style.clipPath = mask;
+      // Keep the painted List footprint occluded while the Twitch frame
+      // settles into its final Split slot AFTER the command entrance. End the
+      // mask when the two layers no longer overlap, without another timer.
+      if (settlingChatMask && (r <= l || b <= t)) {
+        settlingChatMask = false;
+        chatLayer.style.clipPath = "";
+        return;
+      }
       dynamicMaskFrame = requestAnimationFrame(paintDynamicChatMask);
     }
 
@@ -275,6 +282,8 @@
       if (!motion) return;
       const wasEntering = motion === "enter";
       const wasExiting = motion === "exit";
+      const settleSplit = wasEntering && dynamicCommandMotion &&
+        !dynamicMotionFull && chatAvailable && chatHasMessages;
       cancelListMotion(true);
       if ((standaloneMotion || combinedMotion) && mode === "slide") {
         if (wasEntering && slidePhase === "enter" && active) beginHold();
@@ -285,6 +294,10 @@
       }
       lastGeometry = "";
       layout();
+      if (settleSplit) {
+        settlingChatMask = true;
+        paintDynamicChatMask();
+      }
     }
 
     function reverseZeroCommandMotion(next) {
@@ -379,6 +392,7 @@
     function beginCombinedSplitAlwaysMotion(
       entering, direction = "top", commandOverChat = false, replaceFull = false
     ) {
+      if (settlingChatMask) stopDynamicMask();
       // Reuse the List's accepted motion. Settings-driven Always entrance and
       // exit synchronize the chat edge; a command keeps chat full-height while
       // the List passes above it, restoring static split only after entrance.
@@ -600,15 +614,45 @@
       root.classList.toggle("r06-shown", active);
       root.classList.toggle("r06-not-shown", !active);
       root.classList.toggle("r06-replace", replacing);
-      listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
-      // Only a content-sized chat in Split mode animates its boundary. An
-      // Always chat starts at its full allocated height and never rises from
-      // the bottom when a message arrives.
+      // Keep a dynamically sized Split List pinned to the upper edge while
+      // Twitch shrinks only AFTER the command entrance. An ordinary flex
+      // switch made the fully visible List collapse to 0px during that final
+      // chat-height transition. Absolute children have the SAME end geometry
+      // without moving the outer combined OBS source or fading either layer.
+      const dynamicSplit = combinedMotion && split && !chatAlways;
       const animateChat = combinedMotion && !chatAlways && lastChatHeight >= 0 &&
         !replacing && !wasReplacing;
+      if (dynamicSplit) {
+        listLayer.style.flex = "none";
+        listLayer.style.position = "absolute";
+        listLayer.style.top = "0px";
+        listLayer.style.left = "0px";
+        listLayer.style.right = "0px";
+        listLayer.style.height = (available - desiredChat - gap) + "px";
+        listLayer.style.transition = animateChat ?
+          `height ${chatResizeSeconds}s ease` : "none";
+        chatLayer.style.position = "absolute";
+        chatLayer.style.bottom = "0px";
+        chatLayer.style.left = "0px";
+        chatLayer.style.right = "0px";
+        chatLayer.style.marginTop = "0px";
+      } else {
+        listLayer.style.position = "";
+        listLayer.style.top = "";
+        listLayer.style.left = "";
+        listLayer.style.right = "";
+        listLayer.style.height = "";
+        listLayer.style.transition = "";
+        listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
+        chatLayer.style.position = "";
+        chatLayer.style.bottom = "";
+        chatLayer.style.left = "";
+        chatLayer.style.right = "";
+        chatLayer.style.marginTop = gap + "px";
+      }
+      // Preserve accepted Always layout, timer, and separate List behavior.
       chatLayer.style.transition = animateChat ?
         `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
-      chatLayer.style.marginTop = gap + "px";
       if (desiredChat !== lastChatHeight) {
         chatLayer.style.height = desiredChat + "px";
         lastChatHeight = desiredChat;
