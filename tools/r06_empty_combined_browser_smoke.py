@@ -53,6 +53,11 @@ JS = """JSON.stringify((() => {
     ready:true,
     parent:root.parentElement?.id,
     listShown:root.classList.contains("r06-shown"),
+    motionKind:root.dataset.r06StandaloneMotionKind || "idle",
+    combinedSync:root.dataset.r06CombinedSync || "idle",
+    phase:root.dataset.r06StandalonePhase || "idle",
+    motionDuration:Number(root.dataset.r06StandaloneLastMotionDurationMs || 0),
+    holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
     listHeight:box(layer).height, chatHeight:box(chat).height,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
@@ -155,6 +160,7 @@ def main() -> int:
             "list_overlay_show_mode": "slide",
             "list_slide_command": "!list",
             "list_slide_duration": "3",
+            "list_slide_animation_seconds": "2.00",
             "combined_list_chat_layout": "split",
             "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
             "overlay_webcam_enabled": "1",
@@ -219,12 +225,25 @@ def main() -> int:
             # Removing the command message makes the chat genuinely empty
             # while the application-owned List timer keeps running.
             state.delete_message("twitch", "channel", "cmd-1")
+            entering = until(
+                page,
+                lambda m: m["parent"] == "right-list" and
+                m["listShown"] and m["motionKind"] == "enter" and
+                m["combinedSync"] == "command-enter" and
+                m["rootHeight"] > 50,
+                "command starts real List motion from parked empty chat",
+                api=api, dynamic_chat=True,
+            )
+            assert entering["motionDuration"] == 2000, entering
             shown = until(
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
+                m["motionKind"] == "idle" and m["phase"] == "hold" and
                 m["listHeight"] > 20 and m["chatHeight"] < 2,
-                "command shows only list", api=api, dynamic_chat=True,
+                "command shows only list after full entrance",
+                api=api, dynamic_chat=True,
             )
+            assert shown["holdAgeMs"] < 1100, shown
             assert abs(shown["gameWidth"] - idle["gameWidth"]) <= 1.0
             # Server time expires deterministically, while the accepted local
             # Browser Source phase clock finishes its independent 3-second hold.
