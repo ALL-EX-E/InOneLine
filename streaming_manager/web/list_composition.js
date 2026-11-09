@@ -220,9 +220,15 @@
       // settles into its final Split slot AFTER the command entrance. End the
       // mask when the two layers no longer overlap, without another timer.
       if (settlingChatMask && (r <= l || b <= t)) {
-        settlingChatMask = false;
-        chatLayer.style.clipPath = "";
-        return;
+        const {targetChat} = currentDynamicTargets();
+        if (Math.abs(h - targetChat) <= 1) {
+          settlingChatMask = false;
+          chatLayer.style.clipPath = "";
+          // The List and chat now have their exact Split flex geometry;
+          // release the temporary absolute handoff without moving an edge.
+          layout();
+          return;
+        }
       }
       dynamicMaskFrame = requestAnimationFrame(paintDynamicChatMask);
     }
@@ -293,11 +299,9 @@
         }
       }
       lastGeometry = "";
+      settlingChatMask = settleSplit;
       layout();
-      if (settleSplit) {
-        settlingChatMask = true;
-        paintDynamicChatMask();
-      }
+      if (settleSplit) paintDynamicChatMask();
     }
 
     function reverseZeroCommandMotion(next) {
@@ -392,6 +396,8 @@
     function beginCombinedSplitAlwaysMotion(
       entering, direction = "top", commandOverChat = false, replaceFull = false
     ) {
+      const interruptedChatHeight = settlingChatMask ?
+        chatLayer.getBoundingClientRect().height : null;
       if (settlingChatMask) stopDynamicMask();
       // Reuse the List's accepted motion. Settings-driven Always entrance and
       // exit synchronize the chat edge; a command keeps chat full-height while
@@ -427,7 +433,8 @@
       chatLayer.style.right = "0px";
       const dynamicCommand = commandOverChat && !chatAlways;
       chatLayer.style.height = (dynamicCommand ?
-        (replaceFull ? naturalChat : entering ? naturalChat : targetChat) :
+        (replaceFull ? naturalChat : entering ? naturalChat :
+          interruptedChatHeight === null ? targetChat : interruptedChatHeight) :
         commandOverChat ? available : entering ? naturalChat : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
@@ -619,7 +626,8 @@
       // switch made the fully visible List collapse to 0px during that final
       // chat-height transition. Absolute children have the SAME end geometry
       // without moving the outer combined OBS source or fading either layer.
-      const dynamicSplit = combinedMotion && split && !chatAlways;
+      const dynamicSplit = combinedMotion && split && !chatAlways &&
+        settlingChatMask;
       const animateChat = combinedMotion && !chatAlways && lastChatHeight >= 0 &&
         !replacing && !wasReplacing;
       if (dynamicSplit) {
