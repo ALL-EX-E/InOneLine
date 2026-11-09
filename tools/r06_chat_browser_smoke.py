@@ -470,7 +470,18 @@ def main():
                     8 < a["chatHeight"] < a["rootHeight"] / 2,
                     "first message grows compact chat from bottom")
                 assert first["chatTransition"].startswith("0.6s"), first
-                assert first["iframeStable"] and first["documentStable"], first
+                assert first["iframeStable"], first
+                # A parked main OBS composition is permitted to navigate its
+                # child ONCE on reattachment. The accepted iframe/document
+                # identity invariant begins after that first rendered message
+                # and must hold throughout every subsequent List motion.
+                page.runJavaScript("""(() => {
+                  window.__r06MainQaFrame = document.querySelector('#list-chat iframe');
+                  window.__r06MainQaDocument = window.__r06MainQaFrame?.contentDocument;
+                })()""")
+                fresh = until(page, lambda a:
+                    a["hasSentinel"] and a["iframeStable"] and a["documentStable"],
+                    "hide-empty first live iframe established")
 
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction", direction)
