@@ -1076,6 +1076,27 @@ body.preview .preview-label { display: flex; }
       applyTypography(overlayConfig.typography || {});
       applyFrameColors(overlayConfig);
       applyBackgroundMedia(overlayConfig.background || {});
+      // A commanded List can wake a fully parked (display:none) composition
+      // while hide-empty Twitch chat has no messages. Give the existing
+      // composition its real geometry BEFORE it starts the shared WAAPI
+      // entrance; otherwise root.clientHeight=0 silently skips the motion
+      // and starts the hold clock before the List is visible.
+      const listMode = data.visibility?.list?.show_mode;
+      const trigger = data.list_show || {};
+      const listWillShow = listMode === "always" ||
+        (listMode === "slide" &&
+          (trigger.held === true || Number(trigger.remaining_ms || 0) > 0));
+      if (listWillShow && listComposition.parentElement === parking) {
+        const webcamOn = overlayConfig.webcam_enabled !== false;
+        const preferredSide = parseCorner(overlayConfig.webcam_position || "top_right").side;
+        const configuredSide = overlayConfig.list_side;
+        const side = configuredSide === "left" || configuredSide === "right" ?
+          configuredSide : webcamOn ? preferredSide : "right";
+        // Only re-parent when the source was fully parked, never on polls
+        // of an active Twitch iframe.
+        (side === "left" ? leftColumn : rightColumn).classList.remove("hidden");
+        slots[side].list.appendChild(listComposition);
+      }
       composer.apply(data, true);
       applyOverlayLayout(overlayConfig, game);
 
