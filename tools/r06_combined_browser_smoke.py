@@ -54,6 +54,8 @@ JS = """JSON.stringify((() => {
     chatClipPath:csStyle.clipPath,
     lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
     lastExit:root.dataset.r06StandaloneLastExit || "",
+    appliedDirection:root.dataset.r06AppliedListDirection || "",
+    appliedComposeMode:root.dataset.r06AppliedComposeMode || "",
     phase:root.dataset.r06StandalonePhase || "idle",
     holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
     holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
@@ -834,7 +836,13 @@ def main():
             # while the chat contains only a few short messages.
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
+ 
+                until(view.page(), lambda a:
+                      a["appliedDirection"] == direction and
+                      a["appliedComposeMode"] == "split",
+                      "Chromium applied hide-empty split "+direction,
+                      dynamic_chat=True)
+
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "hide-empty-on-" + direction,
                     "qa_viewer", "!list")), direction
@@ -886,7 +894,13 @@ def main():
             QTest.qWait(1300)
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
+ 
+                until(view.page(), lambda a:
+                      a["appliedDirection"] == direction and
+                      a["appliedComposeMode"] == "replace",
+                      "Chromium applied hide-empty replace "+direction,
+                      dynamic_chat=True)
+
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "hide-empty-replace-on-" + direction,
                     "qa_viewer", "!list")), direction
