@@ -1046,6 +1046,77 @@ def main():
                 "hide-empty positive hold ends with reverse exit",
                 timeout=13, dynamic_chat=True)
             assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
+            # FIX-092 separate /combined-overlay: reproduce the user's FULL
+            # Twitch history, not just one short row. New List motion must
+            # cover the chat while the chat itself stays full-height until
+            # entrance ends. Test all four directions in Split and Replace.
+            db.set_settings_bulk({
+                "list_slide_duration": "0",
+                "list_slide_animation_seconds": "1.75",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            state.clear_chat("twitch", "ch")
+            for index in range(25):
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "fix092-combined-full-" + str(index),
+                    "qa_viewer", "Filled Twitch panel message " + str(index)))
+            for composition in ("split", "replace"):
+                for direction in ("left", "right", "top", "bottom"):
+                    db.set_settings_bulk({
+                        "combined_list_chat_layout": composition,
+                        "list_slide_direction": direction,
+                    })
+                    before = until(view.page(), lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["appliedComposeMode"] == composition and
+                        a["appliedDirection"] == direction and
+                        a["chatHeight"] > a["rootHeight"] * .90,
+                        "FULL chat before command " + composition + " " + direction,
+                        dynamic_chat=True)
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "fix092-combined-on-" + composition + direction,
+                        "qa_viewer", "!list"))
+                    until(view.page(), lambda a:
+                        a["motionKind"] == "enter" and
+                        a["lastEntrance"] == direction and
+                        a["motionDuration"] == 1750,
+                        "FIX-092 command entrance " + composition + " " + direction,
+                        dynamic_chat=True)
+                    QTest.qWait(350)
+                    mid = inspect(view.page())
+                    assert mid["motionKind"] == "enter", mid
+                    assert mid["chatHeight"] >= mid["rootHeight"] * .90, (
+                        "Twitch frame must NOT shrink while List arrives",
+                        composition, direction, mid)
+                    assert mid["chatClipPath"] == "none" or (
+                        mid["chatClipPath"].startswith('path(evenodd, ')), (
+                        "Direction-aware painted List mask", composition, direction, mid)
+                    assert mid["sameChatFrame"] and mid["sameChatDocument"], mid
+                    at_end = until(view.page(), lambda a:
+                        a["phase"] == "hold" and a["motionKind"] == "idle" and
+                        a["listHeight"] >= a["rootHeight"] *
+                            (.47 if composition == "split" else .97) and
+                        (a["chatHeight"] < a["rootHeight"] * .56
+                         if composition == "split" else True),
+                        "List never collapses at full chat handoff " +
+                        composition + " " + direction, dynamic_chat=True)
+                    assert at_end["sameChatFrame"] and at_end["sameChatDocument"], at_end
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "fix092-combined-off-" + composition + direction,
+                        "qa_viewer", "!list"))
+                    until(view.page(), lambda a:
+                        a["motionKind"] == "exit" and
+                        a["lastExit"] == direction,
+                        "FIX-092 reverse over filled chat " +
+                        composition + " " + direction, dynamic_chat=True)
+                    restored = until(view.page(), lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["chatHeight"] > a["rootHeight"] * .90,
+                        "FULL chat restored " + composition + " " + direction,
+                        dynamic_chat=True)
+                    assert restored["sameChatFrame"] and restored["sameChatDocument"], restored
+            print("R06_FIX092_COMBINED_FULL_CHAT_ALL_DIRECTIONS_PASS", flush=True)
+
             print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
 
             print("R06_REPLACE_ALL_DIRECTIONS_AND_ZERO_PASS", flush=True)
