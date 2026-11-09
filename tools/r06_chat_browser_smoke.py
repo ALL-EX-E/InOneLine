@@ -508,10 +508,20 @@ def main():
                 assert state.ingest(ChatMessage(
                     "twitch", "chan", "dynamic-on-"+direction, "alice", "!list"))
                 for page in pages:
-                    entry = until(page, lambda a: a["combinedSync"] == "command-enter"
-                                  and a["motionKind"] == "enter"
-                                  and a["lastEntrance"] == direction,
-                                  "hide-empty shared entrance "+direction)
+                    # A 1-second entrance can finish before a loaded Windows
+                    # Chromium callback is delivered. An observed entrance OR
+                    # its correctly counted, fully visible hold is valid here;
+                    # longer motion tests below still inspect intermediate
+                    # frames and the live Twitch mask.
+                    entry = until(page, lambda a:
+                        a["lastEntrance"] == direction and
+                        a["entranceCount"] == prior["entranceCount"] + 1 and
+                        a["motionDuration"] == 1000 and a["shown"] and
+                        ((a["combinedSync"] == "command-enter" and
+                          a["motionKind"] == "enter") or
+                         (a["phase"] == "hold" and a["motionKind"] == "idle" and
+                          a["listHeight"] >= a["rootHeight"] / 2 - 12)),
+                        "hide-empty shared entrance/hold "+direction)
                     assert entry["motionDuration"] == 1000, entry
                     assert entry["iframeStable"] and entry["documentStable"], entry
                     held = until(page, lambda a: a["shown"] and not a["replace"]
@@ -540,10 +550,15 @@ def main():
                 assert state.ingest(ChatMessage(
                     "twitch","chan","dynamic-off-"+direction,"alice","!list"))
                 for page in pages:
-                    leave = until(page, lambda a: a["combinedSync"] == "command-exit"
-                                  and a["motionKind"] == "exit" and
-                                  a["lastExit"] == direction,
-                                  "hide-empty reverse List exit "+direction)
+                    leave = until(page, lambda a:
+                        a["lastExit"] == direction and
+                        a["exitCount"] == prior["exitCount"] + 1 and
+                        a["motionDuration"] == 1000 and
+                        ((a["combinedSync"] == "command-exit" and
+                          a["motionKind"] == "exit") or
+                         (a["motionKind"] == "idle" and not a["shown"] and
+                          a["listHeight"] <= 2)),
+                        "hide-empty reverse List exit/idle "+direction)
                     assert leave["motionDuration"] == 1000, leave
                     restored = until(page, lambda a: not a["shown"] and
                                      a["motionKind"] == "idle" and
@@ -558,17 +573,24 @@ def main():
                 db.set_setting("list_slide_direction",direction)
 
                 for page in pages:
-                    until(page, lambda a: a["appliedDirection"] == direction and
-                          a["appliedComposeMode"] == "replace",
-                          "Chromium applied hide-empty replace "+direction)
+                    prior_replace = until(page, lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["appliedDirection"] == direction and
+                        a["appliedComposeMode"] == "replace",
+                        "Chromium applied hide-empty replace "+direction)
 
                 assert state.ingest(ChatMessage(
                     "twitch","chan","dynamic-replace-on-"+direction,"alice","!list"))
                 for page in pages:
                     entry = until(page, lambda a:
-                        a["combinedSync"] == "replace-command-enter" and
-                        a["motionKind"] == "enter" and a["lastEntrance"] == direction,
-                        "hide-empty replacement enters "+direction)
+                        a["lastEntrance"] == direction and
+                        a["entranceCount"] == prior_replace["entranceCount"] + 1 and
+                        a["motionDuration"] == 1000 and a["shown"] and
+                        ((a["combinedSync"] == "replace-command-enter" and
+                          a["motionKind"] == "enter") or
+                         (a["motionKind"] == "idle" and a["phase"] == "hold" and
+                          a["replace"] and a["listHeight"] >= a["rootHeight"] - 3)),
+                        "hide-empty replacement enters/holds "+direction)
                     assert entry["iframeStable"] and entry["documentStable"], entry
                     full = until(page, lambda a:
                         a["shown"] and a["replace"] and a["phase"] == "hold" and
@@ -579,9 +601,14 @@ def main():
                     "twitch","chan","dynamic-replace-off-"+direction,"alice","!list"))
                 for page in pages:
                     leave = until(page, lambda a:
-                        a["combinedSync"] == "replace-command-exit" and
-                        a["motionKind"] == "exit",
-                        "hide-empty replacement reverses "+direction)
+                        a["lastExit"] == direction and
+                        a["exitCount"] == prior_replace["exitCount"] + 1 and
+                        a["motionDuration"] == 1000 and
+                        ((a["combinedSync"] == "replace-command-exit" and
+                          a["motionKind"] == "exit") or
+                         (a["motionKind"] == "idle" and not a["shown"] and
+                          a["listHeight"] <= 2)),
+                        "hide-empty replacement reverses/settles "+direction)
                     restored = until(page, lambda a:
                         not a["shown"] and not a["replace"] and
                         a["motionKind"] == "idle" and
