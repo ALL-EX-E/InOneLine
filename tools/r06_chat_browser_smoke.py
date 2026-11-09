@@ -588,6 +588,81 @@ def main():
                         a["chatHeight"] > 10 and a["hasSentinel"],
                         "hide-empty replacement restores messages "+direction)
                     assert restored["iframeStable"] and restored["documentStable"], restored
+            # Messages arriving in the MIDDLE of a three-second entrance or
+            # reverse exit must change the actual Twitch geometry, rather than
+            # jump on the List's WAAPI finish. Test both real /overlay views.
+            for composition in ("split", "replace"):
+                db.set_settings_bulk({
+                    "combined_list_chat_layout": composition,
+                    "list_slide_animation_seconds": "3.00",
+                    "list_slide_direction": "left",
+                })
+                state.clear_chat("twitch", "chan")
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "video-start-" + composition,
+                    "alice", "R06 movie first message"))
+                for page in pages:
+                    before = until(page, lambda a:
+                        not a["shown"] and a["count"] == 1 and
+                        a["appliedComposeMode"] == composition and
+                        a["appliedDirection"] == "left" and
+                        15 < a["chatHeight"] < a["rootHeight"] / 2,
+                        "one-message dynamic chat before movie " + composition)
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "video-enter-" + composition,
+                    "alice", "!list"))
+                for page in pages:
+                    entering = until(page, lambda a:
+                        a["motionKind"] == "enter" and
+                        a["motionDuration"] == 3000 and
+                        a["lastEntrance"] == "left" and
+                        (a["combinedSync"] == "command-enter" if composition == "split"
+                         else a["combinedSync"] == "replace-command-enter"),
+                        "movie List entry starts " + composition)
+                    assert abs(entering["chatBottomGap"]) < 4, entering
+                    # A content-sized Twitch frame must NEVER temporarily
+                    # become 100% high just because Replace uses a full List.
+                    assert entering["chatHeight"] < entering["rootHeight"] / 2, entering
+                for index in range(9):
+                    assert state.ingest(ChatMessage(
+                        "twitch", "chan", "video-enter-grow-" + composition + str(index),
+                        "alice", "Message while List enters " + str(index)))
+                for page in pages:
+                    growing = until(page, lambda a:
+                        a["motionKind"] == "enter" and
+                        a["count"] >= 10 and
+                        a["chatHeight"] > entering["chatHeight"] + 25 and
+                        abs(a["chatBottomGap"]) < 4,
+                        "chat grows while List enters " + composition)
+                    assert growing["iframeStable"] and growing["documentStable"], growing
+                    assert growing["panelOpacity"] >= .99, growing
+                    held = until(page, lambda a:
+                        a["motionKind"] == "idle" and a["phase"] == "hold" and
+                        a["shown"], "movie List entry settles " + composition)
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "video-exit-" + composition,
+                    "alice", "!list"))
+                for page in pages:
+                    exiting = until(page, lambda a:
+                        a["motionKind"] == "exit" and a["motionDuration"] == 3000 and
+                        a["lastExit"] == "left", "movie List exit starts " + composition)
+                    assert abs(exiting["chatBottomGap"]) < 4, exiting
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "video-exit-grow-" + composition,
+                    "alice", "Message DURING reverse List exit"))
+                for page in pages:
+                    latest = until(page, lambda a:
+                        a["motionKind"] == "exit" and a["count"] >= 11 and
+                        abs(a["chatBottomGap"]) < 4,
+                        "chat receives messages during reverse exit " + composition)
+                    assert latest["iframeStable"] and latest["documentStable"], latest
+                    settled = until(page, lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["count"] >= 11 and 0 < a["chatHeight"] <= a["rootHeight"] + 3 and
+                        abs(a["chatBottomGap"]) < 4,
+                        "natural Twitch height survives reverse exit " + composition)
+                    assert settled["iframeStable"] and settled["documentStable"], settled
+            print("R06_MAIN_LIVE_MOTION_RESIZE_VIDEO_PASS", flush=True)
             print("R06_MAIN_HIDE_EMPTY_SPLIT_REPLACE_MOTION_PASS", flush=True)
 
             # The OBS switch must remove the chat without reserving empty space.
