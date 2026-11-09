@@ -282,7 +282,7 @@
       const naturalChat = !chatNeeded ? 0 : chatAlways ? available :
         Math.max(0, Math.min(available, measureChat()));
       const gap = replaceFull || !chatNeeded ? 0 : 12;
-      const targetChat = replaceFull ? 0 : chatAlways ?
+      const targetChat = replaceFull || !chatNeeded ? 0 : chatAlways ?
         Math.floor((available - gap) / 2) :
         Math.min(naturalChat, Math.floor((available - gap) / 2));
       // Hide-empty chat never reserves a fixed half; the List fills
