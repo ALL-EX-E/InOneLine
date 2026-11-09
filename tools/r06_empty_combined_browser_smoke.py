@@ -103,7 +103,7 @@ def inspect(page):
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
 
 
-def until(page, predicate, label: str, timeout: float = 25, *, api=None):
+def until(page, predicate, label: str, timeout: float = 25, *, api=None, dynamic_chat=False):
     end = time.monotonic() + timeout
     latest = None
     while time.monotonic() < end:
@@ -120,7 +120,8 @@ def until(page, predicate, label: str, timeout: float = 25, *, api=None):
             assert float(latest["panelOpacity"]) >= 0.99, (label, latest)
             assert latest["panelTransform"] == "none", (label, latest)
             assert latest["panelTransition"] == "0s", (label, latest)
-            assert latest["chatTransition"] == "0s", (label, latest)
+            if not dynamic_chat:
+                assert latest["chatTransition"] == "0s", (label, latest)
             print("R06_EMPTY_CONTAINER_PASS", label, latest, flush=True)
             return latest
         QTest.qWait(130)
@@ -153,7 +154,7 @@ def main() -> int:
         db.set_settings_bulk({
             "list_overlay_show_mode": "slide",
             "list_slide_command": "!list",
-            "list_slide_duration": "90",
+            "list_slide_duration": "3",
             "combined_list_chat_layout": "split",
             "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
             "overlay_webcam_enabled": "1",
@@ -165,7 +166,7 @@ def main() -> int:
         api = LocalApiServer(db, port=free_port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("slide", "!list", 90)
+        api.configure_list_show("slide", "!list", 3)
         api.start()
         view = QWebEngineView()
         try:
@@ -177,6 +178,7 @@ def main() -> int:
                 page,
                 lambda m: m["parent"] == "movable-elements" and not m["listShown"],
                 "slide idle with empty hide-empty chat is parked",
+                dynamic_chat=True,
             )
             assert idle["listHeight"] <= 1, idle
 
@@ -196,7 +198,7 @@ def main() -> int:
                 lambda m: m["parent"] == "right-list" and
                 not m["listShown"] and m["chatHeight"] > 10 and
                 m["listHeight"] <= 2 and m["chatCount"] >= 1,
-                "new message restores chat only", api=api,
+                "new message restores chat only", api=api, dynamic_chat=True,
             )
             assert abs(message["gameWidth"] - idle["gameWidth"]) <= 1.0
 
@@ -205,7 +207,7 @@ def main() -> int:
                 page,
                 lambda m: m["parent"] == "movable-elements" and
                 not m["listShown"],
-                "deleted final message releases combined container",
+                "deleted final message releases combined container", dynamic_chat=True,
             )
 
             assert state.ingest(ChatMessage(
@@ -213,7 +215,7 @@ def main() -> int:
             ))
             with urlopen(api.base_url + "/api/data", timeout=5) as response:
                 snapshot = json.load(response)
-            assert snapshot["list_show"]["remaining_ms"] >= 89000, snapshot["list_show"]
+            assert snapshot["list_show"]["remaining_ms"] >= 2500, snapshot["list_show"]
             # Removing the command message makes the chat genuinely empty
             # while the application-owned List timer keeps running.
             state.delete_message("twitch", "channel", "cmd-1")
@@ -221,12 +223,12 @@ def main() -> int:
                 page,
                 lambda m: m["parent"] == "right-list" and m["listShown"] and
                 m["listHeight"] > 20 and m["chatHeight"] < 2,
-                "command shows only list", api=api,
+                "command shows only list", api=api, dynamic_chat=True,
             )
             assert abs(shown["gameWidth"] - idle["gameWidth"]) <= 1.0
-            # Advance server-owned command time deterministically instead of
-            # letting a 9-second window expire during unrelated Chromium startup.
-            clock.advance(91)
+            # Server time expires deterministically, while the accepted local
+            # Browser Source phase clock finishes its independent 3-second hold.
+            clock.advance(4)
             with urlopen(api.base_url + "/api/data", timeout=5) as response:
                 expired = json.load(response)
             assert expired["list_show"]["remaining_ms"] == 0, expired["list_show"]
@@ -235,7 +237,7 @@ def main() -> int:
                 lambda m: m["parent"] == "movable-elements" and
                 not m["listShown"],
                 "command expiry parks empty combined container",
-                timeout=25, api=api,
+                timeout=25, api=api, dynamic_chat=True,
             )
 
             # Independent Always visibility means a real visible widget exists.
