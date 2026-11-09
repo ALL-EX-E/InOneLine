@@ -9,6 +9,7 @@ import json
 import os
 import re
 import socket
+import threading
 import sys
 import time
 from pathlib import Path
@@ -1197,87 +1198,62 @@ def main():
             assert growing["listHeight"] < empty_list["listHeight"] - 4, growing
             print("R06_FIX092_FIRST_MESSAGE_SPLIT_BOUNDARY_PASS", flush=True)
 
-            # R06/ORDERED-POLL-098: hold one OLD response in the client,
-            # apply a NEW saved direction via a concurrent API response,
-            # then release the old response. The newer Save must win.
+            # R06/ORDERED-POLL-098: real concurrent HTTP responses from the
+            # existing threaded API, not a main-world window.fetch mock.
             db.set_setting("list_slide_direction", "left")
             until(view.page(), lambda a: a["appliedDirection"] == "left" and
                   a["motionKind"] == "idle",
                   "combined ordered-poll baseline saved direction left",
                   dynamic_chat=True)
-            with urlopen(api.base_url + "/api/data", timeout=5) as response:
-                old_snapshot = json.load(response)
-            assert old_snapshot["overlay"]["list_slide_direction"] == "left"
-            old_json_literal = json.dumps(
-                json.dumps(old_snapshot, ensure_ascii=False), ensure_ascii=True
-            )
-            assert evaluate(view.page(), """(() => {
-              const oldJson=__R06_OLD_JSON__;
-              const original=window.fetch.bind(window);
-              const p={started:0,completed:0,running:0,max:0,
-                       firstReady:false,errors:0,release:null,original};
-              window.__r06PollProbe=p;
-              window.fetch=(...args) => {
-                const url=String(args[0]?.url || args[0] || "");
-                if (!url.includes("/api/data")) return original(...args);
-                const id=++p.started;
-                p.running++;
-                p.max=Math.max(p.max,p.running);
-                if (id === 1) {
-                  p.firstReady=true;
-                  return new Promise(resolve => {
-                    p.release=() => {
-                      p.running--;p.completed++;
-                      resolve(new Response(oldJson, {
-                        status:200,
-                        headers:{"Content-Type":"application/json"}
-                      }));
-                    };
-                  });
-                }
-                return original(...args).then(reply => {
-                  p.running--;p.completed++;return reply;
-                },error => {p.running--;p.errors++;throw error;});
-              };
-              return true;
-            })()""".replace("__R06_OLD_JSON__", old_json_literal)) is True
-            deadline = time.monotonic() + 12
-            probe = {}
-            while time.monotonic() < deadline:
-                probe = evaluate(view.page(), """JSON.stringify((() => {
-                  const p=window.__r06PollProbe;
-                  return {started:p.started,completed:p.completed,
-                          firstReady:p.firstReady,errors:p.errors};
-                })())""")
-                if probe["firstReady"]:
-                    break
-                QTest.qWait(100)
-            assert probe["firstReady"], probe
-            db.set_setting("list_slide_direction", "right")
-            until(view.page(), lambda a: a["appliedDirection"] == "right" and
-                  a["motionKind"] == "idle",
-                  "combined new Save applied despite older hung API response",
-                  dynamic_chat=True)
-            probe = evaluate(view.page(), """JSON.stringify((() => {
-              const p=window.__r06PollProbe;
-              return {max:p.max,started:p.started,completed:p.completed};
-            })())""")
-            assert probe["started"] >= 2 and probe["completed"] >= 1, probe
-            assert probe["max"] >= 2, ("Combined Save blocked by old fetch", probe)
-            assert evaluate(view.page(), """(() => {
-              const p=window.__r06PollProbe;
-              if (!p.release) return false;
-              p.release();return true;
-            })()""") is True
-            QTest.qWait(700)
-            final=inspect(view.page())
-            assert final["appliedDirection"] == "right", (
-                "Old combined API response reverted newer saved direction",final)
-            assert evaluate(view.page(), """(() => {
-              window.fetch=window.__r06PollProbe.original;
-              delete window.__r06PollProbe;
-              return true;
-            })()""") is True
+            original_stream_payload = db.current_stream_payload
+            first_ready = threading.Event()
+            first_release = threading.Event()
+            first_returned = threading.Event()
+            counter_lock = threading.Lock()
+            request_state = {"started": 0, "completed": 0, "old_direction": None}
+
+            def delayed_stream_payload():
+                with counter_lock:
+                    request_state["started"] += 1
+                    first = request_state["started"] == 1
+                payload = original_stream_payload()
+                if first:
+                    request_state["old_direction"] = payload["overlay"]["list_slide_direction"]
+                    first_ready.set()
+                    if not first_release.wait(45):
+                        raise AssertionError("R06 combined old HTTP reply was never released")
+                    first_returned.set()
+                with counter_lock:
+                    request_state["completed"] += 1
+                return payload
+
+            db.current_stream_payload = delayed_stream_payload
+            try:
+                deadline = time.monotonic() + 12
+                while not first_ready.is_set() and time.monotonic() < deadline:
+                    QTest.qWait(100)
+                assert first_ready.is_set(), request_state
+                assert request_state["old_direction"] == "left", request_state
+                db.set_setting("list_slide_direction", "right")
+                until(view.page(), lambda a: a["appliedDirection"] == "right" and
+                      a["motionKind"] == "idle",
+                      "combined real HTTP new Save with older reply blocked",
+                      dynamic_chat=True)
+                assert request_state["started"] >= 2, request_state
+                assert request_state["completed"] >= 1, request_state
+                first_release.set()
+                deadline = time.monotonic() + 8
+                while not first_returned.is_set() and time.monotonic() < deadline:
+                    QTest.qWait(50)
+                assert first_returned.is_set(), request_state
+                for _ in range(28):
+                    stable = inspect(view.page())
+                    assert stable["appliedDirection"] == "right", (
+                        "Old combined HTTP reply reverted newer Save", stable)
+                    QTest.qWait(60)
+            finally:
+                first_release.set()
+                db.current_stream_payload = original_stream_payload
             print("R06_COMBINED_ORDERED_POLL_GATE_PASS", flush=True)
             print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
 
