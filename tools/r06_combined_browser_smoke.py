@@ -931,7 +931,11 @@ def main():
                     a["lastEntrance"] == direction,
                     "hide-empty Replace enters " + direction,
                     dynamic_chat=True)
-                expectedMask = "polygon(" if direction in ("left", "right") else "inset("
+                # FIX-092 uses one exact even-odd subtraction mask for the
+                # List's painted rectangle in EVERY direction. The legacy
+                # polygon/inset expectation predates this transparent-safe
+                # occlusion mechanism and must not force a runtime rollback.
+                expectedMask = "path(evenodd, "
                 occluded = until(view.page(), lambda a:
                     a["motionKind"] == "enter" and
                     a["chatClipPath"].startswith(expectedMask) and
