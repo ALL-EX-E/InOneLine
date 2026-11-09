@@ -1066,17 +1066,20 @@ body.preview .preview-label { display: flex; }
     }
   }
 
-  // Reuse the independent List's accepted in-flight gate: the embedded
-  // combined source must never apply an OLDER /api/data snapshot after a
-  // newer Twitch zero-second toggle and accidentally reverse the List.
-  let overlayPollInFlight = false;
+  // Apply only the newest COMPLETED /api/data snapshot. A slow request
+  // must not block newer saved settings, and an older response must never
+  // replay a stale zero-second Twitch toggle after a newer one has applied.
+  // This reuses the existing polling timer; no new clock or animation.
+  let overlayRequestId = 0;
+  let overlayLastAppliedRequestId = 0;
   async function update() {
-    if (overlayPollInFlight) return;
-    overlayPollInFlight = true;
+    const requestId = ++overlayRequestId;
     try {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      if (requestId < overlayLastAppliedRequestId) return;
+      overlayLastAppliedRequestId = requestId;
       ObsVisibility.apply(data.visibility?.overlay);
       const game = data.game || {};
       const overlayConfig = data.overlay || {};
@@ -1150,9 +1153,9 @@ body.preview .preview-label { display: flex; }
 
       apiState.classList.remove("visible");
     } catch (err) {
-      apiState.classList.add("visible");
-    } finally {
-      overlayPollInFlight = false;
+      if (requestId >= overlayLastAppliedRequestId) {
+        apiState.classList.add("visible");
+      }
     }
   }
 
