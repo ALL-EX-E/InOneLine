@@ -320,20 +320,62 @@ def main():
                     "(window.__r06MainQaFrame=document.querySelector("
                     "'#list-chat iframe'),window.__r06MainQaDocument="
                     "window.__r06MainQaFrame.contentDocument,true)")
+            # Keep a passive browser-side observer: the sequential poll fix
+            # must not stall saved settings or mask a failed /api/data response.
+            for page in pages:
+                assert evaluate(page, """(() => {
+                  const previousFetch = window.fetch.bind(window);
+                  const p = {started:0, completed:0, errors:0,
+                             lastDirection:null, lastStatus:null};
+                  window.__r06SavedDirectionPoll = p;
+                  window.fetch = (...args) => {
+                    const url=String(args[0]?.url || args[0] || '');
+                    if (!url.includes('/api/data')) return previousFetch(...args);
+                    p.started++;
+                    return previousFetch(...args).then(response => {
+                      p.completed++;
+                      p.lastStatus=response.status;
+                      response.clone().json().then(data => {
+                        p.lastDirection=data.overlay?.list_slide_direction;
+                      }).catch(() => {p.errors++;});
+                      return response;
+                    }, error => {p.errors++;throw error;});
+                  };
+                  return true;
+                })()""") is True
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
+                assert db.get_setting("list_slide_direction") == direction
+                with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                    immediate = json.load(response)
+                assert immediate["overlay"]["list_slide_direction"] == direction, (
+                    "Database/API direction mismatch", direction, immediate["overlay"]["list_slide_direction"])
                 # /overlay and /combined-overlay apply saved settings via
                 # their existing 1-second /api/data poll. Wait for the next
                 # full poll before issuing a Twitch command, otherwise this
                 # test races a newly saved direction against the old one.
                 QTest.qWait(1600)
                 for page in pages:
-                    idle = until(page, lambda a: not a["shown"] and
-                                 a["combinedSync"] == "idle" and
-                                 a["motionKind"] == "idle" and
-                                 a["appliedDirection"] == direction and
-                                 a["appliedComposeMode"] == "split",
-                                 "main saved direction applied before command "+direction)
+                    try:
+                        idle = until(page, lambda a: not a["shown"] and
+                                     a["combinedSync"] == "idle" and
+                                     a["motionKind"] == "idle" and
+                                     a["appliedDirection"] == direction and
+                                     a["appliedComposeMode"] == "split",
+                                     "main saved direction applied before command "+direction)
+                    except AssertionError:
+                        probe = evaluate(page, """JSON.stringify({
+                          ...window.__r06SavedDirectionPoll,
+                          pageReady:document.readyState,
+                          current:document.getElementById('list-composition')?.dataset.r06AppliedListDirection
+                        })""")
+                        with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                            latest = json.load(response)
+                        print("R06_SAVED_DIRECTION_DIAGNOSTIC", {
+                            "expected":direction, "database":db.get_setting("list_slide_direction"),
+                            "api":latest["overlay"]["list_slide_direction"],
+                            "browser":probe}, flush=True)
+                        raise
                     previous_exit = idle["exitCount"]
                 assert state.ingest(ChatMessage(
                     "twitch", "chan", "main-parity-"+direction, "qa_viewer", "!list"
