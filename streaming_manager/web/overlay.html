@@ -818,8 +818,15 @@ body.preview .preview-label { display: flex; }
 
     // Отключённые элементы убираются из рабочих колонок полностью.
     if (!webcamEnabled) parking.appendChild(webcamFrame);
-    if (!listAreaNeeded && listComposition.parentElement !== parking) {
-      parking.appendChild(listComposition);
+    // Once the embedded Twitch iframe has loaded in a visible List slot,
+    // never re-parent it back into the display:none parking container.
+    // A display:none slot removes the same layout space and empty frame,
+    // without re-navigating the iframe or losing its message document.
+    if (!listAreaNeeded) {
+      const currentSlot = listComposition.parentElement;
+      if (currentSlot === slots.left.list || currentSlot === slots.right.list) {
+        currentSlot.style.display = "none";
+      }
     }
     if (!infoEnabled) parking.appendChild(infoPanel);
 
@@ -832,10 +839,10 @@ body.preview .preview-label { display: flex; }
     }
 
     if (listAreaNeeded) {
-      // Moving an existing iframe-bearing composition on every API poll
-      // navigates its embedded Twitch document and visibly flickers chat.
-      // Reparent only when the user actually changes the selected side.
+      // Reuse the already mounted iframe. Reparent only for a genuine
+      // side change (or its first placement from the initial parking).
       const targetSlot = slots[listSide].list;
+      targetSlot.style.display = "";
       if (listComposition.parentElement !== targetSlot) {
         targetSlot.appendChild(listComposition);
       }
@@ -1086,16 +1093,25 @@ body.preview .preview-label { display: flex; }
       const listWillShow = listMode === "always" ||
         (listMode === "slide" &&
           (trigger.held === true || Number(trigger.remaining_ms || 0) > 0));
-      if (listWillShow && listComposition.parentElement === parking) {
+      const twitch = data.multichat || {};
+      const chatWillShow = twitch.enabled === true &&
+        (twitch.visibility === "always" || twitch.has_messages === true);
+      const oldSlot = listComposition.parentElement;
+      if ((listWillShow || chatWillShow) &&
+          (oldSlot === parking || oldSlot.style.display === "none")) {
         const webcamOn = overlayConfig.webcam_enabled !== false;
         const preferredSide = parseCorner(overlayConfig.webcam_position || "top_right").side;
         const configuredSide = overlayConfig.list_side;
         const side = configuredSide === "left" || configuredSide === "right" ?
           configuredSide : webcamOn ? preferredSide : "right";
-        // Only re-parent when the source was fully parked, never on polls
-        // of an active Twitch iframe.
+        const slot = slots[side].list;
         (side === "left" ? leftColumn : rightColumn).classList.remove("hidden");
-        slots[side].list.appendChild(listComposition);
+        slot.style.display = "";
+        // After the first placement, ordinary hide-empty events only toggle
+        // this slot's display; the Twitch iframe stays in its original DOM.
+        if (listComposition.parentElement !== slot) {
+          slot.appendChild(listComposition);
+        }
       }
       composer.apply(data, true);
       applyOverlayLayout(overlayConfig, game);
