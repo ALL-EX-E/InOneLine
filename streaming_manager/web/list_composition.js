@@ -602,6 +602,12 @@
 
     function layout() {
       if (motion !== null) return;
+      // Settings Save may switch the joint layout or visibility during the
+      // short post-entrance Split handoff. Never leave its old moving mask
+      // attached to a newly selected static Replace / Always / hidden mode.
+      if (settlingChatMask && (!active || mode !== "slide" ||
+          composeMode !== "split" || chatAlways || !chatAvailable ||
+          !chatHasMessages)) stopDynamicMask();
       const available = root.clientHeight;
       if (available <= 0) return;
       const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
