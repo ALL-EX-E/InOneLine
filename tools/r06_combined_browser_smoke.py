@@ -927,7 +927,7 @@ def main():
                 "list_slide_direction": "top",
             })
             api.configure_list_show("slide", "!list", 5)
-            QTest.qWait(1300)
+            QTest.qWait(2200)  # Saved Split layout and duration must reach Chromium
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "hide-empty-timed-on",
                 "qa_viewer", "!list"))
