@@ -335,13 +335,13 @@ html, body {
     list.style.transform = `translateY(${-scrollY}px)`;
   }
 
-  // Independent List only: overlapping 1-second polls can apply stale
-  // mode/sequence snapshots out of order and replay the same Twitch entrance.
-  // Do not alter the separate combined source's historical polling behavior.
+  // Reuse the already accepted standalone in-flight guard for the combined
+  // browser source too. Delayed responses must not reapply old Twitch command
+  // sequences and accidentally toggle the List a second time.
   let standalonePollInFlight = false;
   async function update() {
-    if (!isCombined && standalonePollInFlight) return;
-    if (!isCombined) standalonePollInFlight = true;
+    if (standalonePollInFlight) return;
+    standalonePollInFlight = true;
     try {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -389,7 +389,7 @@ html, body {
     } catch (err) {
       apiState.classList.add("visible");
     } finally {
-      if (!isCombined) standalonePollInFlight = false;
+      standalonePollInFlight = false;
     }
   }
 
