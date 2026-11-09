@@ -739,11 +739,26 @@ def main():
                         assert float(frame["panelOpacity"]) >= .99, frame
                         assert frame["panelTransform"] == "none", frame
                         assert frame["chatClipPath"].startswith("inset("), frame
-                        clip = re.search(
-                            r"inset\(([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px\)",
-                            frame["chatClipPath"])
-                        assert clip, frame
-                        top, right, bottom, left = map(float, clip.groups())
+                        # Computed Chromium CSS is allowed to normalize
+                        # inset() to 1, 2, 3 or 4 components. Expand its
+                        # ordinary CSS shorthand before comparing painted
+                        # edges; requiring exactly four caused a false FAIL.
+                        css_inset = frame["chatClipPath"]
+                        assert css_inset.startswith("inset("), frame
+                        values = [float(v) for v in re.findall(
+                            r"(-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))px",
+                            css_inset)]
+                        assert 1 <= len(values) <= 4, frame
+                        if len(values) == 1:
+                            top = right = bottom = left = values[0]
+                        elif len(values) == 2:
+                            top = bottom = values[0]
+                            right = left = values[1]
+                        elif len(values) == 3:
+                            top, right, bottom = values
+                            left = right
+                        else:
+                            top, right, bottom, left = values
                         if direction == "left":
                             edge = frame["listRight"] - frame["rootLeft"]
                             assert abs(left - edge) <= 16, frame
