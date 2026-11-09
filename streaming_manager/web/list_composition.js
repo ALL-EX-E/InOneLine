@@ -431,9 +431,17 @@
         try {
           ready = typeof iframe.contentWindow?.IOLRenderEmbeddedChatState === "function";
         } catch (_) { /* child not initialized */ }
-        if (!ready) {
+        if (!ready && chatAlways) {
+          // Preserve the previously accepted Always-chat recovery when its
+          // child was genuinely suspended before it became ready.
           const src = iframe.getAttribute("src");
           if (src) iframe.setAttribute("src", src);
+        } else {
+          // Hide-empty may have just been reattached from main OBS parking.
+          // Reassigning the same src while that iframe is loading causes a
+          // second navigation and loses the first live Twitch messages.
+          // Let its own poll/parent render-state recovery revive it instead.
+          lastEmbeddedRefreshAt = -Infinity;
         }
       }
       lastEmbeddedChatNeeded = chatNeeded;
