@@ -123,14 +123,109 @@
     let motionTimeout = null;
     let motionAnimation = null;
     let chatMotionAnimation = null;
+    // The existing List WAAPI remains the only motion clock. In hide-empty
+    // composition the Twitch occlusion mask follows its ACTUAL painted edge
+    // every frame, rather than interpolating an unrelated fixed-height inset.
+    let dynamicCommandMotion = false;
+    let dynamicMotionFull = false;
+    let dynamicMotionDirection = "top";
+    let dynamicMaskFrame = null;
+    let motionChatTarget = -1;
+    let motionListTarget = -1;
 
-    function cancelListMotion() {
+    function stopDynamicMask() {
+      if (dynamicMaskFrame !== null) cancelAnimationFrame(dynamicMaskFrame);
+      dynamicMaskFrame = null;
+      dynamicCommandMotion = false;
+      chatLayer.style.clipPath = "";
+      listLayer.style.transition = "";
+      motionChatTarget = -1;
+      motionListTarget = -1;
+    }
+
+    function currentDynamicTargets() {
+      const available = Math.max(1, root.clientHeight);
+      const chatNeeded = chatAvailable && chatHasMessages;
+      const natural = chatNeeded ?
+        Math.max(0, Math.min(available, measureChat())) : 0;
+      const gap = !dynamicMotionFull && chatNeeded ? 12 : 0;
+      const targetChat = dynamicMotionFull ? natural :
+        Math.min(natural, Math.floor((available - gap) / 2));
+      return {natural, targetChat, targetList: available - targetChat - gap};
+    }
+
+    function syncDynamicMotionGeometry() {
+      if (!dynamicCommandMotion || !motion) return;
+      const {natural, targetChat, targetList} = currentDynamicTargets();
+      // Replacement keeps the live, bottom-anchored chat at its true content
+      // height even when it is fully hidden behind the List. Split smoothly
+      // yields only its needed upper region and re-expands on reverse exit.
+      const wantedChat = dynamicMotionFull ? natural :
+        motion === "enter" ? targetChat : natural;
+      if (wantedChat !== motionChatTarget) {
+        motionChatTarget = wantedChat;
+        chatLayer.style.height = wantedChat + "px";
+      }
+      if (!dynamicMotionFull && targetList !== motionListTarget) {
+        motionListTarget = targetList;
+        listLayer.style.height = targetList + "px";
+        if (onResize) onResize();
+      }
+      matchEmbeddedChatFrame(chatAvailable && chatHasMessages);
+    }
+
+    function paintDynamicChatMask() {
+      dynamicMaskFrame = null;
+      if (!dynamicCommandMotion || !motion) return;
+      const list = listLayer.getBoundingClientRect();
+      const chat = chatLayer.getBoundingClientRect();
+      let listTop = list.top;
+      // The accepted Split/bottom entrance reveals the List within its own
+      // upper slot. Its clip is part of the REAL visible List footprint.
+      if (!dynamicMotionFull && dynamicMotionDirection === "bottom") {
+        const clip = getComputedStyle(listLayer).clipPath;
+        const match = /^inset\(\s*([\d.]+)px/.exec(clip);
+        if (match) listTop += Number(match[1]) || 0;
+      }
+      const l = Math.max(0, list.left - chat.left);
+      const r = Math.min(chat.width, list.right - chat.left);
+      const t = Math.max(0, listTop - chat.top);
+      const b = Math.min(chat.height, list.bottom - chat.top);
+      const w = chat.width;
+      const h = chat.height;
+      let mask = "none";
+      if (chatAvailable && chatHasMessages && r > l && b > t && w > 0 && h > 0) {
+        // Only the part actually behind the translated List is hidden. The
+        // chat frame now has its NATURAL height, never an artificial 100%
+        // column whose glow gets sliced into a moving vertical stripe.
+        if (dynamicMotionDirection === "left") {
+          mask = `polygon(${r}px 0px,100% 0px,100% 100%,0px 100%,0px ${b}px,${r}px ${b}px)`;
+        } else if (dynamicMotionDirection === "right") {
+          mask = `polygon(0px 0px,${l}px 0px,${l}px ${b}px,100% ${b}px,100% 100%,0px 100%)`;
+        } else if (dynamicMotionDirection === "bottom" && dynamicMotionFull) {
+          mask = `inset(0px 0px ${Math.max(0, h - t)}px 0px)`;
+        } else {
+          // Top entrance and Split/bottom reveal overlap the chat from its
+          // upper edge; keep the lower content visible throughout movement.
+          mask = `inset(${b}px 0px 0px 0px)`;
+        }
+      }
+      if (chatLayer.style.clipPath !== mask) chatLayer.style.clipPath = mask;
+      dynamicMaskFrame = requestAnimationFrame(paintDynamicChatMask);
+    }
+
+    function cancelListMotion(preserveDynamicHeight = false) {
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = null;
+      // Keep the painted chat height at the end of an approved command. A
+      // pending message-driven height transition must not snap on WAAPI end.
+      const preserve = preserveDynamicHeight && dynamicCommandMotion && !chatAlways;
+      const paintedChatHeight = preserve ? chatLayer.getBoundingClientRect().height : -1;
       if (motionAnimation) motionAnimation.cancel();
       if (chatMotionAnimation) chatMotionAnimation.cancel();
       motionAnimation = null;
       chatMotionAnimation = null;
+      stopDynamicMask();
       if (combinedMotion) {
         // Restore the existing flex geometry on the same frame as the motion
         // finishes. Neither source gets an independently animated container.
@@ -146,10 +241,11 @@
         chatLayer.style.left = "";
         chatLayer.style.right = "";
         chatLayer.style.zIndex = "";
-        chatLayer.style.height = "";
+        chatLayer.style.height = preserve ? paintedChatHeight + "px" : "";
         chatLayer.style.marginTop = "";
-        chatLayer.style.transition = "";
-        lastChatHeight = -1;
+        chatLayer.style.transition = preserve ?
+          `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "";
+        lastChatHeight = preserve ? paintedChatHeight : -1;
         root.dataset.r06CombinedSync = "idle";
       }
       motion = null;
@@ -173,7 +269,7 @@
       if (!motion) return;
       const wasEntering = motion === "enter";
       const wasExiting = motion === "exit";
-      cancelListMotion();
+      cancelListMotion(true);
       if ((standaloneMotion || combinedMotion) && mode === "slide") {
         if (wasEntering && slidePhase === "enter" && active) beginHold();
         else if (wasExiting && slidePhase === "exit") {
@@ -209,6 +305,9 @@
       }
       motionAnimation.reverse();
       if (chatMotionAnimation) chatMotionAnimation.reverse();
+      // Zero-second toggle uses the same running List animation; the dynamic
+      // chat height retargets without snapping to a stale half/full geometry.
+      if (dynamicCommandMotion) syncDynamicMotionGeometry();
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = setTimeout(() => {
         if (motionAnimation) finishListMotion();
@@ -306,8 +405,10 @@
       chatLayer.style.bottom = "0px";
       chatLayer.style.left = "0px";
       chatLayer.style.right = "0px";
-      chatLayer.style.height = (commandOverChat ? available :
-        entering ? naturalChat : targetChat) + "px";
+      const dynamicCommand = commandOverChat && !chatAlways;
+      chatLayer.style.height = (dynamicCommand ?
+        (replaceFull ? naturalChat : entering ? naturalChat : targetChat) :
+        commandOverChat ? available : entering ? naturalChat : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
@@ -315,7 +416,16 @@
         (replaceFull ? (entering ? "replace-command-enter" : "replace-command-exit") :
           (entering ? "command-enter" : "command-exit")) :
         entering ? "split-enter" : "split-exit";
-      if (commandOverChat) {
+      if (dynamicCommand) {
+        dynamicCommandMotion = true;
+        dynamicMotionFull = replaceFull;
+        dynamicMotionDirection = direction;
+        // Do not resize the iframe to 100% just to crop it afterwards. Keep
+        // the frame and messages together at their bottom-anchored height.
+        void chatLayer.offsetHeight;
+        chatLayer.style.transition = `height ${duration / 1000}s ease-in-out`;
+        listLayer.style.transition = `height ${chatResizeSeconds}s ease`;
+      } else if (commandOverChat) {
         // Preserve the full-size iframe during entrance, but reveal the
         // underlying overlay background wherever the List actually passes.
         // Without this moving CHAT clip, transparent List backgrounds show
@@ -340,12 +450,6 @@
             direction === "bottom" ?
             `inset(0px 0px ${available}px 0px)` :
             `inset(${available}px 0px 0px 0px)`;
-        } else if (!chatAlways) {
-          // Split uses a content-sized, bottom-anchored Twitch area. Animate
-          // only the portion that must yield to the List, with no 50/50
-          // reservation for a single short message.
-          fromClip = `inset(${Math.max(0, available - naturalChat)}px 0px 0px 0px)`;
-          toClip = `inset(${Math.max(0, available - targetChat)}px 0px 0px 0px)`;
         } else if (direction === "left") {
           fromClip = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},0% ${topY})`;
           toClip = `polygon(100% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},100% ${topY})`;
@@ -386,6 +490,10 @@
         commandOverChat && !replaceFull && direction === "bottom" ?
           targetList + gap : null,
       );
+      if (dynamicCommand) {
+        syncDynamicMotionGeometry();
+        paintDynamicChatMask();
+      }
     }
 
     function measureChat() {
@@ -711,7 +819,11 @@
     }
 
     // Chat message count/height may change between /api/data updates.
-    setInterval(() => {expire(); layout();}, 200);
+    setInterval(() => {
+      expire();
+      if (motion && dynamicCommandMotion) syncDynamicMotionGeometry();
+      else layout();
+    }, 200);
     addEventListener("resize", () => {lastGeometry = ""; layout();});
     root.classList.add("r06-not-shown");
     return {
