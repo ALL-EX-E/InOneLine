@@ -860,7 +860,17 @@ def main():
                 until(page, lambda a: a["appliedDirection"] == "left" and
                       a["motionKind"] == "idle",
                       "main ordered-poll baseline left saved direction")
+                # Snapshot the OLD actual API state before replacing the
+                # browser fetch. A synthetic Response lets Chromium hold one
+                # stale reply without consuming/stalling HTTP connections.
+                with urlopen(api.base_url + "/api/data", timeout=5) as response:
+                    old_snapshot = json.load(response)
+                assert old_snapshot["overlay"]["list_slide_direction"] == "left"
+                old_json_literal = json.dumps(
+                    json.dumps(old_snapshot, ensure_ascii=False), ensure_ascii=True
+                )
                 assert evaluate(page, """(() => {
+                  const oldJson = __R06_OLD_JSON__;
                   const original = window.fetch.bind(window);
                   const p = {started:0, completed:0, running:0, max:0,
                     firstReady:false, errors:0, release:null, original};
@@ -871,25 +881,28 @@ def main():
                     const id=++p.started;
                     p.running++;
                     p.max=Math.max(p.max,p.running);
+                    if (id === 1) {
+                      p.firstReady=true;
+                      return new Promise(resolve => {
+                        p.release=() => {
+                          p.running--;p.completed++;
+                          resolve(new Response(oldJson, {
+                            status:200,
+                            headers:{"Content-Type":"application/json"}
+                          }));
+                        };
+                      });
+                    }
                     return original(...args).then(reply => {
-                      if (id === 1) {
-                        p.firstReady=true;
-                        return new Promise(resolve => {
-                          p.release=() => {
-                            p.running--;p.completed++;resolve(reply);
-                          };
-                        });
-                      }
-                      p.running--;p.completed++;
-                      return reply;
+                      p.running--;p.completed++;return reply;
                     }, error => {
                       p.running--;p.errors++;throw error;
                     });
                   };
                   return true;
-                })()""") is True
-            # Do not change DB until the first HTTP response has ALREADY
-            # arrived (and is deliberately held in JS with old direction).
+                })()""".replace("__R06_OLD_JSON__", old_json_literal)) is True
+            # Do not change DB until the OLD API snapshot is already held
+            # in the browser; the next real request must apply NEW Save.
             deadline = time.monotonic() + 12
             while time.monotonic() < deadline:
                 probes = [evaluate(page, """JSON.stringify((() => {
