@@ -1168,6 +1168,45 @@ def main():
             assert growing["listHeight"] < empty_list["listHeight"] - 4, growing
             print("R06_FIX092_FIRST_MESSAGE_SPLIT_BOUNDARY_PASS", flush=True)
 
+            # R06/ORDERED-POLL-098: separate combined OBS must reuse the
+            # independent List's in-flight guard under a 1.7-second delayed
+            # /api/data response. The 1-second poll may skip a busy cycle,
+            # but it may never process an older response after a newer one.
+            assert evaluate(view.page(), """(() => {
+              const original = window.fetch.bind(window);
+              const state = {running:0,max:0,started:0,completed:0,original};
+              window.__r06PollProbe = state;
+              window.fetch = (...args) => {
+                const url = String(args[0]?.url || args[0] || "");
+                if (!url.includes("/api/data")) return original(...args);
+                state.started++;
+                state.running++;
+                state.max = Math.max(state.max, state.running);
+                return new Promise((resolve,reject) => {
+                  setTimeout(() => {
+                    original(...args).then(
+                      reply => {state.running--;state.completed++;resolve(reply);},
+                      error => {state.running--;state.completed++;reject(error);}
+                    );
+                  }, 1700);
+                });
+              };
+              return true;
+            })()""") is True
+            QTest.qWait(5100)
+            probe = evaluate(view.page(), """JSON.stringify((() => {
+              const p=window.__r06PollProbe;
+              return {max:p.max,started:p.started,completed:p.completed};
+            })())""")
+            assert probe["started"] >= 2 and probe["completed"] >= 1, probe
+            assert probe["max"] == 1, (
+                "Combined OBS /api/data allowed an out-of-order snapshot", probe)
+            assert evaluate(view.page(), """(() => {
+              window.fetch=window.__r06PollProbe.original;
+              delete window.__r06PollProbe;
+              return true;
+            })()""") is True
+            print("R06_COMBINED_ORDERED_POLL_GATE_PASS", flush=True)
             print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
 
             print("R06_REPLACE_ALL_DIRECTIONS_AND_ZERO_PASS", flush=True)
