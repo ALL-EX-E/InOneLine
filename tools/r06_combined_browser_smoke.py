@@ -59,6 +59,7 @@ JS = """JSON.stringify((() => {
     appliedComposeMode:root.dataset.r06AppliedComposeMode || "",
     phase:root.dataset.r06StandalonePhase || "idle",
     holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
+    holdStartMs:Number(root.dataset.r06StandaloneHoldStartMs || 0),
     holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
     chatHeight:cs.height, chatTop:cs.top, chatBottom:cs.bottom,
     combinedSync:root.dataset.r06CombinedSync || "idle",
@@ -1068,32 +1069,55 @@ def main():
                 assert settled["sameChatFrame"] and settled["sameChatDocument"], settled
             print("R06_COMBINED_VIDEO_LIVE_RESIZE_PASS", flush=True)
 
-            # Positive hold is independent of 1-second motion; a repeat extends
-            # the full hold instead of hiding as in zero-second toggle.
+            # Positive five-second hold is independent of a ONE-second
+            # entrance. The preceding mid-motion VIDEO checks intentionally
+            # use three seconds; reset that TEST setting explicitly instead
+            # of consuming the server's five-second command window before
+            # checking the second authenticated command.
             db.set_settings_bulk({
                 "combined_list_chat_layout": "split",
                 "list_slide_duration": "5",
+                "list_slide_animation_seconds": "1.00",
                 "list_slide_direction": "top",
             })
             api.configure_list_show("slide", "!list", 5)
-            QTest.qWait(2200)  # Saved Split layout and duration must reach Chromium
+            QTest.qWait(2200)  # Saved Split layout, time and direction
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                before_command = json.load(response)["list_show"]
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "hide-empty-timed-on",
                 "qa_viewer", "!list"))
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                first_command = json.load(response)["list_show"]
+            assert first_command["sequence"] == before_command["sequence"] + 1, (
+                before_command, first_command)
+            assert first_command["remaining_ms"] > 2500, first_command
             timed = until(view.page(), lambda a:
                 a["shown"] and a["phase"] == "hold" and
-                a["holdDurationMs"] == 5000 and a["motionKind"] == "idle",
-                "hide-empty positive hold begins AFTER entrance",
+                a["holdDurationMs"] == 5000 and a["motionKind"] == "idle" and
+                a["motionDuration"] == 1000,
+                "hide-empty positive hold begins AFTER one-second entrance",
                 dynamic_chat=True)
             assert timed["holdAgeMs"] < 1200, timed
-            QTest.qWait(1500)
+            # Deliberately repeat *within* the active five-second window.
+            # A 1.5-second delay following a three-second entrance was
+            # too close to the independently running server-side deadline.
+            QTest.qWait(650)
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "hide-empty-timed-extend",
                 "qa_viewer", "!list"))
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                repeated_command = json.load(response)["list_show"]
+            assert repeated_command["sequence"] == first_command["sequence"] + 1, (
+                first_command, repeated_command)
+            assert repeated_command["remaining_ms"] > 2500, repeated_command
             extended = until(view.page(), lambda a:
                 a["shown"] and a["phase"] == "hold" and
-                a["holdAgeMs"] < 1300 and a["exitCount"] == timed["exitCount"],
-                "hide-empty positive repeat extends rather than toggles",
+                a["holdDurationMs"] == 5000 and
+                a["holdStartMs"] > timed["holdStartMs"] + 100 and
+                a["holdAgeMs"] < 1800 and
+                a["exitCount"] == timed["exitCount"],
+                "hide-empty positive repeat restarts full hold without exit",
                 dynamic_chat=True)
             expired = until(view.page(), lambda a:
                 not a["shown"] and a["phase"] == "idle" and
