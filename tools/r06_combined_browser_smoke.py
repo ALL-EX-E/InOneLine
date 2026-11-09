@@ -1116,6 +1116,32 @@ def main():
                         dynamic_chat=True)
                     assert restored["sameChatFrame"] and restored["sameChatDocument"], restored
             print("R06_FIX092_COMBINED_FULL_CHAT_ALL_DIRECTIONS_PASS", flush=True)
+            # Also protect the already accepted empty-chat -> first-message
+            # split resize while the List is visible. Both boundaries must
+            # move together, not leave a blank strip as the chat grows.
+            state.clear_chat("twitch", "ch")
+            db.set_settings_bulk({
+                "list_overlay_show_mode": "always",
+                "combined_list_chat_layout": "split",
+                "list_slide_direction": "left",
+            })
+            api.configure_list_show("always", "!list", 0)
+            empty_list = until(view.page(), lambda a:
+                a["shown"] and a["motionKind"] == "idle" and
+                a["chatHeight"] <= 2 and
+                a["listHeight"] >= a["rootHeight"] - 3,
+                "FIX-092 active List before first Twitch row", dynamic_chat=True)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "fix092-first-live-row", "qa_viewer",
+                "First message under visible List"))
+            growing = until(view.page(), lambda a:
+                a["shown"] and a["motionKind"] == "idle" and
+                5 < a["chatHeight"] < a["rootHeight"] * .45 and
+                a["listHeight"] + a["chatHeight"] >= a["rootHeight"] - 18,
+                "FIX-092 List and first Twitch row resize TOGETHER",
+                dynamic_chat=True)
+            assert growing["listHeight"] < empty_list["listHeight"] - 4, growing
+            print("R06_FIX092_FIRST_MESSAGE_SPLIT_BOUNDARY_PASS", flush=True)
 
             print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
 
