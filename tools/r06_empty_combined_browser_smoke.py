@@ -52,6 +52,9 @@ JS = """JSON.stringify((() => {
   return {
     ready:true,
     parent:root.parentElement?.id,
+    slotCollapsed:(root.parentElement?.id==="left-list" ||
+      root.parentElement?.id==="right-list") &&
+      getComputedStyle(root.parentElement).display==="none",
     listShown:root.classList.contains("r06-shown"),
     motionKind:root.dataset.r06StandaloneMotionKind || "idle",
     combinedSync:root.dataset.r06CombinedSync || "idle",
@@ -211,9 +214,9 @@ def main() -> int:
             state.delete_message("twitch", "channel", "msg-1")
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "deleted final message releases combined container", dynamic_chat=True,
+                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "deleted final message collapses combined slot without iframe move", dynamic_chat=True,
             )
 
             assert state.ingest(ChatMessage(
@@ -253,9 +256,9 @@ def main() -> int:
             assert expired["list_show"]["remaining_ms"] == 0, expired["list_show"]
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "command expiry parks empty combined container",
+                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "command expiry collapses empty combined slot",
                 timeout=25, api=api, dynamic_chat=True,
             )
 
@@ -286,9 +289,9 @@ def main() -> int:
             )
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "hidden list and hidden chat park container",
+                lambda m: (m["parent"] == "movable-elements" or m["slotCollapsed"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "hidden list and hidden chat collapse container",
             )
             print("R06_EMPTY_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
