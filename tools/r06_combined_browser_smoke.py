@@ -93,14 +93,15 @@ def inspect(page):
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
 
 
-def until(page, expected, label, timeout=35):
+def until(page, expected, label, timeout=35, dynamic_chat=False):
     deadline = time.monotonic() + timeout
     latest = None
     while time.monotonic() < deadline:
         latest = inspect(page)
         if latest and latest.get("ready") and expected(latest):
             assert latest["iframeCount"] == 1, (label, latest)
-            assert latest["chatTransition"] == "0s", (label, latest)
+            if not dynamic_chat:
+                assert latest["chatTransition"] == "0s", (label, latest)
             assert float(latest["panelOpacity"]) >= .99, (label, latest)
             assert latest["panelTransform"] == "none", (label, latest)
             print("R06_COMBINED_PASS", label, latest, flush=True)
@@ -800,6 +801,159 @@ def main():
                 assert hidden["sameChatFrame"] and hidden["sameChatDocument"], hidden
                 assert all(any(msg in row for row in hidden["messageTexts"])
                            for msg in chat_lines), hidden
+            # Regression: hide-empty Twitch chat has no reserved frame until
+            # messages arrive. Its lower edge stays fixed and grows upward.
+            db.set_settings_bulk({
+                "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
+                "list_overlay_show_mode": "slide",
+                "combined_list_chat_layout": "split",
+                "list_slide_duration": "0",
+                "list_slide_animation_seconds": "1.00",
+                "list_animation_seconds": "0.60",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            state.clear_chat("twitch", "ch")
+            empty = until(view.page(), lambda a:
+                          not a["shown"] and a["chatHeight"] <= 2 and
+                          a["motionKind"] == "idle",
+                          "hide-empty combined starts with no chat",
+                          dynamic_chat=True)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-first", "qa_viewer",
+                "R06 dynamic first message"))
+            first = until(view.page(), lambda a:
+                          not a["shown"] and a["messageCount"] == 1 and
+                          10 < a["chatHeight"] < a["rootHeight"] / 2,
+                          "one message occupies compact bottom chat",
+                          dynamic_chat=True)
+            assert first["chatTransition"].startswith("0.6s"), first
+            assert abs(first["chatBottom"] -
+                       (first["rootTop"] + first["rootHeight"])) <= 3, first
+
+            # Share the exact same List WAAPI in Split; no 50/50 reservation
+            # while the chat contains only a few short messages.
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+                QTest.qWait(1300)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-on-" + direction,
+                    "qa_viewer", "!list")), direction
+                entered = until(view.page(), lambda a:
+                    a["combinedSync"] == "command-enter" and
+                    a["motionKind"] == "enter" and
+                    a["lastEntrance"] == direction,
+                    "hide-empty Split enters " + direction, dynamic_chat=True)
+                assert entered["motionDuration"] == 1000, entered
+                held = until(view.page(), lambda a:
+                    a["phase"] == "hold" and a["shown"] and
+                    a["combinedSync"] == "idle" and
+                    a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
+                    a["listHeight"] >= (a["rootHeight"]-12) / 2 - 4,
+                    "hide-empty Split List fills free area " + direction,
+                    dynamic_chat=True)
+                assert held["sameChatFrame"] and held["sameChatDocument"], held
+                assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 18, held
+                if direction == "left":
+                    for n in range(8):
+                        assert state.ingest(ChatMessage(
+                            "twitch", "ch", "hide-empty-grow-" + str(n),
+                            "qa_viewer", "Dynamic message %d preserved" % n))
+                    growing = until(view.page(), lambda a:
+                        a["phase"] == "hold" and a["chatHeight"] > first["chatHeight"] + 50
+                        and a["chatHeight"] <= (a["rootHeight"] - 12) / 2 + 4,
+                        "new messages expand chat upward under List",
+                        dynamic_chat=True)
+                    assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-off-" + direction,
+                    "qa_viewer", "!list")), direction
+                left = until(view.page(), lambda a:
+                    a["combinedSync"] == "command-exit" and
+                    a["motionKind"] == "exit" and a["lastExit"] == direction,
+                    "hide-empty Split reverses " + direction, dynamic_chat=True)
+                assert left["motionDuration"] == 1000, left
+                exposed = until(view.page(), lambda a:
+                    not a["shown"] and a["motionKind"] == "idle" and
+                    a["chatHeight"] > 10 and a["chatHeight"] <= a["rootHeight"] + 3,
+                    "hide-empty chat returns to content height " + direction,
+                    dynamic_chat=True)
+                assert exposed["sameChatFrame"] and exposed["sameChatDocument"], exposed
+                assert exposed["messageCount"] >= 1, exposed
+
+            # Replace uses exactly the same command timings but the List covers
+            # the entire parent. The clipped Twitch iframe stays alive.
+            db.set_setting("combined_list_chat_layout", "replace")
+            QTest.qWait(1300)
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+                QTest.qWait(1300)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-replace-on-" + direction,
+                    "qa_viewer", "!list")), direction
+                entered = until(view.page(), lambda a:
+                    a["combinedSync"] == "replace-command-enter" and
+                    a["motionKind"] == "enter" and
+                    a["lastEntrance"] == direction,
+                    "hide-empty Replace enters " + direction,
+                    dynamic_chat=True)
+                assert entered["chatClipPath"].startswith("inset("), entered
+                held = until(view.page(), lambda a:
+                    a["shown"] and a["replace"] and a["phase"] == "hold" and
+                    a["listHeight"] >= a["rootHeight"] - 3,
+                    "hide-empty Replace fully covers " + direction,
+                    dynamic_chat=True)
+                assert held["sameChatFrame"] and held["sameChatDocument"], held
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-replace-off-" + direction,
+                    "qa_viewer", "!list")), direction
+                left = until(view.page(), lambda a:
+                    a["combinedSync"] == "replace-command-exit" and
+                    a["motionKind"] == "exit",
+                    "hide-empty Replace reverses " + direction,
+                    dynamic_chat=True)
+                exposed = until(view.page(), lambda a:
+                    not a["shown"] and not a["replace"] and
+                    a["motionKind"] == "idle" and a["chatHeight"] > 10,
+                    "hide-empty Replace returns chat " + direction,
+                    dynamic_chat=True)
+                assert exposed["sameChatFrame"] and exposed["sameChatDocument"], exposed
+                assert exposed["messageCount"] >= held["messageCount"], exposed
+
+            # Positive hold is independent of 1-second motion; a repeat extends
+            # the full hold instead of hiding as in zero-second toggle.
+            db.set_settings_bulk({
+                "combined_list_chat_layout": "split",
+                "list_slide_duration": "5",
+                "list_slide_direction": "top",
+            })
+            api.configure_list_show("slide", "!list", 5)
+            QTest.qWait(1300)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-timed-on",
+                "qa_viewer", "!list"))
+            timed = until(view.page(), lambda a:
+                a["shown"] and a["phase"] == "hold" and
+                a["holdDurationMs"] == 5000 and a["motionKind"] == "idle",
+                "hide-empty positive hold begins AFTER entrance",
+                dynamic_chat=True)
+            assert timed["holdAgeMs"] < 1200, timed
+            QTest.qWait(1500)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-timed-extend",
+                "qa_viewer", "!list"))
+            extended = until(view.page(), lambda a:
+                a["shown"] and a["phase"] == "hold" and
+                a["holdAgeMs"] < 1300 and a["exitCount"] == timed["exitCount"],
+                "hide-empty positive repeat extends rather than toggles",
+                dynamic_chat=True)
+            expired = until(view.page(), lambda a:
+                not a["shown"] and a["phase"] == "idle" and
+                a["lastExit"] == "top" and a["motionKind"] == "idle",
+                "hide-empty positive hold ends with reverse exit",
+                timeout=13, dynamic_chat=True)
+            assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
+            print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
+
             print("R06_REPLACE_ALL_DIRECTIONS_AND_ZERO_PASS", flush=True)
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:
