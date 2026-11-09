@@ -163,6 +163,12 @@
       const wantedChat = dynamicMotionFull ? natural :
         motion === "enter" ? targetChat : natural;
       if (wantedChat !== motionChatTarget) {
+        if (motionChatTarget >= 0) {
+          // A newly arrived message must resize both boundaries together.
+          // Do not keep the original three-second command duration for the
+          // chat while the List reacts in the shorter resize duration.
+          chatLayer.style.transition = `height ${chatResizeSeconds}s ease`;
+        }
         motionChatTarget = wantedChat;
         chatLayer.style.height = wantedChat + "px";
       }
