@@ -485,7 +485,7 @@ def main():
 
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(1300)
+                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
                 for page in pages:
                     prior = until(page, lambda a: not a["shown"] and
                                   a["motionKind"] == "idle",
@@ -541,7 +541,7 @@ def main():
             QTest.qWait(1300)
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction",direction)
-                QTest.qWait(1300)
+                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
                 assert state.ingest(ChatMessage(
                     "twitch","chan","dynamic-replace-on-"+direction,"alice","!list"))
                 for page in pages:
