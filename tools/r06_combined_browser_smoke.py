@@ -867,15 +867,20 @@ def main():
                     a["lastEntrance"] == direction,
                     "hide-empty Split enters " + direction, dynamic_chat=True)
                 assert entered["motionDuration"] == 1000, entered
+                # FIX-092 shrinks a populated chat only AFTER the List has
+                # completely entered. "hold" starts before the existing
+                # chat-height transition has settled. Wait for the final
+                # 12px seam rather than asserting on its first moving frame.
                 held = until(view.page(), lambda a:
                     a["phase"] == "hold" and a["shown"] and
                     a["combinedSync"] == "idle" and
                     a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
-                    a["listHeight"] >= (a["rootHeight"]-12) / 2 - 4,
+                    a["listHeight"] >= (a["rootHeight"]-12) / 2 - 4 and
+                    abs(a["listBottom"] + 12 - a["chatTop"]) <= 4,
                     "hide-empty Split List fills free area " + direction,
                     dynamic_chat=True)
                 assert held["sameChatFrame"] and held["sameChatDocument"], held
-                assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 18, held
+                assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 4, held
                 if direction == "left":
                     for n in range(8):
                         assert state.ingest(ChatMessage(
@@ -883,7 +888,8 @@ def main():
                             "qa_viewer", "Dynamic message %d preserved" % n))
                     growing = until(view.page(), lambda a:
                         a["phase"] == "hold" and a["chatHeight"] > first["chatHeight"] + 50
-                        and a["chatHeight"] <= (a["rootHeight"] - 12) / 2 + 4,
+                        and a["chatHeight"] <= (a["rootHeight"] - 12) / 2 + 4 and
+                        abs(a["listBottom"] + 12 - a["chatTop"]) <= 4,
                         "new messages expand chat upward under List",
                         dynamic_chat=True)
                     assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
