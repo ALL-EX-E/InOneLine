@@ -856,7 +856,8 @@ def main():
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
  
-                until(view.page(), lambda a:
+                prior_split = until(view.page(), lambda a:
+                      not a["shown"] and a["motionKind"] == "idle" and
                       a["appliedDirection"] == direction and
                       a["appliedComposeMode"] == "split",
                       "Chromium applied hide-empty split "+direction,
@@ -866,10 +867,15 @@ def main():
                     "twitch", "ch", "hide-empty-on-" + direction,
                     "qa_viewer", "!list")), direction
                 entered = until(view.page(), lambda a:
-                    a["combinedSync"] == "command-enter" and
-                    a["motionKind"] == "enter" and
-                    a["lastEntrance"] == direction,
-                    "hide-empty Split enters " + direction, dynamic_chat=True)
+                    a["lastEntrance"] == direction and a["shown"] and
+                    a["entranceCount"] == prior_split["entranceCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "command-enter" and
+                      a["motionKind"] == "enter") or
+                     (a["phase"] == "hold" and a["motionKind"] == "idle" and
+                      a["listHeight"] >= (a["rootHeight"] - 12) / 2 - 4)),
+                    "hide-empty Split enters or completed 1-second motion " + direction,
+                    dynamic_chat=True)
                 assert entered["motionDuration"] == 1000, entered
                 # FIX-092 shrinks a populated chat only AFTER the List has
                 # completely entered. "hold" starts before the existing
@@ -901,9 +907,15 @@ def main():
                     "twitch", "ch", "hide-empty-off-" + direction,
                     "qa_viewer", "!list")), direction
                 left = until(view.page(), lambda a:
-                    a["combinedSync"] == "command-exit" and
-                    a["motionKind"] == "exit" and a["lastExit"] == direction,
-                    "hide-empty Split reverses " + direction, dynamic_chat=True)
+                    a["lastExit"] == direction and
+                    a["exitCount"] == prior_split["exitCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "command-exit" and
+                      a["motionKind"] == "exit") or
+                     (a["motionKind"] == "idle" and not a["shown"] and
+                      a["listHeight"] <= 2)),
+                    "hide-empty Split reverses/completes " + direction,
+                    dynamic_chat=True)
                 assert left["motionDuration"] == 1000, left
                 exposed = until(view.page(), lambda a:
                     not a["shown"] and a["motionKind"] == "idle" and
@@ -920,7 +932,8 @@ def main():
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
  
-                until(view.page(), lambda a:
+                prior_replace = until(view.page(), lambda a:
+                      not a["shown"] and a["motionKind"] == "idle" and
                       a["appliedDirection"] == direction and
                       a["appliedComposeMode"] == "replace",
                       "Chromium applied hide-empty replace "+direction,
@@ -930,10 +943,14 @@ def main():
                     "twitch", "ch", "hide-empty-replace-on-" + direction,
                     "qa_viewer", "!list")), direction
                 entered = until(view.page(), lambda a:
-                    a["combinedSync"] == "replace-command-enter" and
-                    a["motionKind"] == "enter" and
-                    a["lastEntrance"] == direction,
-                    "hide-empty Replace enters " + direction,
+                    a["lastEntrance"] == direction and a["shown"] and
+                    a["entranceCount"] == prior_replace["entranceCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "replace-command-enter" and
+                      a["motionKind"] == "enter") or
+                     (a["phase"] == "hold" and a["motionKind"] == "idle" and
+                      a["replace"] and a["listHeight"] >= a["rootHeight"] - 3)),
+                    "hide-empty Replace enters or completes 1-second motion " + direction,
                     dynamic_chat=True)
                 # FIX-092 uses one exact even-odd subtraction mask for the
                 # List's painted rectangle in EVERY direction. The legacy
@@ -941,10 +958,13 @@ def main():
                 # occlusion mechanism and must not force a runtime rollback.
                 expectedMask = "path(evenodd, "
                 occluded = until(view.page(), lambda a:
-                    a["motionKind"] == "enter" and
-                    a["chatClipPath"].startswith(expectedMask) and
-                    0 < a["chatHeight"] <= a["rootHeight"] + 3,
-                    "Replace hides only chat beneath moving List " + direction,
+                    0 < a["chatHeight"] <= a["rootHeight"] + 3 and
+                    ((a["motionKind"] == "enter" and
+                      a["chatClipPath"].startswith(expectedMask)) or
+                     (a["motionKind"] == "idle" and a["phase"] == "hold" and
+                      a["replace"] and a["listHeight"] >= a["rootHeight"] - 3 and
+                      a["chatClipPath"].startswith("inset("))),
+                    "Replace masks moving List or fully covered hold " + direction,
                     dynamic_chat=True)
                 assert occluded["sameChatFrame"] and occluded["sameChatDocument"], occluded
                 held = until(view.page(), lambda a:
@@ -957,9 +977,14 @@ def main():
                     "twitch", "ch", "hide-empty-replace-off-" + direction,
                     "qa_viewer", "!list")), direction
                 left = until(view.page(), lambda a:
-                    a["combinedSync"] == "replace-command-exit" and
-                    a["motionKind"] == "exit",
-                    "hide-empty Replace reverses " + direction,
+                    a["lastExit"] == direction and
+                    a["exitCount"] == prior_replace["exitCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "replace-command-exit" and
+                      a["motionKind"] == "exit") or
+                     (a["motionKind"] == "idle" and not a["shown"] and
+                      a["listHeight"] <= 2)),
+                    "hide-empty Replace reverses/completes " + direction,
                     dynamic_chat=True)
                 exposed = until(view.page(), lambda a:
                     not a["shown"] and not a["replace"] and
