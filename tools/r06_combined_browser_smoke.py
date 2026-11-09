@@ -75,6 +75,12 @@ JS = """JSON.stringify((() => {
     sameChatDocument:!window.__r06QaChatDoc || doc===window.__r06QaChatDoc,
     chatTransition:csStyle.transitionDuration,
     panelOpacity:ps.opacity, panelTransform:ps.transform,
+    videoGrowthVerified:window.__r06VideoGrowth?.verified === true,
+    videoGrowthMaxCount:window.__r06VideoGrowth?.maxCount || 0,
+    videoGrowthMaxHeight:window.__r06VideoGrowth?.maxHeight || 0,
+    videoGrowthBaseline:window.__r06VideoGrowth?.baseline || 0,
+    videoGrowthSamples:window.__r06VideoGrowth?.samples || 0,
+    videoGrowthTrace:(window.__r06VideoGrowth?.recent || []).slice(-8),
     obsVisible:document.documentElement.dataset.obsVisible
   };
 })())"""
@@ -112,6 +118,65 @@ def until(page, expected, label, timeout=35, dynamic_chat=False):
             return latest
         QTest.qWait(130)
     raise AssertionError(f"{label} timed out: {latest!r}")
+
+
+def start_native_live_growth_probe(page, baseline):
+    """Sample actual painted Twitch resize while List is entering.
+
+    Qt can deliver a runJavaScript callback after the three-second animation;
+    record valid mid-motion frames *inside Chromium* without altering UI
+    state, timers, messages, request order, or motion duration.
+    """
+    script = """(() => {
+      const root=document.getElementById("list-composition"),
+            chat=document.getElementById("list-chat"),
+            panel=document.getElementById("list-panel"),
+            frame=chat?.querySelector("iframe");
+      if (!root || !chat || !panel || !frame) return false;
+      window.__r06VideoGrowth?.stop?.();
+      const baseline=__BASELINE__;
+      const trace={
+        baseline, verified:false, maxCount:0,
+        maxHeight:0, samples:0, recent:[], stop:null
+      };
+      window.__r06VideoGrowth=trace;
+      const sample=()=>{
+        const doc=frame.contentDocument,
+              cards=doc?.getElementById("messages"),
+              rs=root.getBoundingClientRect(),
+              cs=chat.getBoundingClientRect(),
+              count=cards?.children?.length ?? -1,
+              kind=root.dataset.r06StandaloneMotionKind || "idle";
+        if (kind!=="enter") return;
+        trace.samples++;
+        trace.maxCount=Math.max(trace.maxCount,count);
+        trace.maxHeight=Math.max(trace.maxHeight,cs.height);
+        const anchored=Math.abs(cs.bottom-(rs.top+rs.height))<=4;
+        const opaque=Number(getComputedStyle(panel).opacity)>=.99;
+        const sameFrame=(!window.__r06QaChatFrame ||
+          frame===window.__r06QaChatFrame) &&
+          (!window.__r06QaChatDoc ||
+          doc===window.__r06QaChatDoc);
+        const ok=count>=10 && cs.height>baseline+25 &&
+          anchored && opaque && sameFrame && rs.height>0;
+        if (ok) trace.verified=true;
+        trace.recent.push({
+          kind, count, height:cs.height, baseline, anchored,
+          opaque, sameFrame, ok
+        });
+        if(trace.recent.length>16)trace.recent.shift();
+      };
+      const handle=setInterval(sample,40);
+      trace.stop=()=>clearInterval(handle);
+      sample();
+      return true;
+    })()""".replace("__BASELINE__", json.dumps(float(baseline)))
+    result = []
+    page.runJavaScript(script, result.append)
+    deadline = time.monotonic() + 8
+    while not result and time.monotonic() < deadline:
+        QTest.qWait(25)
+    assert result == [True], ("No Chromium video growth recorder", result)
 
 
 def main():
@@ -1028,17 +1093,24 @@ def main():
                     "three-second dynamic entrance " + composition,
                     dynamic_chat=True)
                 assert entry["chatHeight"] < entry["rootHeight"] / 2, entry
+                # Capture real in-flight rows and painted height inside
+                # Chromium BEFORE the nine messages arrive. A Qt callback
+                # can lag until hold; it must not invent a failed animation.
+                start_native_live_growth_probe(view.page(), entry["chatHeight"])
                 for index in range(9):
                     assert state.ingest(ChatMessage(
                         "twitch", "ch", "video-grow-" + composition + str(index),
                         "qa_viewer", "Chat row arrives WHILE List moves " + str(index)))
                 growing = until(view.page(), lambda a:
-                    a["motionKind"] == "enter" and a["messageCount"] >= 10 and
-                    a["chatHeight"] > entry["chatHeight"] + 25 and
-                    abs(a["chatBottom"] - (a["rootTop"] + a["rootHeight"])) <= 4,
-                    "chat grows continuously DURING List entrance " + composition,
+                    a["videoGrowthVerified"] and
+                    a["videoGrowthBaseline"] == entry["chatHeight"] and
+                    a["videoGrowthMaxCount"] >= 10 and
+                    a["videoGrowthMaxHeight"] > entry["chatHeight"] + 25,
+                    "native Chromium recorded chat growth DURING List entrance " + composition,
                     dynamic_chat=True)
                 assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
+                view.page().runJavaScript(
+                    "window.__r06VideoGrowth?.stop?.()")
                 held = until(view.page(), lambda a:
                     a["phase"] == "hold" and a["motionKind"] == "idle",
                     "new live frame reaches List hold " + composition,
