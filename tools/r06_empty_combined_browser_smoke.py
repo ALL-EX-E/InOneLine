@@ -338,11 +338,14 @@ def main() -> int:
             trace_results = []
             page.runJavaScript("""(() => {
               const frames=window.__r06EmptyTrace?.frames || [];
+              const holdStart=frames.find(p=>p.phase==="hold" && p.shown);
               const onAir=frames.find(p=>p.phase==="hold" && p.shown &&
                 p.listHeight>20 && p.chatHeight<2 && p.rootHeight>50);
-              const exit=onAir && frames.find(p=>p.phase==="exit" && p.t>onAir.t);
+              const exit=holdStart && frames.find(
+                p=>p.phase==="exit" && p.t>holdStart.t);
               window.__r06EmptyTrace?.stop?.();
               return {
+                holdStart:holdStart || null,
                 onAir:onAir || null, exit:exit || null,
                 total:frames.length, tail:frames.slice(-22)
               };
@@ -352,9 +355,12 @@ def main() -> int:
                 QTest.qWait(25)
             assert trace_results, "Missing native Chromium hold duration trace"
             timeline = trace_results[0]
-            assert timeline["onAir"] and timeline["exit"], timeline
-            assert timeline["onAir"]["holdDuration"] == 3000, timeline
-            assert timeline["exit"]["t"] - timeline["onAir"]["t"] >= 2750, timeline
+            assert timeline["holdStart"] and timeline["onAir"] and timeline["exit"], timeline
+            assert timeline["holdStart"]["holdDuration"] == 3000, timeline
+            # The full 3 seconds start at the actual Chromium hold phase,
+            # not after a separate chat-height CSS settling transition.
+            assert timeline["exit"]["t"] - timeline["holdStart"]["t"] >= 2850, timeline
+            assert timeline["onAir"]["t"] < timeline["exit"]["t"], timeline
             print("R06_EMPTY_NATIVE_HOLD_DURATION_PASS", timeline, flush=True)
 
             # Independent Always visibility means a real visible widget exists.
