@@ -737,7 +737,7 @@ def main():
                         assert frame["panelTransform"] == "none", frame
                         assert frame["chatClipPath"].startswith("inset("), frame
                         clip = re.search(
-                            r"inset\\(([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px\\)",
+                            r"inset\(([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px\)",
                             frame["chatClipPath"])
                         assert clip, frame
                         top, right, bottom, left = map(float, clip.groups())
