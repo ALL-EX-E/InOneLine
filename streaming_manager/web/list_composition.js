@@ -577,6 +577,11 @@
       mode = nextMode;
       // Standalone List is not allowed to activate a legacy replacement layer.
       composeMode = allowChat && cfg.list_chat_layout === "replace" ? "replace" : "split";
+      // Expose the saved options actually applied by this browser source.
+      // Native Chromium QA must wait for the saved direction/mode before
+      // sending a new authenticated Twitch command.
+      root.dataset.r06AppliedListDirection = cfg.list_slide_direction || "top";
+      root.dataset.r06AppliedComposeMode = composeMode;
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
