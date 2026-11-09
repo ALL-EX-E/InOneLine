@@ -256,7 +256,7 @@ def main():
             for page in pages:
                 m = until(page, lambda a: a["shown"] and a["chatHeight"] == 0,
                           "hide-empty chat releases its area")
-                static_check(m, "empty chat")
+                static_check(m, "empty chat", dynamic_chat=True)
                 assert not m['mainUnifiedShell'], m
                 assert m['panelBorderWidth'] == '3px', m
 
@@ -266,8 +266,8 @@ def main():
                 m = until(page, lambda a: a["shown"] and a["count"] == 1 and
                           a["chatHeight"] > 15,
                           "dynamic Twitch chat gets message and intrinsic height")
-                static_check(m, "dynamic chat")
-                assert float(m["chatTransition"].split(",")[0].rstrip("s")) == 0
+                static_check(m, "dynamic chat", dynamic_chat=True)
+                assert m["chatTransition"].startswith("1.5s"), m
                 assert m["shellRadius"] == m["cardRadius"] == "8px", (
                     "Original Twitch cards must match shell radius in the main OBS source", m)
 
