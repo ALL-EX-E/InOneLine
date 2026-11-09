@@ -834,7 +834,7 @@ def main():
             # while the chat contains only a few short messages.
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(1300)
+                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "hide-empty-on-" + direction,
                     "qa_viewer", "!list")), direction
@@ -886,7 +886,7 @@ def main():
             QTest.qWait(1300)
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(1300)
+                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "hide-empty-replace-on-" + direction,
                     "qa_viewer", "!list")), direction
