@@ -141,13 +141,14 @@ def assert_main_shared_shell(state, label):
     assert state['panelOpacity'] >= 0.99, (label, state)
 
 
-def static_check(state, label):
+def static_check(state, label, dynamic_chat=False):
     assert state["panelOpacity"] >= 0.99, (label, state)
     assert state["panelTransform"] == "none", (label, state)
     assert float(state["panelTransition"].split(",")[0].rstrip("s")) == 0, (label, state)
     assert state["panelAnimation"] == "none", (label, state)
     assert state["chatAnimation"] == "none", (label, state)
-    assert state["chatTransition"] == "0s", (label, state)
+    if not dynamic_chat:
+        assert state["chatTransition"] == "0s", (label, state)
     assert not state["oldMovementClasses"], (label, state)
     assert abs(state["chatBottomGap"]) <= 3, (label, state)
 
@@ -445,70 +446,117 @@ def main():
                 assert hidden_zero["hasSentinel"] and hidden_zero["iframeStable"], hidden_zero
                 assert_main_shared_shell(hidden_zero, "zero hidden 100% chat")
 
-            # Restore unchanged hide-empty mode for its original static
-            # command tests; it is NOT part of the accepted combined motion.
+            # Hide-empty is now a first-class partner of the accepted shared
+            # List motion. It grows up from zero, with List using the rest.
             db.set_settings_bulk({
                 "multichat_appearance_common":json.dumps({"visibility":"hide_empty"}),
-                "list_slide_duration":"20",
+                "list_slide_duration":"0",
+                "list_slide_animation_seconds":"1.00",
+                "list_animation_seconds":"0.60",
+                "combined_list_chat_layout":"split",
             })
-            api.configure_list_show("slide", "!list", 20)
+            api.configure_list_show("slide", "!list", 0)
             state.clear_chat("twitch", "chan")
-            assert state.ingest(ChatMessage(
-                "twitch", "chan", "zero-message-restored",
-                "alice", "R06 ZERO visible chat"))
             for page in pages:
-                restored = until(
-                    page, lambda a: a["count"] == 1 and
-                    a["combinedSync"] == "idle" and a["hasSentinel"],
-                    "existing hide-empty behavior restored")
-
-            # Directional settings in hide-empty remain instant and do not move.
+                empty = until(page, lambda a: not a["shown"] and
+                              a["chatHeight"] <= 2 and a["listHeight"] <= 2,
+                              "hide-empty starts with no chat region")
+            assert state.ingest(ChatMessage(
+                "twitch", "chan", "dynamic-first", "alice", "R06 ZERO visible chat"))
+            for page in pages:
+                first = until(page, lambda a:
+                    not a["shown"] and a["count"] == 1 and a["hasSentinel"] and
+                    8 < a["chatHeight"] < a["rootHeight"] / 2,
+                    "first message grows compact chat from bottom")
+                assert first["chatTransition"].startswith("0.6s"), first
+                assert first["iframeStable"] and first["documentStable"], first
 
             for direction in ("left","right","top","bottom"):
-                db.set_settings_bulk({
-                    "list_overlay_show_mode":"slide",
-                    "combined_list_chat_layout":"split",
-                    "list_slide_direction":direction,
-                })
-                api.configure_list_show("slide", "!list", 20)
+                db.set_setting("list_slide_direction", direction)
+                QTest.qWait(1300)
                 for page in pages:
-                    m=until(page, lambda a: not a["shown"] and a["listHeight"] <= 2,
-                            "hidden command List before "+direction)
-                    static_check(m, "before "+direction)
-                result=state.ingest(ChatMessage("twitch", "chan",
-                    "zero-command-"+direction, "alice", "!list"))
-                assert result, ("List command was rejected", direction)
-                with urlopen(api.base_url + "/api/data", timeout=5) as response:
-                    server = json.loads(response.read().decode("utf-8"))
-                assert server["list_show"]["remaining_ms"] > 0, (
-                    "R06 ZERO command did not activate server timer",
-                    direction, server["list_show"])
+                    prior = until(page, lambda a: not a["shown"] and
+                                  a["motionKind"] == "idle",
+                                  "hide-empty idle before "+direction)
+                assert state.ingest(ChatMessage(
+                    "twitch", "chan", "dynamic-on-"+direction, "alice", "!list"))
                 for page in pages:
-                    m=until(page, lambda a: a["shown"] and not a["replace"] and
-                            a["listHeight"] > 10,
-                            "instant command List from "+direction)
-                    static_check(m, "command "+direction)
+                    entry = until(page, lambda a: a["combinedSync"] == "command-enter"
+                                  and a["motionKind"] == "enter"
+                                  and a["lastEntrance"] == direction,
+                                  "hide-empty shared entrance "+direction)
+                    assert entry["motionDuration"] == 1000, entry
+                    assert entry["iframeStable"] and entry["documentStable"], entry
+                    held = until(page, lambda a: a["shown"] and not a["replace"]
+                                 and a["phase"] == "hold"
+                                 and a["combinedSync"] == "idle"
+                                 and a["chatHeight"] <= a["rootHeight"] / 2 + 3
+                                 and a["listHeight"] >= a["rootHeight"] / 2 - 12
+                                 and a["chatBottomGap"] <= 3,
+                                 "hide-empty list fills to live chat edge "+direction)
+                    assert held["hasSentinel"] and held["iframeStable"], held
+                if direction == "left":
+                    # Extra messages while List is shown grow the chat upward,
+                    # cap it at half, and keep older rows in the existing iframe.
+                    for index in range(8):
+                        assert state.ingest(ChatMessage(
+                            "twitch","chan","dynamic-grow-"+str(index),
+                            "alice","R06 growing chat "+str(index)))
+                    for page in pages:
+                        grown = until(page, lambda a:
+                            a["shown"] and a["count"] >= 9 and
+                            a["chatHeight"] > first["chatHeight"] + 35 and
+                            a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
+                            a["listHeight"] + a["chatHeight"] <= a["rootHeight"] + 4,
+                            "chat grows upward under live List")
+                        assert grown["hasSentinel"] and grown["iframeStable"], grown
+                assert state.ingest(ChatMessage(
+                    "twitch","chan","dynamic-off-"+direction,"alice","!list"))
                 for page in pages:
-                    m=until(page, lambda a: not a["shown"] and
-                            a["listHeight"] <= 2,
-                            "command expiration from "+direction, timeout=27)
-                    static_check(m, "expired "+direction)
+                    leave = until(page, lambda a: a["combinedSync"] == "command-exit"
+                                  and a["motionKind"] == "exit" and
+                                  a["lastExit"] == direction,
+                                  "hide-empty reverse List exit "+direction)
+                    assert leave["motionDuration"] == 1000, leave
+                    restored = until(page, lambda a: not a["shown"] and
+                                     a["motionKind"] == "idle" and
+                                     a["chatHeight"] <= a["rootHeight"] + 3 and
+                                     a["chatHeight"] > 10,
+                                     "hide-empty chat returns to natural height "+direction)
+                    assert restored["iframeStable"] and restored["documentStable"], restored
 
-            # Replacement covers chat while shown, then uncovers it at once.
             db.set_setting("combined_list_chat_layout","replace")
-            api.configure_list_show("slide", "!list", 20)
-            assert state.ingest(ChatMessage("twitch", "chan",
-                                            "zero-replace", "alice", "!list"))
-            for page in pages:
-                m=until(page, lambda a: a["shown"] and a["replace"] and
+            QTest.qWait(1300)
+            for direction in ("left","right","top","bottom"):
+                db.set_setting("list_slide_direction",direction)
+                QTest.qWait(1300)
+                assert state.ingest(ChatMessage(
+                    "twitch","chan","dynamic-replace-on-"+direction,"alice","!list"))
+                for page in pages:
+                    entry = until(page, lambda a:
+                        a["combinedSync"] == "replace-command-enter" and
+                        a["motionKind"] == "enter" and a["lastEntrance"] == direction,
+                        "hide-empty replacement enters "+direction)
+                    assert entry["iframeStable"] and entry["documentStable"], entry
+                    full = until(page, lambda a:
+                        a["shown"] and a["replace"] and a["phase"] == "hold" and
                         a["listHeight"] >= a["rootHeight"]-3,
-                        "static replacement")
-                static_check(m, "replacement")
-            for page in pages:
-                m=until(page, lambda a: not a["shown"] and not a["replace"] and
-                        a["listHeight"] <= 2,
-                        "replacement timeout", timeout=27)
-                static_check(m, "replacement timeout")
+                        "hide-empty replacement fills entire region "+direction)
+                    assert full["hasSentinel"],full
+                assert state.ingest(ChatMessage(
+                    "twitch","chan","dynamic-replace-off-"+direction,"alice","!list"))
+                for page in pages:
+                    leave = until(page, lambda a:
+                        a["combinedSync"] == "replace-command-exit" and
+                        a["motionKind"] == "exit",
+                        "hide-empty replacement reverses "+direction)
+                    restored = until(page, lambda a:
+                        not a["shown"] and not a["replace"] and
+                        a["motionKind"] == "idle" and
+                        a["chatHeight"] > 10 and a["hasSentinel"],
+                        "hide-empty replacement restores messages "+direction)
+                    assert restored["iframeStable"] and restored["documentStable"], restored
+            print("R06_MAIN_HIDE_EMPTY_SPLIT_REPLACE_MOTION_PASS", flush=True)
 
             # The OBS switch must remove the chat without reserving empty space.
             state.set_obs_enabled("twitch", False)
@@ -518,7 +566,7 @@ def main():
                 m=until(page, lambda a: a["shown"] and a["chatHeight"] == 0 and
                         a["listHeight"] > 10,
                         "OBS Twitch disabled / full List")
-                static_check(m, "OBS chat disabled")
+                static_check(m, "OBS chat disabled", dynamic_chat=True)
             print("R06_ZERO_BROWSER_ALL_PASS", flush=True)
         finally:
             for view in views:
