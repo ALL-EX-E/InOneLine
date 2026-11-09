@@ -81,6 +81,8 @@ METRICS = """JSON.stringify((() => {
     phase:root.dataset.r06StandalonePhase || 'idle',
     lastEntrance:root.dataset.r06StandaloneLastEntrance || '',
     lastExit:root.dataset.r06StandaloneLastExit || '',
+    appliedDirection:root.dataset.r06AppliedListDirection || '',
+    appliedComposeMode:root.dataset.r06AppliedComposeMode || '',
     entranceCount:Number(root.dataset.r06StandaloneEntranceCount || 0),
     exitCount:Number(root.dataset.r06StandaloneExitCount || 0),
     chatClipPath:cc.clipPath,
@@ -485,7 +487,12 @@ def main():
 
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
+
+                for page in pages:
+                    until(page, lambda a: a["appliedDirection"] == direction and
+                          a["appliedComposeMode"] == "split",
+                          "Chromium applied hide-empty split "+direction)
+
                 for page in pages:
                     prior = until(page, lambda a: not a["shown"] and
                                   a["motionKind"] == "idle",
@@ -541,7 +548,12 @@ def main():
             QTest.qWait(1300)
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction",direction)
-                QTest.qWait(2200)  # Allow browser API poll to apply saved direction
+
+                for page in pages:
+                    until(page, lambda a: a["appliedDirection"] == direction and
+                          a["appliedComposeMode"] == "replace",
+                          "Chromium applied hide-empty replace "+direction)
+
                 assert state.ingest(ChatMessage(
                     "twitch","chan","dynamic-replace-on-"+direction,"alice","!list"))
                 for page in pages:
