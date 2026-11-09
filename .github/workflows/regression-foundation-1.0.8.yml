@@ -1171,7 +1171,7 @@ jobs:
           compression-level: 0
 
       - name: Package R06 candidate QA from tested installer
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109')
         shell: pwsh
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
@@ -1186,6 +1186,9 @@ jobs:
           }
           if ($env:GITHUB_HEAD_REF -eq "candidate/r06-list-zero-visible-hint-20261108") {
             Copy-Item "docs\qa\R06-list-zero-visible-hint-checklist.md" "$out\CHECKLIST_LIST_HINT.md"
+          }
+          if ($env:GITHUB_HEAD_REF -eq "candidate/r06-combined-replace-motion-20261109") {
+            Copy-Item "docs\qa\R06-combined-replace-motion-checklist.md" "$out\CHECKLIST_REPLACE_MOTION.md"
           }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
@@ -1207,7 +1210,7 @@ jobs:
           Write-Host "R06_SOURCE_SHA256=$sourceSha"
 
       - name: Upload R06 candidate QA bundle
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109')
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_R06_CANDIDATE_QA

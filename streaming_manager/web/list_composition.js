@@ -1,7 +1,6 @@
 /* R06 List + Twitch-chat composition shared by both OBS sources.
-   The standalone List motion is reused by the accepted combined split
-   transitions and the four-direction command entrance over Twitch chat.
-   Unapproved combined transitions keep their previous behavior. */
+   The accepted standalone List motion is reused by both Split and Replace
+   command transitions; only the occupied List geometry differs. */
 (() => {
   "use strict";
 
@@ -30,8 +29,8 @@
     .r06-compose.r06-not-shown .r06-list-layer {
       flex:0 0 0px!important;height:0;overflow:hidden
     }
-    /* Static replacement: the List covers the chat only while shown.
-       No wipe, opacity interpolation, moving mask, or retained exit layer. */
+    /* Static end state for Replace. During motion Twitch clipping follows
+       the shared List WAAPI clock; neither List nor Twitch content fades. */
     .r06-compose.r06-replace .r06-chat-layer {
       position:absolute;inset:0;height:100%!important;width:100%;z-index:1;
       clip-path:inset(0 100% 0 0);transition:none!important
@@ -107,8 +106,8 @@
     const standaloneMotion = !noMotion && !iframe && !root.closest("#overlay");
     // Both combined OBS placements instantiate the SAME List/chat component.
     // Its Split + Always Twitch transitions were manually accepted in the
-    // standalone source and now also run in the already-embedded main slot.
-    // Other composition modes keep their separately agreed static behavior.
+    // standalone source and run in the embedded main slot. Replace reuses
+    // the same motion with a full-size List target instead of the split slot.
     const combinedMotion = Boolean(iframe && noMotion);
     const mainEmbedded = Boolean(root.closest("#overlay"));
     let motionDurationMs = 650;
@@ -271,7 +270,7 @@
     }
 
     function beginCombinedSplitAlwaysMotion(
-      entering, direction = "top", commandOverChat = false
+      entering, direction = "top", commandOverChat = false, replaceFull = false
     ) {
       // Reuse the List's accepted motion. Settings-driven Always entrance and
       // exit synchronize the chat edge; a command keeps chat full-height while
@@ -279,8 +278,8 @@
       // Only child layers move; iframe and messages remain the same.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
-      const gap = 12;
-      const targetChat = Math.floor((available - gap) / 2);
+      const gap = replaceFull ? 0 : 12;
+      const targetChat = replaceFull ? 0 : Math.floor((available - gap) / 2);
       const targetList = available - targetChat - gap;
       // Command entrance and reverse exit share the originally captured
       // duration, even when settings change during the hold.
@@ -303,7 +302,8 @@
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
       root.dataset.r06CombinedSync = commandOverChat ?
-        (entering ? "command-enter" : "command-exit") :
+        (replaceFull ? (entering ? "replace-command-enter" : "replace-command-exit") :
+          (entering ? "command-enter" : "command-exit")) :
         entering ? "split-enter" : "split-exit";
       if (commandOverChat) {
         // Preserve the full-size iframe during entrance, but reveal the
@@ -316,7 +316,18 @@
         const topY = edge + "px";
         let fromClip;
         let toClip;
-        if (direction === "left") {
+        if (replaceFull) {
+          // The List crosses the entire shared source. Clip Twitch behind
+          // the same moving List edge and preserve existing message nodes.
+          fromClip = "inset(0px 0px 0px 0px)";
+          toClip = direction === "left" ?
+            `inset(0px 0px 0px ${Math.max(1, root.clientWidth)}px)` :
+            direction === "right" ?
+            `inset(0px ${Math.max(1, root.clientWidth)}px 0px 0px)` :
+            direction === "bottom" ?
+            `inset(0px 0px ${available}px 0px)` :
+            `inset(${available}px 0px 0px 0px)`;
+        } else if (direction === "left") {
           fromClip = `polygon(0% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},0% ${topY})`;
           toClip = `polygon(100% 0%,100% 0%,100% 100%,0% 100%,0% ${topY},100% ${topY})`;
         } else if (direction === "right") {
@@ -353,7 +364,8 @@
       // full-size chat without an unmasked intermediate frame.
       beginStandaloneListMotion(
         entering, direction, duration, targetList, true,
-        commandOverChat && direction === "bottom" ? targetList + gap : null,
+        commandOverChat && !replaceFull && direction === "bottom" ?
+          targetList + gap : null,
       );
     }
 
@@ -435,8 +447,8 @@
       const desiredChat = !chatNeeded ? 0 :
         replacing ? available : Math.max(0, Math.min(natural, chatCap));
 
-      // List visibility and replacement remain immediate. Only a content-
-      // sized chat in Split mode may animate its allocated height.
+      // Settle into the static layout when no command movement is active;
+      // a content-sized chat in Split mode keeps its old height behavior.
       root.classList.toggle("r06-shown", active);
       root.classList.toggle("r06-not-shown", !active);
       root.classList.toggle("r06-replace", replacing);
@@ -478,9 +490,11 @@
       }
       if (combinedMotion &&
           ((next && reason === "command") || (!next && reason === "expiry")) &&
-          composeMode === "split" && chatAvailable && chatAlways &&
+          (composeMode === "replace" ||
+            (composeMode === "split" && chatAvailable && chatAlways)) &&
           seenSnapshot && root.clientHeight > 0) {
-        beginCombinedSplitAlwaysMotion(next, direction, true);
+        beginCombinedSplitAlwaysMotion(next, direction, true,
+          composeMode === "replace");
         return;
       }
       if (standaloneMotion && seenSnapshot && root.clientHeight > 0 &&
@@ -497,7 +511,8 @@
 
     function expire() {
       if (standaloneMotion ||
-          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
+          (combinedMotion && (composeMode === "replace" ||
+            (composeMode === "split" && chatAvailable && chatAlways)))) {
         if (mode === "slide" && slidePhase === "hold" &&
             showUntil && performance.now() >= showUntil) {
           showUntil = 0;
@@ -550,7 +565,8 @@
           ? requestedAnimation : 0.65)) * 1000
       );
       if (standaloneMotion ||
-          (combinedMotion && composeMode === "split" && chatAvailable && chatAlways)) {
+          (combinedMotion && (composeMode === "replace" ||
+            (composeMode === "split" && chatAvailable && chatAlways)))) {
         // Share the local phase clock with the approved combined command
         // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
@@ -627,8 +643,8 @@
         return;
       }
 
-      // Main and other combined modes retain server-owned expiry semantics;
-      // only the approved split Always-chat command entrance uses local hold.
+      // Other combined modes retain server-owned expiry semantics; approved
+      // Split Always-chat and Replace reuse the same local animation/hold clock.
       const sequence = Number(trigger.sequence || 0);
       const remaining = Math.max(0, Number(trigger.remaining_ms || 0));
       if (mode === "slide") {
