@@ -804,6 +804,46 @@ def main():
                         a["listHeight"] > 10,
                         "OBS Twitch disabled / full List")
                 static_check(m, "OBS chat disabled", dynamic_chat=True)
+            # R06/ORDERED-POLL-098: Chromium's 1-second /api/data timer
+            # must never overlap requests. A delayed old snapshot can carry
+            # held=false and replay a phantom OFF after a newer Twitch ON.
+            for page in pages:
+                assert evaluate(page, """(() => {
+                  const original = window.fetch.bind(window);
+                  const state = {running:0, max:0, started:0, completed:0, original};
+                  window.__r06PollProbe = state;
+                  window.fetch = (...args) => {
+                    const url = String(args[0]?.url || args[0] || "");
+                    if (!url.includes("/api/data")) return original(...args);
+                    state.started++;
+                    state.running++;
+                    state.max = Math.max(state.max, state.running);
+                    return new Promise((resolve,reject) => {
+                      setTimeout(() => {
+                        original(...args).then(
+                          reply => { state.running--; state.completed++; resolve(reply); },
+                          error => { state.running--; state.completed++; reject(error); }
+                        );
+                      }, 1700);
+                    });
+                  };
+                  return true;
+                })()""") is True
+            QTest.qWait(5100)
+            for page in pages:
+                probe = evaluate(page, """JSON.stringify((() => {
+                  const p = window.__r06PollProbe;
+                  return {max:p.max,started:p.started,completed:p.completed};
+                })())""")
+                assert probe["started"] >= 2 and probe["completed"] >= 1, probe
+                assert probe["max"] == 1, (
+                    "Main OBS /api/data allowed out-of-order snapshot polls", probe)
+                assert evaluate(page, """(() => {
+                  window.fetch = window.__r06PollProbe.original;
+                  delete window.__r06PollProbe;
+                  return true;
+                })()""") is True
+            print("R06_MAIN_ORDERED_POLL_GATE_PASS", flush=True)
             print("R06_ZERO_BROWSER_ALL_PASS", flush=True)
         finally:
             for view in views:
