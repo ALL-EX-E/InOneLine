@@ -101,6 +101,7 @@
     let lastEmbeddedChatNeeded = false;
     let lastEmbeddedRefreshAt = -Infinity;
     let embeddedRefreshPending = false;
+    let embeddedRefreshController = null;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
     // The standalone List has no Twitch layer. Reuse the same List motion
@@ -594,20 +595,31 @@
       const movingChat = dynamicChat &&
         dynamicCommandMotion && motion === "enter";
       const refreshIntervalMs = movingChat ? 350 : 1000;
-      if (!chatNeeded || !chatHasMessages || embeddedRefreshPending ||
-          performance.now() - lastEmbeddedRefreshAt < refreshIntervalMs) return;
+      const now = performance.now();
+      if (!chatNeeded || !chatHasMessages ||
+          now - lastEmbeddedRefreshAt < refreshIntervalMs) return;
+      // Reuse the existing 200-ms layout/motion cycle as a watchdog.
+      // A stuck browser HTTP request must not block all future Twitch resyncs.
+      if (embeddedRefreshPending) {
+        if (now - lastEmbeddedRefreshAt < 3000) return;
+        embeddedRefreshController?.abort();
+      }
       try {
         const childDocument = iframe.contentDocument;
         const messages = childDocument?.getElementById("messages");
         const render = iframe.contentWindow?.IOLRenderEmbeddedChatState;
         if (!messages || (!dynamicChat && messages.children.length) ||
             typeof render !== "function") return;
-        lastEmbeddedRefreshAt = performance.now();
+        const controller = new AbortController();
+        lastEmbeddedRefreshAt = now;
         embeddedRefreshPending = true;
-        fetch("/api/multichat", {cache:"no-store"})
+        embeddedRefreshController = controller;
+        fetch("/api/multichat", {cache:"no-store", signal:controller.signal})
           .then(response => response.ok ? response.json() : null)
           .then(snapshot => {
-            if (!snapshot || !chatAvailable || !chatHasMessages ||
+            // A late HTTP response must never replace a newer resync.
+            if (embeddedRefreshController !== controller || !snapshot ||
+                !chatAvailable || !chatHasMessages ||
                 iframe.contentDocument !== childDocument) return;
             const rows = childDocument.getElementById("messages");
             if (rows && (dynamicChat || !rows.children.length)) {
@@ -615,10 +627,16 @@
             }
           })
           .catch(() => { /* next parent poll can retry */ })
-          .finally(() => { embeddedRefreshPending = false; });
+          .finally(() => {
+            if (embeddedRefreshController === controller) {
+              embeddedRefreshPending = false;
+              embeddedRefreshController = null;
+            }
+          });
       } catch (_) {
         // A child navigation must not prevent the next normal recovery poll.
         embeddedRefreshPending = false;
+        embeddedRefreshController = null;
       }
     }
 
