@@ -1172,7 +1172,7 @@ jobs:
           compression-level: 0
 
       - name: Package R06 candidate QA from tested installer
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/r06-timer-tab-slide-20261110' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
         shell: pwsh
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
@@ -1194,6 +1194,9 @@ jobs:
           if ($env:GITHUB_HEAD_REF -in @("candidate/r06-hide-empty-combined-motions-20261109", "candidate/release-1.0.10")) {
             Copy-Item "docs\qa\R06-hide-empty-combined-motions-checklist.md" "$out\CHECKLIST_HIDE_EMPTY_COMBINED.md"
           }
+          if ($env:GITHUB_HEAD_REF -eq "candidate/r06-timer-tab-slide-20261110") {
+            Copy-Item "docs\qa\R06-timer-tab-slide-checklist.md" "$out\CHECKLIST_TIMER_TAB_SLIDE.md"
+          }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }
           $installer = Get-Item "$out\InOneLine_R06_Setup_CANDIDATE.exe"
@@ -1214,7 +1217,7 @@ jobs:
           Write-Host "R06_SOURCE_SHA256=$sourceSha"
 
       - name: Upload R06 candidate QA bundle
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/r06-timer-tab-slide-20261110' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_R06_CANDIDATE_QA

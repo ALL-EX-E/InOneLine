@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
+from ..obs_visibility import AUCTION_WIDGET_BINDINGS, auction_widget_linked
 from ..constants import (
     AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT,
     AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
@@ -234,6 +235,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # MainWindow переключает это состояние вместе с основной вкладкой.
         # До привязки к MainWindow сохраняем прежнее standalone-поведение.
         self._main_tab_visible = True
+        self._auction_widgets_visible = False
         self._refresh_pending = False
         self._wheel_chance_visible = self.db.get_auction_wheel_chance_visible()
         self._history_auction_id: int | None = None
@@ -299,6 +301,10 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         self.auction_rules_editor_btn.clicked.connect(self.open_auction_rules_editor)
         conduct_rules_row.addWidget(self.auction_rules_editor_btn)
+        self.auction_widgets_button = QPushButton("Показать виджеты аукциона")
+        self.auction_widgets_button.clicked.connect(self._toggle_auction_widgets)
+        conduct_rules_row.addWidget(self.auction_widgets_button)
+        self.refresh_auction_widgets_button()
         conduct_rules_row.addStretch()
         conduct_layout.addLayout(conduct_rules_row)
 
@@ -2120,6 +2126,25 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             AUCTION_LOTS_SHOW_TOTAL_FOOTER_KEY, "1" if enabled else "0"
         )
 
+    def refresh_auction_widgets_button(self) -> None:
+        settings = self.db.get_settings()
+        has_linked_widgets = any(
+            auction_widget_linked(settings, widget) for widget in AUCTION_WIDGET_BINDINGS
+        )
+        if not has_linked_widgets:
+            self._set_auction_widgets_visible(False)
+        self.auction_widgets_button.setVisible(has_linked_widgets)
+
+    def _set_auction_widgets_visible(self, visible: bool) -> None:
+        self._auction_widgets_visible = visible
+        self.auction_widgets_button.setText(
+            "Скрыть виджеты аукциона" if visible else "Показать виджеты аукциона"
+        )
+
+    def _toggle_auction_widgets(self) -> None:
+        if not self.auction_widgets_button.isHidden():
+            self._set_auction_widgets_visible(not self._auction_widgets_visible)
+
     def auction_lots_overlay_state(self) -> dict[str, object]:
         """Expose existing Auction-owned transient state without duplicating it."""
         return {
@@ -2134,6 +2159,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 else self._prestart_wheel_format
             ),
             "auto_scroll": bool(self._obs_lot_auto_scroll_enabled),
+            "auction_widgets_visible": self._auction_widgets_visible,
             "audio": self.auction_browser_audio_state(),
         }
 

@@ -60,6 +60,10 @@ def api_smoke() -> None:
             MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, source,
         )
         default = db.current_timer_payload()
+        assert default["tab_motion"] == {
+            "follow_auction_tab": False, "auction_widgets_visible": False,
+            "direction": "left", "duration_seconds": 0.65,
+        }
         assert default["presentation"]["background"] == "transparent"
         assert default["presentation"]["background_media"]["url"] == ""
         before_audio = default["audio"]
@@ -155,6 +159,38 @@ def ui_smoke() -> None:
                     __import__("PySide6.QtWidgets", fromlist=["QLabel"]).QLabel
                 )
             )
+
+            mode_combo = stream.obs_show_modes["timer"]
+            assert not stream.timer_follow_auction_tab.isChecked()
+            assert mode_combo.findData("slide") == -1
+            assert stream.timer_slide_direction.currentData() == "left"
+            assert stream.timer_slide_seconds.value() == 0.65
+            assert not stream.timer_slide_direction.isEnabled()
+            stream.timer_follow_auction_tab.setChecked(True)
+            assert stream.timer_slide_direction.isEnabled()
+            assert mode_combo.itemText(mode_combo.findData("slide")) == "Выезд"
+            mode_combo.setCurrentIndex(mode_combo.findData("slide"))
+            stream.timer_slide_direction.setCurrentIndex(
+                stream.timer_slide_direction.findData("top")
+            )
+            stream.timer_slide_seconds.setValue(1.25)
+            assert not read_json(server, "/api/timer")["tab_motion"]["follow_auction_tab"]
+            with patch.object(QMessageBox, "information"):
+                stream.timer_save_button.click()
+            assert read_json(server, "/api/timer")["tab_motion"] == {
+                "follow_auction_tab": True, "auction_widgets_visible": False,
+                "direction": "top", "duration_seconds": 1.25,
+            }
+            assert read_json(server, "/api/timer")["visibility"]["show_mode"] == "slide"
+            stream.timer_follow_auction_tab.setChecked(False)
+            assert mode_combo.findData("slide") == -1
+            assert mode_combo.currentData() == "always"
+            stream.timer_slide_seconds.setValue(2)
+            stream.refresh()
+            assert stream.timer_follow_auction_tab.isChecked()
+            assert mode_combo.currentData() == "slide"
+            assert stream.timer_slide_direction.currentData() == "top"
+            assert stream.timer_slide_seconds.value() == 1.25
 
             # Import exactly one shared external media asset using the original
             # P08 workflow, not an isolated timer registry or separate folder.
@@ -296,9 +332,11 @@ def ui_smoke() -> None:
 def browser_smoke() -> None:
     from PySide6.QtCore import Qt, QUrl
     from PySide6.QtGui import QColor
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QMessageBox
     from PySide6.QtWebEngineWidgets import QWebEngineView
 
+    from streaming_manager.app_paths import AppPaths
+    from streaming_manager.views.main_window import MainWindow
     from tools.qt_browser_test_wait import wait_with_http_workers
 
     if sys.platform != "win32":
@@ -307,12 +345,12 @@ def browser_smoke() -> None:
 
     def js(page, expression):
         result = []
-        page.runJavaScript(expression, result.append)
+        page.runJavaScript(f"JSON.stringify(({expression}) ?? null)", result.append)
         deadline = time.monotonic() + 5
         while not result and time.monotonic() < deadline:
             wait_with_http_workers(20)
         assert result, "Browser JavaScript callback timed out"
-        return result[0]
+        return json.loads(result[0])
 
     def wait_js(page, expression, expected, label, timeout=8):
         deadline = time.monotonic() + timeout
@@ -327,6 +365,8 @@ def browser_smoke() -> None:
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         root = Path(tmp)
         db = Database(root / "data" / "streaming.db")
+        paths = AppPaths.from_root(root)
+        paths.ensure_runtime_dirs()
         image_file = fixture_media(root)
         image = db.register_external_media_asset(MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, image_file)
         video_file = fixture_media(root, ".mp4")
@@ -335,8 +375,11 @@ def browser_smoke() -> None:
             "timer_overlay_background": "media",
             "timer_overlay_background_media_id": str(image.id),
         })
-        server = LocalApiServer(db, port=free_port())
-        server.start()
+        db.set_setting("api_port", str(free_port()))
+        window = MainWindow(db, paths)
+        window.show()
+        window._set_current_main_page(window.stream_tab)
+        server = window.api
         view = QWebEngineView()
         try:
             view.resize(800, 450)
@@ -394,12 +437,138 @@ def browser_smoke() -> None:
             db.set_settings_bulk({"timer_overlay_background": "transparent"})
             wait_js(page, "document.querySelector('#root').style.background",
                     "transparent", "Transparent mode")
+
+            stream = window.stream_tab
+            auction = window.auction_tab
+            button = auction.auction_widgets_button
+            mode_combo = stream.obs_show_modes["timer"]
+
+            def save_mode(mode):
+                mode_combo.setCurrentIndex(mode_combo.findData(mode))
+                assert mode_combo.currentData() == mode
+                with patch.object(QMessageBox, "information"):
+                    stream.timer_save_button.click()
+
+            assert button.isHidden()
+            stream.timer_follow_auction_tab.setChecked(True)
+            stream.timer_slide_seconds.setValue(1.2)
+            assert button.isHidden(), "Unsaved link created a control on Auction"
+            save_mode("hidden")
+            assert not button.isHidden()
+            assert button.text() == "Показать виджеты аукциона"
+            visible = "document.documentElement?.dataset.obsVisible"
+            mode = "document.documentElement?.dataset.obsShowMode"
+            pose = """(() => {
+              const r = document.querySelector('#root')?.getBoundingClientRect();
+              return r ? [Math.round(r.left), Math.round(r.top)] : null;
+            })()"""
+            wait_js(page, mode, "hidden", "Preview received saved mode")
+            assert js(page, visible) == "true" and js(page, pose) == [0, 0]
+
+            view.load(QUrl(server.base_url + "/timer-overlay"))
+            wait_js(page, "location.search", "", "Live source loaded")
+            wait_js(page, visible, "false", "Hidden takes priority in live source")
+            window._set_current_main_page(auction)
+            window.resize(1280, 760)
+            wait_with_http_workers(150)
+            rules_button = auction.auction_rules_editor_btn
+            assert button.isVisible()
+            assert button.y() == rules_button.y()
+            assert button.x() > rules_button.geometry().right()
+            window.resize(window.minimumWidth(), 640)
+            wait_with_http_workers(150)
+            viewport = window._main_tab_scroll_by_page[auction].viewport()
+            assert button.mapTo(viewport, button.rect().topRight()).x() < viewport.width()
+            button.click()
+            assert button.text() == "Скрыть виджеты аукциона"
+            assert read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+            assert js(page, visible) == "false"
+            button.click()
+
+            save_mode("slide")
+            wait_js(page, mode, "slide", "Live source received slide mode")
+            axis_duration = """(() => {
+              const motion = document.querySelector('#root').getAnimations()[0];
+              return motion?.effect.getTiming().duration ?? null;
+            })()"""
+            for direction, outside in (
+                ("left", [-800, 0]), ("right", [800, 0]),
+                ("top", [0, -450]), ("bottom", [0, 450]),
+            ):
+                db.set_setting("timer_overlay_slide_direction", direction)
+                wait_js(page, pose, outside, f"{direction} hidden position")
+                axis = 0 if outside[0] else 1
+                minimum, maximum = sorted([0, outside[axis]])
+                intermediate = (
+                    f"(({pose})[{axis}] > {minimum + 10} && "
+                    f"({pose})[{axis}] < {maximum - 10} && ({pose})[{1 - axis}] === 0)"
+                )
+
+                button.click()
+                assert button.text() == "Скрыть виджеты аукциона"
+                wait_js(page, axis_duration, 1200, f"{direction} enter duration")
+                wait_js(page, intermediate, True, f"{direction} moving in")
+                wait_js(page, pose, [0, 0], f"{direction} entered")
+                wait_js(page, axis_duration, None, f"{direction} entry complete")
+
+                if direction == "left":
+                    window._set_current_main_page(stream)
+                    wait_with_http_workers(1600)
+                    assert js(page, pose) == [0, 0], "Tab change hid the shown timer"
+                    window._set_current_main_page(auction)
+                    assert button.text() == "Скрыть виджеты аукциона"
+
+                button.click()
+                assert button.text() == "Показать виджеты аукциона"
+                assert not read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+                wait_js(page, axis_duration, 1200, f"{direction} exit duration")
+                wait_js(page, intermediate, True, f"{direction} moving out")
+                wait_js(page, pose, outside, f"{direction} exited")
+                wait_js(page, axis_duration, None, f"{direction} exit complete")
+
+            # Reverse before the entry settles and observe the outward leg.
+            window._set_current_main_page(stream)
+            wait_with_http_workers(300)
+            window._set_current_main_page(auction)
+            wait_with_http_workers(300)
+            assert js(page, pose) == [0, 450], "Tab change revealed the hidden timer"
+
+            button.click()
+            wait_js(page, f"({pose})[1] < 300 && ({pose})[1] > 160",
+                    True, "Partial entry before pressing Hide")
+            button.click()
+            wait_js(page, f"({pose})[1] > 310 && ({pose})[1] < 450",
+                    True, "Rapid reversal travels back down")
+            wait_js(page, pose, [0, 450], "Rapid reversal finished")
+
+            save_mode("always")
+            root_visibility = "getComputedStyle(document.querySelector('#root')).visibility"
+            wait_js(page, root_visibility, "hidden", "Linked always mode waits for Show")
+            button.click()
+            wait_js(page, root_visibility, "visible", "Linked always mode appears immediately")
+            assert js(page, axis_duration) is None
+
+            stream.timer_follow_auction_tab.setChecked(False)
+            save_mode("always")
+            assert button.isHidden()
+            assert not read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+            assert mode_combo.findData("slide") == -1
+            wait_js(page, pose, [0, 0], "Unlinked widget stays visible")
+            window._set_current_main_page(stream)
+            window._set_current_main_page(auction)
+            wait_with_http_workers(400)
+            assert js(page, root_visibility) == "visible"
+            assert js(page, pose) == [0, 0] and js(page, axis_duration) is None
         finally:
             view.close()
             view.deleteLater()
             wait_with_http_workers(100)
+            window.close()
             server.stop()
+            window.thread_pool.waitForDone(15000)
+            app.processEvents()
     print("UI045_TIMER_MEDIA_REAL_CHROMIUM_IMAGE_VIDEO_MISSING_FALLBACK=PASS")
+    print("R06_TIMER_BUTTON_SLIDE_REAL_CHROMIUM_FOUR_SIDES=PASS")
 
 
 def main():
