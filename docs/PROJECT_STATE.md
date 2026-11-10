@@ -1,6 +1,6 @@
 # Состояние проекта InOneLine
 
-## Состояние на 10 ноября 2026
+## Состояние на 11 ноября 2026
 
 - Актуальный публичный выпуск — [InOneLine 1.0.10](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10). Пользователь подтвердил работу установщика версии 1.0.10. Опубликованы проверенный установщик и точный архив исходников из Actions artifact `13751287494`. [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42787015004) · [Публикация и контрольные суммы](https://github.com/ALL-EX-E/InOneLine/actions/runs/42802456094).
 - Пользователь подтвердил работу FIX‑092 в установщике `1701581`. [PR №421](https://github.com/ALL-EX-E/InOneLine/pull/421) слит в `main` коммитом `9e5124a76ecfece10dc30b067ff9b260594f40d3`. Дерево этого коммита совпадает с деревом, проверенным в [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42776409499).
@@ -9,7 +9,8 @@
 - Пользователь принял команду Twitch для показа скрытого плеера OBS. [PR №424](https://github.com/ALL-EX-E/InOneLine/pull/424) слит в `main` коммитом `8256185e0afd7b2e8e8bf091853bfafff48adf17`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42846679366) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/176u_yu-ibM2qk43XdwniWQJ_J6ieRv5c/view?usp=drivesdk).
 - Пользователь решил сохранить текущий показ колеса OBS.
 - Пользователь принял выезд списка лотов OBS по общей кнопке аукциона. [PR №425](https://github.com/ALL-EX-E/InOneLine/pull/425) слит в `main` коммитом `660b443cfee90abda92d639dbd7f315134363095`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42858374873) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/1G81s-57JJdRevBdoDZvQGKTQFBtLzNAG/view?usp=drivesdk).
-- Следующий разбор Р06 — самостоятельный OBS-виджет правил аукциона.
+- Пользователь принял выезд правил OBS и ограничение общей кнопки режимом «Выезд». [PR №426](https://github.com/ALL-EX-E/InOneLine/pull/426) слит в `main` коммитом `850bdc1365090db307800e6a5451bbd6688b52e7`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42896490766) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/1iYuGkuMQxKGdBFR7Sy4glexb787nPzxU/view?usp=drivesdk).
+- Разбор виджетов завершён. Перед возвращением к дорожной карте пользователь поручил провести технический проход по программе, проверить лишние ветки и скрывать неприменимые параметры.
 
 
 Обновлено: **2026-10-10**
