@@ -24,9 +24,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.database import Database, Game
@@ -97,7 +98,7 @@ def inspect(page):
     page.runJavaScript(JS, values.append)
     expiry = time.monotonic() + 8
     while not values and time.monotonic() < expiry:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not values:
         raise AssertionError("combined Chromium JS callback timed out")
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
@@ -116,7 +117,7 @@ def until(page, expected, label, timeout=35, dynamic_chat=False):
             assert latest["panelTransform"] == "none", (label, latest)
             print("R06_COMBINED_PASS", label, latest, flush=True)
             return latest
-        QTest.qWait(130)
+        wait_with_http_workers(130)
     raise AssertionError(f"{label} timed out: {latest!r}")
 
 
@@ -175,7 +176,7 @@ def start_native_live_growth_probe(page, baseline):
     page.runJavaScript(script, result.append)
     deadline = time.monotonic() + 8
     while not result and time.monotonic() < deadline:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     assert result == [True], ("No Chromium video growth recorder", result)
 
 
@@ -309,7 +310,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "No intermediate combined animation frames"
             done = until(
                 view.page(),
@@ -321,7 +322,7 @@ def main():
             entrance_count = done["entranceCount"]
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["entranceCount"] == entrance_count, stable
             assert stable["combinedSync"] == "idle", stable
@@ -348,7 +349,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "No intermediate reverse List/chat frames"
             done = until(
                 view.page(),
@@ -361,7 +362,7 @@ def main():
             exit_count = done["exitCount"]
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["exitCount"] == exit_count, stable
             assert stable["combinedSync"] == "idle", stable
@@ -398,7 +399,7 @@ def main():
             )
             capture_deadline = time.monotonic() + 8
             while not capture and time.monotonic() < capture_deadline:
-                QTest.qWait(25)
+                wait_with_http_workers(25)
             assert capture == [True], capture
 
             db.set_setting("list_overlay_show_mode", "always")
@@ -424,7 +425,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "Missing nonempty split-entry intermediate frames"
             done = until(
                 view.page(),
@@ -439,7 +440,7 @@ def main():
             entrance_count = done["entranceCount"]
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["entranceCount"] == entrance_count, stable
             assert stable["messageCount"] == 4, stable
@@ -474,7 +475,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "Missing nonempty split-exit intermediate frames"
             done = until(
                 view.page(),
@@ -490,7 +491,7 @@ def main():
             exit_count = done["exitCount"]
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["exitCount"] == exit_count, stable
             assert stable["messageCount"] == 4, stable
@@ -520,7 +521,7 @@ def main():
                 # their existing 1-second /api/data poll. Wait for the next
                 # full poll before issuing a Twitch command, otherwise this
                 # test races a newly saved direction against the old one.
-                QTest.qWait(1600)
+                wait_with_http_workers(1600)
                 baseline = until(
                     view.page(),
                     lambda a: not a["shown"] and a["motionKind"] == "idle" and
@@ -606,7 +607,7 @@ def main():
                             # the upward-revealed List, including the 12px gap.
                             assert abs(float(mask_match.group(1)) -
                                        float(list_match.group(1))) < 4, frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(frames) >= 3, (
                     "Insufficient intermediate combined command frames", direction, frames)
                 assert len({a["chatClipPath"] for a in frames}) >= 3, (
@@ -626,7 +627,7 @@ def main():
                 assert 9 <= done["chatTop"] - done["listBottom"] <= 15, done
                 assert all(any(msg in row for row in done["messageTexts"])
                            for msg in chat_lines), done
-                QTest.qWait(600)
+                wait_with_http_workers(600)
                 stable = inspect(view.page())
                 assert stable["entranceCount"] == done["entranceCount"], stable
                 assert stable["phase"] == "hold", stable
@@ -702,7 +703,7 @@ def main():
                             assert mask_match and list_match, frame
                             assert abs(float(mask_match.group(1)) -
                                        float(list_match.group(1))) < 4, frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(exit_frames) >= 3, (
                     "Insufficient intermediate reverse expiry frames", direction, exit_frames)
                 assert len({a["chatClipPath"] for a in exit_frames}) >= 3, (
@@ -723,7 +724,7 @@ def main():
                 assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
                 assert all(any(msg in row for row in expired["messageTexts"])
                            for msg in chat_lines), expired
-                QTest.qWait(600)
+                wait_with_http_workers(600)
                 stable_exit = inspect(view.page())
                 assert stable_exit["exitCount"] == expired["exitCount"], stable_exit
                 assert stable_exit["phase"] == "idle", stable_exit
@@ -734,7 +735,7 @@ def main():
                 "list_slide_direction": "top",
             })
             api.configure_list_show("slide", "!list", 0)
-            QTest.qWait(1600)
+            wait_with_http_workers(1600)
             baseline = until(view.page(), lambda a: not a["shown"] and
                              a["motionKind"] == "idle",
                              "combined 0-second command idle")
@@ -750,7 +751,7 @@ def main():
                               a["combinedSync"] == "idle",
                               "combined 0-second List stays visible")
             assert zero_hold["sameChatFrame"] and zero_hold["sameChatDocument"], zero_hold
-            QTest.qWait(1800)
+            wait_with_http_workers(1800)
             retained = inspect(view.page())
             assert retained["shown"] and retained["exitCount"] == baseline["exitCount"], retained
             assert state.ingest(ChatMessage(
@@ -778,10 +779,10 @@ def main():
                 "list_slide_animation_seconds": "2.00",
             })
             api.configure_list_show("slide", "!list", 0)
-            QTest.qWait(1600)
+            wait_with_http_workers(1600)
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(1600)  # Snapshot poll must read the saved direction.
+                wait_with_http_workers(1600)  # Snapshot poll must read the saved direction.
                 prior = until(
                     view.page(), lambda a: not a["shown"] and
                     a["motionKind"] == "idle" and
@@ -845,7 +846,7 @@ def main():
                         assert frame["messageCount"] >= 4, frame
                         assert all(any(msg in row for row in frame["messageTexts"])
                                    for msg in chat_lines), frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(samples) >= 3, (direction, samples)
                 assert len({a["chatClipPath"] for a in samples}) >= 3, samples
                 full = until(view.page(), lambda a:
@@ -855,7 +856,7 @@ def main():
                              abs(a["listHeight"] - a["rootHeight"]) < 3,
                              "replace zero toggle holds full area " + direction)
                 assert full["sameChatFrame"] and full["sameChatDocument"], full
-                QTest.qWait(700)
+                wait_with_http_workers(700)
                 retained = inspect(view.page())
                 assert retained["shown"] and retained["replace"], retained
                 assert retained["exitCount"] == prior["exitCount"], retained
@@ -879,7 +880,7 @@ def main():
                         assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
                         assert all(any(msg in row for row in frame["messageTexts"])
                                    for msg in chat_lines), frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(exit_samples) >= 3, (direction, exit_samples)
                 hidden = until(view.page(), lambda a:
                                not a["shown"] and not a["replace"] and
@@ -995,7 +996,7 @@ def main():
             # Replace uses exactly the same command timings but the List covers
             # the entire parent. The clipped Twitch iframe stays alive.
             db.set_setting("combined_list_chat_layout", "replace")
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
  
@@ -1153,7 +1154,7 @@ def main():
                 "list_slide_direction": "top",
             })
             api.configure_list_show("slide", "!list", 5)
-            QTest.qWait(2200)  # Saved Split layout, time and direction
+            wait_with_http_workers(2200)  # Saved Split layout, time and direction
             with urlopen(api.base_url + "/api/data", timeout=8) as response:
                 before_command = json.load(response)["list_show"]
             assert state.ingest(ChatMessage(
@@ -1174,7 +1175,7 @@ def main():
             # Deliberately repeat *within* the active five-second window.
             # A 1.5-second delay following a three-second entrance was
             # too close to the independently running server-side deadline.
-            QTest.qWait(650)
+            wait_with_http_workers(650)
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "hide-empty-timed-extend",
                 "qa_viewer", "!list"))
@@ -1233,7 +1234,7 @@ def main():
                         a["motionDuration"] == 1750,
                         "FIX-092 command entrance " + composition + " " + direction,
                         dynamic_chat=True)
-                    QTest.qWait(350)
+                    wait_with_http_workers(350)
                     mid = inspect(view.page())
                     assert mid["motionKind"] == "enter", mid
                     assert mid["chatHeight"] >= mid["rootHeight"] * .90, (
@@ -1327,7 +1328,7 @@ def main():
             try:
                 deadline = time.monotonic() + 12
                 while not first_ready.is_set() and time.monotonic() < deadline:
-                    QTest.qWait(100)
+                    wait_with_http_workers(100)
                 assert first_ready.is_set(), request_state
                 assert request_state["old_direction"] == "left", request_state
                 db.set_setting("list_slide_direction", "right")
@@ -1340,13 +1341,13 @@ def main():
                 first_release.set()
                 deadline = time.monotonic() + 8
                 while not first_returned.is_set() and time.monotonic() < deadline:
-                    QTest.qWait(50)
+                    wait_with_http_workers(50)
                 assert first_returned.is_set(), request_state
                 for _ in range(28):
                     stable = inspect(view.page())
                     assert stable["appliedDirection"] == "right", (
                         "Old combined HTTP reply reverted newer Save", stable)
-                    QTest.qWait(60)
+                    wait_with_http_workers(60)
             finally:
                 first_release.set()
                 db.current_stream_payload = original_stream_payload

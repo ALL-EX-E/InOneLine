@@ -23,9 +23,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.database import Database, Game
@@ -142,7 +143,7 @@ def enable_browser_phase_trace(page) -> None:
     })()""", done.append)
     deadline = time.monotonic() + 8
     while not done and time.monotonic() < deadline:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     assert done == [True], ("Chromium phase trace was not installed", done)
 
 
@@ -170,7 +171,7 @@ def inspect(page):
     page.runJavaScript(JS, values.append)
     end = time.monotonic() + 8
     while not values and time.monotonic() < end:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not values:
         raise AssertionError("R06 empty-container Chromium JS callback timed out")
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
@@ -197,7 +198,7 @@ def until(page, predicate, label: str, timeout: float = 25, *, api=None, dynamic
                 assert latest["chatTransition"] == "0s", (label, latest)
             print("R06_EMPTY_CONTAINER_PASS", label, latest, flush=True)
             return latest
-        QTest.qWait(130)
+        wait_with_http_workers(130)
     if api is not None:
         # Do not heal the browser under test; report actual server snapshots.
         try:
@@ -295,7 +296,7 @@ def main() -> int:
             })()""", removed.append)
             until_removed = time.monotonic() + 8
             while not removed and time.monotonic() < until_removed:
-                QTest.qWait(25)
+                wait_with_http_workers(25)
             assert removed == [True], ("Controlled embedded DOM loss failed", removed)
             recovered = until(
                 page,
@@ -386,7 +387,7 @@ def main() -> int:
             })()""", trace_results.append)
             deadline = time.monotonic() + 8
             while not trace_results and time.monotonic() < deadline:
-                QTest.qWait(25)
+                wait_with_http_workers(25)
             assert trace_results, "Missing native Chromium hold duration trace"
             timeline = trace_results[0]
             assert timeline["holdStart"] and timeline["onAir"] and timeline["exit"], timeline

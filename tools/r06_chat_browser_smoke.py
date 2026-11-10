@@ -23,9 +23,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database, Game
 from streaming_manager.constants import STATUS_NOT_PLAYED
@@ -43,7 +44,7 @@ def evaluate(page, expression):
     page.runJavaScript(expression, values.append)
     end = time.monotonic() + 8
     while not values and time.monotonic() < end:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not values:
         raise AssertionError("Chromium JS callback timed out: " + expression)
     value = values[0]
@@ -126,7 +127,7 @@ def until(page, predicate, label, timeout=32):
         if recent.get("ready") and predicate(recent):
             print("R06_ZERO_PASS:", label, recent, flush=True)
             return recent
-        QTest.qWait(140)
+        wait_with_http_workers(140)
     raise AssertionError(f"{label} timeout: {recent!r}")
 
 
@@ -190,7 +191,7 @@ def main():
                 view.load(QUrl(api.base_url + route))
                 views.append(view)
                 app.processEvents()
-                QTest.qWait(300)
+                wait_with_http_workers(300)
             pages = [view.page() for view in views]
 
             for page in pages:
@@ -233,7 +234,7 @@ def main():
                         assert abs(frame["chatBottomGap"]) < 3, frame
                     else:
                         break
-                    QTest.qWait(135)
+                    wait_with_http_workers(135)
                 assert midframes[0]["motionKind"] == "exit", midframes
                 m = until(
                     page, lambda a: not a["shown"] and
@@ -355,7 +356,7 @@ def main():
                 # their existing 1-second /api/data poll. Wait for the next
                 # full poll before issuing a Twitch command, otherwise this
                 # test races a newly saved direction against the old one.
-                QTest.qWait(1600)
+                wait_with_http_workers(1600)
                 for page in pages:
                     try:
                         idle = until(page, lambda a: not a["shown"] and
@@ -399,7 +400,7 @@ def main():
                             assert point["iframeStable"] and point["documentStable"], point
                             assert abs(point["chatBottomGap"]) <= 3, point
                             assert_main_shared_shell(point, "main command moving seam")
-                        QTest.qWait(125)
+                        wait_with_http_workers(125)
                     assert len(entry) >= 2, (direction, entry)
                     assert len({p["chatClipPath"] for p in entry}) >= 2, entry
                     held = until(
@@ -428,7 +429,7 @@ def main():
                             assert point["iframeStable"] and point["documentStable"], point
                             assert abs(point["chatBottomGap"]) <= 3, point
                             assert_main_shared_shell(point, "main command moving seam")
-                        QTest.qWait(125)
+                        wait_with_http_workers(125)
                     assert len(retreat) >= 2, retreat
                     assert len({p["chatClipPath"] for p in retreat}) >= 2, retreat
                     after = until(
@@ -451,7 +452,7 @@ def main():
                 "list_slide_direction":"left",
             })
             api.configure_list_show("slide", "!list", 0)
-            QTest.qWait(1600)
+            wait_with_http_workers(1600)
             for page in pages:
                 idle = until(page, lambda a: not a["shown"] and
                              a["combinedSync"] == "idle" and
@@ -460,7 +461,7 @@ def main():
                              a["appliedComposeMode"] == "split",
                              "main zero toggle initially hidden after saved direction")
                 prior_exit = idle["exitCount"]
-            QTest.qWait(1900)  # Offscreen clock must not reset on show.
+            wait_with_http_workers(1900)  # Offscreen clock must not reset on show.
             assert state.ingest(ChatMessage(
                 "twitch", "chan", "main-zero-on", "qa_viewer", "!list"
             ))
@@ -479,7 +480,7 @@ def main():
                     "Main hidden List restarted its scroll on command", held_zero
                 )
                 assert_main_shared_shell(held_zero, "zero held 50/50")
-            QTest.qWait(1800)
+            wait_with_http_workers(1800)
             for page in pages:
                 still = evaluate(page, METRICS)
                 assert still["shown"] and still["exitCount"] == prior_exit, (
@@ -635,7 +636,7 @@ def main():
                               xhr.onerror=()=>{probe.parentXhr={status:'error'};};
                               xhr.send();
                             })()""")
-                            QTest.qWait(2200)
+                            wait_with_http_workers(2200)
                             probe = evaluate(page, """JSON.stringify((() => {
                               const iframe=document.querySelector('#list-chat iframe');
                               return {requests:window.__r06TransportProbe,
@@ -668,7 +669,7 @@ def main():
                     assert restored["iframeStable"] and restored["documentStable"], restored
 
             db.set_setting("combined_list_chat_layout","replace")
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             for direction in ("left","right","top","bottom"):
                 db.set_setting("list_slide_direction",direction)
 
@@ -761,7 +762,7 @@ def main():
                               status:"error", error:String(error)
                             };});
                         })()""")
-                        QTest.qWait(1600)
+                        wait_with_http_workers(1600)
                         probe = evaluate(page, """JSON.stringify((() => {
                           const iframe=document.querySelector('#list-chat iframe');
                           return {network:window.__r06ChatNetworkProbe,
@@ -883,7 +884,7 @@ def main():
                             composition, direction, entering,
                             state.snapshot()["list_show"])
                     # Sample an actual intermediate frame, not just endpoints.
-                    QTest.qWait(350)
+                    wait_with_http_workers(350)
                     for page in pages:
                         m = evaluate(page, METRICS)
                         server_mid = state.snapshot()["list_show"]
@@ -979,7 +980,7 @@ def main():
             try:
                 deadline = time.monotonic() + 12
                 while not first_ready.is_set() and time.monotonic() < deadline:
-                    QTest.qWait(100)
+                    wait_with_http_workers(100)
                 assert first_ready.is_set(), request_state
                 assert request_state["old_direction"] == "left", request_state
                 db.set_setting("list_slide_direction", "right")
@@ -993,7 +994,7 @@ def main():
                 first_release.set()
                 deadline = time.monotonic() + 8
                 while not first_returned.is_set() and time.monotonic() < deadline:
-                    QTest.qWait(50)
+                    wait_with_http_workers(50)
                 assert first_returned.is_set(), request_state
                 # A stale response must not flip the saved direction even
                 # for a single observed frame before the next poll repairs it.
@@ -1002,7 +1003,7 @@ def main():
                         stable = evaluate(page, METRICS)
                         assert stable["appliedDirection"] == "right", (
                             "Old main HTTP reply reverted newer Save", stable)
-                    QTest.qWait(60)
+                    wait_with_http_workers(60)
             finally:
                 first_release.set()
                 db.current_stream_payload = original_stream_payload
