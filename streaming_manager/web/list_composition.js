@@ -100,6 +100,7 @@
     let intrinsicChatHeight = 0;
     let lastEmbeddedChatNeeded = false;
     let lastEmbeddedRefreshAt = -Infinity;
+    let embeddedRefreshPending = false;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
     // The standalone List has no Twitch layer. Reuse the same List motion
@@ -181,6 +182,11 @@
         if (onResize) onResize();
       }
       matchEmbeddedChatFrame(chatAvailable && chatHasMessages);
+      // Chromium can defer a hidden embedded iframe's own 500-ms polling.
+      // Reuse the already accepted parent's targeted HTTP->child-render
+      // recovery while the List crosses real Twitch messages. The child
+      // renderer compares snapshots and never remounts its iframe.
+      recoverEmbeddedChat(chatAvailable && chatHasMessages);
     }
 
     function paintDynamicChatMask() {
@@ -580,24 +586,40 @@
         }
       }
       lastEmbeddedChatNeeded = chatNeeded;
-      if (!chatNeeded || !chatHasMessages ||
-          performance.now() - lastEmbeddedRefreshAt < 1000) return;
+      // During an approved hide-empty command entrance, additional Twitch
+      // rows must resize the existing bottom-anchored chat immediately.
+      // The embedded document's own timer can be throttled while covered
+      // by the List. Reuse the existing parent's non-reload resync even if
+      // some older message cards are already rendered.
+      const movingChat = dynamicCommandMotion && motion === "enter" &&
+        !chatAlways && chatHasMessages;
+      const refreshIntervalMs = movingChat ? 350 : 1000;
+      if (!chatNeeded || !chatHasMessages || embeddedRefreshPending ||
+          performance.now() - lastEmbeddedRefreshAt < refreshIntervalMs) return;
       try {
-        const messages = iframe.contentDocument?.getElementById("messages");
+        const childDocument = iframe.contentDocument;
+        const messages = childDocument?.getElementById("messages");
         const render = iframe.contentWindow?.IOLRenderEmbeddedChatState;
-        if (!messages || messages.children.length || typeof render !== "function") return;
+        if (!messages || (!movingChat && messages.children.length) ||
+            typeof render !== "function") return;
         lastEmbeddedRefreshAt = performance.now();
+        embeddedRefreshPending = true;
         fetch("/api/multichat", {cache:"no-store"})
           .then(response => response.ok ? response.json() : null)
           .then(snapshot => {
-            const rows = iframe.contentDocument?.getElementById("messages");
-            if (snapshot && chatAvailable && chatHasMessages &&
-                rows && !rows.children.length) {
+            if (!snapshot || !chatAvailable || !chatHasMessages ||
+                iframe.contentDocument !== childDocument) return;
+            const rows = childDocument.getElementById("messages");
+            if (rows && (movingChat || !rows.children.length)) {
               iframe.contentWindow?.IOLRenderEmbeddedChatState?.(snapshot);
             }
           })
-          .catch(() => { /* next parent poll can retry */ });
-      } catch (_) { /* child can be navigating */ }
+          .catch(() => { /* next parent poll can retry */ })
+          .finally(() => { embeddedRefreshPending = false; });
+      } catch (_) {
+        // A child navigation must not prevent the next normal recovery poll.
+        embeddedRefreshPending = false;
+      }
     }
 
     function layout() {
