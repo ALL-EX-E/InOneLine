@@ -217,7 +217,7 @@ def ui_smoke() -> None:
     # black tree stroke. Only its exterior dark margin should become green.
     from PySide6.QtGui import QColor, QImage
     from streaming_manager.default_wheel_icon import (
-        fill_default_icon_corners, default_wheel_icon_image,
+        bundled_icon_path, default_wheel_icon_image, fill_default_icon_corners,
     )
     synthetic = QImage(44, 44, QImage.Format.Format_ARGB32)
     synthetic.fill(QColor("#000000"))
@@ -259,9 +259,9 @@ def ui_smoke() -> None:
     assert clicked == [True] and hit_probe.accepted, "P15-A center hitbox did not double"
     assert wheel_probe.CENTER_RADIUS_RATIO == 0.24
     # UI-079: already-bundled app logo is the local fallback if no custom asset.
-    assert wheel_probe._default_center_icon_path.is_file()
+    assert bundled_icon_path().is_file()
     assert not wheel_probe._default_center_pixmap.isNull()
-    wheel_probe.set_center_image_path(str(wheel_probe._default_center_icon_path))
+    wheel_probe.set_center_image_path(str(bundled_icon_path()))
     assert wheel_probe._center_image_pixmap is not None
     wheel_probe.set_center_image_path(None)
     assert wheel_probe._center_image_pixmap is None
@@ -757,6 +757,19 @@ def browser_smoke() -> None:
                         wait_js(normal,
                                 "document.querySelector('#lots-rows').style.transform",
                                 "translateY(0px)", "P14-C OBS list starts stopped")
+                        frames = "window.__auctionScrollRequests"
+                        js(normal, """
+                            (() => {
+                                window.__auctionScrollRequests = 0;
+                                const requestFrame = window.requestAnimationFrame.bind(window);
+                                window.requestAnimationFrame = callback => {
+                                    if (callback.name === 'scrollFrame') ++window.__auctionScrollRequests;
+                                    return requestFrame(callback);
+                                };
+                            })()
+                        """)
+                        QTest.qWait(300)
+                        assert js(normal, frames) == 0, "Disabled autoscroll still requests frames"
                         runtime["auto_scroll"] = True
                         wait_js(normal,
                                 "document.querySelector('#lots-rows').style.transform !== 'translateY(0px)'",
@@ -771,14 +784,26 @@ def browser_smoke() -> None:
                                 "false", "P14-D OBS consumed disable state")
                         stopped_at = js(normal,
                                         "document.querySelector('#lots-rows').style.transform")
+                        stopped_frames = js(normal, frames)
+                        assert stopped_frames > 0, "Autoscroll did not request animation frames"
                         QTest.qWait(300)
                         stopped_after = js(normal,
                                            "document.querySelector('#lots-rows').style.transform")
+                        assert js(normal, frames) == stopped_frames, "Disabling autoscroll left a frame loop"
                         if stopped_after != stopped_at:
                             raise AssertionError(
                                 f"P14-C OBS still scrolls after toggle: "
                                 f"{stopped_at!r} → {stopped_after!r}"
                             )
+                        runtime["auto_scroll"] = True
+                        wait_js(normal, f"({frames}) > {stopped_frames}", True,
+                                "Auction Lots autoscroll requests frames again")
+                        wait_js(normal,
+                                "document.querySelector('#lots-rows').style.transform !== " + json.dumps(stopped_at),
+                                True, "Auction Lots autoscroll resumes from the paused position")
+                        runtime["auto_scroll"] = False
+                        wait_js(normal, "document.documentElement.dataset.auctionLotsAutoScroll",
+                                "false", "Auction Lots autoscroll returns to off")
                         # P14-B:UI-047: changes saved to existing settings
                         # must update the already opened Chromium source live,
                         # including explicit zero-opacity (not fallback).

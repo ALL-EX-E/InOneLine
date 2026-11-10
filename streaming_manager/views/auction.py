@@ -411,12 +411,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.rng_methods_btn.clicked.connect(self.show_rng_methods)
         setup.addWidget(self.rng_methods_btn, 3, 0)
 
-        self.verification_data_btn = QPushButton("Данные проверки")
-        self.verification_data_btn.setToolTip(
-            "Предварительный read-only состав и математические диапазоны будущего вращения"
-        )
-        self.verification_data_btn.clicked.connect(self.show_pre_spin_verification)
-        setup.addWidget(self.verification_data_btn, 3, 1)
         setup.setColumnStretch(2, 1)
 
         self.wheel_format_label = QLabel("Формат колеса:")
@@ -1021,6 +1015,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         wheel_heading.setStyleSheet("font-size: 11pt; font-weight: 650;")
         wheel_heading_row.addWidget(wheel_heading)
         wheel_heading_row.addStretch()
+        self.verification_data_btn = QPushButton("Данные проверки")
+        self.verification_data_btn.setToolTip(
+            "Состав и математические диапазоны будущего вращения"
+        )
+        self.verification_data_btn.clicked.connect(self.show_pre_spin_verification)
+        wheel_heading_row.addWidget(self.verification_data_btn)
         wheel_panel_layout.addLayout(wheel_heading_row)
 
         # P13-C/UI-071: move the ONE existing wheel soundtrack editor into
@@ -1143,7 +1143,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.refresh_rng_availability()
         self.refresh()
-        self._handle_prestart_mode_changed()
 
 
 
@@ -2077,8 +2076,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             )
             self.timer_edit.setText(self._format_milliseconds(value))
 
-        self._update_session_controls(None)
-        self._refresh_conduct_wheel_chances_in_place(None)
+        self._update_session_controls(None, refresh_wheel_chances=True)
 
     def _handle_wheel_format_changed(self, _index: int = -1) -> None:
         combo = getattr(self, "wheel_format_combo", None)
@@ -2092,8 +2090,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         if session is None:
             self._prestart_wheel_format = wheel_format
             self.db.set_setting(AUCTION_WHEEL_FORMAT_KEY, wheel_format)
-            self._update_session_controls(None)
-            self._refresh_conduct_wheel_chances_in_place(None)
+            self._update_session_controls(None, refresh_wheel_chances=True)
             return
 
         if str(session.get("mode") or "") != "weighted_wheel":
@@ -2684,10 +2681,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             return False
         return bool(item.data(Qt.UserRole + 1))
 
-    def _update_delete_lot_action_state(self, *args, running: bool | None = None):
-        session = self._current_session()
-        if running is None:
-            running = bool(session and session.get("status") == "running")
+    def _update_delete_lot_action_state(self):
+        self._sync_lot_action_state(self._current_session())
+
+    def _sync_lot_action_state(self, session: dict | None):
+        running = bool(session and session.get("status") == "running")
         late_temporary_delete = bool(
             session
             and str(session.get("mode") or "") == "max_amount"

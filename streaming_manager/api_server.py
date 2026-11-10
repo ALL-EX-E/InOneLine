@@ -223,9 +223,8 @@ class LocalApiServer:
         wheel_overlay_html = _inject_overlay_version_handshake(
             wheel_overlay_path.read_text(encoding="utf-8"), APP_VERSION
         )
-        # Compute the built-in fallback icon once BEFORE HTTP worker threads
-        # and OBS Chromium begin requesting resources. It is a high-resolution
-        # QImage and its color normalization must never block an image GET.
+        # Load the prepared icon before HTTP workers start. If the resource is
+        # missing, the compatibility fallback still runs outside image requests.
         wheel_default_icon_bytes = default_wheel_icon_png()
         rules_overlay_html = _inject_overlay_version_handshake(
             rules_overlay_path.read_text(encoding="utf-8"), APP_VERSION
@@ -821,7 +820,13 @@ class LocalApiServer:
             self.last_error = str(exc)
             self._httpd = None
             raise
-        self._thread = threading.Thread(target=self._httpd.serve_forever, name="StreamingManagerAPI", daemon=True)
+        self._thread = threading.Thread(
+            target=self._httpd.serve_forever,
+            # Bound the idle shutdown wait without changing request handling.
+            kwargs={"poll_interval": 0.1},
+            name="StreamingManagerAPI",
+            daemon=True,
+        )
         self._thread.start()
 
     def stop(self) -> None:

@@ -68,6 +68,28 @@ class JournalCurrentDescriptionSmoke(unittest.TestCase):
         self.assertTrue(self.tab.search.isClearButtonEnabled())
         self.assertIsInstance(self.tab.search, QLineEdit)
 
+    def test_worker_finishing_during_typing_preserves_search_debounce(self):
+        from unittest.mock import patch
+
+        self.tab.thread_pool.waitForDone(5000)
+        self.app.processEvents()
+        with patch.object(self.tab.thread_pool, "start") as start:
+            self.tab.refresh()
+            self.tab.search.setText("first")
+            self.tab.refresh()  # A data refresh also arrives while typing.
+            self.tab._refresh_finished()
+            self.assertTrue(self.tab._search_timer.isActive())
+            self.assertEqual(start.call_count, 1)
+
+            self.tab.search.setText("latest")
+            # Deliver the single-shot timeout once for the final query.
+            self.tab._search_timer.stop()
+            self.tab._search_timer.timeout.emit()
+            self.assertEqual(start.call_count, 2)
+            self.assertEqual(self.tab._refresh_worker.args, ("latest",))
+            self.tab._refresh_finished()
+            self.assertEqual(start.call_count, 2)
+
     def test_existing_readonly_refresh_keeps_description(self):
         self.tab.thread_pool.waitForDone(5000)
         self.app.processEvents()

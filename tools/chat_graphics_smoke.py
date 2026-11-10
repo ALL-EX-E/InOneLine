@@ -62,6 +62,13 @@ class GraphicsSmoke(unittest.TestCase):
             self.assertEqual(msg["badges"][0]["url"],"https://static-cdn.jtvnw.net/m.png")
             self.assertEqual(msg["badges"][1]["url"],"")
             self.assertEqual(msg["avatar_url"],"https://static-cdn.jtvnw.net/a.png")
+        before = state.operator_feed_snapshot()
+        state.enrich_twitch_media(
+            "channel", badge_urls={("subscriber", "6"): "https://static-cdn.jtvnw.net/s.png"}
+        )
+        enriched = state.operator_feed_snapshot(before["key"])
+        self.assertEqual(enriched["messages"][0]["badges"][1]["url"],
+                         "https://static-cdn.jtvnw.net/s.png")
         state.delete_message("twitch","channel","msg1")
         state.enrich_twitch_media("channel",avatar_by_user={"7":"https://static-cdn.jtvnw.net/b.png"})
         self.assertEqual(state.snapshot()["messages"],[])
@@ -195,6 +202,28 @@ class GraphicsSmoke(unittest.TestCase):
                 self.assertEqual(len(feed._jobs), 2)
             self.assertEqual(feed._poll.interval(), 75)
             self.assertEqual(len(feed._preload_candidates), 15)
+        finally:
+            feed.close()
+            app.processEvents()
+
+    def test_qt_media_timer_sleeps_when_download_queue_is_empty(self):
+        from concurrent.futures import Future
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QApplication
+        from streaming_manager.views.chat_rich_feed import ChatRichFeed
+        app = QApplication.instance() or QApplication([])
+        feed = ChatRichFeed()
+        try:
+            self.assertFalse(feed._poll.isActive())
+            first, second = Future(), Future()
+            with patch.object(feed._pool, "submit", side_effect=(first, second)):
+                feed._enqueue("https://static-cdn.jtvnw.net/first.png")
+                self.assertTrue(feed._poll.isActive())
+                first.set_result(None)
+                feed._finish_downloads()
+                self.assertFalse(feed._poll.isActive())
+                feed._enqueue("https://static-cdn.jtvnw.net/second.png")
+                self.assertTrue(feed._poll.isActive())
         finally:
             feed.close()
             app.processEvents()

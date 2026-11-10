@@ -19,12 +19,13 @@ class AuctionStateMixin:
             return
         self._refresh_visible_state()
 
-    def refresh_force(self):
-        """Explicit user refresh also re-scans the D26 soundtrack directory."""
-        if hasattr(self, "wheel_soundtrack_combo"):
-            self._refresh_wheel_soundtrack_library()
-        if hasattr(self, "auction_soundtrack_combo"):
-            self._refresh_auction_soundtrack_library()
+    def refresh_force(self, *, refresh_soundtracks: bool = True):
+        """Refresh even when hidden, optionally re-scanning the soundtrack catalog."""
+        if refresh_soundtracks:
+            if hasattr(self, "wheel_soundtrack_combo"):
+                self._refresh_wheel_soundtrack_library()
+            if hasattr(self, "auction_soundtrack_combo"):
+                self._refresh_auction_soundtrack_library()
         self._refresh_visible_state()
 
     @staticmethod
@@ -159,8 +160,7 @@ class AuctionStateMixin:
             )
             self._refresh_visible_state()
             return
-        self._update_session_controls(session)
-        self._refresh_conduct_wheel_chances_in_place(session)
+        self._update_session_controls(session, refresh_wheel_chances=True)
         self._sync_auction_history(session)
 
     def _update_session_controls(
@@ -168,6 +168,8 @@ class AuctionStateMixin:
         session: dict | None,
         all_rows=None,
         wheel_payload: dict | None = None,
+        *,
+        refresh_wheel_chances: bool = False,
     ):
         active = session is not None
         status = str(session["status"]) if active else ""
@@ -237,6 +239,9 @@ class AuctionStateMixin:
             self.setup_widget,
             (not active) or weighted_context,
         )
+        self._set_visible_state(
+            self.verification_data_btn, prestart_wheel or awaiting_wheel
+        )
         self._set_visible_state(self.wheel_format_label, weighted_context)
         self._set_visible_state(self.wheel_format_combo, weighted_context)
         if active and mode == "weighted_wheel":
@@ -265,7 +270,6 @@ class AuctionStateMixin:
 
         # 9.3: единый большой таймер остаётся на экране всегда. После выбора
         # победителя он служит точкой доступа к отмене завершённого результата.
-        timer_visible = True
         self._set_visible_state(self.timer_widget, True)
 
         timer_editable = bool(
@@ -274,7 +278,7 @@ class AuctionStateMixin:
             or (awaiting_wheel and not preparing_wheel_rng)
         )
         self.timer_edit.setReadOnly(not timer_editable)
-        self.timer_edit.setEnabled(timer_visible and not preparing_rng)
+        self.timer_edit.setEnabled(not preparing_rng)
 
         timer_action_visible = bool(
             (not active)
@@ -437,7 +441,7 @@ class AuctionStateMixin:
             "в этом аукционе, не ниже стартовой суммы лота."
             if late_max_bid else ""
         )
-        self._update_delete_lot_action_state(running=running)
+        self._sync_lot_action_state(session)
 
         # P20-G: in provisional Max Amount, late new/reused titles follow
         # the same original-auction scope and wheel freeze as bid corrections.
@@ -451,8 +455,16 @@ class AuctionStateMixin:
             if late_max_bid else ""
         )
 
+        if wheel_payload is None:
+            wheel_payload = (
+                self._load_wheel_payload(session)
+                if self._wheel_context_relevant(session)
+                else {}
+            )
         self._sync_wheel_chance_visibility(session)
         self._update_wheel_panel(session, wheel_payload=wheel_payload)
+        if refresh_wheel_chances:
+            self._refresh_conduct_wheel_chances_in_place(session, wheel_payload)
         self._update_auction_soundtrack_panel(session)
         self._update_winner_chance_display(
             session,
@@ -460,7 +472,7 @@ class AuctionStateMixin:
             wheel_payload=wheel_payload,
         )
         self._sync_timer_display_state(session)
-        self._update_auction_total_display(session)
+        self._update_auction_total_display(session, all_rows)
 
         if not active:
             self.state_label.setText("Состояние: НЕТ АКТИВНОГО АУКЦИОНА")
@@ -560,7 +572,7 @@ class AuctionStateMixin:
         session: dict | None,
         *,
         spin_running: bool,
-        wheel_payload: dict | None = None,
+        wheel_payload: dict,
     ) -> None:
         """W4: show the frozen winner chance only after a direct weighted spin."""
         applicable = bool(
@@ -574,12 +586,7 @@ class AuctionStateMixin:
             self.winner_chance_label.setText("")
             return
 
-        payload = (
-            self._load_wheel_payload(session)
-            if wheel_payload is None
-            else wheel_payload
-        )
-        chance = ((payload or {}).get("winner") or {}).get("chance")
+        chance = (wheel_payload.get("winner") or {}).get("chance")
         elimination = bool(
             session
             and str(session.get("wheel_format") or "") == "elimination"
@@ -601,15 +608,17 @@ class AuctionStateMixin:
             + self._format_wheel_probability(float(probability))
         )
 
-    def _update_auction_total_display(self, session: dict | None) -> None:
+    def _update_auction_total_display(self, session: dict | None, all_rows) -> None:
         """Refresh the always-visible A6 total without mutating auction state."""
-        if session is None:
+        if session is not None:
+            total = self.db.auction_total_sm_points(int(session["id"]))
+        elif all_rows is not None:
+            total = sum(max(0, row["total_sm_points"]) for row in all_rows)
+        else:
             total = sum(
                 max(0, int(game.sm_points))
                 for game in self.db.auction_eligible_games()
             )
-        else:
-            total = self.db.auction_total_sm_points(int(session["id"]))
         formatted = f"{int(total):,}".replace(",", " ")
         self.auction_total_label.setText(f"Всего: {formatted} баллов")
 
@@ -649,18 +658,13 @@ class AuctionStateMixin:
     def _refresh_conduct_wheel_chances_in_place(
         self,
         session: dict | None,
-        wheel_payload: dict | None = None,
+        wheel_payload: dict,
     ) -> None:
         """Refresh only A6.1 chance cells without rebuilding Conduct rows."""
         if not self._weighted_wheel_chance_context(session):
             return
 
-        payload = (
-            self._load_wheel_payload(session)
-            if wheel_payload is None
-            else wheel_payload
-        )
-        probabilities = self._wheel_probability_map(payload)
+        probabilities = self._wheel_probability_map(wheel_payload)
         for row_index in range(self.conduct_table.rowCount()):
             id_item = self.conduct_table.item(row_index, 0)
             chance_item = self.conduct_table.item(
@@ -738,7 +742,7 @@ class AuctionStateMixin:
         self.wheel_widget.set_center_image_path(center_path)
         self.wheel_widget.set_payload(payload or {})
         self._refresh_wheel_soundtrack_availability()
-        self._set_wheel_soundtrack_edit_enabled(not self.wheel_widget.is_spinning())
+        self._sync_wheel_soundtrack_edit_controls()
 
 
     def _sync_timer_display_state(self, session: dict | None) -> None:

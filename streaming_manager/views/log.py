@@ -467,20 +467,19 @@ class LogTab(QWidget):
         }
 
     def _search_text_changed(self, _text: str):
-        # Mark an in-flight result as stale immediately; the timer will launch
-        # one refresh with the latest text after the user pauses typing.
-        if self._refresh_worker is not None:
-            self._refresh_pending = True
         self._search_timer.start()
 
     def refresh(self):
         # Refresh is deliberately asynchronous. MainWindow calls this directly
         # from currentChanged when a dirty tab is opened; doing heavy table work
         # here would freeze every button in the application until it completed.
-        if self._refresh_worker is not None:
+        # Leave the latest query pending until both the current worker and
+        # the user's typing pause have completed.
+        if self._refresh_worker is not None or self._search_timer.isActive():
             self._refresh_pending = True
             return
 
+        self._refresh_pending = False
         self._last_refresh_started = time.perf_counter()
         search_text = self.search.text().strip()
         worker = FunctionWorker(self._load_rows, search_text)
@@ -519,10 +518,5 @@ class LogTab(QWidget):
 
     def _refresh_finished(self):
         self._refresh_worker = None
-        if self._refresh_pending:
-            self._refresh_pending = False
-            # If pending work came from textChanged, the latest query is
-            # already known.  Stop the debounce timer so it cannot trigger a
-            # redundant second worker after this immediate catch-up refresh.
-            self._search_timer.stop()
+        if self._refresh_pending and not self._search_timer.isActive():
             self.refresh()

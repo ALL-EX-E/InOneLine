@@ -3,7 +3,9 @@
 The original square asset has dark corner padding around a green panel.  Fill
 only the exterior bands of that *bundled* asset with its own dominant green.
 Scan both axes and cover the narrow antialiased panel fringe; the interior
-black symbol stays untouched. This never transforms user-selected media/GIFs.
+black symbol stays untouched. The bundled wheel PNG is the lossless result of
+this correction. The runtime correction also covers a missing or damaged
+prepared resource. This never transforms user-selected media/GIFs.
 """
 from __future__ import annotations
 
@@ -90,18 +92,29 @@ def bundled_icon_path() -> Path:
 
 
 @lru_cache(maxsize=1)
-def default_wheel_icon_image() -> QImage:
-    return fill_default_icon_corners(QImage(str(bundled_icon_path())))
+def _load_default_wheel_icon() -> tuple[QImage, bytes]:
+    master_path = bundled_icon_path()
+    try:
+        png = master_path.with_name("InOneLine_wheel_default.png").read_bytes()
+    except OSError:
+        png = b""
+    if png:
+        image = QImage.fromData(png, "PNG")
+        if not image.isNull():
+            return image, png
 
-
-@lru_cache(maxsize=1)
-def default_wheel_icon_png() -> bytes:
-    image = default_wheel_icon_image()
+    image = fill_default_icon_corners(QImage(str(master_path)))
     if image.isNull():
-        return b""
+        return image, b""
     buffer = QBuffer()
-    if not buffer.open(QIODevice.OpenModeFlag.WriteOnly):
-        return b""
-    if not image.save(buffer, "PNG"):
-        return b""
-    return bytes(buffer.data())
+    if not buffer.open(QIODevice.OpenModeFlag.WriteOnly) or not image.save(buffer, "PNG"):
+        return image, b""
+    return image, bytes(buffer.data())
+
+
+def default_wheel_icon_image() -> QImage:
+    return _load_default_wheel_icon()[0]
+
+
+def default_wheel_icon_png() -> bytes:
+    return _load_default_wheel_icon()[1]

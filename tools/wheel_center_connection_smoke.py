@@ -19,7 +19,7 @@ from streaming_manager.app_paths import AppPaths
 from streaming_manager.constants import WHEEL_CENTER_IMAGE_MEDIA_ID_KEY as CENTER_KEY
 from streaming_manager.database import Database
 from streaming_manager.default_wheel_icon import (
-    bundled_icon_path, default_wheel_icon_png, fill_default_icon_corners,
+    _load_default_wheel_icon, bundled_icon_path, default_wheel_icon_png, fill_default_icon_corners,
 )
 from streaming_manager.integrations import (
     IntegrationAdapter, IntegrationManager, IntegrationOperationResult, IntegrationRegistry,
@@ -221,6 +221,12 @@ class CenterConnectionTests(unittest.TestCase):
         self.assertEqual(fixed.pixelColor(50, 50).name(), "#000000")
         source = QImage(str(bundled_icon_path()))
         real = fill_default_icon_corners(source)
+        prepared_path = bundled_icon_path().with_name("InOneLine_wheel_default.png")
+        prepared = QImage(str(prepared_path))
+        self.assertFalse(prepared.isNull(), "Packaged wheel icon is missing or invalid")
+        self.assertEqual(prepared.convertToFormat(real.format()), real)
+        self.assertEqual(prepared.colorSpace(), real.colorSpace())
+        self.assertEqual(default_wheel_icon_png(), prepared_path.read_bytes())
         self.assertGreater(real.pixelColor(627, 1156).green(), 200, "Bundled bottom seam remains")
         self.assertGreater(real.pixelColor(98, 627).green(), 200, "Bundled left seam remains")
         self.assertEqual(real.pixelColor(627, 600), source.pixelColor(627, 600), "Inner symbol changed")
@@ -229,6 +235,25 @@ class CenterConnectionTests(unittest.TestCase):
             source.convertToFormat(real.format()).copy(280, 135, 694, 995),
             "Interior symbol region changed",
         )
+
+    def test_default_icon_recovers_when_prepared_resource_is_missing_or_corrupt(self):
+        master = Path(self.temp.name) / bundled_icon_path().name
+        master.write_bytes(bundled_icon_path().read_bytes())
+        prepared = master.with_name("InOneLine_wheel_default.png")
+        expected = QImage.fromData(default_wheel_icon_png(), "PNG")
+
+        with patch("streaming_manager.default_wheel_icon.bundled_icon_path", return_value=master):
+            for unavailable in ("missing", "corrupt"):
+                with self.subTest(unavailable=unavailable):
+                    if unavailable == "corrupt":
+                        prepared.write_bytes(b"not a PNG")
+                    image, png = _load_default_wheel_icon.__wrapped__()
+                    self.assertEqual(image, expected.convertToFormat(image.format()))
+                    self.assertEqual(QImage.fromData(png, "PNG"), expected)
+            master.unlink()
+            image, png = _load_default_wheel_icon.__wrapped__()
+            self.assertTrue(image.isNull())
+            self.assertEqual(png, b"")
 
 
 if __name__ == "__main__":

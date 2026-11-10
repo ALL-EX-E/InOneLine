@@ -186,6 +186,8 @@ class PublicTab(QWidget):
     def _init_public_xlsx_mirror(self) -> None:
         self._public_xlsx_path: Path | None = None
         self._public_xlsx_worker: FunctionWorker | None = None
+        self._public_xlsx_target_generation = 0
+        self._public_xlsx_worker_generation = 0
         self._public_xlsx_last_hash = ""
         self._public_xlsx_write_pending = False
         self._public_xlsx_write_retry = False
@@ -276,10 +278,13 @@ class PublicTab(QWidget):
         self._public_xlsx_activate(Path(path), persist=True, force_write=True)
 
     def _public_xlsx_activate(self, path: Path, *, persist: bool, force_write: bool) -> None:
+        self._public_xlsx_write_timer.stop()
         self._public_xlsx_path = self._public_xlsx_normalize_path(path)
+        self._public_xlsx_target_generation += 1
         self._public_xlsx_last_hash = ""
-        self._public_xlsx_write_pending = False
+        self._public_xlsx_write_pending = force_write
         self._public_xlsx_write_retry = False
+        self.public_xlsx_modified_label.setText("—")
         if persist:
             self.db.set_settings_bulk(
                 {
@@ -291,7 +296,7 @@ class PublicTab(QWidget):
         self._public_xlsx_update_controls()
         self._public_xlsx_set_status("Подключено. Запись актуального списка…")
         if force_write:
-            QTimer.singleShot(0, self._public_xlsx_force_write)
+            self._public_xlsx_write_timer.start(0)
 
     def _public_xlsx_disconnect(self) -> None:
         if self._public_xlsx_worker is not None:
@@ -331,29 +336,17 @@ class PublicTab(QWidget):
         self._public_xlsx_write_retry = True
         self._public_xlsx_write_timer.start(0)
 
-    def _public_xlsx_force_write(self) -> None:
-        if self._public_xlsx_path is None or self._public_xlsx_shutdown:
-            return
-        self._public_xlsx_start_write(self._public_xlsx_path, force=True)
-
     def _public_xlsx_start_local_write(self) -> None:
-        if self._public_xlsx_path is None or self._public_xlsx_shutdown:
-            return
-        if self._public_xlsx_worker is not None:
-            self._public_xlsx_write_pending = True
+        path = self._public_xlsx_path
+        if path is None or self._public_xlsx_shutdown or self._public_xlsx_worker is not None:
             return
         self._public_xlsx_write_pending = False
-        self._public_xlsx_start_write(self._public_xlsx_path, force=False)
-
-    def _public_xlsx_start_write(self, path: Path, *, force: bool) -> None:
-        if self._public_xlsx_worker is not None or self._public_xlsx_shutdown:
-            self._public_xlsx_write_pending = True
-            return
         self._public_xlsx_set_status("Запись таблицы…")
         previous_hash = self._public_xlsx_last_hash
 
         def write_task():
-            if not force and path.exists():
+            # A newly connected target must be written before its contents can be skipped.
+            if previous_hash and path.exists():
                 rows = public_mirror_rows(self.db)
                 logical_hash = public_state_hash(rows)
                 if logical_hash == previous_hash:
@@ -372,6 +365,7 @@ class PublicTab(QWidget):
 
         worker = FunctionWorker(write_task)
         self._public_xlsx_worker = worker
+        self._public_xlsx_worker_generation = self._public_xlsx_target_generation
         self._public_xlsx_update_controls()
         worker.signals.result.connect(self._public_xlsx_write_succeeded)
         worker.signals.error.connect(self._public_xlsx_worker_failed)
@@ -379,11 +373,15 @@ class PublicTab(QWidget):
         self.thread_pool.start(worker)
 
     def _public_xlsx_write_succeeded(self, result: dict) -> None:
+        if self._public_xlsx_worker_generation != self._public_xlsx_target_generation:
+            return
         self._public_xlsx_write_retry = False
         self._public_xlsx_last_hash = str(result.get("hash") or "")
         self._public_xlsx_set_status("Синхронизировано", mtime=result.get("mtime"))
 
     def _public_xlsx_worker_failed(self, exc: Exception) -> None:
+        if self._public_xlsx_worker_generation != self._public_xlsx_target_generation:
+            return
         if isinstance(exc, PublicXlsxTransientError):
             self._public_xlsx_set_status(str(exc))
             self._public_xlsx_write_pending = True
@@ -394,7 +392,7 @@ class PublicTab(QWidget):
     def _public_xlsx_worker_finished(self) -> None:
         self._public_xlsx_worker = None
         self._public_xlsx_update_controls()
-        if self._public_xlsx_write_pending and self._public_xlsx_path is not None:
+        if self._public_xlsx_write_pending and not self._public_xlsx_shutdown:
             delay = 1500 if self._public_xlsx_write_retry else PUBLIC_XLSX_LOCAL_WRITE_DEBOUNCE_MS
             self._public_xlsx_write_timer.start(delay)
 

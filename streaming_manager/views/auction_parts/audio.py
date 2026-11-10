@@ -1373,7 +1373,7 @@ class AuctionAudioMixin:
         if hasattr(self, "auction_soundtrack_status"):
             self.auction_soundtrack_status.setText(self._auction_audio_runtime_error)
 
-    def _set_auction_soundtrack_edit_enabled(self, enabled: bool) -> None:
+    def _sync_auction_soundtrack_edit_controls(self) -> None:
         if not hasattr(self, "auction_soundtrack_combo"):
             return
         # D26 explicitly allows changing the selected soundtrack live.
@@ -1387,7 +1387,6 @@ class AuctionAudioMixin:
             return
         if session is None:
             show = str(self.mode_combo.currentData() or "max_amount") == "max_amount"
-            editable = True
         else:
             status = str(session.get("status") or "")
             mode = str(session.get("mode") or "")
@@ -1397,7 +1396,6 @@ class AuctionAudioMixin:
                 or mode == "weighted_wheel"
             )
             show = mode == "max_amount" and not wheel_context
-            editable = status not in ("running", "paused")
 
         # P13-C/UI-071: both existing soundtrack panels now live inside
         # the same timer. The wheel panel follows the existing wheel context
@@ -1410,7 +1408,7 @@ class AuctionAudioMixin:
         self._set_visible_state(self.auction_soundtrack_widget, show)
         if show:
             self._refresh_auction_soundtrack_availability()
-            self._set_auction_soundtrack_edit_enabled(editable)
+            self._sync_auction_soundtrack_edit_controls()
         self._sync_auction_soundtrack_state(session)
 
     def _schedule_wheel_soundtrack(self, wheel_payload: dict) -> None:
@@ -1471,7 +1469,7 @@ class AuctionAudioMixin:
         if hasattr(self, "wheel_soundtrack_status"):
             self.wheel_soundtrack_status.setText(self._wheel_audio_runtime_error)
 
-    def _set_wheel_soundtrack_edit_enabled(self, enabled: bool) -> None:
+    def _sync_wheel_soundtrack_edit_controls(self) -> None:
         if not hasattr(self, "wheel_soundtrack_combo"):
             return
         self.wheel_soundtrack_combo.setEnabled(True)

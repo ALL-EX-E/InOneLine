@@ -3772,8 +3772,16 @@ def main() -> int:
         app.processEvents()
         if public_tab.table.rowCount() != 1:
             raise AssertionError("UI-028 Public live-search stopped showing matches")
-        QTest.keyClick(public_tab.search, Qt.Key_Return)
-        app.processEvents()
+        with (
+            patch.object(window.auction_tab, "_refresh_wheel_soundtrack_library") as wheel_scan,
+            patch.object(window.auction_tab, "_refresh_auction_soundtrack_library") as auction_scan,
+        ):
+            QTest.keyClick(public_tab.search, Qt.Key_Return)
+            app.processEvents()
+        wheel_scan.assert_not_called()
+        auction_scan.assert_not_called()
+        if window.auction_tab.selected_conduct_game_id() != first_id:
+            raise AssertionError("Public Enter no longer selects the linked Auction lot")
         if public_tab.selected_game_id() != first_id:
             raise AssertionError("Public Enter search stopped selecting its target")
         if not public_tab.table.hasFocus():
