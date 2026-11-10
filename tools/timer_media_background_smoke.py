@@ -296,9 +296,10 @@ def ui_smoke() -> None:
 def browser_smoke() -> None:
     from PySide6.QtCore import Qt, QUrl
     from PySide6.QtGui import QColor
-    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     from PySide6.QtWebEngineWidgets import QWebEngineView
+
+    from tools.qt_browser_test_wait import wait_with_http_workers
 
     if sys.platform != "win32":
         os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
@@ -309,7 +310,7 @@ def browser_smoke() -> None:
         page.runJavaScript(expression, result.append)
         deadline = time.monotonic() + 5
         while not result and time.monotonic() < deadline:
-            QTest.qWait(20)
+            wait_with_http_workers(20)
         assert result, "Browser JavaScript callback timed out"
         return result[0]
 
@@ -320,7 +321,7 @@ def browser_smoke() -> None:
             last = js(page, expression)
             if last == expected:
                 return
-            QTest.qWait(50)
+            wait_with_http_workers(50)
         raise AssertionError(f"{label}: {last!r} != {expected!r}")
 
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -369,7 +370,18 @@ def browser_smoke() -> None:
                 "Authoritative timer text disappeared with video background"
             )
 
-            video_file.unlink()
+            # A concurrent localhost Range response can briefly hold the
+            # external fixture open on Windows. Keep exercising deletion of
+            # the live source once that reader has closed its file handle.
+            delete_deadline = time.monotonic() + 5
+            while True:
+                try:
+                    video_file.unlink()
+                    break
+                except PermissionError as error:
+                    if getattr(error, "winerror", None) != 32 or time.monotonic() >= delete_deadline:
+                        raise
+                    wait_with_http_workers(25)
             wait_js(page, video_display, "none", "Missing original hides video")
             # Qt Chromium may return an empty string after removeAttribute;
             # either representation is safe as long as no media URL remains.
@@ -385,7 +397,7 @@ def browser_smoke() -> None:
         finally:
             view.close()
             view.deleteLater()
-            QTest.qWait(100)
+            wait_with_http_workers(100)
             server.stop()
     print("UI045_TIMER_MEDIA_REAL_CHROMIUM_IMAGE_VIDEO_MISSING_FALLBACK=PASS")
 
