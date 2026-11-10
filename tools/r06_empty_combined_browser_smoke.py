@@ -371,7 +371,7 @@ def main() -> int:
             # stay visible for the independent full three seconds after the
             # completed entrance. Browser timestamps avoid Qt scheduling lag.
             trace_results = []
-            page.runJavaScript("""(() => {
+            page.runJavaScript("""JSON.stringify((() => {
               const frames=window.__r06EmptyTrace?.frames || [];
               const holdStart=frames.find(p=>p.phase==="hold" && p.shown);
               const onAir=frames.find(p=>p.phase==="hold" && p.shown &&
@@ -384,12 +384,12 @@ def main() -> int:
                 onAir:onAir || null, exit:exit || null,
                 total:frames.length, tail:frames.slice(-22)
               };
-            })()""", trace_results.append)
+            })())""", trace_results.append)
             deadline = time.monotonic() + 8
             while not trace_results and time.monotonic() < deadline:
                 wait_with_http_workers(25)
             assert trace_results, "Missing native Chromium hold duration trace"
-            timeline = trace_results[0]
+            timeline = json.loads(trace_results[0])
             assert timeline["holdStart"] and timeline["onAir"] and timeline["exit"], timeline
             assert timeline["holdStart"]["holdDuration"] == 3000, timeline
             # The full 3 seconds start at the actual Chromium hold phase,
