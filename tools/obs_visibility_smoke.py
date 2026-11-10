@@ -362,8 +362,11 @@ def ui_smoke() -> None:
             assert not stream.wheel_glow_enabled.isChecked()
             assert not stream.wheel_pointer_label_enabled.isChecked()
             assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_enabled).text() == "Светящийся контур:"
-            assert stream.wheel_overlay_form.labelForField(stream.wheel_glow_color_row).text() == "Цвет контура:"
+            glow_color_label = stream.wheel_overlay_form.labelForField(stream.wheel_glow_color_row)
+            assert glow_color_label.text() == "Цвет контура:"
+            assert glow_color_label.isHidden() and stream.wheel_glow_color_row.isHidden()
             stream.wheel_glow_enabled.setChecked(True)
+            assert not glow_color_label.isHidden() and not stream.wheel_glow_color_row.isHidden()
             stream.wheel_pointer_label_enabled.setChecked(True)
             stream._set_color_button(stream.wheel_glow_color_btn, "#12AB34")
             auction = window.auction_tab

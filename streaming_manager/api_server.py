@@ -17,7 +17,7 @@ from .database import Database
 from .music_player import music_player_overlay_appearance
 from .multichat import MultichatState
 from .obs_visibility import show_mode
-from .chat_appearance import public_appearance
+from .chat_appearance import public_appearance, saved_appearance
 from .media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     is_supported_media_name,
@@ -94,6 +94,7 @@ class LocalApiServer:
         self._music_player_state_provider = None
         self._music_player_cover_provider = None
         self._multichat_state_provider = None
+        self._multichat_overlay_summary_provider = None
         self._list_show_controller = None
         self._music_command_state: MultichatState | None = None
 
@@ -144,8 +145,9 @@ class LocalApiServer:
         except Exception:
             return None
 
-    def set_multichat_state_provider(self, provider) -> None:
+    def set_multichat_state_provider(self, provider, *, overlay_summary=None) -> None:
         self._multichat_state_provider = provider
+        self._multichat_overlay_summary_provider = overlay_summary
 
     def set_list_show_controller(self, controller) -> None:
         self._list_show_controller = controller
@@ -171,16 +173,17 @@ class LocalApiServer:
         state = self._music_command_state
         return state.music_command_event() if state is not None else None
 
-    def multichat_state(self, *, for_obs: bool = True) -> dict:
+    def multichat_state(self, *, for_obs: bool = True, summary: bool = False) -> dict:
+        overlay_summary = self._multichat_overlay_summary_provider
         provider = self._multichat_state_provider
         if provider is None:
             return {"messages": [], "show_time": True}
         try:
-            state = provider(for_obs=for_obs)
+            state = overlay_summary() if summary and overlay_summary else provider(for_obs=for_obs)
         except Exception:
             return {"messages": [], "show_time": True}
         payload = dict(state) if isinstance(state, dict) else {"messages": [], "show_time": True}
-        payload["appearance"] = public_appearance(self.db)
+        payload["appearance"] = saved_appearance(self.db) if summary else public_appearance(self.db)
         return payload
 
     def start(self) -> None:
@@ -673,17 +676,20 @@ class LocalApiServer:
                     return
                 if path in ("/api/data", "/data"):
                     payload = db.current_stream_payload()
-                    chat = api_server.multichat_state(for_obs=True)
+                    chat = api_server.multichat_state(for_obs=True, summary=True)
                     appearance = chat.get("appearance") or {}
                     common = appearance.get("common") or {}
                     obs_enabled = chat.get("obs_enabled") or {}
-                    chat_messages = chat.get("messages") or []
+                    has_messages = chat.get("twitch_has_messages")
+                    if has_messages is None:
+                        has_messages = any(
+                            item.get("platform") == "twitch"
+                            for item in chat.get("messages") or []
+                            if isinstance(item, dict)
+                        )
                     payload["multichat"] = {
                         "enabled": obs_enabled.get("twitch", True) is True and common.get("visibility") != "hidden",
-                        "has_messages": any(
-                            item.get("platform") == "twitch"
-                            for item in chat_messages if isinstance(item, dict)
-                        ),
+                        "has_messages": bool(has_messages),
                         "visibility": common.get("visibility", "hide_empty"),
                     }
                     payload["list_show"] = chat.get("list_show", {})

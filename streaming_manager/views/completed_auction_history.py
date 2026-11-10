@@ -73,7 +73,8 @@ class CompletedAuctionHistoryTab(QWidget):
         self.date_to.setCalendarPopup(True)
         self.date_to.setDisplayFormat("dd.MM.yyyy")
         controls.addWidget(self.date_from)
-        controls.addWidget(QLabel("—"))
+        self.date_separator = QLabel("—")
+        controls.addWidget(self.date_separator)
         controls.addWidget(self.date_to)
 
         self.sort = QComboBox()
@@ -163,7 +164,8 @@ class CompletedAuctionHistoryTab(QWidget):
         verification_layout.addWidget(self.verification_notice)
 
         verification_spin_row = QHBoxLayout()
-        verification_spin_row.addWidget(QLabel("Раунд:"))
+        self.verification_spin_label = QLabel("Раунд:")
+        verification_spin_row.addWidget(self.verification_spin_label)
         self.verification_spin_combo = QComboBox()
         self.verification_spin_combo.setMinimumWidth(220)
         self.verification_spin_combo.currentIndexChanged.connect(
@@ -186,7 +188,10 @@ class CompletedAuctionHistoryTab(QWidget):
             ("result", "Проверка результата:"),
             ("random_org", "Random.org+:"),
         )):
-            verification_grid.addWidget(QLabel(title), row, 0)
+            label = QLabel(title)
+            verification_grid.addWidget(label, row, 0)
+            if key == "random_org":
+                self.verification_random_org_label = label
             value = QLabel("—")
             value.setWordWrap(True)
             value.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -228,12 +233,11 @@ class CompletedAuctionHistoryTab(QWidget):
         self.date_to.dateChanged.connect(self._custom_date_changed)
         self.table.itemSelectionChanged.connect(self._selection_changed)
         self._period_changed()
-        self.refresh()
 
     def _period_changed(self):
         custom = self.period.currentData() == "custom"
-        self.date_from.setVisible(custom)
-        self.date_to.setVisible(custom)
+        for field in (self.date_from, self.date_separator, self.date_to):
+            field.setVisible(custom)
         self.refresh()
 
     def _custom_date_changed(self):
@@ -350,6 +354,10 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verification_spin_combo.blockSignals(True)
         self.verification_spin_combo.clear()
         self.verification_spin_combo.blockSignals(False)
+        self.verification_spin_combo.hide()
+        self.verification_spin_label.hide()
+        self.verification_random_org_label.hide()
+        self.verification_labels["random_org"].hide()
         for label in self.verification_labels.values():
             label.setText("—")
         self.verification_notice.setText(
@@ -375,8 +383,13 @@ class CompletedAuctionHistoryTab(QWidget):
         if snapshots:
             self.verification_spin_combo.setCurrentIndex(len(snapshots) - 1)
         self.verification_spin_combo.blockSignals(False)
+        multiple_rounds = len(snapshots) > 1
+        self.verification_spin_combo.setVisible(multiple_rounds)
+        self.verification_spin_label.setVisible(multiple_rounds)
 
         if not snapshots:
+            self.verification_random_org_label.hide()
+            self.verification_labels["random_org"].hide()
             self._verification_snapshot = None
             self.verification_notice.setText(
                 "Verification snapshot отсутствует. Для аукционов, завершённых до 0.3.41, "
@@ -447,7 +460,10 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verification_labels["result"].setText(
             f"{verification['label']}. {verification.get('reason') or ''}".strip()
         )
-        if rng_method == "random_org_plus":
+        signed_rng = rng_method == "random_org_plus"
+        self.verification_random_org_label.setVisible(signed_rng)
+        self.verification_labels["random_org"].setVisible(signed_rng)
+        if signed_rng:
             verified = snapshot.get("rng_verified")
             proof = (
                 "подпись подтверждена"
@@ -464,7 +480,7 @@ class CompletedAuctionHistoryTab(QWidget):
         self.verify_result_btn.setVisible(True)
         self.verification_details_btn.setVisible(True)
         self.verification_random_org_btn.setVisible(
-            rng_method == "random_org_plus"
+            signed_rng
             and bool(snapshot.get("rng_random_json"))
             and bool(snapshot.get("rng_signature"))
         )

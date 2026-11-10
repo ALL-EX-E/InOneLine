@@ -122,6 +122,8 @@ class ConditionalWheelVerificationHistoryTests(unittest.TestCase):
         self.assertIn("Verification snapshot отсутствует",
                       tab.verification_notice.text())
         self.assertFalse(tab.verify_result_btn.isVisible())
+        self.assertTrue(tab.verification_random_org_label.isHidden())
+        self.assertTrue(tab.verification_labels["random_org"].isHidden())
 
     def test_snapshot_without_old_wheel_audit_is_visible(self):
         sid = self.auction("weighted_wheel")
@@ -132,6 +134,8 @@ class ConditionalWheelVerificationHistoryTests(unittest.TestCase):
             tab._load_details(sid)
         self.assertTrue(self.shown(tab))
         self.assertEqual(tab.verification_spin_combo.count(), 1)
+        self.assertTrue(tab.verification_spin_combo.isHidden())
+        self.assertTrue(tab.verification_spin_label.isHidden())
 
     def test_multi_round_verification_picker_retained(self):
         sid = self.auction("weighted_wheel", "elimination")
@@ -143,6 +147,8 @@ class ConditionalWheelVerificationHistoryTests(unittest.TestCase):
             tab._load_details(sid)
         self.assertTrue(self.shown(tab))
         self.assertEqual(tab.verification_spin_combo.count(), 2)
+        self.assertFalse(tab.verification_spin_combo.isHidden())
+        self.assertFalse(tab.verification_spin_label.isHidden())
         self.assertIn("Раунд 1", tab.verification_spin_combo.itemText(0))
         self.assertIn("Раунд 2", tab.verification_spin_combo.itemText(1))
         self.assertEqual(tab.verification_spin_combo.currentIndex(), 1)

@@ -94,7 +94,7 @@ class TwitchRewardActionsTests(unittest.TestCase):
         controls = self.controls()
         self.assertTrue(controls["Добавить награду"].isEnabled())
         self.assertTrue(controls["Сохранить и синхронизировать награды"].isEnabled())
-        self.assertFalse(controls["Включить награды"].isEnabled())
+        self.assertNotIn("Включить награды", controls)
         self.assertNotIn("Отключить награды", controls)
         self.assertNotIn("Удалить награды", controls)
 
@@ -114,7 +114,8 @@ class TwitchRewardActionsTests(unittest.TestCase):
         self.setup_provider(retired_ids=("retired-1",))
         controls = self.controls()
         self.assertTrue(controls["Удалить награды"].isEnabled())
-        self.assertFalse(controls["Включить награды"].isEnabled())
+        self.assertNotIn("Включить награды", controls)
+        self.assertNotIn("Отключить награды", controls)
 
     def test_not_eligible_blocks_remote_actions_even_after_worker_finish(self):
         self.setup_provider(available=False, reward_ids=("reward-1",))

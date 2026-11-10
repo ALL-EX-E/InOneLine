@@ -54,6 +54,32 @@ class AuctionSettingsCopyTests(unittest.TestCase):
         self.assertNotIn("локальная PNG-копия", text)
         self.assertNotIn("— стандартный центр —", text)
 
+    def test_threshold_follows_enabled_reasons_and_keeps_the_last_saved_duration(self):
+        tab = self.tab
+        threshold = tab.auto_extend_threshold_duration
+        self.assertTrue(tab.auto_extend_threshold_enabled.isHidden())
+        self.assertTrue(threshold.isHidden())
+        tab.auto_extend_threshold_enabled.setChecked(False)
+        tab.auto_extend_leader_enabled.setChecked(True)
+        self.assertFalse(tab.auto_extend_threshold_enabled.isHidden())
+        self.assertTrue(threshold.isHidden())
+        tab.auto_extend_threshold_enabled.setChecked(True)
+        self.assertFalse(threshold.isHidden())
+        threshold.setText("00:03:12.000")
+        with patch.object(QMessageBox, "information"):
+            tab.save_auction_settings()
+        self.assertEqual(threshold.text(), "00:03:12.000")
+        threshold.setText("invalid draft")
+        tab.auto_extend_leader_enabled.setChecked(False)
+        self.assertTrue(tab.auto_extend_threshold_enabled.isHidden())
+        self.assertTrue(threshold.isHidden())
+        with patch.object(QMessageBox, "information"), patch.object(QMessageBox, "warning") as warning:
+            tab.save_auction_settings()
+        warning.assert_not_called()
+        tab.auto_extend_external_enabled.setChecked(True)
+        self.assertFalse(threshold.isHidden())
+        self.assertEqual(threshold.text(), "00:03:12.000")
+
     def test_external_label_does_not_rename_persisted_reason(self):
         control = self.tab.auto_extend_external_enabled
         self.assertEqual(control.text(), "Внешнее поступление")

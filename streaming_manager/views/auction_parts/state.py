@@ -113,7 +113,6 @@ class AuctionStateMixin:
         self.count_label.setText(f"Лотов: {len(filtered_rows)}")
         conduct_started = time.perf_counter()
         conduct_timing = self._populate_lot_table(
-            self.conduct_table,
             filtered_rows,
             conduct_selected_id,
             wheel_probabilities=wheel_probabilities,

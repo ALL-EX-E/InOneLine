@@ -1112,9 +1112,14 @@ class StreamTab(QWidget):
         glow_row.addStretch()
         self.wheel_overlay_form.addRow("Цвет контура:", self.wheel_glow_color_row)
         self.wheel_glow_enabled.toggled.connect(
-            self.wheel_glow_color_row.setEnabled
+            lambda enabled: self._set_form_row_visible(
+                self.wheel_overlay_form, self.wheel_glow_color_row, enabled,
+            )
         )
-        self.wheel_glow_color_row.setEnabled(WHEEL_GLOW_ENABLED_DEFAULT)
+        self._set_form_row_visible(
+            self.wheel_overlay_form, self.wheel_glow_color_row,
+            self.wheel_glow_enabled.isChecked(),
+        )
         self.wheel_pointer_label_enabled = QCheckBox("Показывать при вращении")
         self.wheel_pointer_label_enabled.setToolTip(
             "Отображать название лота, находящегося под стрелкой, в программе и OBS"
@@ -1442,10 +1447,10 @@ class StreamTab(QWidget):
             down_tooltip=f"Уменьшить время анимации {name_genitive}",
         )
         form.addRow("Время анимации:", time_control)
-        direction.setEnabled(False)
-        time_control.setEnabled(False)
-        link.toggled.connect(direction.setEnabled)
-        link.toggled.connect(time_control.setEnabled)
+        def update_slide_rows(*_args) -> None:
+            visible = show_mode_combo.currentData() == AUCTION_WIDGET_SLIDE_MODE[0]
+            for field in (hint, direction, time_control):
+                self._set_form_row_visible(form, field, visible)
 
         def update_slide_mode(linked: bool) -> None:
             value, label = AUCTION_WIDGET_SLIDE_MODE
@@ -1459,6 +1464,8 @@ class StreamTab(QWidget):
 
         update_slide_mode(False)
         link.toggled.connect(update_slide_mode)
+        show_mode_combo.currentIndexChanged.connect(update_slide_rows)
+        update_slide_rows()
         controls = (link, direction, seconds)
         self._auction_widget_motion_controls[widget] = controls
         return controls
@@ -2662,11 +2669,8 @@ class StreamTab(QWidget):
                 slide and not self.list_slide_command.text(),
             )
         if hasattr(self, "info_position"):
-            self._set_form_row_visible(
-                self.info_form,
-                self.info_position,
-                info_enabled,
-            )
+            for field in (self.info_field, self.info_position):
+                self._set_form_row_visible(self.info_form, field, info_enabled)
 
         if hasattr(self, "frame_color_row_widgets"):
             for key, visible in (
@@ -2715,7 +2719,9 @@ class StreamTab(QWidget):
             self._set_combo_by_data(direction, motion["direction"])
             seconds.setValue(motion["duration_seconds"])
         for widget, combo in self.obs_show_modes.items():
-            combo.blockSignals(True)
+            # These modes only update their own animation rows. Apply the
+            # same visibility logic on reload as on an operator's selection.
+            combo.blockSignals(widget not in self._auction_widget_motion_controls)
             self._set_combo_by_data(combo, show_mode(settings, widget))
             combo.blockSignals(False)
         self.wheel_glow_enabled.setChecked(

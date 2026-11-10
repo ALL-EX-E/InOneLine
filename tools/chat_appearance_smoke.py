@@ -19,6 +19,11 @@ class StubDatabase:
         self.values = {}
         self.path = Path(base) / "inone.db"
         self.assets = {}
+        self.settings_reads = []
+
+    def get_settings(self, keys=None):
+        self.settings_reads.append(tuple(keys) if keys is not None else None)
+        return {key: value for key, value in self.values.items() if keys is None or key in keys}
 
     def get_setting(self, key, default=""):
         return self.values.get(key, default)
@@ -42,6 +47,17 @@ class StubDatabase:
 
 
 class AppearanceModelTests(unittest.TestCase):
+    def test_saved_appearance_reads_one_settings_snapshot(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = StubDatabase(folder)
+            db.set_setting(TWITCH_KEY, '{"mode":"custom","text_size":30}')
+            db.set_setting(COMMON_KEY, '{"visibility":"always"}')
+            db.set_setting("multichat_twitch_obs", "0")
+            value = saved_appearance(db)
+            self.assertEqual(value["twitch"]["text_size"], 30)
+            self.assertEqual(value["common"]["visibility"], "hidden")
+            self.assertEqual(db.settings_reads, [(COMMON_KEY, "multichat_twitch_obs", TWITCH_KEY)])
+
     def test_invalid_and_unsafe_values_are_bounded(self):
         t = normalize_twitch({
             "mode":"custom", "text_font":"Arial;};alert(1)",
@@ -151,12 +167,20 @@ class AppearanceModelTests(unittest.TestCase):
             db = StubDatabase(folder)
             editor = ChatAppearanceEditor(db)
             self.assertEqual(editor.values(), editor.saved)
+            self.assertTrue(all(w.isHidden() for w in editor.custom_widgets))
+            self.assertFalse(editor.mode.isHidden())
+            self.assertFalse(editor.test.isHidden())
             self.assertEqual(
                 [editor.visibility.itemData(i) for i in range(editor.visibility.count())],
                 ["hidden", "hide_empty", "always"],
             )
             editor.mode.setCurrentIndex(1)
+            self.assertTrue(all(not w.isHidden() for w in editor.custom_widgets))
             editor.text_size.setValue(31)
+            editor.mode.setCurrentIndex(0)
+            self.assertTrue(all(w.isHidden() for w in editor.custom_widgets))
+            editor.mode.setCurrentIndex(1)
+            self.assertEqual(editor.text_size.value(), 31)
             self.assertTrue(editor.is_dirty())
             self.assertEqual(db.values,{})
             editor.test.click()

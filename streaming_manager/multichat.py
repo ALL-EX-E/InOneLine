@@ -312,25 +312,35 @@ class MultichatState:
             self._seen_order = deque(k for k in self._seen_order if k[0] != platform)
             self._seen = set(self._seen_order)
 
+    def _list_show_snapshot_locked(self) -> dict:
+        remaining = max(0.0, self._list_show_until - self._clock())
+        return {
+            "remaining_ms": int(remaining * 1000) if self._list_mode == "slide" else 0,
+            "sequence": self._list_sequence,
+            # Older timed snapshots do not contain the optional held field.
+            **({"held": self._list_held} if (
+                self._list_mode == "slide" and (self._list_duration == 0 or self._list_held)
+            ) else {}),
+        }
+
+    def obs_overlay_summary(self) -> dict:
+        """Read visibility and List timing without copying every chat row."""
+        with self._lock:
+            self._flush_ready(self._clock())
+            return {
+                "twitch_has_messages": any(message.platform == "twitch" for message in self._obs),
+                "obs_enabled": dict(self._obs_enabled),
+                "list_show": self._list_show_snapshot_locked(),
+            }
+
     def snapshot(self, *, for_obs: bool = False) -> dict:
         with self._lock:
             self._flush_ready(self._clock())
             messages = self._obs if for_obs else self._operator
-            remaining = max(0.0, self._list_show_until - self._clock())
             return {
                 "messages": [asdict(m) for m in messages],
                 "obs_enabled": dict(self._obs_enabled),
-                "list_show": {
-                    "remaining_ms": int(remaining * 1000) if self._list_mode == "slide" else 0,
-                    "sequence": self._list_sequence,
-                    # Preserve exact legacy timed snapshots (remaining_ms,
-                    # sequence). Only the new 0-second policy or an already
-                    # latched show needs the additional optional held field.
-                    **({"held": bool(self._list_held)} if (
-                        self._list_mode == "slide" and
-                        (self._list_duration == 0 or self._list_held)
-                    ) else {}),
-                },
+                "list_show": self._list_show_snapshot_locked(),
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,
                 "media_preload": dict(self._chat_media_preload),

@@ -75,6 +75,24 @@ class MultichatCoreTests(unittest.TestCase):
         self.clock.advance(1)
         self.assertEqual(self.ids(obs=True), ["2"])
 
+    def test_obs_overlay_summary_preserves_chat_delay_and_list_hold(self):
+        self.state.configure(delay=3)
+        self.state.configure_list_show("slide", "hello", 0)
+        self.state.ingest(msg(platform="youtube", identifier="youtube"))
+        self.state.ingest(msg(identifier="twitch"))
+        initial = self.state.obs_overlay_summary()
+        self.assertFalse(initial["twitch_has_messages"])
+        self.assertEqual(initial["list_show"], {"remaining_ms": 0, "sequence": 1, "held": True})
+        self.clock.advance(3)
+        ready = self.state.obs_overlay_summary()
+        self.assertTrue(ready["twitch_has_messages"])
+        self.assertEqual(self.state.snapshot(for_obs=True)["list_show"], ready["list_show"])
+        self.state.set_obs_enabled("twitch", False)
+        hidden = self.state.obs_overlay_summary()
+        self.assertFalse(hidden["twitch_has_messages"])
+        self.assertFalse(hidden["obs_enabled"]["twitch"])
+        self.assertTrue(hidden["list_show"]["held"])
+
     def test_list_command_exact_match_shared_timer_and_repeats(self):
         self.state.configure_list_show("slide", "!список", 30)
         self.assertEqual(self.state.snapshot()["list_show"]["remaining_ms"], 0)

@@ -135,7 +135,10 @@ class MainWindow(QMainWindow):
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
         self.multichat_state = MultichatState()
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
-        self.api.set_multichat_state_provider(self.multichat_state.snapshot)
+        self.api.set_multichat_state_provider(
+            self.multichat_state.snapshot,
+            overlay_summary=self.multichat_state.obs_overlay_summary,
+        )
         self.api.set_list_show_controller(self.multichat_state.configure_list_show)
         self.api.set_music_command_state(self.multichat_state)
         self.api.configure_music_command(db.get_settings())

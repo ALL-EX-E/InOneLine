@@ -91,6 +91,16 @@ def main() -> int:
                 "background_media_id": None,
             }
             assert not dialog._rules_glow_effect.isEnabled()
+            assert dialog.rules_obs_glow_color_btn.parentWidget().isHidden()
+            assert dialog.rules_obs_media_combo.parentWidget().isHidden()
+            assert dialog.rules_obs_media_add.isHidden()
+            assert dialog.rules_obs_media_hint.isHidden()
+            dialog.rules_obs_transparent.setChecked(True)
+            assert dialog.rules_obs_color_btn.parentWidget().isHidden()
+            assert dialog.rules_obs_opacity_control.isHidden()
+            dialog.rules_obs_color_mode.setChecked(True)
+            assert not dialog.rules_obs_color_btn.parentWidget().isHidden()
+            assert not dialog.rules_obs_opacity_control.isHidden()
             assert "border-radius: 8px" in dialog.editor.viewport().styleSheet()
             assert dialog._is_dirty() is False
             dialog.rules_obs_glow.setChecked(True)

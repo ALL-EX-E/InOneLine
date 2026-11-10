@@ -2170,11 +2170,14 @@ class ServicesMixin:
                 )
                 auction_id: int | None = None
                 status = "preview"
+                total_sm_points = sum(max(0, int(game.sm_points or 0)) for game in game_rows)
             else:
                 auction_id = int(session["id"])
                 mode = str(session.get("mode") or "max_amount")
                 status = str(session.get("status") or "")
                 rows = self._list_auction_entries_conn(conn, auction_id)
+                # A6 includes inactive history and excludes removed lots.
+                total_sm_points = self._auction_total_sm_points_conn(conn, auction_id)
                 wheel_payload = (
                     self._wheel_payload_from_conn(conn, session)
                     if mode == "weighted_wheel"
@@ -2208,15 +2211,6 @@ class ServicesMixin:
             for sector in (wheel_payload or {}).get("sectors", [])
             if sector.get("game_id") is not None
         }
-
-        # Reuse the same authoritative A6 session total as the local label.
-        # The session total includes inactive history and excludes 'removed'.
-        if session is None:
-            total_sm_points = sum(
-                max(0, int(game.sm_points or 0)) for game in game_rows
-            )
-        else:
-            total_sm_points = self.auction_total_sm_points(int(auction_id))
 
         payload_rows = []
         for row in rows:

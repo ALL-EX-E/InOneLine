@@ -300,7 +300,7 @@ class ChatAppearanceEditor(QWidget):
         custom = data["twitch"]["mode"] == "custom"
         for widget in self.custom_widgets:
             if widget is not None:
-                widget.setEnabled(custom)
+                widget.setVisible(custom)
         bg = data["common"]["background"]
         for widget in (
             self.bg_color_control, self.bg_color_label,

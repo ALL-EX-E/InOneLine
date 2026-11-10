@@ -172,8 +172,6 @@ class MusicTab(QWidget):
         self.controller.playbackError.connect(self._show_playback_error)
 
         self.refresh_library()
-        self._refresh_controls()
-        self._refresh_transport()
 
     @staticmethod
     def _format_ms(value: int) -> str:
@@ -228,8 +226,6 @@ class MusicTab(QWidget):
 
     def refresh(self) -> None:
         self.controller.refresh_library()
-        self._refresh_controls()
-        self._refresh_transport()
 
     def _refresh_transport(self) -> None:
         asset = self.controller.current_asset()
@@ -247,8 +243,10 @@ class MusicTab(QWidget):
         for index in range(self.list_widget.count()):
             row = self.list_widget.item(index)
             font = row.font()
-            font.setBold(int(row.data(Qt.UserRole)) == int(current) if current is not None else False)
-            row.setFont(font)
+            is_current = current is not None and int(row.data(Qt.UserRole)) == current
+            if font.bold() != is_current:
+                font.setBold(is_current)
+                row.setFont(font)
         self._refresh_controls()
         self._position_changed(self.controller.position_ms, self.controller.duration_ms)
 

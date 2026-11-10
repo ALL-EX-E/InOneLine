@@ -488,22 +488,24 @@ class AuctionSessionMixin:
         session, including entries made inactive by tie-break narrowing. Only
         an A5 operator-removed erroneous temporary lot is excluded.
         """
-        auction_id = int(auction_id)
         with self.connect() as conn:
-            if conn.execute(
-                "SELECT 1 FROM auction_sessions WHERE id=?",
-                (auction_id,),
-            ).fetchone() is None:
-                raise KeyError(auction_id)
-            value = conn.execute(
-                """
-                SELECT COALESCE(SUM(starting_sm_points + bid_sm_points), 0)
-                FROM auction_entries
-                WHERE auction_id=?
-                  AND COALESCE(result, '') <> 'removed'
-                """,
-                (auction_id,),
-            ).fetchone()[0]
+            return self._auction_total_sm_points_conn(conn, int(auction_id))
+
+    def _auction_total_sm_points_conn(self, conn: sqlite3.Connection, auction_id: int) -> int:
+        if conn.execute(
+            "SELECT 1 FROM auction_sessions WHERE id=?",
+            (auction_id,),
+        ).fetchone() is None:
+            raise KeyError(auction_id)
+        value = conn.execute(
+            """
+            SELECT COALESCE(SUM(starting_sm_points + bid_sm_points), 0)
+            FROM auction_entries
+            WHERE auction_id=?
+              AND COALESCE(result, '') <> 'removed'
+            """,
+            (auction_id,),
+        ).fetchone()[0]
         return max(0, int(value or 0))
 
     def _list_auction_entries_conn(

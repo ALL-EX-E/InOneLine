@@ -42,6 +42,7 @@ from .constants import (
     MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
     MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
@@ -112,7 +113,6 @@ class MusicPlayerController(QObject):
         self._event_started_at_ms = 0
         self._pending_new_track_event = False
         self._pending_seek_ms: int | None = None
-        self._loading_source = False
         self._shutdown = False
 
         self.audio_output.setVolume(self._volume_percent / 100.0)
@@ -324,12 +324,10 @@ class MusicPlayerController(QObject):
         except (OSError, ValueError) as exc:
             self.playbackError.emit(str(exc))
             return
-        self._loading_source = True
         self._pending_seek_ms = max(0, int(position_ms))
         self.player.stop()
         self.player.setSource(QUrl.fromLocalFile(str(path)))
         self.player.setLoops(QMediaPlayer.Loops.Once)
-        self._loading_source = False
         if play is None:
             play = self._desired_state == PLAYER_PLAY
         if play and not self._suppressed:
@@ -852,7 +850,21 @@ class MusicPlayerController(QObject):
 
 def music_player_overlay_appearance(db) -> dict[str, object]:
     """Read the persisted D26 visual settings without touching Qt objects."""
-    settings = db.get_settings()
+    settings = db.get_settings((
+        MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY,
+        MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY,
+        MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
+        MUSIC_PLAYER_OVERLAY_BACKGROUND_KEY,
+        MUSIC_PLAYER_OVERLAY_BACKGROUND_COLOR_KEY,
+        MUSIC_PLAYER_OVERLAY_FRAME_COLOR_KEY,
+        MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
+        MUSIC_PLAYER_OVERLAY_AUTO_COLORS_KEY,
+        MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY,
+        MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY,
+        MUSIC_PLAYER_OVERLAY_ANIMATION_KEY,
+        MUSIC_PLAYER_OVERLAY_DIRECTION_KEY,
+    ))
+
     def setting(key: str, default):
         return settings.get(key, str(default))
 

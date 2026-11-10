@@ -11,16 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QIODevice
-from PySide6.QtGui import QColor, QImage
-
-
-def _is_panel_green(color: QColor) -> bool:
-    return (
-        color.green() >= 110
-        and color.green() > color.red() * 1.65
-        and color.green() > color.blue() * 1.65
-        and color.alpha() >= 200
-    )
+from PySide6.QtGui import QImage
 
 
 def fill_default_icon_corners(source: QImage) -> QImage:

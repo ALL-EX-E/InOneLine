@@ -353,18 +353,19 @@ class PublicTab(QWidget):
         previous_hash = self._public_xlsx_last_hash
 
         def write_task():
-            rows = public_mirror_rows(self.db)
-            logical_hash = public_state_hash(rows)
-            if not force and path.exists() and logical_hash == previous_hash:
-                stat = path.stat()
-                return {
-                    "path": str(path),
-                    "hash": logical_hash,
-                    "rows": len(rows),
-                    "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
-                    "mtime": float(stat.st_mtime),
-                    "written": False,
-                }
+            if not force and path.exists():
+                rows = public_mirror_rows(self.db)
+                logical_hash = public_state_hash(rows)
+                if logical_hash == previous_hash:
+                    stat = path.stat()
+                    return {
+                        "path": str(path),
+                        "hash": logical_hash,
+                        "rows": len(rows),
+                        "signature": (int(stat.st_mtime_ns), int(stat.st_size)),
+                        "mtime": float(stat.st_mtime),
+                        "written": False,
+                    }
             result = write_public_xlsx(self.db, path)
             result["written"] = True
             return result

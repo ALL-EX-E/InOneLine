@@ -5,7 +5,7 @@ from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QBoxLayout, QComboBox, QDoubleSpinBox, QFontComboBox, QFormLayout,
     QHeaderView, QHBoxLayout, QPushButton, QScrollArea, QSpinBox,
-    QTabWidget, QTableWidget, QTableWidgetItem, QWidget,
+    QTabWidget, QTableWidget, QWidget,
 )
 
 
@@ -678,10 +678,6 @@ def make_screen_color_picker_button(tooltip: str = "") -> QPushButton:
         button.setToolTip(tooltip)
     return button
 
-
-def _center(item: QTableWidgetItem) -> QTableWidgetItem:
-    item.setTextAlignment(Qt.AlignCenter)
-    return item
 
 class FocusClearingWidget(QWidget):
     """Клик по пустой области страницы снимает фокус с поля ввода."""

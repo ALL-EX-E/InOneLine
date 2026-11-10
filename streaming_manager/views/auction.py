@@ -951,8 +951,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # Keep compatibility for callers reading .table, but do NOT construct
         # a second table. The authoritative operator lot widget is Conduct.
         self.table = self.conduct_table
-        self._lot_title_column = self._conduct_title_column
-        self._lot_compact_columns = self._conduct_compact_columns
 
         # A7/B5: one compact operator-side area.  История keeps the full
         # current-session audit feed; Ставки is a filtered read-only feed of
@@ -2154,11 +2152,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 if self._timer_context == "wheel"
                 else "max_amount"
             ),
-            "wheel_format": str(
-                self.wheel_format_combo.currentData()
-                if hasattr(self, "wheel_format_combo")
-                else self._prestart_wheel_format
-            ),
             "auto_scroll": bool(self._obs_lot_auto_scroll_enabled),
             "auction_widgets_visible": self._auction_widgets_visible,
             "audio": self.auction_browser_audio_state(),
@@ -2353,39 +2346,28 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def _populate_lot_table(
         self,
-        table: QTableWidget,
         rows,
         selected_id: int | None,
         wheel_probabilities: dict[int, float] | None = None,
         position_mode: str = "position",
     ) -> dict[str, float]:
-        is_conduct = table is self.conduct_table
-        if is_conduct:
-            self._clear_history_hover_highlight()
+        table = self.conduct_table
+        self._clear_history_hover_highlight()
+        probabilities = wheel_probabilities or {}
 
         show_start_current = position_mode == "start_current"
         position_column_count = 2 if show_start_current else 1
         name_column = position_column_count
-        chance_column = name_column + 1 if is_conduct else None
-        points_column = name_column + (2 if is_conduct else 1)
+        chance_column = name_column + 1
+        points_column = name_column + 2
         labels = (
             (["СТАРТ", "ТЕКУЩАЯ"] if show_start_current else ["ПОЗИЦИЯ"])
-            + ["НАЗВАНИЕ"]
-            + (["Шанс в колесе"] if is_conduct else [])
-            + ["БАЛЛЫ"]
+            + ["НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
         )
-        compact_columns = tuple(range(position_column_count)) + (
-            (chance_column, points_column) if is_conduct else (points_column,)
-        )
-        if is_conduct:
-            self._conduct_title_column = name_column
-            self._conduct_chance_column = int(chance_column)
-            self._conduct_compact_columns = compact_columns
-            self._lot_title_column = name_column
-            self._lot_compact_columns = compact_columns
-        else:
-            self._lot_title_column = name_column
-            self._lot_compact_columns = compact_columns
+        compact_columns = tuple(range(position_column_count)) + (chance_column, points_column)
+        self._conduct_title_column = name_column
+        self._conduct_chance_column = chance_column
+        self._conduct_compact_columns = compact_columns
 
         previous_blocked = table.blockSignals(True)
         table.setUpdatesEnabled(False)
@@ -2429,14 +2411,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     if show_start_current
                     else (row.get("current_position") or "",)
                 )
-                values = position_values + (row["title"],)
-                if is_conduct:
-                    probability = (wheel_probabilities or {}).get(
-                        int(row["game_id"]),
-                        0.0,
-                    )
-                    values += (self._format_wheel_probability(probability),)
-                values += (format_points(int(row["total_sm_points"])),)
+                game_id = int(row["game_id"])
+                values = position_values + (
+                    row["title"],
+                    self._format_wheel_probability(probabilities.get(game_id, 0.0)),
+                    format_points(int(row["total_sm_points"])),
+                )
 
                 for column, value in enumerate(values):
                     text = str(value)
@@ -2447,7 +2427,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     if item.text() != text:
                         item.setText(text)
                     if column == 0:
-                        item.setData(Qt.UserRole, int(row["game_id"]))
+                        item.setData(Qt.UserRole, game_id)
                         item.setData(
                             Qt.UserRole + 1,
                             bool(row.get("auction_only")),
@@ -2462,7 +2442,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     else:
                         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-                if int(row["game_id"]) == selected_id:
+                if game_id == selected_id:
                     selected_row = r
 
             fill_seconds = time.perf_counter() - fill_started

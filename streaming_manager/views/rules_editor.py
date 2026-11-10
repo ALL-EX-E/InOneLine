@@ -212,7 +212,7 @@ class AuctionRulesEditorDialog(QDialog):
 
         # P11-K3: the five existing Rules appearance settings now belong
         # to the selected template, not to a second save in Stream / OBS.
-        obs_form = QFormLayout()
+        obs_form = self._rules_obs_form = QFormLayout()
         obs_form.setVerticalSpacing(10)
         obs_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         obs_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
@@ -240,7 +240,7 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_media_combo = ScrollSafeComboBox()
         self.rules_obs_media_combo.setMinimumWidth(175)
         self.rules_obs_media_combo.currentIndexChanged.connect(self._editor_changed)
-        media_row = QWidget()
+        media_row = self._rules_obs_media_row = QWidget()
         media_row_layout = QHBoxLayout(media_row)
         media_row_layout.setContentsMargins(0, 0, 0, 0)
         media_row_layout.addWidget(self.rules_obs_media_combo, 1)
@@ -262,7 +262,7 @@ class AuctionRulesEditorDialog(QDialog):
         obs_form.addRow(self.rules_obs_media_hint)
         self._refresh_rules_media_library()
 
-        color_row = QWidget()
+        color_row = self._rules_obs_color_row = QWidget()
         color_row_layout = QHBoxLayout(color_row)
         color_row_layout.setContentsMargins(0, 0, 0, 0)
         self.rules_obs_color_btn = QPushButton()
@@ -297,7 +297,7 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_glow = QCheckBox("Светящийся контур")
         self.rules_obs_glow.toggled.connect(self._obs_glow_changed)
         obs_form.addRow("Контур:", self.rules_obs_glow)
-        glow_row = QWidget()
+        glow_row = self._rules_obs_glow_color_row = QWidget()
         glow_layout = QHBoxLayout(glow_row)
         glow_layout.setContentsMargins(0, 0, 0, 0)
         self.rules_obs_glow_color_btn = QPushButton()
@@ -638,11 +638,13 @@ class AuctionRulesEditorDialog(QDialog):
         self.rules_obs_color_btn.setEnabled(color_mode)
         self.rules_obs_color_pick_btn.setEnabled(color_mode)
         self.rules_obs_opacity_control.setEnabled(color_mode)
-        self.rules_obs_media_combo.setEnabled(self.rules_obs_media_mode.isChecked())
-        self.rules_obs_media_add.setEnabled(
-            self.rules_obs_media_mode.isChecked()
-            and self._import_background is not None
-        )
+        media_mode = self.rules_obs_media_mode.isChecked()
+        self.rules_obs_media_combo.setEnabled(media_mode)
+        self.rules_obs_media_add.setEnabled(media_mode and self._import_background is not None)
+        for field in (self._rules_obs_color_row, self.rules_obs_opacity_control):
+            self._rules_obs_form.setRowVisible(field, color_mode)
+        for field in (self._rules_obs_media_row, self.rules_obs_media_add, self.rules_obs_media_hint):
+            self._rules_obs_form.setRowVisible(field, media_mode)
         self._editor_changed()
 
     def _refresh_rules_media_library(self, selected_id=_UNSET_MEDIA) -> None:
@@ -695,6 +697,7 @@ class AuctionRulesEditorDialog(QDialog):
         enabled = self.rules_obs_glow.isChecked()
         self.rules_obs_glow_color_btn.setEnabled(enabled)
         self.rules_obs_glow_color_pick_btn.setEnabled(enabled)
+        self._rules_obs_form.setRowVisible(self._rules_obs_glow_color_row, enabled)
         self._editor_changed()
 
     def _choose_obs_glow_color(self, pipette: bool) -> None:
