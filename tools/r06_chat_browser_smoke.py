@@ -759,6 +759,7 @@ def main():
                             not a["shown"] and a["motionKind"] == "idle" and
                             a["appliedComposeMode"] == composition and
                             a["appliedDirection"] == direction and
+                            a["count"] >= 24 and
                             a["chatHeight"] > a["rootHeight"] * .90,
                             "full Twitch frame before List entry " +
                             composition + " " + direction)
