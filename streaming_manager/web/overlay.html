@@ -1072,13 +1072,27 @@ body.preview .preview-label { display: flex; }
   // This reuses the existing polling timer; no new clock or animation.
   let overlayRequestId = 0;
   let overlayLastAppliedRequestId = 0;
+  // The main OBS Source must keep processing new Saves even when an earlier
+  // /api/data response is delayed, but cannot fill Chromium's connection pool
+  // with indefinitely pending polls. No new clock: reuse the 1-second poll.
+  const overlayInFlight = new Map();
   async function update() {
     const requestId = ++overlayRequestId;
+    const controller = new AbortController();
+    overlayInFlight.set(requestId, controller);
+    while (overlayInFlight.size > 3) {
+      const [oldId, oldController] = overlayInFlight.entries().next().value;
+      overlayInFlight.delete(oldId);
+      oldController.abort();
+    }
     try {
-      const response = await fetch("/api/data", { cache: "no-store" });
+      const response = await fetch("/api/data", {
+        cache: "no-store", signal: controller.signal
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (requestId < overlayLastAppliedRequestId) return;
+      if (!overlayInFlight.has(requestId) ||
+          requestId < overlayLastAppliedRequestId) return;
       overlayLastAppliedRequestId = requestId;
       ObsVisibility.apply(data.visibility?.overlay);
       const game = data.game || {};
@@ -1153,9 +1167,12 @@ body.preview .preview-label { display: flex; }
 
       apiState.classList.remove("visible");
     } catch (err) {
-      if (requestId >= overlayLastAppliedRequestId) {
+      if (!controller.signal.aborted &&
+          requestId >= overlayLastAppliedRequestId) {
         apiState.classList.add("visible");
       }
+    } finally {
+      overlayInFlight.delete(requestId);
     }
   }
 
