@@ -371,6 +371,20 @@ def main() -> int:
             assert js(live_page, "document.querySelector('#content').firstElementChild.dataset.motionQa") == "kept"
             assert js(preview_page, left) == 0 and js(preview_page, top) == 0
             wait_js(preview_page, expr, "A LIVE", "Editor preview still follows selected A")
+
+            db.set_setting("rules_overlay_show_mode", "always")
+            mode = "document.documentElement.dataset.obsShowMode"
+            body_visibility = "getComputedStyle(document.body).visibility"
+            wait_js(live_page, mode, "always", "Rules switched to Always")
+            wait_js(live_page, body_visibility, "visible", "Linked Always rules ignore hidden group")
+            assert js(live_page, left) == 0 and js(live_page, top) == 0
+            auction_runtime["auction_widgets_visible"] = True
+            wait_with_http_workers(650)
+            assert js(live_page, body_visibility) == "visible" and js(live_page, duration) == 0
+            auction_runtime["auction_widgets_visible"] = False
+            wait_with_http_workers(650)
+            assert js(live_page, body_visibility) == "visible" and js(live_page, duration) == 0
+
             db.set_setting("rules_overlay_show_mode", "hidden")
             auction_runtime["auction_widgets_visible"] = True
             visible = "document.documentElement.dataset.obsVisible"

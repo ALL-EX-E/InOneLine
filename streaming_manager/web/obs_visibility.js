@@ -33,17 +33,15 @@
   function createAuctionMotion(layer) {
     let lastMotionConfig = "";
     return (policy, motion = {}) => {
-      const linked = !preview && motion.follow_auction_tab === true;
-      const shown = !linked || motion.auction_widgets_visible === true;
-      const offset = linked && policy?.show_mode === "slide" ? slideOffsets[motion.direction] : "";
+      const sliding = !preview && policy?.show_mode === "slide" && motion.follow_auction_tab === true;
+      const offset = sliding ? slideOffsets[motion.direction] : "";
       const config = offset ? String(motion.duration_seconds) + offset : "";
       // Only the operator's show/hide command animates. Initialization and
       // saved setting changes apply the group's current pose immediately.
       layer.style.transition = config && config === lastMotionConfig
         ? "transform " + motion.duration_seconds + "s ease-in-out"
         : "none";
-      layer.style.transform = !shown && offset ? offset : "";
-      layer.style.visibility = shown || offset ? "" : "hidden";
+      layer.style.transform = offset && motion.auction_widgets_visible !== true ? offset : "";
       lastMotionConfig = config;
     };
   }

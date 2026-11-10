@@ -500,6 +500,15 @@ def ui_smoke() -> None:
             assert not read_json(window.api, "/api/auction-lots")["tab_motion"]["follow_auction_tab"]
             button.click()
             assert not read_json(window.api, "/api/rules")["tab_motion"]["auction_widgets_visible"]
+            rules_mode = stream.obs_show_modes["rules"]
+            for mode in ("always", "hidden"):
+                rules_mode.setCurrentIndex(rules_mode.findData(mode))
+                with patch.object(QMessageBox, "information"):
+                    stream._save_rules_overlay_settings()
+                assert link.isChecked() and button.isHidden()
+                button.click()
+                assert not read_json(window.api, "/api/rules")["tab_motion"]["auction_widgets_visible"]
+            rules_mode.setCurrentIndex(rules_mode.findData("slide"))
             link.setChecked(False)
             assert stream.obs_show_modes["rules"].findData("slide") == -1
             assert stream.obs_show_modes["rules"].currentData() == "always"
