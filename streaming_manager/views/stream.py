@@ -105,6 +105,7 @@ from ..constants import (
     MUSIC_PLAYER_OVERLAY_SPECTRUM_COLOR_KEY,
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_DEFAULT,
     MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY,
+    MUSIC_PLAYER_OVERLAY_TWITCH_COMMAND_KEY,
     STREAM_FORMATS,
     WHEEL_GLOW_ENABLED_KEY,
     WHEEL_GLOW_ENABLED_DEFAULT,
@@ -1069,6 +1070,15 @@ class StreamTab(QWidget):
         )
         music_form.addRow("Время показа:", self.music_player_duration_seconds_control)
 
+        self.music_player_twitch_command = QLineEdit()
+        self.music_player_twitch_command.setPlaceholderText("Например, !музыка")
+        self.music_player_twitch_command.setToolTip(
+            "Необязательно. Зритель отправляет точный текст команды в чат Twitch. "
+            "Она показывает скрытую карточку на заданное время. "
+            "Пока карточка видна, команда не продлевает показ."
+        )
+        music_form.addRow("Команда Twitch:", self.music_player_twitch_command)
+
         self.music_player_animation = ScrollSafeComboBox()
         self.music_player_animation.addItem("Проявление", MUSIC_PLAYER_OVERLAY_ANIMATION_FADE)
         self.music_player_animation.addItem("Выезд", MUSIC_PLAYER_OVERLAY_ANIMATION_SLIDE)
@@ -1539,10 +1549,12 @@ class StreamTab(QWidget):
         )
 
         visual_is_enabled = show_mode != MUSIC_PLAYER_OVERLAY_SHOW_HIDDEN
+        temporary_show = show_mode == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE
         self._set_music_player_form_row_visible(
             self.music_player_duration_seconds_control,
-            show_mode == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE,
+            temporary_show,
         )
+        self._set_music_player_form_row_visible(self.music_player_twitch_command, temporary_show)
         self._set_music_player_form_row_visible(
             self.music_player_animation,
             visual_is_enabled,
@@ -1559,7 +1571,7 @@ class StreamTab(QWidget):
             if self.music_player_background_color_mode.isChecked()
             else "transparent"
         )
-        self.db.set_settings_bulk({
+        values = {
             MUSIC_PLAYER_OVERLAY_FONT_FAMILY_KEY: self.music_player_overlay_font.currentFont().family(),
             MUSIC_PLAYER_OVERLAY_FONT_SIZE_KEY: str(self.music_player_overlay_font_size.value()),
             MUSIC_PLAYER_OVERLAY_TEXT_COLOR_KEY: str(
@@ -1587,6 +1599,7 @@ class StreamTab(QWidget):
             MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_KEY: str(
                 self.music_player_duration_seconds.value()
             ),
+            MUSIC_PLAYER_OVERLAY_TWITCH_COMMAND_KEY: self.music_player_twitch_command.text(),
             MUSIC_PLAYER_OVERLAY_ANIMATION_KEY: str(
                 self.music_player_animation.currentData()
                 or MUSIC_PLAYER_OVERLAY_ANIMATION_DEFAULT
@@ -1595,7 +1608,9 @@ class StreamTab(QWidget):
                 self.music_player_direction.currentData()
                 or MUSIC_PLAYER_OVERLAY_DIRECTION_DEFAULT
             ),
-        })
+        }
+        self.db.set_settings_bulk(values)
+        self.api.configure_music_command(values)
         QMessageBox.information(
             self,
             "OBS Music Player",
@@ -2884,6 +2899,7 @@ class StreamTab(QWidget):
             ))
         except ValueError:
             music_duration = MUSIC_PLAYER_OVERLAY_DURATION_SECONDS_DEFAULT
+        self.music_player_twitch_command.setText(setting(MUSIC_PLAYER_OVERLAY_TWITCH_COMMAND_KEY, ""))
         self.music_player_duration_seconds.setValue(
             max(1, min(120, music_duration))
         )

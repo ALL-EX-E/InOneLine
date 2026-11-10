@@ -172,6 +172,7 @@ let audioContext = null, analyser = null, gainNode = null, mediaNode = null;
 let frequencyData = null;
 let lastMediaId = null, lastEventSerial = -1, currentState = {}, appearance = {};
 let hideTimer = 0, currentVisible = false, lastCoverUrl = "";
+let lastCommandEvent = null, timedShowUntil = 0;
 let autoPalette = null, autoPaletteUrl = "";
 let pollBusy = false, audioSyncBusy = false, unlockBusy = false, unlockHintTimer = 0;
 let previousAppearance = null;
@@ -564,14 +565,16 @@ function showCard(){
 }
 function hideCard(){
   clearTimeout(hideTimer);
+  if(currentVisible) timedShowUntil=Math.min(timedShowUntil,Date.now());
   card.className=hiddenClass();
   currentVisible=false;
 }
-function scheduleHide(seconds){
-  clearTimeout(hideTimer);
-  hideTimer=setTimeout(hideCard,Math.max(1,Number(seconds)||8)*1000);
+function showUntil(deadline){
+  showCard();
+  timedShowUntil=deadline;
+  hideTimer=setTimeout(hideCard,Math.max(0,deadline-Date.now()));
 }
-function evaluateVisibility(state, isInitial=false){
+function evaluateVisibility(state, isInitial=false, commandEvent=null){
   if(preview){
     showCard();
     return;
@@ -587,15 +590,20 @@ function evaluateVisibility(state, isInitial=false){
   }
   const serial=Number(state.event_serial)||0;
   const started=Number(state.event_started_at_ms)||0;
-  const duration=Math.max(1,Number(appearance.duration_seconds)||8);
-  const remaining=duration*1000-(Date.now()-started);
-  if(serial>0 && remaining>0 && (serial!==lastEventSerial || isInitial)){
-    showCard();
-    clearTimeout(hideTimer);
-    hideTimer=setTimeout(hideCard,remaining);
+  const durationMs=Math.max(1,Number(appearance.duration_seconds)||8)*1000;
+  const now=Date.now();
+  const trackDeadline=started+durationMs;
+  if(serial>0 && trackDeadline>now && (serial!==lastEventSerial || isInitial)){
+    showUntil(trackDeadline);
   } else if(serial!==lastEventSerial && state.playing) {
     // Event is already older than its configured lifetime; reload must not retrigger it.
     hideCard();
+  }
+  // Ignore a command received before the card hid even when the poll reads
+  // it just after that hide.
+  const commandAt=Number(commandEvent?.received_at_ms)||0;
+  if(!currentVisible && commandAt>0 && commandAt>=timedShowUntil && commandAt+durationMs>now){
+    showUntil(commandAt+durationMs);
   }
   lastEventSerial=serial;
 }
@@ -647,6 +655,11 @@ async function poll(){
     if(!response.ok) return;
     const payload=await response.json();
     const nextAppearance=payload.appearance||{};
+    const commandEvent=payload.command_event||null;
+    const commandChanged=commandEvent?.sequence!==lastCommandEvent?.sequence
+      || commandEvent?.received_at_ms!==lastCommandEvent?.received_at_ms;
+    const newCommand=previousAppearance!==null && commandChanged ? commandEvent : null;
+    lastCommandEvent=commandEvent;
     ObsVisibility.apply(nextAppearance);
     currentState=payload.state||{};
     appearance=nextAppearance;
@@ -668,9 +681,9 @@ async function poll(){
       nextAppearance,
       currentState
     );
-    if(!appearanceTransitionHandled){
+    if(!appearanceTransitionHandled || (newCommand && appearance.show_mode==="track_change")){
       if(previousAppearance===null && !currentVisible) syncHiddenPoseInstantly();
-      evaluateVisibility(currentState,lastEventSerial<0);
+      evaluateVisibility(currentState,lastEventSerial<0,newCommand);
     }
     previousAppearance={...nextAppearance};
 

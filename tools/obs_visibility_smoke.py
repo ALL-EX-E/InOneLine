@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.database import Database, Game
+from streaming_manager.multichat import ChatMessage, MultichatState
 
 
 def free_port() -> int:
@@ -431,6 +432,16 @@ def ui_smoke() -> None:
                 assert all(combo.isVisible() for combo in stream.obs_show_modes.values())
                 assert all(combo.geometry().right() <= combo.parentWidget().width()
                            for combo in stream.obs_show_modes.values()), "Mode row overflows narrow page"
+            assert stream.music_player_twitch_command.isHidden()
+            stream.music_player_show_mode.setCurrentIndex(
+                stream.music_player_show_mode.findData("track_change")
+            )
+            assert stream.music_player_twitch_command.isVisible()
+            stream.music_player_twitch_command.setText("!плеер")
+            with patch.object(QMessageBox, "information"):
+                stream._save_music_player_overlay_settings()
+            assert db.get_setting("music_player_overlay_twitch_command", "") == "!плеер"
+            assert read_json(window.api, "/api/music-player")["command_event"] is None
             saved = db.get_settings()
         finally:
             window.api.stop()
@@ -443,7 +454,13 @@ def ui_smoke() -> None:
         try:
             QTest.qWait(600)
             assert window.db.get_settings() == saved
-            assert all(combo.currentData() == "hidden" for combo in window.stream_tab.obs_show_modes.values())
+            assert all(
+                combo.currentData() == ("track_change" if widget == "music_player" else "hidden")
+                for widget, combo in window.stream_tab.obs_show_modes.items()
+            )
+            assert window.stream_tab.music_player_twitch_command.text() == "!плеер"
+            window.multichat_state.ingest(ChatMessage("twitch", "ch", "restart-cmd", "viewer", "!плеер"))
+            assert read_json(window.api, "/api/music-player")["command_event"]["sequence"] == 1
             assert window.stream_tab.wheel_glow_enabled.isChecked()
             assert window.stream_tab.wheel_pointer_label_enabled.isChecked()
             assert window.stream_tab.wheel_glow_color_btn.property("fontColor") == "#12AB34"
@@ -468,6 +485,7 @@ def browser_smoke() -> None:
     from PySide6.QtWebEngineWidgets import QWebEngineView
     from streaming_manager.obs_visibility import WIDGETS
     from streaming_manager.views.stream import StreamTab
+    from tools.qt_browser_test_wait import wait_with_http_workers
 
     if sys.platform != "win32":
         os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
@@ -478,7 +496,7 @@ def browser_smoke() -> None:
         page.runJavaScript(expression, result.append)
         deadline = time.monotonic() + 5
         while not result and time.monotonic() < deadline:
-            QTest.qWait(20)
+            wait_with_http_workers(20)
         assert result, "JavaScript callback timed out"
         return result[0]
 
@@ -489,7 +507,7 @@ def browser_smoke() -> None:
             actual = js(page, expression)
             if actual == expected:
                 return
-            QTest.qWait(50)
+            wait_with_http_workers(50)
         raise AssertionError(f"{label}: {actual!r} != {expected!r}")
 
     with TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -503,6 +521,9 @@ def browser_smoke() -> None:
         server = LocalApiServer(db, port=free_port())
         server.set_auction_lots_state_provider(lambda: runtime)
         server.set_music_player_state_provider(lambda: music)
+        chat = MultichatState(delay=20)
+        chat.set_obs_enabled("twitch", False)
+        server.set_music_command_state(chat)
         server.start()
         stream = StreamTab(db, server)
         handlers = {
@@ -759,17 +780,71 @@ def browser_smoke() -> None:
                     wait_js(preview, visible, "false" if widget == "list" else "true",
                             route + " preview after Save")
                     if widget == "music_player":
+                        player_card_visible = "document.querySelector('#card').classList.contains('visible')"
+                        player_card_class = "document.querySelector('#card').className"
+                        stream.music_player_twitch_command.setText("!музыка")
+                        stream.music_player_duration_seconds.setValue(5)
+                        stream.music_player_animation.setCurrentIndex(
+                            stream.music_player_animation.findData("slide")
+                        )
+                        stream.music_player_direction.setCurrentIndex(
+                            stream.music_player_direction.findData("right")
+                        )
+
+                        def music_command(identifier, text="!музыка"):
+                            chat.ingest(ChatMessage("twitch", "ch", identifier, "viewer", text))
+                            return read_json(server, "/api/music-player")["command_event"]
+
+                        assert music_command("before-save") is None
                         save(widget, "track_change")
                         wait_js(normal, mode_js, "track_change", "Music event mode")
-                        wait_js(normal, "document.querySelector('#card').classList.contains('visible')", False, "Mode Save must wait for real next event")
+                        wait_js(normal, player_card_class, "hidden slide-right", "Saved music entrance")
                         assert music["event_serial"] == 17
                         music["event_serial"] = 18
                         music["event_started_at_ms"] = int(time.time() * 1000)
-                        db.set_settings_bulk({"music_player_overlay_duration_seconds": "5"})
-                        wait_js(normal, "document.querySelector('#card').classList.contains('visible')", True, "Real Music event")
-                        QTest.qWait(5300)
-                        wait_js(normal, "document.querySelector('#card').classList.contains('visible')", False, "Music event expires")
-                        wait_js(preview, "document.querySelector('#card').classList.contains('visible')", True, "Music preview ignores event expiry")
+                        wait_js(normal, player_card_visible, True, "Real Music event")
+
+                        assert js(normal, """(() => {
+                          const card = document.querySelector('#card');
+                          let wasVisible = card.classList.contains('visible');
+                          window.musicQaHiddenAt = 0;
+                          new MutationObserver(() => {
+                            const visible = card.classList.contains('visible');
+                            if (wasVisible && !visible) window.musicQaHiddenAt = Date.now();
+                            wasVisible = visible;
+                          }).observe(card, {attributeFilter: ['class']});
+                          return wasVisible;
+                        })()""")
+                        wait_with_http_workers(2200)
+                        assert js(normal, player_card_visible)
+                        event = music_command("while-track-visible")
+                        wait_js(normal, player_card_class, "hidden slide-right", "Music event expires")
+                        track_show_ms = js(normal, "window.musicQaHiddenAt") - music["event_started_at_ms"]
+                        assert 4800 <= track_show_ms <= 6100, track_show_ms
+                        wait_js(preview, player_card_visible, True, "Music preview ignores event expiry")
+
+                        assert music_command("wrong-command", "!список") == event
+                        audio_state = read_json(server, "/api/music-player")["state"]
+                        command = music_command("hidden-player")
+                        wait_js(normal, player_card_visible, True, "Twitch command shows hidden Music")
+                        assert read_json(server, "/api/music-player")["state"] == audio_state
+                        assert chat.snapshot(for_obs=True)["messages"] == []
+
+                        wait_with_http_workers(2200)
+                        assert js(normal, player_card_visible)
+                        repeat = music_command("while-command-visible")
+                        assert repeat["received_at_ms"] - command["received_at_ms"] >= 2200
+                        wait_js(normal, player_card_class, "hidden slide-right",
+                                "Command show ends at original deadline")
+                        command_show_ms = js(normal, "window.musicQaHiddenAt") - command["received_at_ms"]
+                        assert 4800 <= command_show_ms <= 6100, command_show_ms
+                        wait_js(preview, player_card_visible, True, "Preview stays visible")
+
+                        save(widget, "hidden")
+                        wait_js(normal, visible, "false", "Never-show setting has priority")
+                        assert music_command("never-show") is None
+                        assert read_json(server, "/api/music-player")["state"] == audio_state
+                        print("R06_MUSIC_TWITCH_COMMAND_CHROMIUM_VISIBILITY=PASS")
                         music["event_serial"] = 17
                     if widget == "wheel":
                         # Chromium runs the shared OBS center-size geometry too.
