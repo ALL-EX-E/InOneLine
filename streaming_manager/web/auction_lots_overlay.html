@@ -228,6 +228,9 @@ body.preview #api-state.visible { display: block; }
   const SPEED_PX_PER_SECOND = 25;
   const preview = ObsVisibility.preview;
   if (preview) document.body.classList.add("preview");
+  // Move the viewport-sized body, including the padding around the card,
+  // so the rounded edge and its glow travel all the way offscreen.
+  const applyTabMotion = ObsVisibility.createAuctionMotion(document.body);
 
   const headerShell = document.getElementById("header-shell");
   const headerRow = document.getElementById("header-row");
@@ -523,6 +526,7 @@ body.preview #api-state.visible { display: block; }
   }
 
   function applyPayload(payload) {
+    applyTabMotion(payload?.visibility, payload?.tab_motion);
     ObsVisibility.apply(payload?.visibility);
     renderRows(payload || {});
     applyPresentation((payload || {}).presentation || {});

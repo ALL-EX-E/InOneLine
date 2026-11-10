@@ -62,9 +62,9 @@ def policy_smoke() -> None:
             assert show_mode({spec.key: "bogus"}, widget) == default
             for mode, label in spec.options:
                 mode_settings = {spec.key: mode}
-                if widget == "timer" and mode == "slide":
+                if widget in {"timer", "auction_lots"} and mode == "slide":
                     assert show_mode(mode_settings, widget) == "always"
-                    mode_settings["timer_overlay_follow_auction_tab"] = "1"
+                    mode_settings[f"{widget}_overlay_follow_auction_tab"] = "1"
                 assert show_mode(mode_settings, widget) == ("always" if widget == "overlay" else mode)
                 assert label in {"Не показывать", "При смене трека", "Когда колесо используется", "Показывать постоянно", "Выезд"}
             assert visibility_payload({spec.key: "hidden"}, widget, False) == {
@@ -351,7 +351,7 @@ def ui_smoke() -> None:
             saved_before = db.get_settings()
             for widget, combo in stream.obs_show_modes.items():
                 spec = WIDGETS[widget]
-                options = spec.options if widget != "timer" else tuple(
+                options = spec.options if widget not in {"timer", "auction_lots"} else tuple(
                     (mode, label) for mode, label in spec.options if mode != "slide"
                 )
                 assert tuple((combo.itemData(i), combo.itemText(i)) for i in range(combo.count())) == options

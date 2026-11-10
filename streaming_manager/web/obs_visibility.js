@@ -1,4 +1,4 @@
-/* Presentation only: polling, layout, animation and audio remain widget-owned. */
+/* Shared OBS visibility and operator-controlled auction widget motion. */
 (() => {
   "use strict";
   const root = document.documentElement;
@@ -23,8 +23,33 @@
     if (root.dataset.obsPolicyReady !== "true") root.dataset.obsPolicyReady = "true";
   }
 
+  const slideOffsets = {
+    left: "translateX(-100%)",
+    right: "translateX(100%)",
+    top: "translateY(-100%)",
+    bottom: "translateY(100%)",
+  };
+
+  function createAuctionMotion(layer) {
+    let lastMotionConfig = "";
+    return (policy, motion = {}) => {
+      const linked = !preview && motion.follow_auction_tab === true;
+      const shown = !linked || motion.auction_widgets_visible === true;
+      const offset = linked && policy?.show_mode === "slide" ? slideOffsets[motion.direction] : "";
+      const config = offset ? String(motion.duration_seconds) + offset : "";
+      // Only the operator's show/hide command animates. Initialization and
+      // saved setting changes apply the group's current pose immediately.
+      layer.style.transition = config && config === lastMotionConfig
+        ? "transform " + motion.duration_seconds + "s ease-in-out"
+        : "none";
+      layer.style.transform = !shown && offset ? offset : "";
+      layer.style.visibility = shown || offset ? "" : "hidden";
+      lastMotionConfig = config;
+    };
+  }
+
   // Avoid flashing saved-hidden content before the first existing API poll.
   root.dataset.obsVisible = String(preview);
   root.dataset.obsPolicyReady = "false";
-  window.ObsVisibility = Object.freeze({ preview, isVisible, apply });
+  window.ObsVisibility = Object.freeze({ preview, isVisible, apply, createAuctionMotion });
 })();
