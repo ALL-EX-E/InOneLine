@@ -74,6 +74,8 @@ class MultichatState:
         self._list_show_until = 0.0
         self._list_held = False  # duration=0: persistent List until the next command
         self._list_sequence = 0
+        self._music_command = ""
+        self._music_command_event: tuple[int, int] | None = None
         self._seen: set[tuple[str, str, str]] = set()
         self._seen_order: deque[tuple[str, str, str]] = deque()
         self._seen_capacity = max(4096, self._limit * 4)
@@ -152,6 +154,19 @@ class MultichatState:
                 self._list_show_until = 0.0
                 self._list_held = False
 
+    def configure_music_command(self, command: str) -> None:
+        with self._lock:
+            if command != self._music_command:
+                self._music_command = command
+                self._music_command_event = None
+
+    def music_command_event(self) -> dict[str, int] | None:
+        with self._lock:
+            if self._music_command_event is None:
+                return None
+            sequence, received_at_ms = self._music_command_event
+            return {"sequence": sequence, "received_at_ms": received_at_ms}
+
     def set_media_preload(self, platform: str, urls) -> None:
         """Bounded session-only hint for Qt and local OBS image warm-up.
 
@@ -205,6 +220,12 @@ class MultichatState:
             received = self._wall_clock() if message.received_at is None else message.received_at
             item = replace(message, received_at=received)
             self._sequence += 1
+            if (
+                message.platform == "twitch"
+                and self._music_command
+                and message.text == self._music_command
+            ):
+                self._music_command_event = (self._sequence, int(self._wall_clock() * 1000))
             self._pending.append((now, self._sequence, item))
             self._flush_ready(now)
             self._shed_pending()
@@ -283,6 +304,8 @@ class MultichatState:
         """Only call after a confirmed change of account or chosen broadcast."""
         with self._lock:
             self._chat_media_preload.pop(platform, None)
+            if platform == "twitch":
+                self._music_command_event = None
             self.disconnect(platform)
             self._operator = deque((m for m in self._operator if m.platform != platform), maxlen=self._limit)
             self._obs = deque((m for m in self._obs if m.platform != platform), maxlen=self._limit)

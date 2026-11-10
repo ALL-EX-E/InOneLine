@@ -7,10 +7,16 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from .constants import APP_VERSION
+from .constants import (
+    APP_VERSION,
+    MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE,
+    MUSIC_PLAYER_OVERLAY_TWITCH_COMMAND_KEY,
+)
 from .default_wheel_icon import default_wheel_icon_png
 from .database import Database
 from .music_player import music_player_overlay_appearance
+from .multichat import MultichatState
+from .obs_visibility import show_mode
 from .chat_appearance import public_appearance
 from .media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
@@ -89,6 +95,7 @@ class LocalApiServer:
         self._music_player_cover_provider = None
         self._multichat_state_provider = None
         self._list_show_controller = None
+        self._music_command_state: MultichatState | None = None
 
     @property
     def running(self) -> bool:
@@ -146,6 +153,23 @@ class LocalApiServer:
     def configure_list_show(self, mode: str, command: str, duration: int) -> None:
         if self._list_show_controller is not None:
             self._list_show_controller(mode, command, duration)
+
+    def set_music_command_state(self, state: MultichatState) -> None:
+        self._music_command_state = state
+
+    def configure_music_command(self, settings: dict[str, str]) -> None:
+        if self._music_command_state is None:
+            return
+        command = (
+            settings.get(MUSIC_PLAYER_OVERLAY_TWITCH_COMMAND_KEY, "")
+            if show_mode(settings, "music_player") == MUSIC_PLAYER_OVERLAY_SHOW_TRACK_CHANGE
+            else ""
+        )
+        self._music_command_state.configure_music_command(command)
+
+    def music_command_event(self) -> dict[str, int] | None:
+        state = self._music_command_state
+        return state.music_command_event() if state is not None else None
 
     def multichat_state(self, *, for_obs: bool = True) -> dict:
         provider = self._multichat_state_provider
@@ -719,6 +743,7 @@ class LocalApiServer:
                         {
                             "state": api_server.music_player_state(),
                             "appearance": music_player_overlay_appearance(db),
+                            "command_event": api_server.music_command_event(),
                         },
                         pretty=pretty,
                     )

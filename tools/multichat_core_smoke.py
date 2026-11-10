@@ -91,6 +91,42 @@ class MultichatCoreTests(unittest.TestCase):
         self.clock.advance(30)
         self.assertEqual(self.state.snapshot()["list_show"]["remaining_ms"], 0)
 
+    def test_music_command_uses_exact_twitch_arrival_independently_of_list(self):
+        self.state.configure(delay=20)
+        self.state.set_obs_enabled("twitch", False)
+        self.state.configure_list_show("slide", "!список", 30)
+        self.state.configure_music_command("!музыка")
+        for index, (platform, text) in enumerate([
+            ("twitch", " !музыка"), ("twitch", "!музыка трек"),
+            ("twitch", "!МУЗЫКА"), ("youtube", "!музыка"),
+            ("twitch", "!список"),
+        ]):
+            self.state.ingest(ChatMessage(platform, "ch", str(index), "viewer", text))
+        self.assertIsNone(self.state.music_command_event())
+        self.assertEqual(self.state.snapshot()["list_show"]["remaining_ms"], 30000)
+        command = ChatMessage("twitch", "ch", "music-1", "viewer", "!музыка")
+        self.assertTrue(self.state.ingest(command))
+        first = self.state.music_command_event()
+        self.assertEqual(first["received_at_ms"], 100000)
+        self.assertEqual(self.ids(obs=True), [])
+        self.clock.advance(1)
+        self.assertFalse(self.state.ingest(command))
+        self.assertEqual(self.state.music_command_event(), first)
+        self.state.ingest(ChatMessage("twitch", "ch", "music-2", "viewer", "!музыка"))
+        second = self.state.music_command_event()
+        self.assertGreater(second["sequence"], first["sequence"])
+        self.assertEqual(second["received_at_ms"], 101000)
+        self.assertEqual(self.state.snapshot()["list_show"]["remaining_ms"], 29000)
+        self.state.configure_music_command("!трек")
+        self.assertIsNone(self.state.music_command_event())
+        self.state.ingest(ChatMessage("twitch", "ch", "music-3", "viewer", "!трек"))
+        self.assertIsNotNone(self.state.music_command_event())
+        self.state.change_source("twitch")
+        self.assertIsNone(self.state.music_command_event())
+        self.state.configure_music_command("")
+        self.state.ingest(ChatMessage("twitch", "ch", "music-4", "viewer", "!трек"))
+        self.assertIsNone(self.state.music_command_event())
+
     def test_list_command_works_when_obs_chat_off(self):
         self.state.configure_list_show("slide", "show", 20)
         self.state.set_obs_enabled("twitch", False)

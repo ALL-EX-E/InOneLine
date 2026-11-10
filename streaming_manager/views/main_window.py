@@ -137,6 +137,8 @@ class MainWindow(QMainWindow):
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
         self.api.set_multichat_state_provider(self.multichat_state.snapshot)
         self.api.set_list_show_controller(self.multichat_state.configure_list_show)
+        self.api.set_music_command_state(self.multichat_state)
+        self.api.configure_music_command(db.get_settings())
         try:
             list_duration = int(db.get_setting("list_slide_duration", "30"))
         except (TypeError, ValueError):
@@ -1076,6 +1078,7 @@ class MainWindow(QMainWindow):
         ):
             widget.refresh()
         self.auction_tab.refresh_force()
+        self.api.configure_music_command(self.db.get_settings())
         self.auction_tab.refresh_auction_widgets_button()
         self._queue_responsive_layout_update()
         self._dirty_tabs.clear()
