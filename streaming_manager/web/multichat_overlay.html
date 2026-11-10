@@ -297,12 +297,38 @@ body {color:#fff;font:18px/1.3 sans-serif}
       }
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
   }
+  // In hidden embedded Chromium frames, a fetch can remain pending while
+  // the 500-ms interval continues. Never accumulate requests until the
+  // browser's per-origin connection pool is exhausted. Reuse this interval
+  // to cancel a stalled request, without introducing another timer.
+  let embeddedPollController = null;
+  let embeddedPollStartedAt = -Infinity;
   async function update() {
+    let controller = null;
+    if (embedded) {
+      const now = performance.now();
+      if (embeddedPollController && now - embeddedPollStartedAt < 3000) return;
+      if (embeddedPollController) embeddedPollController.abort();
+      controller = new AbortController();
+      embeddedPollController = controller;
+      embeddedPollStartedAt = now;
+    }
     const sequence = ++nextStateSequence;
     try {
-      const response = await fetch("/api/multichat", {cache:"no-store"});
-      if (response.ok) renderState(await response.json(), sequence);
+      const response = await fetch("/api/multichat", {
+        cache:"no-store", ...(controller ? {signal:controller.signal} : {})
+      });
+      if (response.ok) {
+        const snapshot = await response.json();
+        // Never apply a reply from an aborted, superseded embedded poll.
+        if (!controller || embeddedPollController === controller)
+          renderState(snapshot, sequence);
+      }
     } catch (_) { /* operator diagnostics stay in InOneLine */ }
+    finally {
+      if (controller && embeddedPollController === controller)
+        embeddedPollController = null;
+    }
   }
   // The same renderer serves ordinary child polling and a targeted parent
   // resync when Chromium suspends an embedded iframe's asynchronous timers.
