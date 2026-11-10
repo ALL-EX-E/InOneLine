@@ -676,13 +676,52 @@ def main():
                 assert state.ingest(ChatMessage(
                     "twitch", "chan", "video-start-" + composition,
                     "alice", "R06 movie first message"))
+                expected_id = "video-start-" + composition
+                server_ids = [row["external_id"] for row in
+                              state.snapshot(for_obs=True)["messages"]]
+                with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                    http_ids = [row["external_id"] for row in
+                                json.load(response)["messages"]]
+                assert server_ids == http_ids == [expected_id], (
+                    "Clear/new message did not propagate to server API",
+                    composition, server_ids, http_ids)
                 for page in pages:
-                    before = until(page, lambda a:
-                        not a["shown"] and a["count"] == 1 and
-                        a["appliedComposeMode"] == composition and
-                        a["appliedDirection"] == "left" and
-                        15 < a["chatHeight"] < a["rootHeight"] / 2,
-                        "one-message dynamic chat before movie " + composition)
+                    try:
+                        before = until(page, lambda a:
+                            not a["shown"] and a["count"] == 1 and
+                            a["appliedComposeMode"] == composition and
+                            a["appliedDirection"] == "left" and
+                            15 < a["chatHeight"] < a["rootHeight"] / 2,
+                            "one-message dynamic chat before movie " + composition)
+                    except AssertionError as original:
+                        # Passive failure-only diagnostic. Do NOT replace
+                        # fetch or force the embedded renderer to update.
+                        page.runJavaScript("""(() => {
+                          window.__r06ChatNetworkProbe = {status:"pending"};
+                          fetch('/api/multichat', {cache:'no-store'})
+                            .then(response => response.ok ? response.json() :
+                                  Promise.reject(Error('HTTP '+response.status)))
+                            .then(snapshot => {window.__r06ChatNetworkProbe = {
+                              status:"ok", count:snapshot.messages?.length ?? -1,
+                              ids:(snapshot.messages || []).map(x=>x.external_id)
+                            };})
+                            .catch(error => {window.__r06ChatNetworkProbe = {
+                              status:"error", error:String(error)
+                            };});
+                        })()""")
+                        QTest.qWait(1600)
+                        probe = evaluate(page, """JSON.stringify((() => {
+                          const iframe=document.querySelector('#list-chat iframe');
+                          return {network:window.__r06ChatNetworkProbe,
+                                  childRender:typeof iframe?.contentWindow?.IOLRenderEmbeddedChatState,
+                                  childReady:iframe?.contentDocument?.readyState,
+                                  count:iframe?.contentDocument?.getElementById('messages')?.children.length};
+                        })())""")
+                        raise AssertionError(
+                            "Chromium stale Twitch diagnostic: " +
+                            repr({"scenario":composition, "server_ids":server_ids,
+                                  "http_ids":http_ids, "probe":probe,
+                                  "original":str(original)})) from original
                 assert state.ingest(ChatMessage(
                     "twitch", "chan", "video-enter-" + composition,
                     "alice", "!list"))
