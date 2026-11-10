@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
 
 from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
-from ..obs_visibility import AUCTION_WIDGET_BINDINGS, auction_widget_linked
+from ..obs_visibility import AUCTION_WIDGET_BINDINGS, AUCTION_WIDGET_SLIDE_MODE, show_mode
 from ..constants import (
     AUCTION_LOTS_OBS_AUTO_SCROLL_DEFAULT,
     AUCTION_LOTS_OBS_AUTO_SCROLL_KEY,
@@ -2128,12 +2128,13 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def refresh_auction_widgets_button(self) -> None:
         settings = self.db.get_settings()
-        has_linked_widgets = any(
-            auction_widget_linked(settings, widget) for widget in AUCTION_WIDGET_BINDINGS
+        has_sliding_widgets = any(
+            show_mode(settings, widget) == AUCTION_WIDGET_SLIDE_MODE[0]
+            for widget in AUCTION_WIDGET_BINDINGS
         )
-        if not has_linked_widgets:
+        if not has_sliding_widgets:
             self._set_auction_widgets_visible(False)
-        self.auction_widgets_button.setVisible(has_linked_widgets)
+        self.auction_widgets_button.setVisible(has_sliding_widgets)
 
     def _set_auction_widgets_visible(self, visible: bool) -> None:
         self._auction_widgets_visible = visible

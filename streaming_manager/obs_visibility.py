@@ -42,6 +42,11 @@ AUCTION_WIDGET_BINDINGS = {
         "auction_lots_overlay_slide_direction",
         "auction_lots_overlay_slide_seconds",
     ),
+    "rules": (
+        "rules_overlay_follow_auction_tab",
+        "rules_overlay_slide_direction",
+        "rules_overlay_slide_seconds",
+    ),
 }
 AUCTION_WIDGET_SLIDE_MODE = ("slide", "Выезд")
 AUCTION_WIDGET_SLIDE_DIRECTIONS = (
@@ -68,7 +73,7 @@ WIDGETS = {
     "auction_lots": WidgetVisibility(
         "auction_lots_overlay_show_mode", "always", (*_SIMPLE, AUCTION_WIDGET_SLIDE_MODE),
     ),
-    "rules": WidgetVisibility("rules_overlay_show_mode", "always", _SIMPLE),
+    "rules": WidgetVisibility("rules_overlay_show_mode", "always", (*_SIMPLE, AUCTION_WIDGET_SLIDE_MODE)),
     "wheel": WidgetVisibility(
         "wheel_overlay_show_mode", "context",
         (_HIDDEN, ("context", "Когда колесо используется"), _ALWAYS),

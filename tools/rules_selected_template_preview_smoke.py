@@ -61,6 +61,10 @@ def main() -> int:
         assert live_before["source"] == "auction_snapshot"
         assert "ON AIR PRIMARY" in live_before["content_html"]
         assert live_before["presentation"]["padding"] == 27
+        assert live_before["tab_motion"] == {
+            "follow_auction_tab": False, "auction_widgets_visible": False,
+            "direction": "left", "duration_seconds": 0.65,
+        }
 
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0))

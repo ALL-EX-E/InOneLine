@@ -457,8 +457,7 @@ def browser_smoke() -> None:
             stream.timer_slide_seconds.setValue(1.2)
             assert button.isHidden(), "Unsaved link created a control on Auction"
             save_mode("hidden")
-            assert not button.isHidden()
-            assert button.text() == "Показать виджеты аукциона"
+            assert button.isHidden(), "A linked timer in Never Show must not enable the button"
             visible = "document.documentElement?.dataset.obsVisible"
             mode = "document.documentElement?.dataset.obsShowMode"
             pose = """(() => {
@@ -472,6 +471,13 @@ def browser_smoke() -> None:
             wait_js(page, "location.search", "", "Live source loaded")
             wait_js(page, visible, "false", "Hidden takes priority in live source")
             window._set_current_main_page(auction)
+            button.click()
+            assert not read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+            assert js(page, visible) == "false"
+
+            save_mode("slide")
+            wait_js(page, mode, "slide", "Live source received slide mode")
+            assert button.text() == "Показать виджеты аукциона"
             window.resize(1280, 760)
             wait_with_http_workers(150)
             rules_button = auction.auction_rules_editor_btn
@@ -482,14 +488,6 @@ def browser_smoke() -> None:
             wait_with_http_workers(150)
             viewport = window._main_tab_scroll_by_page[auction].viewport()
             assert button.mapTo(viewport, button.rect().topRight()).x() < viewport.width()
-            button.click()
-            assert button.text() == "Скрыть виджеты аукциона"
-            assert read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
-            assert js(page, visible) == "false"
-            button.click()
-
-            save_mode("slide")
-            wait_js(page, mode, "slide", "Live source received slide mode")
             axis_duration = """(() => {
               const motion = document.querySelector('#root').getAnimations()[0];
               return motion?.effect.getTiming().duration ?? null;
@@ -546,10 +544,10 @@ def browser_smoke() -> None:
 
             save_mode("always")
             root_visibility = "getComputedStyle(document.querySelector('#root')).visibility"
-            wait_js(page, root_visibility, "hidden", "Linked always mode waits for Show")
-            button.click()
-            wait_js(page, root_visibility, "visible", "Linked always mode appears immediately")
-            assert js(page, axis_duration) is None
+            assert button.isHidden(), "A linked Always timer must not enable the button"
+            wait_js(page, mode, "always", "Timer switched to Always")
+            wait_js(page, root_visibility, "visible", "Linked Always timer ignores the group state")
+            assert js(page, pose) == [0, 0] and js(page, axis_duration) is None
 
             stream.timer_follow_auction_tab.setChecked(False)
             save_mode("always")
@@ -632,6 +630,19 @@ def browser_smoke() -> None:
                 wait_js(lots_page, lots_duration, 1800, "Lots leave in 1.8 seconds")
                 wait_js(page, pose, [0, -450], "Timer left by the same side")
                 wait_js(lots_page, lots_pose, [source_width, 0], "Lots left by the same side")
+
+                save_lots("always")
+                wait_js(lots_page, mode, "always", "Lots switched to Always")
+                lots_visibility = "getComputedStyle(document.body).visibility"
+                wait_js(lots_page, lots_visibility, "visible", "Linked Always lots ignore hidden group")
+                assert js(lots_page, lots_pose) == [0, 0] and js(lots_page, lots_duration) is None
+                assert not button.isHidden(), "The sliding timer still needs the button"
+                button.click()
+                wait_js(page, pose, [0, 0], "Button shows the sliding timer")
+                assert js(lots_page, lots_visibility) == "visible" and js(lots_page, lots_pose) == [0, 0]
+                button.click()
+                wait_js(page, pose, [0, -450], "Button hides the sliding timer")
+                assert js(lots_page, lots_visibility) == "visible" and js(lots_page, lots_pose) == [0, 0]
 
                 save_lots("hidden")
                 wait_js(lots_page, visible, "false", "Lots Never Show has priority")

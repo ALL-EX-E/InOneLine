@@ -62,7 +62,7 @@ def policy_smoke() -> None:
             assert show_mode({spec.key: "bogus"}, widget) == default
             for mode, label in spec.options:
                 mode_settings = {spec.key: mode}
-                if widget in {"timer", "auction_lots"} and mode == "slide":
+                if widget in {"timer", "auction_lots", "rules"} and mode == "slide":
                     assert show_mode(mode_settings, widget) == "always"
                     mode_settings[f"{widget}_overlay_follow_auction_tab"] = "1"
                 assert show_mode(mode_settings, widget) == ("always" if widget == "overlay" else mode)
@@ -351,7 +351,7 @@ def ui_smoke() -> None:
             saved_before = db.get_settings()
             for widget, combo in stream.obs_show_modes.items():
                 spec = WIDGETS[widget]
-                options = spec.options if widget not in {"timer", "auction_lots"} else tuple(
+                options = spec.options if widget not in {"timer", "auction_lots", "rules"} else tuple(
                     (mode, label) for mode, label in spec.options if mode != "slide"
                 )
                 assert tuple((combo.itemData(i), combo.itemText(i)) for i in range(combo.count())) == options
@@ -442,6 +442,24 @@ def ui_smoke() -> None:
                 stream._save_music_player_overlay_settings()
             assert db.get_setting("music_player_overlay_twitch_command", "") == "!плеер"
             assert read_json(window.api, "/api/music-player")["command_event"] is None
+
+            rules_link, rules_direction, rules_seconds = stream._auction_widget_motion_controls["rules"]
+            rules_mode = stream.obs_show_modes["rules"]
+            assert rules_mode.findData("slide") == -1
+            assert window.auction_tab.auction_widgets_button.isHidden()
+            rules_link.setChecked(True)
+            assert rules_mode.itemText(rules_mode.findData("slide")) == "Выезд"
+            rules_mode.setCurrentIndex(rules_mode.findData("slide"))
+            rules_direction.setCurrentIndex(rules_direction.findData("bottom"))
+            rules_seconds.setValue(1.75)
+            assert window.auction_tab.auction_widgets_button.isHidden()
+            with patch.object(QMessageBox, "information"):
+                stream._save_rules_overlay_settings()
+            assert not window.auction_tab.auction_widgets_button.isHidden()
+            assert read_json(window.api, "/api/rules")["tab_motion"] == {
+                "follow_auction_tab": True, "auction_widgets_visible": False,
+                "direction": "bottom", "duration_seconds": 1.75,
+            }
             saved = db.get_settings()
         finally:
             window.api.stop()
@@ -455,7 +473,7 @@ def ui_smoke() -> None:
             QTest.qWait(600)
             assert window.db.get_settings() == saved
             assert all(
-                combo.currentData() == ("track_change" if widget == "music_player" else "hidden")
+                combo.currentData() == {"music_player": "track_change", "rules": "slide"}.get(widget, "hidden")
                 for widget, combo in window.stream_tab.obs_show_modes.items()
             )
             assert window.stream_tab.music_player_twitch_command.text() == "!плеер"
@@ -469,12 +487,41 @@ def ui_smoke() -> None:
                 "pointer_label_enabled": True,
             }
             assert read_json(window.api, "/api/data")["visibility"]["overlay"]["show_mode"] == "always"
+            stream = window.stream_tab
+            link, direction, seconds = stream._auction_widget_motion_controls["rules"]
+            assert link.isChecked() and direction.currentData() == "bottom" and seconds.value() == 1.75
+            button = window.auction_tab.auction_widgets_button
+            assert not button.isHidden()
+            assert button.text() == "Показать виджеты аукциона"
+            window._set_current_main_page(window.auction_tab)
+            button.click()
+            assert read_json(window.api, "/api/rules")["tab_motion"]["auction_widgets_visible"]
+            assert not read_json(window.api, "/api/timer")["tab_motion"]["follow_auction_tab"]
+            assert not read_json(window.api, "/api/auction-lots")["tab_motion"]["follow_auction_tab"]
+            button.click()
+            assert not read_json(window.api, "/api/rules")["tab_motion"]["auction_widgets_visible"]
+            rules_mode = stream.obs_show_modes["rules"]
+            for mode in ("always", "hidden"):
+                rules_mode.setCurrentIndex(rules_mode.findData(mode))
+                with patch.object(QMessageBox, "information"):
+                    stream._save_rules_overlay_settings()
+                assert link.isChecked() and button.isHidden()
+                button.click()
+                assert not read_json(window.api, "/api/rules")["tab_motion"]["auction_widgets_visible"]
+            rules_mode.setCurrentIndex(rules_mode.findData("slide"))
+            link.setChecked(False)
+            assert stream.obs_show_modes["rules"].findData("slide") == -1
+            assert stream.obs_show_modes["rules"].currentData() == "always"
+            with patch.object(QMessageBox, "information"):
+                stream._save_rules_overlay_settings()
+            assert button.isHidden()
         finally:
             window.api.stop()
             QThreadPool.globalInstance().waitForDone(15000)
             window.close()
             app.processEvents()
     print("P10_OBS_VISIBILITY_QT_SAVES_RESTART=PASS")
+    print("R06_RULES_AUCTION_BUTTON_QT_SETTINGS_AND_RESTART=PASS")
 
 
 def browser_smoke() -> None:
