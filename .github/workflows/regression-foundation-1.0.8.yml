@@ -254,7 +254,7 @@ jobs:
           from streaming_manager.constants import APP_VERSION, SCHEMA_VERSION
           from streaming_manager.database import Database
 
-          assert APP_VERSION == "1.0.9"
+          assert APP_VERSION == "1.0.10"
           assert SCHEMA_VERSION == 21
           with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
@@ -680,7 +680,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Frozen API did not start" }
-            if ($health.version -ne "1.0.9") { throw "Wrong frozen version: $($health.version)" }
+            if ($health.version -ne "1.0.10") { throw "Wrong frozen version: $($health.version)" }
 
             $routes = @(
               "/overlay",
@@ -804,19 +804,19 @@ jobs:
             throw "Inno Setup administrative user-area warning returned"
           }
           Write-Host "INNO_USER_AREAS_WARNING=NONE"
-          $setup = "installer\output\InOneLine_Setup_1.0.9.exe"
+          $setup = "installer\output\InOneLine_Setup_1.0.10.exe"
           if (!(Test-Path $setup)) { throw "Installer output missing" }
           $item = Get-Item $setup
           Write-Host "REGRESSION_SETUP_BYTES=$($item.Length)"
           Write-Host "REGRESSION_SETUP_SHA256=$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant())"
-          if ($item.VersionInfo.FileVersion -notlike "1.0.9*") {
+          if ($item.VersionInfo.FileVersion -notlike "1.0.10*") {
             throw "Wrong installer FileVersion: $($item.VersionInfo.FileVersion)"
           }
 
       - name: Silent installer startup regression
         shell: pwsh
         run: |
-          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.9.exe").Path
+          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.10.exe").Path
           $install = "$env:RUNNER_TEMP\InOneLineRegressionInstalled"
           Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
@@ -839,7 +839,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Installed app API did not start" }
-            if ($health.version -ne "1.0.9") { throw "Wrong installed version: $($health.version)" }
+            if ($health.version -ne "1.0.10") { throw "Wrong installed version: $($health.version)" }
 
             $visibility = Invoke-WebRequest -Uri "http://127.0.0.1:8765/obs-visibility.js" -TimeoutSec 3
             if ($visibility.Content -notmatch "ObsVisibility") { throw "Installed visibility script missing" }
@@ -944,8 +944,8 @@ jobs:
       - name: Preserve Windows installer for manual QA
         uses: actions/upload-artifact@v7
         with:
-          name: InOneLine_1.0.8_WINDOWS_QA
-          path: installer/output/InOneLine_Setup_1.0.9.exe
+          name: InOneLine_1.0.10_WINDOWS_QA
+          path: installer/output/InOneLine_Setup_1.0.10.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -1172,12 +1172,12 @@ jobs:
           compression-level: 0
 
       - name: Package R06 candidate QA from tested installer
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
         shell: pwsh
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "installer\output\InOneLine_Setup_1.0.9.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
+          Copy-Item "installer\output\InOneLine_Setup_1.0.10.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
           if ($env:GITHUB_HEAD_REF -eq "candidate/r06-main-embedded-shared-composition-20261108") {
             Copy-Item "docs\qa\R06-main-embedded-parity-checklist.md" "$out\CHECKLIST_MAIN_OBS_COMBINED.md"
@@ -1191,7 +1191,7 @@ jobs:
           if ($env:GITHUB_HEAD_REF -eq "candidate/r06-combined-replace-motion-20261109") {
             Copy-Item "docs\qa\R06-combined-replace-motion-checklist.md" "$out\CHECKLIST_REPLACE_MOTION.md"
           }
-          if ($env:GITHUB_HEAD_REF -eq "candidate/r06-hide-empty-combined-motions-20261109") {
+          if ($env:GITHUB_HEAD_REF -in @("candidate/r06-hide-empty-combined-motions-20261109", "candidate/release-1.0.10")) {
             Copy-Item "docs\qa\R06-hide-empty-combined-motions-checklist.md" "$out\CHECKLIST_HIDE_EMPTY_COMBINED.md"
           }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
@@ -1214,7 +1214,7 @@ jobs:
           Write-Host "R06_SOURCE_SHA256=$sourceSha"
 
       - name: Upload R06 candidate QA bundle
-        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109')
+        if: github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'candidate/r06-list-twitch-chat-visibility' || github.event.pull_request.head.ref == 'candidate/r06-main-embedded-shared-composition-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-hidden-scroll-zero-toggle-20261108' || github.event.pull_request.head.ref == 'candidate/r06-list-zero-visible-hint-20261108' || github.event.pull_request.head.ref == 'candidate/r06-combined-replace-motion-20261109' || github.event.pull_request.head.ref == 'candidate/r06-hide-empty-combined-motions-20261109' || github.event.pull_request.head.ref == 'candidate/release-1.0.10')
         uses: actions/upload-artifact@v7
         with:
           name: InOneLine_R06_CANDIDATE_QA

@@ -1,8 +1,15 @@
 # InOneLine — Current Project State
 
+## Актуальная очередь на 10 ноября 2026
+
+- FIX‑092 принят и объединён с `main`. Список и Twitch-чат в OBS готовы в принятом объёме.
+- Готовится отдельный выпуск InOneLine 1.0.10. [Заметки к версии](../RELEASE_NOTES_1.0.10.md).
+- После выпуска возобновить разбор самостоятельного OBS-таймера, затем музыкального плеера и остальных виджетов по очереди Р06.
+
+
 Обновлено: **2026-10-10**
 
-## CURRENT / RELEASED
+## Историческое состояние на 10 октября 2026 / RELEASED
 
 - Version: **1.0.8**
 - Scope: **Global Conditional UI Visibility / Issue #3**
@@ -1596,7 +1603,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - P17-A is the smallest still-open UI-083 presentation/copy-only scope in `Настройки → Аукцион`: rename visible extension cause `Внешнее пожертвование` to `Внешнее поступление`, name center-image fallback `Логотип InOneLine`, and correct the false `локальная PNG-копия` wording to the actual managed original-compatible supported format with GIF/WebP animation. Preserve all S2 backend reason IDs, saved thresholds/durations, center media setting, actual local/OBS behavior and save callbacks.
 - Verified CURRENT already implements UI-072 1s wheel default validation and UI-083 immediate choice/import/fallback save via `_save_wheel_center_selection_immediately`; do not duplicate, reimplement or alter them. Native Settings regression protects new texts and preserved persisted defaults/external-extend key. **P17-A unaccepted / draft Windows QA**, requires CI SUCCESS, exact ZIP and user manual PASS before promotion; do not merge or replace public release.
 
-## CURRENT checkpoint — P18-E accepted / P18-F QA (2026-10-18)
+## Историческое состояние на 10 октября 2026 checkpoint — P18-E accepted / P18-F QA (2026-10-18)
 
 - Current accepted source on `main`: **`1656d40ec6f48d3bbfdf838de31b341d2b3a5813`**. Product version remains **1.0.8**, and no new public release was published. Earlier top-of-file release/baseline entries are historical, not a claim that development stopped at P17-A.
 - P17-A / UI-083 accepted as exact-tree PR #246. P18 / UI-084 prior scopes A–D accepted as PR #248 (disabled health check), #250 (contextual provider actions), #252 (Twitch reward eligibility), #254 (Twitch unsaved draft / partial sync safety).
@@ -1611,104 +1618,104 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - **Next isolated P18-G / UI-084 #11** removes the unreachable provider empty-state label only, without changing card visibility or service lifecycle. [Draft QA PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260), not accepted, not merged. Requires full Windows/wording success, exact Windows installer ZIP archived to Drive and manual Windows 5/5 before promotion.
 - After P18-G acceptance and final UI-084 reconciliation, proceed to P19 / UI-085 Conversion per approved ordering. No automatic broadening of current scope.
 
-## CURRENT: P18-G accepted; P19-A / UI-085 first independent QA — 2026-10-19
+## Историческое состояние на 10 октября 2026: P18-G accepted; P19-A / UI-085 first independent QA — 2026-10-19
 
 - Version remains 1.0.8; no new public release.
 - User installed the P18-G build and explicitly confirmed all five Windows tests work (2026-10-18 18:19 UTC, 2026-10-19 local). Frozen QA [PR #260](https://github.com/ALL-EX-E/InOneLine/pull/260) source HEAD `b92a934f52e5e5ff69846d5390970078074946c3`, tree `63ccee0d6b14c0f99d5e830c87ebd161742cd818`. QA Windows Regression #39152204517 SUCCESS; wording #39152204535 SUCCESS. ZIP archived on [Google Drive](https://drive.google.com/file/d/1CEDoOOIq-_LR5r64ETxVPNlITWUNkX-R/view), 46,861,297 bytes SHA256 `fb6fa7357f19f8623632d328d76b67295f8798856fffe0a0792a253efc612bd1`.
 - **P18-G ACCEPTED AND IN MAIN**: exact-four-tested-blobs promotion [PR #262](https://github.com/ALL-EX-E/InOneLine/pull/262), native Windows #39153752761 SUCCESS, wording #39153752741 SUCCESS, merged as `54ab80dfeebd33fc627f28743fb46f90617f9283`. The original QA draft #260 remains unmerged. Accepted UI-084 packages P18-A through P18-G complete; keep provider semantics/credentials/UTC/history unchanged.
 - Next work is approved **P19 / UI-085 `Настройки → Конвертация`**. Start with isolated P19-A (heading `Курсы конвертации`; existing `Сохранить курсы` directly after rate editors) in [draft PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263). No atomic save, pending event, source-time, rejection or historical credit changes in P19-A. **DRAFT, NOT MANUALLY ACCEPTED**, needs Windows CI, exact installer ZIP on Drive and user Windows acceptance. Then P19-B atomic persistence and subsequent UI-085 tasks one by one.
 
-## CURRENT P19-A accepted / P19-B isolated atomic conversion QA — 2026-10-19
+## Историческое состояние на 10 октября 2026 P19-A accepted / P19-B isolated atomic conversion QA — 2026-10-19
 
 - Version 1.0.8 unchanged; no official release. User manually installed and accepted all five P19-A / UI-085 layout QA scenarios: `Настройки → Конвертация` heading `Курсы конвертации` and existing `Сохранить курсы` button directly under the rate rows.
 - P19-A frozen [QA PR #263](https://github.com/ALL-EX-E/InOneLine/pull/263): tested commit `b1adad467878fe3009a2472e3770c561af495b5c`, native Windows Regression Foundation #39154698137 SUCCESS, Publication wording #39154697973 SUCCESS. [Google Drive ZIP](https://drive.google.com/file/d/1AF5RajahtuDl5FZ5fU0L_UxqWICJkBjj/view): 46,854,173 bytes, SHA-256 `07cfe478828702e6ac1e88686b14bf062d9ce29e80b1c99e0d4580ef2776dc9f`; installer SHA-256 `bdac4ad403e5c2ddff501356778b5810f3eb8b4b41c4fb1531546380d9b790ef`.
 - **P19-A ACCEPTED / merged `main`** via [exact-four-Git-blob promotion PR #265](https://github.com/ALL-EX-E/InOneLine/pull/265), fresh Windows #39156588945 SUCCESS and wording #39156589003 SUCCESS, merge commit `333adeca80bcc37b0e5d7c0b2704e30bae4c2a9a`. Frozen QA PR #263 remains draft/unmerged, no release.
 - **Current next P19-B / UI-085**: atomic all-or-nothing conversion-rate saving, including prevalidation and single DB transaction for settings, unit metadata, audit and pending/external event statuses, no automatic credit. [Draft QA PR #266](https://github.com/ALL-EX-E/InOneLine/pull/266); **not user accepted / not merged**. Require full native Windows CI, Drive QA archive, five-step manual Windows QA before exact-tested-blobs promotion. Next P19-C handles unknown-rate pending target/title independently, not in P19-B.
 
-## CURRENT — P19-B accepted; P19-C isolated Windows QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-B accepted; P19-C isolated Windows QA (2026-10-19)
 
 - Version 1.0.8 unchanged; **no public release**. User explicitly reported installed P19-B manual Windows QA all working (five scenarios PASS). P19-B is atomic rate prevalidation and a single SQLite transaction for settings, unit metadata, audit and pending + external event status, no automatic credit.
 - Frozen [QA PR #266](https://github.com/ALL-EX-E/InOneLine/pull/266), commit `a47835faba55a5f7252e5cd078f436d99a05d762`, native Windows #39157744940 SUCCESS, Publication wording #39157745085 SUCCESS. QA ZIP [Drive](https://drive.google.com/file/d/1g3LjRFt0SZnIz4EIGk_rJiHAeMAOUh2a/view), 46,849,064 bytes, SHA256 `5e3ba5f4e87068e311f3eee20873b3242c0a4c2d33a0e861c0bb3e18389141df`.
 - **P19-B accepted and in `main`:** exact-five-tested-blob [PR #268](https://github.com/ALL-EX-E/InOneLine/pull/268), promotion Windows #39201152469 SUCCESS, wording #39201152479 SUCCESS, merge `76e36770b5a20cd09f1822be145dbe2e8a5a181f`. Original QA #266 intentionally not merged.
 - Next **P19-C / UI-085 pending new-title fallback and safe manual Apply**: [draft PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269), not yet accepted or merged. Correct title recovered from `external_events.payload_json.normalized.lot_title` if `game_id` intentionally NULL; no auto-creation/credit. Full native Windows CI + Drive QA ZIP and explicit user acceptance required. Do not combine with UI-086 auction correction-phase or UI-085 event-time/rejection features.
 
-## CURRENT — P19-C user accepted; P19-D local time QA isolated (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-C user accepted; P19-D local time QA isolated (2026-10-19)
 
 - User installed P19-C Windows QA and explicitly reported «Всё работает. Идём дальше.» on 2026-10-19; all five requested manual checks accepted. Frozen source QA [PR #269](https://github.com/ALL-EX-E/InOneLine/pull/269), head `5928632a2aa23f30b52b65128f07f0148c0b2622`, native Windows #39201965942 SUCCESS and wording #39201965930 SUCCESS. Exact ZIP [Google Drive](https://drive.google.com/file/d/17f2H4dJ5oROOQbUY8JOrHKt3VjFnqSZt/view), 46,848,349 bytes, SHA256 `c7b19dddeeaf3099f388c5c81e994630d31252294608e79dc5bbf805a6f3c553`.
 - **P19-C ACCEPTED by user.** Clean five tested blob promotion [PR #271](https://github.com/ALL-EX-E/InOneLine/pull/271), head `b32472bfc1db4154339b880e8eb89160be10e24e` based on latest `main` while preserving documentation; fresh Windows #39213736634 and wording #39213736637 SUCCESS; merged into `main` as `09de164370193a77f538de1b7038d4abaa2b56b3`. QA draft #269 remains unmerged. No public release/version bump.
 - **Selected next P19-D / UI-085 #5**: `Настройки → Конвертация → Ожидают применения` gets local `Время` of authoritative `external_events.created_at` (immutable UTC stored) and concise row provenance tooltip. Isolated [draft PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272), new native Qt/SQLite test and Windows/wording checks; no schema, backend credit, event routing or auction change. No P19-D manual acceptance or release. Next P19-E is separate reject action.
 
-## CURRENT — P19-D user accepted, P19-E explicit No Apply QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-D user accepted, P19-E explicit No Apply QA (2026-10-19)
 
 - User installed P19-D Windows QA and explicitly confirmed «Всё работает. Идём дальше.» on 2026-10-19. Frozen [QA draft PR #272](https://github.com/ALL-EX-E/InOneLine/pull/272), commit `f00d7404fbed8c00592533c5f64c0fdff8a35fd5`, native Windows [#39214485331](https://github.com/ALL-EX-E/InOneLine/actions/runs/39214485331) SUCCESS, wording #39214485363 SUCCESS. [Drive QA ZIP](https://drive.google.com/file/d/1abPwAqdUCfQyJHHjZjdYg1NtTjdeR7jS/view), 46,851,713 bytes SHA256 `23eb935d46a1558c37803401b558294d8cc2e62c3aa394bce3f7a35a7a1e17a9`. **P19-D manually accepted.** Exact-six-tested-blobs [promotion PR #274](https://github.com/ALL-EX-E/InOneLine/pull/274), head `cfd0d3591371f89d66ab6d50d9f10b485b359e32`. Fresh Windows [#39219909356](https://github.com/ALL-EX-E/InOneLine/actions/runs/39219909356) and wording #39219909154 SUCCESS; merged into main as `19a0d5bc2c6d44d30cd98c750f426bc92dc9a276`. QA draft #272 remains unmerged.
 - **CURRENT P19-E / UI-085 #6**: operator action «Не применять» next to «Применить» with confirmation, final no-credit `pending_conversions.status=cancelled`, `external_events.processing_status=cancelled` within one transaction and detailed change-log audit; keep raw event and dedup, no schema or real donation required for synthetic QA. [Draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275), native Qt/SQLite test and Windows+wording workflow, manual five-point QA. **Not accepted, not merged**; requires verified QA ZIP in Google Drive and user signoff. No official release, version 1.0.8 unchanged.
 
-## CURRENT — P19-E accepted; P19-F rate drafts isolated QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-E accepted; P19-F rate drafts isolated QA (2026-10-19)
 
 - User installed P19-E Windows QA and explicitly reported «Всё работает. Идём дальше.» on 2026-10-19. Frozen QA [draft PR #275](https://github.com/ALL-EX-E/InOneLine/pull/275) head `d80b5da3509adc46bf25ded89567c489734f8daa`: Windows #39221047242 SUCCESS (five P19-E native Qt/SQLite scenarios and full installer/OBS/regressions), wording #39221047310 SUCCESS. [Drive ZIP](https://drive.google.com/file/d/1Zd_tmp5UpScFY5IYASf006pdgce4eLno/view), 46,854,366 bytes, SHA256 `fcc554a6586bfa0a8a0014d189485d0e14e10f844c2bcba87a05dde7c606b809`. **P19-E manually accepted.** Exact-six-tested-blob clean [promotion PR #277](https://github.com/ALL-EX-E/InOneLine/pull/277) head `56745a1de2fd92f40e247bf5ca33bcd82d89b9cb`, fresh Windows #39223217704 and wording #39223217838 SUCCESS; merged into main as `811789f47a6593d518ba413244a8505c0376777e`. QA draft #275 remains unmerged. No public release.
 - **CURRENT P19-F / UI-085 #7**: in-memory retention of unsaved conversion-rate text across connected adapter/capability set rebuild, hidden service-unit draft reinstated on reconnect. Nothing persisted without explicit Save. [Draft QA PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278), five native Qt tests and five user QA checks. Not user accepted/not merged; need full Windows CI, wording gate, Drive installer and manual Windows acceptance. Following P19-F: UI-085 #7.1 unknown-unit handling, then UI-086 phase separately.
 
-## CURRENT — P19-F user accepted; P19-G unknown unit QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-F user accepted; P19-G unknown unit QA (2026-10-19)
 
 - User installed P19-F Windows QA and confirmed «Всё работает. Идём дальше.» 2026-10-19. Frozen [QA draft PR #278](https://github.com/ALL-EX-E/InOneLine/pull/278) head `a4a25743a13f06868686247129ce38f73978ab4f`, native Windows #39223611623 SUCCESS and wording #39223611578 SUCCESS. [Drive QA ZIP](https://drive.google.com/file/d/1WF6WBJN7_JFBzrZGy9rkMil79bZEqcpz/view) 46,851,512 bytes SHA256 `e0f89126140e5ebf310f628cef8144e331f2616e4ba9f195782905db1180d481`. **P19-F manually accepted.** Clean exact-four-blob [promotion PR #280](https://github.com/ALL-EX-E/InOneLine/pull/280), head `d3a4cb6e2e6a5d7a8f554c32a31e92a8163bb7e7`, fresh Windows #39228013720 and wording #39228013948 SUCCESS; merged into main as `73e8da4dbea67b0dd4e13028465d71c3f744892a`. Source QA draft stays unmerged. Version 1.0.8/no release.
 - **CURRENT P19-G / UI-085 #7.1:** accepted unknown currency and service unit must appear as corresponding rate editor and pending external event. Backend atomic unit+pending already exists; ensure unadvertised dynamic service unit visible while originating integration connected, hidden on disconnect without deleting stored rate/pending. Synchronize rate-editor refresh with queue; retain P19-F drafts, no automatic credit. [Draft PR #281](https://github.com/ALL-EX-E/InOneLine/pull/281), five new Windows Qt/SQLite smoke cases and five manual QA checks. Not accepted/merged; needs Windows+wording, verified Drive QA ZIP and explicit user manual PASS. UI-086 source-time auction correction separate afterward.
 
-## CURRENT — P19-G user accepted; P20-A UI-086 first result gate QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P19-G user accepted; P20-A UI-086 first result gate QA (2026-10-19)
 
 - User installed P19-G Windows QA and confirmed «Всё работает. Идём дальше.» 2026-10-19. Frozen [QA draft PR #281](https://github.com/ALL-EX-E/InOneLine/pull/281) head `f9e462fddd6e066b7d53088414068dc7c121077f`, native Windows #39228580943 and wording #39228580927 SUCCESS. [Google Drive QA ZIP](https://drive.google.com/file/d/1001bWh7W079YIRohOyF-K6PpfE4_FvtO/view), 46,862,313 bytes sha256 `3a9e5ffc892ddd08a10bbc1cc4b20d1fe7207ae2cbc8861ae5ba8950b2cb6fe6`. **P19-G manually accepted.** Clean exact-five-blob [promotion PR #283](https://github.com/ALL-EX-E/InOneLine/pull/283), head `7d1eb5b911535baf49218c1313e1a575d29b4701`, fresh Windows #39231437209 and wording #39231437189 SUCCESS; merged into main as `96914c129f6abe7318598466476884c9f420f1a0`. Source QA draft stays unmerged; no release.
 - **CURRENT P20-A / UI-086 #1:** warning/count for unresolved conversion events scoped to active source-auction id and guard confirmation/tie-wheel in DB transaction and UI. [Draft PR #284](https://github.com/ALL-EX-E/InOneLine/pull/284), new Windows Qt/SQLite tests, five manual QA scenarios in docs/P20_A_UI086_AUCTION_PENDING_RESULT_GATE_QA.md. **No post-00:00 late source-time apply or full wheel freeze/cancel warning yet** — separate follow-up. P20-A not accepted/merged; verify Windows+wording/Drive/manual PASS before promotion.
 
-## CURRENT — P20-A user accepted; P20-B late source-auction correction QA (2026-10-19)
+## Историческое состояние на 10 октября 2026 — P20-A user accepted; P20-B late source-auction correction QA (2026-10-19)
 
 - User installed P20-A Windows QA and confirmed «Всё работает. Идём дальше.» on 2026-10-19. Frozen [QA draft PR #284](https://github.com/ALL-EX-E/InOneLine/pull/284), head `0dfb53bc0494f39400ee9d01e54fddb82ba374e3`; full native Windows #39232192391 and wording #39232192409 SUCCESS. [Google Drive ZIP](https://drive.google.com/file/d/1JZDfulWYyzHeiV_zGWg1Sq1l39CavY5t/view) 46,855,004 bytes SHA256 `28d97d9e13a8aaab142ed327bd7a23246a07dc8dd4efcc4e6b6c895619a60e60`. **P20-A manually accepted.** Exact-six-blob clean [promotion PR #286](https://github.com/ALL-EX-E/InOneLine/pull/286), head `2a7019ac0f5f74ab55af08af831cb9c679aa7792`, fresh Windows #39238302234 and wording #39238302222 SUCCESS; merged into main as `cd38520c7d4f63154f918a87f446195c08b036d9`. QA source draft remains unmerged. Version 1.0.8, no public release.
 - **CURRENT P20-B / UI-086 stage 2:** explicit application of an unknown-rate pending event after timer expiry to an **existing lot** of its exact original Max Amount session while preliminary winner/tie. In one SQLite transaction, credit, audit and recompute provisional winner/tie without timer restart; protect confirmed history and never capture newer auction. [QA draft PR #287](https://github.com/ALL-EX-E/InOneLine/pull/287), 5 native SQLite cases, 5 user manual checks in docs/P20_B_UI086_EXPIRED_SOURCE_AUCTION_CORRECTION_QA.md. Missing title-only source lot and general weighted-wheel freeze are **separate next steps**; P20-B not user accepted/merged and requires Windows+wording/verified Drive ZIP/manual PASS.
 
 
-## CURRENT — P20-B FIX1 manually accepted/merged; P20-C title-only source-auction QA — 2026-10-19
+## Историческое состояние на 10 октября 2026 — P20-B FIX1 manually accepted/merged; P20-C title-only source-auction QA — 2026-10-19
 
 - Original P20-B post-00:00 pending application into existing original Max Amount lot [draft #287](https://github.com/ALL-EX-E/InOneLine/pull/287) passed user's five installed Windows checks, but promotion #289 was **blocked** by a deleted temporary-lot tombstone defect; source drafts #287/#289 remain unmerged. Native P20-B FIX1 [QA draft #290](https://github.com/ALL-EX-E/InOneLine/pull/290) head `c5fafa992c55b7a1ff8a6f5ea5d89cbe1b85a5a2` fixes reactivation/TypeError; native Windows #39255128139 and wording #39255128196 SUCCESS. [Verified Drive FIX1 ZIP](https://drive.google.com/file/d/1BqHs1a3jCvgkvP3pnnttMCY3IB28bWYU/view) 46,848,255 bytes SHA256 `1a6fe758c4a9fc514beb5d83f5fdb939e0467af8612b12e40be58a719a939a19`. User installed FIX1 and stated «Всё работает. Идём дальше.» 2026-10-19. **P20-B FIX1 USER ACCEPTED.** Exact-six-blob promotion [#291](https://github.com/ALL-EX-E/InOneLine/pull/291), QA-matching Git tree `0bc7c0cad6c1f8aee1d9c30150d5bf63a1c99417`, fresh Windows #39258152397 and wording #39258152356 SUCCESS; merged to main as `785051caabea80cc9b43c298a74e701f9b43c95e`. No public release/version/schema change.
 - **CURRENT P20-C / UI-086 stage 3:** saved new title-only pending event from an original Max Amount before 00:00 can explicitly create/reuse a missing lot in that same still-provisional source session after expiry. Deleted history, confirmed sessions, time and dedup guarded. [Draft QA #292](https://github.com/ALL-EX-E/InOneLine/pull/292), docs/P20_C_UI086_POST_EXPIRY_NEW_TITLE_QA.md, tools/auction_pending_post_expiry_new_title_smoke.py. NOT ACCEPTED/MERGED; require full native Windows, wording, verified Drive QA installer and separate installed user approval. New events actually arriving after expiry, wheel freeze and stop warning are separate future tasks.
 
-## CURRENT 21 октября 2026 — P22-A пользователь принял, P22-B/UI-080 QA ожидает проверки
+## Историческое состояние на 10 октября 2026 21 октября 2026 — P22-A пользователь принял, P22-B/UI-080 QA ожидает проверки
 
 - Пользователь установил и принял P22-A/UI-066: «Всё работает. Идём дальше.» QA draft PR #317 HEAD 196baaf366f47e43df43b1431a6dfd55d449164b; native Windows #39551436778 SUCCESS, wording #39551436954 SUCCESS; Drive ZIP ID 1a7G2qmRvad_HQHzTLEA48Zv2VI4geHaG SHA256 37582d5743798214151650c9417cf6d486a7ac80017198e23c654a27908dcab2.
 - Exact five source blobs promoted by PR #318 MERGED as c653f9352f5502b525a3d5878af8e0089def38f5, Git tree 8f117089a2f21cdc51de6f7aadbf8523999e59f2; Windows promotion #39555136569 SUCCESS, wording #39555136439 SUCCESS. Postmerge wording #39556274452 SUCCESS; postmerge Windows #39556274411 requires confirmed completion.
 - NEXT P22-B/UI-080 #1: remove only non-useful history sorting by generated auction names, retain chronological newest/oldest. Clean draft QA PR #320 HEAD 4f2d541e1de345c2f13d8dbd60901e2e9b37f205, 5 files, documentation docs/P22_B_UI080_HISTORY_SORT_QA.md. Windows #39556393378 pending full result, wording #39556393273 SUCCESS. Do not promote or release until installer ZIP/Drive and user manual QA; earlier staging PR #319 closed unmerged.
 - No other UI-080/UI-081 change; version 1.0.8/schema 19/migrations 15 unchanged, no official release. This note supersedes historical older CURRENT/P22-A-awaiting lines.
 
-## CURRENT 2026-10-21 — P22-A postmerge PASSED; P22-B QA installer archived, manual QA next
+## Историческое состояние на 10 октября 2026 2026-10-21 — P22-A postmerge PASSED; P22-B QA installer archived, manual QA next
 
 - P22-A (`c653f9352f5502b525a3d5878af8e0089def38f5`) clean exact-five-blob merge and independent `main` Windows #39556274411 **SUCCESS**, postmerge wording #39556274452 **SUCCESS**. Explicit manual acceptance previously recorded; P22-A complete.
 - P22-B/UI-080 #1: QA draft PR #320 exact head `4f2d541e1de345c2f13d8dbd60901e2e9b37f205`; native Windows Regression Foundation #39556393378 **SUCCESS**, wording #39556393273 **SUCCESS**. GitHub Actions artifact `12325279706`, ZIP SHA256 `35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788`, 46,878,373 bytes, CRC PASS; sole `InOneLine_Setup_1.0.8.exe` 47,738,494 bytes. Exact same archive uploaded to [Google Drive](https://drive.google.com/file/d/1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7/view?usp=drivesdk), under `Обзор_UI_1.0.8`.
 - **P22-B AWAITS USER MANUAL INSTALLED WINDOWS QA; DO NOT MERGE.** Change is only removing name_asc/name_desc History sorts, keeping chronological sort and all period/search/summary/history views. Subsequent UI-080/081 separate. Product 1.0.8 schema19 migrations15 no new public release.
 
-## CURRENT P22-B UI-080 — date sorting accepted, actual mode path QA pending, 2026-10-21
+## Историческое состояние на 10 октября 2026 P22-B UI-080 — date sorting accepted, actual mode path QA pending, 2026-10-21
 
 - User installed and accepted P22-B step 1: «Всё работает. Принимаю. Идём дальше.» Accepted QA source PR #320 HEAD 4f2d541e1de345c2f13d8dbd60901e2e9b37f205, Windows #39556393378 SUCCESS, wording #39556393273 SUCCESS; archived Drive ZIP https://drive.google.com/file/d/1hY7_RVFBDwf1C_ClzMVzqK7PTDREa0H7/view with SHA256 35f882eaadb88b3ad8ff7470289d1f747bd4f83e47afbed18eff75d758e2b788.
 - Exact five blob promotion PR #322 **MERGED** as 484f96b683817830866078c2c360103995313c91 (main tree 9147c5442ef66f97f49474fd2ad45e81f0e6ebc1); promotion native Windows #39560434630 SUCCESS and wording #39560434903 SUCCESS. Postmerge Windows #39561723413 result pending, wording #39561723411 SUCCESS.
 - CURRENT next step UI-080 #2: actual winner-selection path in completed History, only read existing audit and immutable spin evidence; matching column and General mode display. QA draft PR #323 HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, six files, docs/P22_B_UI080_HISTORY_MODE_QA.md and new native Qt/SQLite smoke. CI Windows #39561894563, wording #39561894590 started; not yet manually QA'd, NOT MERGED. No UI-080 #3/#4 or UI-081 implementation.
 - Product 1.0.8, SQLite schema19/migrations15, no new public release. This latest direct user acceptance supersedes prior tails saying P22-B #1 awaiting review.
 
-## CURRENT — P22-B UI-080 #2 готов для ручной Windows QA (2026-10-21)
+## Историческое состояние на 10 октября 2026 — P22-B UI-080 #2 готов для ручной Windows QA (2026-10-21)
 
 - Previous UI-080 #1 accepted and merged PR #322 at 484f96b683817830866078c2c360103995313c91, independent postmerge Windows #39561723413 SUCCESS.
 - Current UI-080 #2 actual completed-auction mode-path frozen QA PR #323 HEAD a6f27879702e1fca42d9be933fa6de6af7e16e8a, Windows #39561894563 SUCCESS, wording #39561894590 SUCCESS. Artifact 12328247607, SHA256 f0d616adfb550f24ab761c2cc11a9339f3dbd11d8d0aecc5cd75f1b72b758bcf, size 46,883,664 bytes, CRC PASS, one installer 47,743,630 bytes. Verified Drive https://drive.google.com/file/d/18QV9TYspT6Qu7TVLv4UAqWD0tTLXJoRA/view?usp=drivesdk.
 - AWAITS USER MANUAL WINDOWS QA; DO NOT MERGE candidate until separate user acceptance. Source scope: History table РЕЖИМ and Общие → Режим derive executed mode path from existing change_log and verification snapshots, no DB writes/schema changes. UI-080 #3 and #4 and UI-081 excluded. App 1.0.8 schema19/migrations15 unchanged, no official release.
 
-## CURRENT 2026-10-21 — UI-080 #3 manually accepted and merged; #4 awaits QA
+## Историческое состояние на 10 октября 2026 2026-10-21 — UI-080 #3 manually accepted and merged; #4 awaits QA
 
 - User accepted UI-080 #3 conditional `Проверка результата` tab after installed native Windows QA. Source QA draft PR #328 HEAD `41950fbcaa86dd7b61c583c50a807f3ab4c85fbe`, Windows #39566107985 SUCCESS; SHA256 `2d783ccf70fc40889a527e35df31141304439074c4c66b203b5999792ad6435c` archived on Google Drive `1cUCkJDTGdNYKvHQURTaL34RRyKlFYzgk`.
 - Exact four blob promotion PR #329 MERGED as `a197678b280b5ab43178ee27e6c0594aad89b4db`, Git tree `973ff1149336a4557de7cfcad8d32fad240a4b56`, promotion Windows #39569787817 SUCCESS. Independent postmerge Windows #39571202957 still requires completed result.
 - Next UI-080 #4 read-only History audit event formatting: clean draft PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f` exactly five files. New native Windows #39572146701 IN PROGRESS after corrected QA expectations (older initial run #39571331574 failed only narrow UI-080 audit smoke). No installed QA release/Drive archive yet and NOT manually accepted. Do not merge until full Windows PASS, artifact CRC/SHA256, Drive, manual user PASS. Staging PR #330 closed unmerged. UI-081 not started.
 - Product 1.0.8/schema19/migrations15 no public release. This supersedes old appended tails claiming UI-080 #3 unaccepted.
 
-## CURRENT — 2026-10-21: UI-080 #3 accepted/merged, #4 Windows QA ready for manual review
+## Историческое состояние на 10 октября 2026 — 2026-10-21: UI-080 #3 accepted/merged, #4 Windows QA ready for manual review
 
 - UI-080 #3 clean promotion PR #329 merged main `a197678b280b5ab43178ee27e6c0594aad89b4db`. Postmerge native Windows #39571202957 **SUCCESS**, wording SUCCESS. Previous user manual QA PASS is authoritative.
 - UI-080 #4 read-only History event Russian presentation: QA draft PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f`, exactly 5 files, native Windows #39572146701 **SUCCESS**, wording **SUCCESS**. GitHub Actions artifact ID `12331854696`, ZIP 46,888,231 bytes, SHA256 `c5e0205bb9b434ac102736bd8025aff96aba4e1995d15c969db3d2428e756620`, independently downloaded and CRC PASS; sole `InOneLine_Setup_1.0.8.exe` member 47,748,166 bytes. Verified Drive archive https://drive.google.com/file/d/1c0WlwR7EzlDkvCKlrY7m932xLUVibqot/view?usp=drivesdk.
 - **Next: user manual installed Windows QA of #4. DO NOT MERGE PR #331 BEFORE EXPLICIT PASS.** Known actual audit actions formatted, no rewritten change_log, no fake future events or DB changes. UI-081 not started. Product 1.0.8, schema19, no official release.
 
-## CURRENT 2026-10-21 — UI-080 #4 user PASS; UI-081 #1 shared dark table style staging
+## Историческое состояние на 10 октября 2026 2026-10-21 — UI-080 #4 user PASS; UI-081 #1 shared dark table style staging
 
 - User explicitly accepted installed UI-080 #4 History event presentation Windows QA. Accepted source PR #331 HEAD `3123b4108e47bf1014d132d9566486fdc2dfff8f`, Windows #39572146701 SUCCESS, Drive ZIP https://drive.google.com/file/d/1T7Fw1Jjp8S49jpkO7j1c_nmBWMznsTM1/view, size 46,888,231 bytes SHA256 `c5e0205bb9b434ac102736bd8025aff96aba4e1995d15c969db3d2428e756620` CRC PASS. Exact five-blob promotion PR #333 head `183d981decc742087c6b7d58b19b0735bf4ffc95` Windows #39584107278 SUCCESS, then MERGED to main as `ae1480dc5cba33c0f161c5151369d40f8fc810b1`, tree `d44371dfa20f442c8e8b3021b9129c2b341a4c06`. Independent postmerge main Windows #39585455015 **SUCCESS**, wording SUCCESS. UI-080 #4 completely accepted and independently checked.
 - Next strictly ledger-approved UI-081 #1 is only shared dark QTableView+QTableWidget style in APP_STYLE, retaining alternating rows. Clean QA draft PR #336 HEAD `36b650f8bb7229ec674758fa583e3aff04c7f6e9` based on accepted main, exactly 4 UI-081 #1 files and exact QA checklist `docs/P23_A_UI081_DARK_TABLE_QA.md`. Git tree identical to closed-unmerged staging PR #334. Native Windows #39585563054 running, wording SUCCESS; after native Windows pass exact installer ZIP CRC/SHA256 + Drive required, then user manual acceptance. No UI-081 #2 copy or #3 formatting in #1.
@@ -1749,7 +1756,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - **UI-081 #2 AWAITS USER INSTALLED WINDOWS SIX-STEP QA / DO NOT MERGE PR #341**. Manual checklist `docs/P23_B_UI081_JOURNAL_DESCRIPTION_QA.md`. After user PASS, promote exact tested source blob SHAs to main, native Windows and postmerge CI. UI-081 #3 Russian event presentation separate. No version/schema/release change.
 
 
-## CURRENT — 2026-10-21: UI-081 #2 USER MANUALLY ACCEPTED; exact-source promotion gated
+## Историческое состояние на 10 октября 2026 — 2026-10-21: UI-081 #2 USER MANUALLY ACCEPTED; exact-source promotion gated
 
 - User's separate installed Windows manual QA of P23-B/UI-081 #2 explicitly PASSED on 2026-10-21: «Всё проверил. Работает. Идём дальше.» No more Windows user checks are needed for that exact frozen candidate.
 - Accepted QA source remains **draft/unmerged** PR #341 HEAD `dd9d4790e687720bce21d005f5a68a6a38afbe6f`, native Windows #39591490607 SUCCESS and Publication wording SUCCESS; frozen 46,884,802-byte ZIP SHA256 `20380fe15146cd2685879e103e1bc7ad7a2cda4005a6961d32aea1e611e68aad`, CRC PASS; verified Google Drive file `1xrcQ9J3GLA_5wX9tuNSYOEjEFLkOmtFl` (same frozen bytes). No public release.
@@ -1757,7 +1764,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - Next strictly approved source scope **UI-081 #3**: readable Russian Journal technical entities/actions/details by reusing existing accepted History/integration formatters, without audit storage changes. Separate staging draft PR #345 is **NOT manually accepted, not a clean main QA candidate**, and must be rebuilt as clean single-scope source from the final accepted main after #344 merges. Native QA + exact ZIP/Drive + separate user Windows PASS remain required. Version 1.0.8, schema 19, migrations 15, publication unchanged.
 
 
-## CURRENT 2026-10-21 — P23-B/UI-081 #2 POSTMERGE PASS; P23-C/UI-081 #3 clean QA ZIP on Drive, awaits USER
+## Историческое состояние на 10 октября 2026 2026-10-21 — P23-B/UI-081 #2 POSTMERGE PASS; P23-C/UI-081 #3 clean QA ZIP on Drive, awaits USER
 
 - P23-B/UI-081 #2 user's explicit installed Windows manual PASS «Всё проверил. Работает. Идём дальше.» recorded; user-accepted exact four tested source blobs from original QA PR #341 were promoted with no modifications via PR #344, **MERGED** as `3c431aae0c97faec4ff49bf6e13546e11cb9ea2a`. Promotion Windows #39606624602 attempt 2 **SUCCESS**, Publication wording #39606624569 SUCCESS. First Windows attempt 1 had P16-F transient failures; rerun fully passed without changes to auction code. Independent MAIN postmerge native Windows Regression Foundation [#39610100024](https://github.com/ALL-EX-E/InOneLine/actions/runs/39610100024) **SUCCESS** and wording #39610099828 SUCCESS. P23-B now CLOSED / USER ACCEPTED / MERGED / POSTMERGE PASS.
 - Next P23-C/UI-081 #3 follows only the accepted active ledger: readable Russian technical entity/action/details on **existing read-only authoritative** `change_log`, reuse `format_auction_history_event` and `format_integration_bet_event`, existing game formatter and settings secret-value redaction. Preserve original full technical search and fast 500-row view, same Qt async path and no backend/DB/schema/version/release change.
@@ -1768,7 +1775,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 
 
 
-## CURRENT 2026-10-21 — P23-C/UI-081 #3 USER PASS, exact promotion and MAIN postmerge PASS; FINAL GATE next
+## Историческое состояние на 10 октября 2026 2026-10-21 — P23-C/UI-081 #3 USER PASS, exact promotion and MAIN postmerge PASS; FINAL GATE next
 
 - User explicitly accepted **all seven** separately installed Windows QA checks for P23-C/UI-081 #3: «UI-081 №3: все 7 пунктов ручной проверки пройдены. Всё работает. Принимаю. Идём дальше.» (2026-10-21). **P23-C UI-081 #3 = USER ACCEPTED.**
 - Frozen read-only Journal Russian presentation QA draft [#347](https://github.com/ALL-EX-E/InOneLine/pull/347) HEAD `a8bfcc91e0b5dd01e260c04e3db9c65765726a40`, native Windows [#39610350010](https://github.com/ALL-EX-E/InOneLine/actions/runs/39610350010) SUCCESS and wording #39610350128 SUCCESS. Verified [exact Drive installer ZIP](https://drive.google.com/file/d/1PPpG10bh0hxwHceMOPg3oL6molsK7UV6/view), 46,892,893 bytes, SHA256 `d2e277e679cf776829f53b081a3faf19e28b4e7bc98cbfef8594a8ec356be830`, independently verified ZIP CRC PASS.
@@ -1778,7 +1785,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 
 
 
-## CURRENT 2026-10-21 — FINAL GATE native Windows PASS; exact Google Drive QA ready for separate USER MANUAL QA
+## Историческое состояние на 10 октября 2026 2026-10-21 — FINAL GATE native Windows PASS; exact Google Drive QA ready for separate USER MANUAL QA
 
 - Accepted UI-081 #3 remains **USER PASS / merged main `44ece91138ebe6bf2d5e2d9b66bd5bb17031c16d` / independent postmerge Windows #39634618121 and wording #39634618138 SUCCESS**. No further runtime scope was introduced.
 - **FINAL GATE validation-only draft** [PR #350](https://github.com/ALL-EX-E/InOneLine/pull/350), frozen head `a9f23e527cf3b6dd9620adf99edc17f8ee853e72`, changes exactly two files: the existing Windows Regression Foundation CI workflow and `docs/FINAL_GATE_1_0_8_QA.md`. All **68/68 existing standalone `*_smoke.py` directly executed**, including the newly wired EXISTING `position_policy_smoke.py`. No app/runtime/DB/version/migration or release action.
@@ -1789,7 +1796,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 
 
 
-## CURRENT 2026-10-21 — FINAL GATE 17/17 INSTALLED USER MANUAL PASS; exact-source merged, MAIN postmerge OBS P16-C FAIL
+## Историческое состояние на 10 октября 2026 2026-10-21 — FINAL GATE 17/17 INSTALLED USER MANUAL PASS; exact-source merged, MAIN postmerge OBS P16-C FAIL
 
 - User explicitly accepted **all 17 installed Windows FINAL GATE end-to-end manual checks** on 2026-10-21: «FINAL GATE: все 17 пунктов ручной проверки успешно пройдены. Всё работает. Принимаю. Идём дальше.» This confirms **FINAL GATE MANUAL QA PASS**, but NOT a public release or permission to replace CURRENT.
 - Frozen [FINAL GATE QA draft #350](https://github.com/ALL-EX-E/InOneLine/pull/350) head `a9f23e527cf3b6dd9620adf99edc17f8ee853e72`, native Windows [#39635025811](https://github.com/ALL-EX-E/InOneLine/actions/runs/39635025811) **SUCCESS**, wording #39635025916 SUCCESS. Exact Drive [Windows QA ZIP](https://drive.google.com/file/d/1NJDvxnXn6FwYkoWm_0u50_a4vkHiUToS/view) 46,885,444 bytes, SHA256 `7fc90d66fd1a933e45caa0daacd07cea603a5b2ddb81fd1e23cb84a86313caa1`, CRC PASS; sole `InOneLine_Setup_1.0.8.exe` 47,745,396 bytes. All 68 existing standalone smoke files are directly covered in the accepted workflow, including existing P07 position policy test.
@@ -1798,7 +1805,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - **NEXT REQUIRED CONTROL:** independently re-run exact main Windows regression (no code edits), and determine reproducibility of P16-C wheel stop visibility. If it remains reproducible, request user's explicit permission BEFORE making any test/runtime changes; one item at a time. No automatic version bump, publication, or CURRENT replacement while postmerge Windows gate is red. Release and CURRENT replacement remain separate user decisions.
 
 
-## CURRENT 2026-10-22 — FINAL GATE CLOSED: user 17/17 PASS; exact promotion merged; independent MAIN Windows rerun SUCCESS
+## Историческое состояние на 10 октября 2026 2026-10-22 — FINAL GATE CLOSED: user 17/17 PASS; exact promotion merged; independent MAIN Windows rerun SUCCESS
 
 - User explicitly passed all 17 installed Windows FINAL GATE scenarios on 2026-10-21. Frozen QA draft [#350](https://github.com/ALL-EX-E/InOneLine/pull/350) HEAD a9f23e527cf3b6dd9620adf99edc17f8ee853e72; native Windows [#39635025811](https://github.com/ALL-EX-E/InOneLine/actions/runs/39635025811) SUCCESS and wording #39635025916 SUCCESS. Exact frozen Drive ZIP https://drive.google.com/file/d/1NJDvxnXn6FwYkoWm_0u50_a4vkHiUToS/view ; 46,885,444 bytes, SHA256 7fc90d66fd1a933e45caa0daacd07cea603a5b2ddb81fd1e23cb84a86313caa1, CRC PASS. Accepted workflow directly runs all 68 standalone smoke scripts.
 - Only the two unchanged QA-tested Git blobs were promoted by [PR #353](https://github.com/ALL-EX-E/InOneLine/pull/353) head 5fe4e1b021d0552c21182381d95bb15724556df0: .github/workflows/regression-foundation-1.0.8.yml blob 1f6b3a1355603db6b08f0e457787f3b44107bb25 and docs/FINAL_GATE_1_0_8_QA.md blob 57bc93f36694bef9d25b0ce7447ce681c24a4987. Promotion Windows [#39641034105](https://github.com/ALL-EX-E/InOneLine/actions/runs/39641034105) SUCCESS, wording #39641034107 SUCCESS, merged as 1c7c9abf262801b7e72e26034be448ebe32dd7c1. No runtime, database or release changes.
@@ -1811,7 +1818,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 Новые публичные описания InOneLine: «аукцион», «лот», «запись», «ставка/баллы», «результат», «история» вместо привязки к одной предметной области. **Поддержка произвольных категорий лотов = ACCEPTED AS POSSIBLE, NOT IMPLEMENTED.** См. `docs/FUTURE_GENERAL_AUCTIONS.md`. Перед реализацией нужен отдельный approval. Не менять runtime, данные, legacy названия или исторические сведения ради перепозиционирования.
 
 
-## CURRENT 2026-10-22 — нейтральные описания приняты, FINAL GATE release publication pending one CI fix
+## Историческое состояние на 10 октября 2026 2026-10-22 — нейтральные описания приняты, FINAL GATE release publication pending one CI fix
 
 - User approved release of accepted FINAL GATE 1.0.8 and neutral public auction/lot terminology. Docs/README/release notes/future-ideas were updated by [PR #356](https://github.com/ALL-EX-E/InOneLine/pull/356); **arbitrary auction categories are NOT IMPLEMENTED**. Preserve legacy data and historical QA facts.
 - Exact accepted EXE SHA256 `318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04`, 47,745,396 bytes. Two-file publication bundle prepared by [#357](https://github.com/ALL-EX-E/InOneLine/pull/357) and immutable preparation [#358](https://github.com/ALL-EX-E/InOneLine/pull/358), Actions #39733626580 SUCCESS, artifact **12406595428** (49,247,058 bytes), internal EXE SHA unchanged; official Git-tracked source ZIP 2,385,164 bytes SHA256 `52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f`, CRC PASS.
@@ -1819,7 +1826,7 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 - Only necessary safety-preserving publisher fix is proposed in **DRAFT [PR #360](https://github.com/ALL-EX-E/InOneLine/pull/360)**: require tag probe exit=2, reject existing-tag exit=0 and unexpected status, then clear LASTEXITCODE; add CI regression. **User's standing approval rule requires explicit consent before merging this out-of-roadmap fix.** Once approved and CI passed, merge, add a distinct NEW immutable publication request filename to retrigger the same tag/assets (do not edit original request), and verify GitHub Release downloaded assets and SHA256.
 - Repo **About/Description metadata** still contains old wording and is **not editable with current GitHub connector permissions**; tracked as [issue #361](https://github.com/ALL-EX-E/InOneLine/issues/361) with exact neutral description for an admin to apply manually. README is neutral and merged. No runtime/DB/schema/version changes; do not claim publication or About update completed.
 
-## CURRENT 2026-10-22 — Official FINAL GATE 1.0.8 GitHub Release published and verified
+## Историческое состояние на 10 октября 2026 2026-10-22 — Official FINAL GATE 1.0.8 GitHub Release published and verified
 
 - User explicitly approved this publication. The new **[official GitHub Release v1.0.8-final-gate-2026-10-22](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22)** is **PUBLISHED / not draft / not prerelease**; tag target is the frozen accepted release-source snapshot commit `2440ff4e974c6a1f96ad03a05152bd867d8553cc`.
 - Existing publisher safeguard required the minimal extra safety-only change [PR #360](https://github.com/ALL-EX-E/InOneLine/pull/360), expressly user approved on 2026-10-22. The fix checks absent tag result 2, rejects existing tags and unexpected failures, then clears PowerShell LASTEXITCODE; regression test added. Native Windows PR check #39734208325 **SUCCESS**, independent main postmerge native Windows #39735652965 **SUCCESS 69/69**, publication wording SUCCESS. No runtime, DB, migration or accepted EXE modifications.
@@ -1831,21 +1838,21 @@ P16-E installed Windows QA **5/5 PASS**, exact accepted promotion PR #242 merged
 
 
 
-## CURRENT 2026-10-22 — published FINAL GATE release verified; additional publication-commit CI P16-F attempt-1 finding
+## Историческое состояние на 10 октября 2026 2026-10-22 — published FINAL GATE release verified; additional publication-commit CI P16-F attempt-1 finding
 
 - Official [InOneLine 1.0.8 FINAL GATE Release](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22) is public, not draft/prerelease. Publisher [#39737160246](https://github.com/ALL-EX-E/InOneLine/actions/runs/39737160246) **SUCCESS**, exact published EXE SHA256 `318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04`, source ZIP SHA256 `52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f`. The original accepted FINAL GATE 17/17 user Windows QA and frozen two-asset source bundle remain unchanged.
 - A **separate additional post-release Windows Regression Foundation** [#39737160279](https://github.com/ALL-EX-E/InOneLine/actions/runs/39737160279) on publication request commit `c131b3d83cddbcab4ea1cb47b7f1d5d490a6ce31` had attempt 1 FAILURE in pre-existing **P16-F `tools/auction_phase_preparation_smoke.py:120`**: `assert_pending_duration(sid, 7000)` observed `-0.311005` seconds remaining instead of positive value while testing pause during preparation. The same unchanged runtime passed user FINAL GATE QA, promotion and postmerge regression before publication; this particular first failure is **NOT proven** to be a runtime defect or timing flake.
 - GitHub Actions **attempt 2 rerun was successfully requested** from failed job `119685448577`, and started under job `119688126779` on the **same unmodified commit**. At this documentation update its conclusion was **not available**. Do not claim all post-release Windows reruns PASS until this run completes. No source/tests/runtime edited to mask the finding.
 - User requested and received official publication; do not revoke exact-release acceptance or silently modify published assets. If this P16-F observation repeats, open a separate user-approved scope for diagnosis/repair. Historical records, hash metadata and future neutral-auctions concept remain preserved.
 
-## CURRENT 2026-10-22 — post-release P16-F QA-only regression issue CLOSED
+## Историческое состояние на 10 октября 2026 2026-10-22 — post-release P16-F QA-only regression issue CLOSED
 
 - Additional post-release CI P16-F finding from Windows [#39737160279](https://github.com/ALL-EX-E/InOneLine/actions/runs/39737160279) (attempts 1 and 2 both FAILED) was investigated and resolved **only within explicitly approved test-harness scope**. No application behavior changed; both original failures stay in history.
 - QA candidate [PR #367](https://github.com/ALL-EX-E/InOneLine/pull/367), HEAD `80798be0577b3036db893b05baad4adbc543fcd5`, native Windows [#39758863514](https://github.com/ALL-EX-E/InOneLine/actions/runs/39758863514) **69/69 PASS** and publication wording #39758863561 **PASS**. Changes only `tools/auction_phase_preparation_smoke.py`, including deterministic test-only UTC clock, retained real Qt event-loop exercise and runner-latency diagnostics.
 - User approved promotion; exact tested QA blob `2dc86aa7f38df89283198cb457cd70b406cfd691` promoted via PR #367, **MERGED `main`** as `8e9d3f56dc78a6597f7aad7cf924138b585db932`. Independent MAIN native Windows [#39761374801](https://github.com/ALL-EX-E/InOneLine/actions/runs/39761374801) **SUCCESS 69/69**, wording [#39761374760](https://github.com/ALL-EX-E/InOneLine/actions/runs/39761374760) **SUCCESS**; [Issue #366](https://github.com/ALL-EX-E/InOneLine/issues/366) **CLOSED**.
 - **State: CLOSED / QA-ONLY / EXACT PROMOTION / POSTMERGE PASS.** Released 1.0.8 EXE/SOURCE/tag and app runtime unchanged. No automatically selected next feature; future arbitrary-category auction work is still a separately approved possibility, not an implementation commitment.
 
-## CURRENT 2026-10-22 — Global Multi-File Import / Issue #4 COMPLETE
+## Историческое состояние на 10 октября 2026 2026-10-22 — Global Multi-File Import / Issue #4 COMPLETE
 
 - User approved the retained [Global Multi-File Import / Issue #4](https://github.com/ALL-EX-E/InOneLine/issues/4) on 2026-10-22, then separately reported Windows manual **PASS A 8/8, B 10/10 and C 9/9**.
 - **A, wheel-center images:** [PR #369](https://github.com/ALL-EX-E/InOneLine/pull/369) exact merged commit f49dd85ebefddc5880fb703aee168c8baffc7522; native Windows candidate [#39766707265](https://github.com/ALL-EX-E/InOneLine/actions/runs/39766707265) 69/69 PASS and independent MAIN [#39772494058](https://github.com/ALL-EX-E/InOneLine/actions/runs/39772494058) 69/69 PASS.
