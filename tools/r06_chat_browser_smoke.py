@@ -70,10 +70,27 @@ METRICS = """JSON.stringify((() => {
   const r=root.getBoundingClientRect(),
         l=layer.getBoundingClientRect(),
         c=chat.getBoundingClientRect();
+  const coveredTop = Math.max(l.top, c.top);
+  const coveredBottom = Math.min(l.bottom, c.bottom);
+  const chatCenterX = (c.left + c.right) / 2;
+  let coveredChatClipped = false, exposedChatVisible = false;
+  if (coveredBottom - coveredTop > 2) {
+    // Main OBS disables pointer events on its outer container. Enable hit
+    // testing only for this measurement, with no change to its painted mask.
+    const pointerEvents = chat.style.pointerEvents;
+    chat.style.pointerEvents = "auto";
+    coveredChatClipped =
+      !document.elementsFromPoint(chatCenterX, (coveredTop + coveredBottom) / 2).includes(chat);
+    exposedChatVisible = c.bottom - l.bottom > 4 &&
+      document.elementsFromPoint(chatCenterX, (c.bottom + l.bottom) / 2).includes(chat);
+    chat.style.pointerEvents = pointerEvents;
+  }
   return {
     ready:true, shown:root.classList.contains('r06-shown'),
     replace:root.classList.contains('r06-replace'),
     listHeight:l.height, chatHeight:c.height, rootHeight:r.height,
+    listPanelHeight:panel.getBoundingClientRect().height,
+    coveredChatClipped, exposedChatVisible,
     rootTop:r.top, rootLeft:r.left, rootWidth:r.width,
     listTop:l.top, listBottom:l.bottom, chatTop:c.top,
     chatBottomGap: +(r.bottom-c.bottom).toFixed(2),
@@ -576,14 +593,16 @@ def main():
                     held = until(page, lambda a: a["shown"] and not a["replace"]
                                  and a["phase"] == "hold"
                                  and a["combinedSync"] == "idle"
-                                 and a["chatHeight"] <= a["rootHeight"] / 2 + 3
+                                 and a["chatHeight"] <= a["rootHeight"] + 3
                                  and a["listHeight"] >= a["rootHeight"] / 2 - 12
+                                 and (a["chatTop"] >= a["listBottom"] - 2 or
+                                      a["coveredChatClipped"])
                                  and a["chatBottomGap"] <= 3,
                                  "hide-empty list fills to live chat edge "+direction)
                     assert held["hasSentinel"] and held["iframeStable"], held
                 if direction == "left":
                     # Extra messages while List is shown grow the chat upward,
-                    # cap it at half, and keep older rows in the existing iframe.
+                    # cap its exposed area, and retain rows in the existing iframe.
                     for index in range(8):
                         assert state.ingest(ChatMessage(
                             "twitch","chan","dynamic-grow-"+str(index),
@@ -601,8 +620,9 @@ def main():
                             grown = until(page, lambda a:
                                 a["shown"] and a["count"] >= 9 and
                                 a["chatHeight"] > first["chatHeight"] + 35 and
-                                a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
-                                a["listHeight"] + a["chatHeight"] <= a["rootHeight"] + 4,
+                                a["chatHeight"] <= a["rootHeight"] + 3 and
+                                (a["chatTop"] >= a["listBottom"] - 2 or
+                                 a["coveredChatClipped"]),
                                 "chat grows upward under live List")
                         except AssertionError as original:
                             # Non-mutating, failure-only browser-network probe.
@@ -852,7 +872,7 @@ def main():
                             a["appliedComposeMode"] == composition and
                             a["appliedDirection"] == direction and
                             a["count"] >= 24 and
-                            a["chatHeight"] > a["rootHeight"] * .90,
+                            a["chatHeight"] >= a["rootHeight"] - 2,
                             "full Twitch frame before List entry " +
                             composition + " " + direction)
                     # At zero seconds, a command must toggle the shared
@@ -906,12 +926,24 @@ def main():
                         hold = until(page, lambda a:
                             a["motionKind"] == "idle" and a["phase"] == "hold" and
                             a["listHeight"] >= a["rootHeight"] *
-                                (.47 if composition == "split" else .97) and
-                            (a["chatHeight"] < a["rootHeight"] * .56
-                             if composition == "split" else True),
+                                (.47 if composition == "split" else .97),
                             "List remains painted after full-chat entrance " +
                             composition + " " + direction)
                         assert hold["panelOpacity"] > .99, hold
+                    # The previous candidate shrank the chat AFTER WAAPI ended.
+                    # Check the actual settled hold before issuing the exit.
+                    wait_with_http_workers(1100)
+                    for page in pages:
+                        held = evaluate(page, METRICS)
+                        assert abs(held["chatHeight"] - before["chatHeight"]) <= 3, held
+                        assert abs(held["listTop"] - held["rootTop"]) <= 3, held
+                        assert abs(held["listPanelHeight"] - held["listHeight"]) <= 3, held
+                        assert held["coveredChatClipped"], held
+                        if composition == "split":
+                            assert .47 <= held["listHeight"] / held["rootHeight"] <= .53, held
+                            assert held["exposedChatVisible"], held
+                        else:
+                            assert abs(held["listHeight"] - held["rootHeight"]) <= 3, held
                     assert state.ingest(ChatMessage(
                         "twitch", "chan",
                         "fix092-hide-" + composition + "-" + direction,
@@ -922,9 +954,10 @@ def main():
                         "Server zero-toggle OFF must follow exactly one command",
                         composition, direction, server_on, server_off)
                     for page in pages:
-                        until(page, lambda a: a["motionKind"] == "exit" and
+                        exiting = until(page, lambda a: a["motionKind"] == "exit" and
                               a["lastExit"] == direction,
                               "FIX-092 reverse exit " + composition + " " + direction)
+                        assert abs(exiting["chatHeight"] - before["chatHeight"]) <= 3, exiting
                         end = until(page, lambda a:
                             a["motionKind"] == "idle" and not a["shown"] and
                             a["chatHeight"] > a["rootHeight"] * .90,

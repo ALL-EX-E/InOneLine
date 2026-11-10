@@ -46,11 +46,29 @@ JS = """JSON.stringify((() => {
   const rs=root.getBoundingClientRect(), ls=layer.getBoundingClientRect(),
         cs=chat.getBoundingClientRect(), ps=getComputedStyle(panel),
         csStyle=getComputedStyle(chat);
+  const l = ls, c = cs;
+  const coveredTop = Math.max(l.top, c.top);
+  const coveredBottom = Math.min(l.bottom, c.bottom);
+  const chatCenterX = (c.left + c.right) / 2;
+  let coveredChatClipped = false, exposedChatVisible = false;
+  if (coveredBottom - coveredTop > 2) {
+    // Main OBS disables pointer events on its outer container. Enable hit
+    // testing only for this measurement, with no change to its painted mask.
+    const pointerEvents = chat.style.pointerEvents;
+    chat.style.pointerEvents = "auto";
+    coveredChatClipped =
+      !document.elementsFromPoint(chatCenterX, (coveredTop + coveredBottom) / 2).includes(chat);
+    exposedChatVisible = c.bottom - l.bottom > 4 &&
+      document.elementsFromPoint(chatCenterX, (c.bottom + l.bottom) / 2).includes(chat);
+    chat.style.pointerEvents = pointerEvents;
+  }
   return {
     ready:true, shown:root.classList.contains("r06-shown"),
     replace:root.classList.contains("r06-replace"),
     rootHeight:rs.height, rootTop:rs.top, rootLeft:rs.left, rootWidth:rs.width,
     listHeight:ls.height, listTop:ls.top, listBottom:ls.bottom,
+    listPanelHeight:panel.getBoundingClientRect().height,
+    coveredChatClipped, exposedChatVisible,
     listLeft:ls.left, listRight:ls.right, layerTransform:getComputedStyle(layer).transform,
     listClipPath:getComputedStyle(layer).clipPath,
     chatClipPath:csStyle.clipPath,
@@ -945,20 +963,19 @@ def main():
                     "hide-empty Split enters or completed 1-second motion " + direction,
                     dynamic_chat=True)
                 assert entered["motionDuration"] == 1000, entered
-                # FIX-092 shrinks a populated chat only AFTER the List has
-                # completely entered. "hold" starts before the existing
-                # chat-height transition has settled. Wait for the final
-                # 12px seam rather than asserting on its first moving frame.
+                # A compact chat keeps the 12px seam. A taller chat retains
+                # its natural height behind the painted List footprint.
                 held = until(view.page(), lambda a:
                     a["phase"] == "hold" and a["shown"] and
                     a["combinedSync"] == "idle" and
-                    a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
-                    a["listHeight"] >= (a["rootHeight"]-12) / 2 - 4 and
-                    abs(a["listBottom"] + 12 - a["chatTop"]) <= 4,
+                    abs(a["listHeight"] - (a["rootHeight"] - 12 -
+                       min(a["chatHeight"], (a["rootHeight"] - 12) / 2))) <= 4 and
+                    (a["chatTop"] >= a["listBottom"] - 2 or a["coveredChatClipped"]),
                     "hide-empty Split List fills free area " + direction,
                     dynamic_chat=True)
                 assert held["sameChatFrame"] and held["sameChatDocument"], held
-                assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 4, held
+                if held["chatHeight"] < (held["rootHeight"] - 12) / 2 - 4:
+                    assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 4, held
                 if direction == "left":
                     for n in range(8):
                         assert state.ingest(ChatMessage(
@@ -966,8 +983,10 @@ def main():
                             "qa_viewer", "Dynamic message %d preserved" % n))
                     growing = until(view.page(), lambda a:
                         a["phase"] == "hold" and a["chatHeight"] > first["chatHeight"] + 50
-                        and a["chatHeight"] <= (a["rootHeight"] - 12) / 2 + 4 and
-                        abs(a["listBottom"] + 12 - a["chatTop"]) <= 4,
+                        and a["chatHeight"] <= a["rootHeight"] + 3 and
+                       abs(a["listHeight"] - (a["rootHeight"] - 12 -
+                           min(a["chatHeight"], (a["rootHeight"] - 12) / 2))) <= 4
+                       and (a["chatTop"] >= a["listBottom"] - 2 or a["coveredChatClipped"]),
                         "new messages expand chat upward under List",
                         dynamic_chat=True)
                     assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
@@ -1200,8 +1219,8 @@ def main():
             assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
             # FIX-092 separate /combined-overlay: reproduce the user's FULL
             # Twitch history, not just one short row. New List motion must
-            # cover the chat while the chat itself stays full-height until
-            # entrance ends. Test all four directions in Split and Replace.
+            # cover the chat while the frame retains its full height through
+            # entrance, hold and exit. Exercise all directions in both modes.
             db.set_settings_bulk({
                 "list_slide_duration": "0",
                 "list_slide_animation_seconds": "1.75",
@@ -1222,7 +1241,7 @@ def main():
                         not a["shown"] and a["motionKind"] == "idle" and
                         a["appliedComposeMode"] == composition and
                         a["appliedDirection"] == direction and
-                        a["chatHeight"] > a["rootHeight"] * .90,
+                        a["chatHeight"] >= a["rootHeight"] - 2,
                         "FULL chat before command " + composition + " " + direction,
                         dynamic_chat=True)
                     assert state.ingest(ChatMessage(
@@ -1247,20 +1266,30 @@ def main():
                     at_end = until(view.page(), lambda a:
                         a["phase"] == "hold" and a["motionKind"] == "idle" and
                         a["listHeight"] >= a["rootHeight"] *
-                            (.47 if composition == "split" else .97) and
-                        (a["chatHeight"] < a["rootHeight"] * .56
-                         if composition == "split" else True),
+                            (.47 if composition == "split" else .97),
                         "List never collapses at full chat handoff " +
                         composition + " " + direction, dynamic_chat=True)
                     assert at_end["sameChatFrame"] and at_end["sameChatDocument"], at_end
+                    wait_with_http_workers(1100)
+                    held = inspect(view.page())
+                    assert abs(held["chatHeight"] - before["chatHeight"]) <= 3, held
+                    assert abs(held["listTop"] - held["rootTop"]) <= 3, held
+                    assert abs(held["listPanelHeight"] - held["listHeight"]) <= 3, held
+                    assert held["coveredChatClipped"], held
+                    if composition == "split":
+                        assert .47 <= held["listHeight"] / held["rootHeight"] <= .53, held
+                        assert held["exposedChatVisible"], held
+                    else:
+                        assert abs(held["listHeight"] - held["rootHeight"]) <= 3, held
                     assert state.ingest(ChatMessage(
                         "twitch", "ch", "fix092-combined-off-" + composition + direction,
                         "qa_viewer", "!list"))
-                    until(view.page(), lambda a:
+                    exiting = until(view.page(), lambda a:
                         a["motionKind"] == "exit" and
                         a["lastExit"] == direction,
                         "FIX-092 reverse over filled chat " +
                         composition + " " + direction, dynamic_chat=True)
+                    assert abs(exiting["chatHeight"] - before["chatHeight"]) <= 3, exiting
                     restored = until(view.page(), lambda a:
                         not a["shown"] and a["motionKind"] == "idle" and
                         a["chatHeight"] > a["rootHeight"] * .90,
