@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import math
 import re
 from typing import Any
 
@@ -29,6 +30,20 @@ class WidgetVisibility:
 _HIDDEN = ("hidden", "Не показывать")
 _ALWAYS = ("always", "Показывать постоянно")
 _SIMPLE = (_HIDDEN, _ALWAYS)
+
+TIMER_FOLLOW_AUCTION_TAB_KEY = "timer_overlay_follow_auction_tab"
+TIMER_SLIDE_DIRECTION_KEY = "timer_overlay_slide_direction"
+TIMER_SLIDE_SECONDS_KEY = "timer_overlay_slide_seconds"
+TIMER_TAB_MOTION_KEYS = (
+    TIMER_FOLLOW_AUCTION_TAB_KEY, TIMER_SLIDE_DIRECTION_KEY, TIMER_SLIDE_SECONDS_KEY,
+)
+TIMER_SLIDE_DIRECTIONS = (
+    ("Слева", "left"), ("Справа", "right"),
+    ("Сверху", "top"), ("Снизу", "bottom"),
+)
+TIMER_SLIDE_DEFAULT_SECONDS = 0.65
+TIMER_SLIDE_MIN_SECONDS = 0.10
+TIMER_SLIDE_MAX_SECONDS = 10.00
 
 # Keep the main-overlay visibility mechanism for future use, but the
 # operator's primary canvas is currently always rendered. Re-enable the
@@ -69,6 +84,23 @@ def show_mode(settings: Mapping[str, Any], widget: str) -> str:
         return "always" if legacy == "1" else "hidden"
     mode = str(settings.get(spec.key) or "").strip().casefold()
     return mode if any(mode == value for value, _label in spec.options) else spec.default
+
+
+def timer_tab_motion(settings: Mapping[str, Any]) -> dict[str, Any]:
+    direction = settings.get(TIMER_SLIDE_DIRECTION_KEY)
+    if not any(direction == value for _label, value in TIMER_SLIDE_DIRECTIONS):
+        direction = TIMER_SLIDE_DIRECTIONS[0][1]
+    try:
+        seconds = float(settings.get(TIMER_SLIDE_SECONDS_KEY, TIMER_SLIDE_DEFAULT_SECONDS))
+    except (TypeError, ValueError):
+        seconds = TIMER_SLIDE_DEFAULT_SECONDS
+    if not math.isfinite(seconds):
+        seconds = TIMER_SLIDE_DEFAULT_SECONDS
+    return {
+        "follow_auction_tab": settings.get(TIMER_FOLLOW_AUCTION_TAB_KEY) == "1",
+        "direction": direction,
+        "duration_seconds": max(TIMER_SLIDE_MIN_SECONDS, min(TIMER_SLIDE_MAX_SECONDS, seconds)),
+    }
 
 
 def wheel_glow_appearance(settings: Mapping[str, Any]) -> dict[str, Any]:

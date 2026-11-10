@@ -391,8 +391,30 @@ body.preview #api-state.visible { display: block; }
     if (remaining > 0 && state?.running) frameId = requestAnimationFrame(tick);
   }
 
+  const slideOffsets = {
+    left: "translateX(-100%)",
+    right: "translateX(100%)",
+    top: "translateY(-100%)",
+    bottom: "translateY(100%)",
+  };
+  let lastMotionConfig = "";
+
+  function applyTabMotion(policy, motion = {}) {
+    const linked = !preview && ObsVisibility.isVisible(policy) && motion.follow_auction_tab === true;
+    const offset = linked ? slideOffsets[motion.direction] : "";
+    const config = offset ? String(motion.duration_seconds) + offset : "";
+    // Only tab changes animate. Initialization and saved setting changes
+    // apply the selected tab's current pose immediately.
+    root.style.transition = config && config === lastMotionConfig
+      ? "transform " + motion.duration_seconds + "s ease-in-out"
+      : "none";
+    root.style.transform = offset && !motion.auction_tab_active ? offset : "";
+    lastMotionConfig = config;
+  }
+
   function applyPayload(payload) {
     state = payload || {};
+    applyTabMotion(state.visibility, state.tab_motion);
     ObsVisibility.apply(state.visibility);
     anchorRemainingMs = Math.max(0, Number(state.remaining_ms) || 0);
     anchorPerformanceMs = performance.now();

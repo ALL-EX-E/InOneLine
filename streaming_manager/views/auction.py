@@ -2134,6 +2134,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 else self._prestart_wheel_format
             ),
             "auto_scroll": bool(self._obs_lot_auto_scroll_enabled),
+            "auction_tab_active": self._main_tab_visible,
             "audio": self.auction_browser_audio_state(),
         }
 

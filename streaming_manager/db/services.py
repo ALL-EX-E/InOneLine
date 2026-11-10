@@ -47,7 +47,9 @@ from ..constants import (
 )
 from ..backup_restore import create_sqlite_backup, prune_backup_files
 from ..position_policy import position_columns_for_surface
-from ..obs_visibility import WIDGETS, show_mode, visibility_payload
+from ..obs_visibility import (
+    TIMER_TAB_MOTION_KEYS, WIDGETS, show_mode, timer_tab_motion, visibility_payload,
+)
 from ..media import (
     MEDIA_CATEGORY_OVERLAY_BACKGROUNDS,
     MEDIA_STORAGE_MANAGED,
@@ -1924,6 +1926,7 @@ class ServicesMixin:
             "auction_max_amount_default_duration_ms",
             "auction_wheel_default_duration_ms",
             WIDGETS["timer"].key,
+            *TIMER_TAB_MOTION_KEYS,
             TIMER_OVERLAY_FONT_FAMILY_KEY,
             TIMER_OVERLAY_FONT_SIZE_KEY,
             TIMER_OVERLAY_FONT_COLOR_KEY,
@@ -2047,6 +2050,10 @@ class ServicesMixin:
             "text": self._format_timer_overlay_milliseconds(remaining_ms),
             "audio": audio_payload,
             "visibility": visibility_payload(settings, "timer"),
+            "tab_motion": {
+                **timer_tab_motion(settings),
+                "auction_tab_active": runtime.get("auction_tab_active") is True,
+            },
             "presentation": {
                 "font_family": family,
                 "font_size": self._timer_overlay_bounded_int(
