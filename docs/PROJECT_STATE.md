@@ -5,7 +5,8 @@
 - Актуальный публичный выпуск — [InOneLine 1.0.10](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10). Пользователь подтвердил работу установщика версии 1.0.10. Опубликованы проверенный установщик и точный архив исходников из Actions artifact `13751287494`. [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42787015004) · [Публикация и контрольные суммы](https://github.com/ALL-EX-E/InOneLine/actions/runs/42802456094).
 - Пользователь подтвердил работу FIX‑092 в установщике `1701581`. [PR №421](https://github.com/ALL-EX-E/InOneLine/pull/421) слит в `main` коммитом `9e5124a76ecfece10dc30b067ff9b260594f40d3`. Дерево этого коммита совпадает с деревом, проверенным в [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42776409499).
 - Тег `v1.0.10` указывает на принятый коммит `5a70f926c6d2ee3eb5f2aa447c48e5cbfc05e3ff`. Принятая логика OBS и схема SQLite 21 сохранены. [SHA‑256](../SHA256SUMS.txt).
-- После выпуска следующий шаг Р06 — самостоятельный OBS-таймер. Ранее принятые режимы показа сохраняются. Вопрос отдельной анимации рассматривается с пользователем.
+- Пользователь принял выезд таймера OBS и общую кнопку показа на вкладке «Аукцион». [PR №423](https://github.com/ALL-EX-E/InOneLine/pull/423) слит в `main` коммитом `943ca5a76774db0becf2ccb2424143c44dc6bef5`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42825902941) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/15LiBvskdN94N5wkwFlXndVza5r8BW8aB/view?usp=drivesdk).
+- Следующий разбор Р06 — OBS-виджет музыкального плеера. Пользователь хочет дополнить его функции. Конкретные дополнения уточняются отдельно.
 
 
 Обновлено: **2026-10-10**
