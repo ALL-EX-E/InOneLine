@@ -586,13 +586,13 @@
         }
       }
       lastEmbeddedChatNeeded = chatNeeded;
-      // During an approved hide-empty command entrance, additional Twitch
-      // rows must resize the existing bottom-anchored chat immediately.
-      // The embedded document's own timer can be throttled while covered
-      // by the List. Reuse the existing parent's non-reload resync even if
-      // some older message cards are already rendered.
-      const movingChat = dynamicCommandMotion && motion === "enter" &&
-        !chatAlways && chatHasMessages;
+      // Chromium can throttle embedded polling both during List motion and
+      // after a command leaves a populated hide-empty chat parked. Keep the
+      // existing bounded parent resync for BOTH states; the child renderer
+      // leaves unchanged snapshots and DOM rows untouched.
+      const dynamicChat = !chatAlways && chatHasMessages;
+      const movingChat = dynamicChat &&
+        dynamicCommandMotion && motion === "enter";
       const refreshIntervalMs = movingChat ? 350 : 1000;
       if (!chatNeeded || !chatHasMessages || embeddedRefreshPending ||
           performance.now() - lastEmbeddedRefreshAt < refreshIntervalMs) return;
@@ -600,7 +600,7 @@
         const childDocument = iframe.contentDocument;
         const messages = childDocument?.getElementById("messages");
         const render = iframe.contentWindow?.IOLRenderEmbeddedChatState;
-        if (!messages || (!movingChat && messages.children.length) ||
+        if (!messages || (!dynamicChat && messages.children.length) ||
             typeof render !== "function") return;
         lastEmbeddedRefreshAt = performance.now();
         embeddedRefreshPending = true;
@@ -610,7 +610,7 @@
             if (!snapshot || !chatAvailable || !chatHasMessages ||
                 iframe.contentDocument !== childDocument) return;
             const rows = childDocument.getElementById("messages");
-            if (rows && (movingChat || !rows.children.length)) {
+            if (rows && (dynamicChat || !rows.children.length)) {
               iframe.contentWindow?.IOLRenderEmbeddedChatState?.(snapshot);
             }
           })
