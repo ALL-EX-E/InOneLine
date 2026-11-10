@@ -135,23 +135,33 @@ def verify_page(page, *, embedded: bool):
     state = evaluate(page, DOM)
     assert state["messages"] == [], ("late deletion rollback", state)
 
-    # A failed newer request does NOT prevent an older successful response
-    # from updating the UI; only already applied newer data wins.
+    # In standalone chat, an older in-flight success is still valid if
+    # the newer request fails before applying any snapshot. Embedded chat
+    # now cancels its preceding request after the 3-s watchdog: even a mock
+    # Promise that ignores AbortSignal MUST NOT revive that stale response.
     until(page, lambda s: s["requests"] >= 6, "retry pair")
     fail(page, 5)
-    reply(page, 4, ["RECOVERED"])
+    if embedded:
+        reply(page, 4, ["STALE-ABORTED"])
+        QTest.qWait(120)
+        state = evaluate(page, DOM)
+        assert state["messages"] == [], ("aborted old reply revived rows", state)
+        until(page, lambda s: s["requests"] >= 7, "embedded retry after timeout")
+        reply(page, 6, ["RECOVERED"])
+    else:
+        reply(page, 4, ["RECOVERED"])
     until(page, lambda s: s["messages"] and "RECOVERED" in s["messages"][0],
-          "older success still works when newer request failed")
+          "successful refresh after a failed newer request")
 
     if embedded:
-        until(page, lambda s: s["requests"] >= 7, "parent resync in flight")
+        until(page, lambda s: s["requests"] >= 8, "parent resync in flight")
         direct = json.dumps(snapshot(["PARENT-NEW"]), ensure_ascii=False)
         assert evaluate(
             page, f"window.IOLRenderEmbeddedChatState({direct}); true;"
         ) is True
         until(page, lambda s: s["messages"] and "PARENT-NEW" in s["messages"][0],
               "direct parent resync")
-        reply(page, 6, ["OLDER-THAN-PARENT"])
+        reply(page, 7, ["OLDER-THAN-PARENT"])
         QTest.qWait(120)
         state = evaluate(page, DOM)
         assert state["messages"] and "PARENT-NEW" in state["messages"][0], state
