@@ -64,6 +64,9 @@ def api_smoke() -> None:
             "follow_auction_tab": False, "auction_widgets_visible": False,
             "direction": "left", "duration_seconds": 0.65,
         }
+        lots = db.current_auction_lots_payload()
+        assert lots["visibility"]["show_mode"] == "always"
+        assert lots["tab_motion"] == default["tab_motion"]
         assert default["presentation"]["background"] == "transparent"
         assert default["presentation"]["background_media"]["url"] == ""
         before_audio = default["audio"]
@@ -559,6 +562,94 @@ def browser_smoke() -> None:
             wait_with_http_workers(400)
             assert js(page, root_visibility) == "visible"
             assert js(page, pose) == [0, 0] and js(page, axis_duration) is None
+
+            lots_mode = stream.obs_show_modes["auction_lots"]
+            assert lots_mode.findData("slide") == -1
+
+            def save_lots(mode_name):
+                lots_mode.setCurrentIndex(lots_mode.findData(mode_name))
+                assert lots_mode.currentData() == mode_name
+                with patch.object(QMessageBox, "information"):
+                    stream._save_auction_lots_overlay_settings()
+
+            stream.auction_lots_follow_auction_tab.setChecked(True)
+            assert lots_mode.itemText(lots_mode.findData("slide")) == "Выезд"
+            stream.auction_lots_slide_direction.setCurrentIndex(
+                stream.auction_lots_slide_direction.findData("right")
+            )
+            stream.auction_lots_slide_seconds.setValue(1.8)
+            assert button.isHidden(), "Unsaved lots binding enabled the Auction button"
+            save_lots("slide")
+            assert not button.isHidden(), "Lots binding alone must enable the Auction button"
+            assert read_json(server, "/api/auction-lots")["tab_motion"] == {
+                "follow_auction_tab": True, "auction_widgets_visible": False,
+                "direction": "right", "duration_seconds": 1.8,
+            }
+            assert not read_json(server, "/api/timer")["tab_motion"]["follow_auction_tab"]
+            stream.refresh()
+            assert stream.auction_lots_follow_auction_tab.isChecked()
+            assert lots_mode.currentData() == "slide"
+            assert stream.auction_lots_slide_direction.currentData() == "right"
+            assert stream.auction_lots_slide_seconds.value() == 1.8
+
+            stream.timer_follow_auction_tab.setChecked(True)
+            stream.timer_slide_direction.setCurrentIndex(stream.timer_slide_direction.findData("top"))
+            stream.timer_slide_seconds.setValue(1.2)
+            save_mode("slide")
+            screen = app.primaryScreen().availableGeometry()
+            source_width = min(800, (screen.width() - 36) // 2)
+            view.resize(source_width, 450)
+            view.move(screen.x() + 8, screen.y() + 8)
+            lots_view = QWebEngineView()
+            try:
+                lots_view.resize(source_width, 450)
+                lots_view.move(screen.x() + source_width + 16, screen.y() + 8)
+                lots_view.page().setBackgroundColor(QColor(Qt.transparent))
+                lots_view.show()
+                lots_view.load(QUrl(server.base_url + "/auction-lots-overlay"))
+                lots_page = lots_view.page()
+                lots_pose = pose.replace("document.querySelector('#root')", "document.body")
+                lots_duration = axis_duration.replace("document.querySelector('#root')", "document.body")
+
+                wait_js(page, pose, [0, -450], "Timer hidden above its source")
+                wait_js(lots_page, lots_pose, [source_width, 0], "Whole lots source hidden to its right")
+                button.click()
+                wait_js(page, axis_duration, 1200, "Timer enters in 1.2 seconds")
+                wait_js(lots_page, lots_duration, 1800, "Lots enter in 1.8 seconds")
+                wait_js(lots_page, f"({lots_pose})[0] > 10 && ({lots_pose})[0] < {source_width - 10}",
+                        True, "Lots moving in horizontally")
+                wait_js(page, pose, [0, 0], "Shared command showed timer")
+                wait_js(lots_page, lots_pose, [0, 0], "Shared command showed lots")
+                wait_js(lots_page, lots_duration, None, "Lots entry completed")
+
+                window._set_current_main_page(stream)
+                wait_with_http_workers(2100)
+                assert js(lots_page, lots_pose) == [0, 0]
+                assert js(page, pose) == [0, 0]
+                window._set_current_main_page(auction)
+                button.click()
+                wait_js(page, axis_duration, 1200, "Timer leaves in 1.2 seconds")
+                wait_js(lots_page, lots_duration, 1800, "Lots leave in 1.8 seconds")
+                wait_js(page, pose, [0, -450], "Timer left by the same side")
+                wait_js(lots_page, lots_pose, [source_width, 0], "Lots left by the same side")
+
+                save_lots("hidden")
+                wait_js(lots_page, visible, "false", "Lots Never Show has priority")
+                button.click()
+                wait_js(page, pose, [0, 0], "Timer shows even when lots are explicitly hidden")
+                assert js(lots_page, visible) == "false"
+                lots_view.load(QUrl(server.base_url + "/auction-lots-overlay?preview=1"))
+                wait_js(lots_page, visible, "true", "Lots preview ignores saved hide")
+                assert js(lots_page, lots_pose) == [0, 0]
+
+                stream.auction_lots_follow_auction_tab.setChecked(False)
+                assert lots_mode.findData("slide") == -1
+                save_lots("always")
+                assert not button.isHidden(), "Unbinding lots must preserve the linked timer"
+                assert read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+            finally:
+                lots_view.close()
+                lots_view.deleteLater()
         finally:
             view.close()
             view.deleteLater()
@@ -569,6 +660,7 @@ def browser_smoke() -> None:
             app.processEvents()
     print("UI045_TIMER_MEDIA_REAL_CHROMIUM_IMAGE_VIDEO_MISSING_FALLBACK=PASS")
     print("R06_TIMER_BUTTON_SLIDE_REAL_CHROMIUM_FOUR_SIDES=PASS")
+    print("R06_AUCTION_LOTS_AND_TIMER_SHARED_BUTTON_CHROMIUM=PASS")
 
 
 def main():

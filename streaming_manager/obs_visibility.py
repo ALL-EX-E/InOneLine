@@ -31,21 +31,26 @@ _HIDDEN = ("hidden", "Не показывать")
 _ALWAYS = ("always", "Показывать постоянно")
 _SIMPLE = (_HIDDEN, _ALWAYS)
 
-TIMER_FOLLOW_AUCTION_TAB_KEY = "timer_overlay_follow_auction_tab"
-AUCTION_WIDGET_BINDINGS = {"timer": TIMER_FOLLOW_AUCTION_TAB_KEY}
-TIMER_SLIDE_MODE = ("slide", "Выезд")
-TIMER_SLIDE_DIRECTION_KEY = "timer_overlay_slide_direction"
-TIMER_SLIDE_SECONDS_KEY = "timer_overlay_slide_seconds"
-TIMER_TAB_MOTION_KEYS = (
-    TIMER_FOLLOW_AUCTION_TAB_KEY, TIMER_SLIDE_DIRECTION_KEY, TIMER_SLIDE_SECONDS_KEY,
-)
-TIMER_SLIDE_DIRECTIONS = (
+AUCTION_WIDGET_BINDINGS = {
+    "timer": (
+        "timer_overlay_follow_auction_tab",
+        "timer_overlay_slide_direction",
+        "timer_overlay_slide_seconds",
+    ),
+    "auction_lots": (
+        "auction_lots_overlay_follow_auction_tab",
+        "auction_lots_overlay_slide_direction",
+        "auction_lots_overlay_slide_seconds",
+    ),
+}
+AUCTION_WIDGET_SLIDE_MODE = ("slide", "Выезд")
+AUCTION_WIDGET_SLIDE_DIRECTIONS = (
     ("Слева", "left"), ("Справа", "right"),
     ("Сверху", "top"), ("Снизу", "bottom"),
 )
-TIMER_SLIDE_DEFAULT_SECONDS = 0.65
-TIMER_SLIDE_MIN_SECONDS = 0.10
-TIMER_SLIDE_MAX_SECONDS = 10.00
+AUCTION_WIDGET_SLIDE_DEFAULT_SECONDS = 0.65
+AUCTION_WIDGET_SLIDE_MIN_SECONDS = 0.10
+AUCTION_WIDGET_SLIDE_MAX_SECONDS = 10.00
 
 # Keep the main-overlay visibility mechanism for future use, but the
 # operator's primary canvas is currently always rendered. Re-enable the
@@ -55,12 +60,14 @@ MAIN_OVERLAY_SHOW_MODE_CONTROL_ENABLED = False
 WIDGETS = {
     "overlay": WidgetVisibility("overlay_show_mode", "always", _SIMPLE),
     "list": WidgetVisibility("list_overlay_show_mode", "always", (_HIDDEN, _ALWAYS, ("slide", "Выезд"))),
-    "timer": WidgetVisibility("timer_overlay_show_mode", "always", (*_SIMPLE, TIMER_SLIDE_MODE)),
+    "timer": WidgetVisibility("timer_overlay_show_mode", "always", (*_SIMPLE, AUCTION_WIDGET_SLIDE_MODE)),
     "music_player": WidgetVisibility(
         MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY, "track_change",
         (_HIDDEN, ("track_change", "При смене трека"), _ALWAYS),
     ),
-    "auction_lots": WidgetVisibility("auction_lots_overlay_show_mode", "always", _SIMPLE),
+    "auction_lots": WidgetVisibility(
+        "auction_lots_overlay_show_mode", "always", (*_SIMPLE, AUCTION_WIDGET_SLIDE_MODE),
+    ),
     "rules": WidgetVisibility("rules_overlay_show_mode", "always", _SIMPLE),
     "wheel": WidgetVisibility(
         "wheel_overlay_show_mode", "context",
@@ -70,7 +77,8 @@ WIDGETS = {
 
 
 def auction_widget_linked(settings: Mapping[str, Any], widget: str) -> bool:
-    return settings.get(AUCTION_WIDGET_BINDINGS[widget]) == "1"
+    link_key, _, _ = AUCTION_WIDGET_BINDINGS[widget]
+    return settings.get(link_key) == "1"
 
 
 def show_mode(settings: Mapping[str, Any], widget: str) -> str:
@@ -89,25 +97,35 @@ def show_mode(settings: Mapping[str, Any], widget: str) -> str:
         )
         return "always" if legacy == "1" else "hidden"
     mode = str(settings.get(spec.key) or "").strip().casefold()
-    if widget == "timer" and mode == TIMER_SLIDE_MODE[0] and not auction_widget_linked(settings, widget):
+    if (
+        widget in AUCTION_WIDGET_BINDINGS
+        and mode == AUCTION_WIDGET_SLIDE_MODE[0]
+        and not auction_widget_linked(settings, widget)
+    ):
         return spec.default
     return mode if any(mode == value for value, _label in spec.options) else spec.default
 
 
-def timer_tab_motion(settings: Mapping[str, Any]) -> dict[str, Any]:
-    direction = settings.get(TIMER_SLIDE_DIRECTION_KEY)
-    if not any(direction == value for _label, value in TIMER_SLIDE_DIRECTIONS):
-        direction = TIMER_SLIDE_DIRECTIONS[0][1]
+def auction_widget_motion(
+    settings: Mapping[str, Any], widget: str, *, auction_widgets_visible: bool = False,
+) -> dict[str, Any]:
+    _, direction_key, seconds_key = AUCTION_WIDGET_BINDINGS[widget]
+    direction = settings.get(direction_key)
+    if not any(direction == value for _label, value in AUCTION_WIDGET_SLIDE_DIRECTIONS):
+        direction = AUCTION_WIDGET_SLIDE_DIRECTIONS[0][1]
     try:
-        seconds = float(settings.get(TIMER_SLIDE_SECONDS_KEY, TIMER_SLIDE_DEFAULT_SECONDS))
+        seconds = float(settings.get(seconds_key, AUCTION_WIDGET_SLIDE_DEFAULT_SECONDS))
     except (TypeError, ValueError):
-        seconds = TIMER_SLIDE_DEFAULT_SECONDS
+        seconds = AUCTION_WIDGET_SLIDE_DEFAULT_SECONDS
     if not math.isfinite(seconds):
-        seconds = TIMER_SLIDE_DEFAULT_SECONDS
+        seconds = AUCTION_WIDGET_SLIDE_DEFAULT_SECONDS
     return {
-        "follow_auction_tab": auction_widget_linked(settings, "timer"),
+        "follow_auction_tab": auction_widget_linked(settings, widget),
+        "auction_widgets_visible": auction_widgets_visible,
         "direction": direction,
-        "duration_seconds": max(TIMER_SLIDE_MIN_SECONDS, min(TIMER_SLIDE_MAX_SECONDS, seconds)),
+        "duration_seconds": max(
+            AUCTION_WIDGET_SLIDE_MIN_SECONDS, min(AUCTION_WIDGET_SLIDE_MAX_SECONDS, seconds),
+        ),
     }
 
 

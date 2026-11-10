@@ -126,16 +126,14 @@ from ..media import (
 )
 from ..workers import FunctionWorker
 from ..obs_visibility import (
-    TIMER_FOLLOW_AUCTION_TAB_KEY,
-    TIMER_SLIDE_DIRECTION_KEY,
-    TIMER_SLIDE_DIRECTIONS,
-    TIMER_SLIDE_MAX_SECONDS,
-    TIMER_SLIDE_MIN_SECONDS,
-    TIMER_SLIDE_MODE,
-    TIMER_SLIDE_SECONDS_KEY,
+    AUCTION_WIDGET_BINDINGS,
+    AUCTION_WIDGET_SLIDE_DIRECTIONS,
+    AUCTION_WIDGET_SLIDE_MAX_SECONDS,
+    AUCTION_WIDGET_SLIDE_MIN_SECONDS,
+    AUCTION_WIDGET_SLIDE_MODE,
     WIDGETS,
+    auction_widget_motion,
     show_mode,
-    timer_tab_motion,
 )
 from .common import (
     ScrollSafeComboBox,
@@ -196,6 +194,9 @@ class StreamTab(QWidget):
         # existing copy/preview callbacks; no second URL policy is introduced.
         self.overlay_url_labels: dict[str, tuple[QLabel, str]] = {}
         self.obs_show_modes: dict[str, ScrollSafeComboBox] = {}
+        self._auction_widget_motion_controls: dict[
+            str, tuple[QCheckBox, ScrollSafeComboBox, ScrollSafeDoubleSpinBox]
+        ] = {}
 
         def add_show_mode(widget: str, form: QFormLayout) -> ScrollSafeComboBox:
             combo = ScrollSafeComboBox()
@@ -761,54 +762,10 @@ class StreamTab(QWidget):
         timer_form.setVerticalSpacing(10)
         timer_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         timer_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        timer_show_mode = add_show_mode("timer", timer_form)
-
-        self.timer_follow_auction_tab = QCheckBox("Привязать к вкладке „Аукцион“")
-        timer_form.addRow(self.timer_follow_auction_tab)
-        timer_tab_hint = QLabel(
-            "Кнопка на вкладке «Аукцион» управляет показом таймера. "
-            "В режиме «Выезд» таймер выезжает с выбранной стороны и остаётся "
-            "видимым до нажатия «Скрыть виджеты аукциона»."
-        )
-        timer_tab_hint.setWordWrap(True)
-        timer_tab_hint.setProperty("muted", True)
-        self.timer_follow_auction_tab.setToolTip(timer_tab_hint.text())
-        timer_form.addRow(timer_tab_hint)
-
-        self.timer_slide_direction = ScrollSafeComboBox()
-        for label, direction in TIMER_SLIDE_DIRECTIONS:
-            self.timer_slide_direction.addItem(label, direction)
-        timer_form.addRow("Направление выезда:", self.timer_slide_direction)
-
-        self.timer_slide_seconds = ScrollSafeDoubleSpinBox()
-        self.timer_slide_seconds.setDecimals(2)
-        self.timer_slide_seconds.setRange(TIMER_SLIDE_MIN_SECONDS, TIMER_SLIDE_MAX_SECONDS)
-        self.timer_slide_seconds.setSingleStep(0.10)
-        self.timer_slide_seconds.setSuffix(" сек.")
-        self.timer_slide_seconds.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        timer_slide_time_control = make_wide_step_control(
-            self.timer_slide_seconds,
-            up_tooltip="Увеличить время анимации таймера",
-            down_tooltip="Уменьшить время анимации таймера",
-        )
-        timer_form.addRow("Время анимации:", timer_slide_time_control)
-        self.timer_slide_direction.setEnabled(False)
-        timer_slide_time_control.setEnabled(False)
-        self.timer_follow_auction_tab.toggled.connect(self.timer_slide_direction.setEnabled)
-        self.timer_follow_auction_tab.toggled.connect(timer_slide_time_control.setEnabled)
-
-        def update_timer_slide_mode(linked: bool) -> None:
-            value, label = TIMER_SLIDE_MODE
-            index = timer_show_mode.findData(value)
-            if linked and index < 0:
-                timer_show_mode.addItem(label, value)
-            elif not linked and index >= 0:
-                if timer_show_mode.currentIndex() == index:
-                    timer_show_mode.setCurrentIndex(timer_show_mode.findData("always"))
-                timer_show_mode.removeItem(index)
-
-        update_timer_slide_mode(False)
-        self.timer_follow_auction_tab.toggled.connect(update_timer_slide_mode)
+        add_show_mode("timer", timer_form)
+        (
+            self.timer_follow_auction_tab, self.timer_slide_direction, self.timer_slide_seconds,
+        ) = self._add_auction_widget_motion_controls("timer", timer_form, "таймер", "таймера")
 
         self.timer_overlay_font = ScrollSafeFontComboBox()
         self.timer_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -1186,6 +1143,13 @@ class StreamTab(QWidget):
         auction_lots_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         auction_lots_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         add_show_mode("auction_lots", auction_lots_form)
+        (
+            self.auction_lots_follow_auction_tab,
+            self.auction_lots_slide_direction,
+            self.auction_lots_slide_seconds,
+        ) = self._add_auction_widget_motion_controls(
+            "auction_lots", auction_lots_form, "список лотов", "списка лотов",
+        )
 
         # R38: layout is selected only by the operator in Stream / OBS.
         self.auction_lots_overlay_layout = ScrollSafeComboBox()
@@ -1442,6 +1406,69 @@ class StreamTab(QWidget):
         if label is not None:
             label.setVisible(bool(visible))
 
+    def _add_auction_widget_motion_controls(
+        self, widget: str, form: QFormLayout, name: str, name_genitive: str,
+    ) -> tuple[QCheckBox, ScrollSafeComboBox, ScrollSafeDoubleSpinBox]:
+        show_mode_combo = self.obs_show_modes[widget]
+        link = QCheckBox("Привязать к вкладке „Аукцион“")
+        form.addRow(link)
+        hint = QLabel(
+            f"Кнопка на вкладке «Аукцион» управляет показом {name_genitive}. "
+            f"В режиме «Выезд» {name} выезжает с выбранной стороны и остаётся "
+            "видимым до нажатия «Скрыть виджеты аукциона»."
+        )
+        hint.setWordWrap(True)
+        hint.setProperty("muted", True)
+        link.setToolTip(hint.text())
+        form.addRow(hint)
+
+        direction = ScrollSafeComboBox()
+        for label, value in AUCTION_WIDGET_SLIDE_DIRECTIONS:
+            direction.addItem(label, value)
+        form.addRow("Направление выезда:", direction)
+
+        seconds = ScrollSafeDoubleSpinBox()
+        seconds.setDecimals(2)
+        seconds.setRange(AUCTION_WIDGET_SLIDE_MIN_SECONDS, AUCTION_WIDGET_SLIDE_MAX_SECONDS)
+        seconds.setSingleStep(0.10)
+        seconds.setSuffix(" сек.")
+        seconds.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        time_control = make_wide_step_control(
+            seconds,
+            up_tooltip=f"Увеличить время анимации {name_genitive}",
+            down_tooltip=f"Уменьшить время анимации {name_genitive}",
+        )
+        form.addRow("Время анимации:", time_control)
+        direction.setEnabled(False)
+        time_control.setEnabled(False)
+        link.toggled.connect(direction.setEnabled)
+        link.toggled.connect(time_control.setEnabled)
+
+        def update_slide_mode(linked: bool) -> None:
+            value, label = AUCTION_WIDGET_SLIDE_MODE
+            index = show_mode_combo.findData(value)
+            if linked and index < 0:
+                show_mode_combo.addItem(label, value)
+            elif not linked and index >= 0:
+                if show_mode_combo.currentIndex() == index:
+                    show_mode_combo.setCurrentIndex(show_mode_combo.findData("always"))
+                show_mode_combo.removeItem(index)
+
+        update_slide_mode(False)
+        link.toggled.connect(update_slide_mode)
+        controls = (link, direction, seconds)
+        self._auction_widget_motion_controls[widget] = controls
+        return controls
+
+    def _auction_widget_motion_values(self, widget: str) -> dict[str, str]:
+        link_key, direction_key, seconds_key = AUCTION_WIDGET_BINDINGS[widget]
+        link, direction, seconds = self._auction_widget_motion_controls[widget]
+        return {
+            link_key: "1" if link.isChecked() else "0",
+            direction_key: str(direction.currentData()),
+            seconds_key: f"{seconds.value():.2f}",
+        }
+
     def _update_timer_background_enabled_state(self) -> None:
         self._set_form_row_visible(
             self.timer_overlay_form,
@@ -1486,9 +1513,7 @@ class StreamTab(QWidget):
         media_id = str(media_value) if str(media_value or "").isdigit() else ""
         self.db.set_settings_bulk({
             WIDGETS["timer"].key: str(self.obs_show_modes["timer"].currentData()),
-            TIMER_FOLLOW_AUCTION_TAB_KEY: "1" if self.timer_follow_auction_tab.isChecked() else "0",
-            TIMER_SLIDE_DIRECTION_KEY: str(self.timer_slide_direction.currentData()),
-            TIMER_SLIDE_SECONDS_KEY: f"{self.timer_slide_seconds.value():.2f}",
+            **self._auction_widget_motion_values("timer"),
             TIMER_OVERLAY_FONT_FAMILY_KEY: self.timer_overlay_font.currentFont().family(),
             TIMER_OVERLAY_FONT_SIZE_KEY: str(self.timer_overlay_font_size.value()),
             TIMER_OVERLAY_FONT_COLOR_KEY: str(
@@ -1715,6 +1740,7 @@ class StreamTab(QWidget):
         )
         self.db.set_settings_bulk({
             WIDGETS["auction_lots"].key: str(self.obs_show_modes["auction_lots"].currentData()),
+            **self._auction_widget_motion_values("auction_lots"),
             AUCTION_LOTS_OVERLAY_LAYOUT_KEY:
                 str(self.auction_lots_overlay_layout.currentData()),
             AUCTION_LOTS_OVERLAY_FONT_FAMILY_KEY:
@@ -1763,6 +1789,7 @@ class StreamTab(QWidget):
             AUCTION_LOTS_CARD_HEADER_FONT_SIZE_KEY:
                 str(self.auction_lots_header_font_size.value()),
         })
+        self.auctionWidgetBindingSaved.emit()
         QMessageBox.information(
             self,
             "OBS Auction Lots",
@@ -2678,8 +2705,11 @@ class StreamTab(QWidget):
         # of appearance options grows.
         settings = self.db.get_settings()
         setting = settings.get
-        motion = timer_tab_motion(settings)
-        self.timer_follow_auction_tab.setChecked(motion["follow_auction_tab"])
+        for widget, (link, direction, seconds) in self._auction_widget_motion_controls.items():
+            motion = auction_widget_motion(settings, widget)
+            link.setChecked(motion["follow_auction_tab"])
+            self._set_combo_by_data(direction, motion["direction"])
+            seconds.setValue(motion["duration_seconds"])
         for widget, combo in self.obs_show_modes.items():
             combo.blockSignals(True)
             self._set_combo_by_data(combo, show_mode(settings, widget))
@@ -2802,8 +2832,6 @@ class StreamTab(QWidget):
         self._load_typography_settings(settings)
         self._update_main_overlay_conditional_visibility()
 
-        self._set_combo_by_data(self.timer_slide_direction, motion["direction"])
-        self.timer_slide_seconds.setValue(motion["duration_seconds"])
         self.timer_overlay_font.setCurrentFont(QFont(
             setting(TIMER_OVERLAY_FONT_FAMILY_KEY, TIMER_OVERLAY_FONT_FAMILY_DEFAULT)
         ))

@@ -391,28 +391,7 @@ body.preview #api-state.visible { display: block; }
     if (remaining > 0 && state?.running) frameId = requestAnimationFrame(tick);
   }
 
-  const slideOffsets = {
-    left: "translateX(-100%)",
-    right: "translateX(100%)",
-    top: "translateY(-100%)",
-    bottom: "translateY(100%)",
-  };
-  let lastMotionConfig = "";
-
-  function applyTabMotion(policy, motion = {}) {
-    const linked = !preview && motion.follow_auction_tab === true;
-    const shown = !linked || motion.auction_widgets_visible === true;
-    const offset = linked && policy?.show_mode === "slide" ? slideOffsets[motion.direction] : "";
-    const config = offset ? String(motion.duration_seconds) + offset : "";
-    // Only the operator's show/hide command animates. Initialization and
-    // saved setting changes apply the group's current pose immediately.
-    root.style.transition = config && config === lastMotionConfig
-      ? "transform " + motion.duration_seconds + "s ease-in-out"
-      : "none";
-    root.style.transform = !shown && offset ? offset : "";
-    root.style.visibility = shown || offset ? "" : "hidden";
-    lastMotionConfig = config;
-  }
+  const applyTabMotion = ObsVisibility.createAuctionMotion(root);
 
   function applyPayload(payload) {
     state = payload || {};
