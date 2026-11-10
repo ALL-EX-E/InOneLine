@@ -818,8 +818,14 @@ body.preview .preview-label { display: flex; }
 
     // Отключённые элементы убираются из рабочих колонок полностью.
     if (!webcamEnabled) parking.appendChild(webcamFrame);
-    if (!listAreaNeeded && listComposition.parentElement !== parking) {
-      parking.appendChild(listComposition);
+    // Keep the already loaded Twitch iframe in its previous List slot.
+    // Hide only its composition, not the flex spacer: removing the spacer
+    // would shift the independent webcam/info panels in the side column.
+    if (!listAreaNeeded) {
+      const currentSlot = listComposition.parentElement;
+      if (currentSlot === slots.left.list || currentSlot === slots.right.list) {
+        listComposition.style.display = "none";
+      }
     }
     if (!infoEnabled) parking.appendChild(infoPanel);
 
@@ -832,10 +838,10 @@ body.preview .preview-label { display: flex; }
     }
 
     if (listAreaNeeded) {
-      // Moving an existing iframe-bearing composition on every API poll
-      // navigates its embedded Twitch document and visibly flickers chat.
-      // Reparent only when the user actually changes the selected side.
+      // Reuse the already mounted iframe. Reparent only for a genuine
+      // side change (or its first placement from the initial parking).
       const targetSlot = slots[listSide].list;
+      listComposition.style.display = "";
       if (listComposition.parentElement !== targetSlot) {
         targetSlot.appendChild(listComposition);
       }
@@ -1060,11 +1066,20 @@ body.preview .preview-label { display: flex; }
     }
   }
 
+  // Apply only the newest COMPLETED /api/data snapshot. A slow request
+  // must not block newer saved settings, and an older response must never
+  // replay a stale zero-second Twitch toggle after a newer one has applied.
+  // This reuses the existing polling timer; no new clock or animation.
+  let overlayRequestId = 0;
+  let overlayLastAppliedRequestId = 0;
   async function update() {
+    const requestId = ++overlayRequestId;
     try {
       const response = await fetch("/api/data", { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
+      if (requestId < overlayLastAppliedRequestId) return;
+      overlayLastAppliedRequestId = requestId;
       ObsVisibility.apply(data.visibility?.overlay);
       const game = data.game || {};
       const overlayConfig = data.overlay || {};
@@ -1076,6 +1091,36 @@ body.preview .preview-label { display: flex; }
       applyTypography(overlayConfig.typography || {});
       applyFrameColors(overlayConfig);
       applyBackgroundMedia(overlayConfig.background || {});
+      // A commanded List can wake a fully parked (display:none) composition
+      // while hide-empty Twitch chat has no messages. Give the existing
+      // composition its real geometry BEFORE it starts the shared WAAPI
+      // entrance; otherwise root.clientHeight=0 silently skips the motion
+      // and starts the hold clock before the List is visible.
+      const listMode = data.visibility?.list?.show_mode;
+      const trigger = data.list_show || {};
+      const listWillShow = listMode === "always" ||
+        (listMode === "slide" &&
+          (trigger.held === true || Number(trigger.remaining_ms || 0) > 0));
+      const twitch = data.multichat || {};
+      const chatWillShow = twitch.enabled === true &&
+        (twitch.visibility === "always" || twitch.has_messages === true);
+      const oldSlot = listComposition.parentElement;
+      if ((listWillShow || chatWillShow) &&
+          (oldSlot === parking || listComposition.style.display === "none")) {
+        const webcamOn = overlayConfig.webcam_enabled !== false;
+        const preferredSide = parseCorner(overlayConfig.webcam_position || "top_right").side;
+        const configuredSide = overlayConfig.list_side;
+        const side = configuredSide === "left" || configuredSide === "right" ?
+          configuredSide : webcamOn ? preferredSide : "right";
+        const slot = slots[side].list;
+        (side === "left" ? leftColumn : rightColumn).classList.remove("hidden");
+        listComposition.style.display = "";
+        // After first placement, hide-empty toggles composition visibility
+        // inside the same flex slot; the iframe document remains untouched.
+        if (listComposition.parentElement !== slot) {
+          slot.appendChild(listComposition);
+        }
+      }
       composer.apply(data, true);
       applyOverlayLayout(overlayConfig, game);
 
@@ -1108,7 +1153,9 @@ body.preview .preview-label { display: flex; }
 
       apiState.classList.remove("visible");
     } catch (err) {
-      apiState.classList.add("visible");
+      if (requestId >= overlayLastAppliedRequestId) {
+        apiState.classList.add("visible");
+      }
     }
   }
 

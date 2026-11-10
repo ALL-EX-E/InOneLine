@@ -23,9 +23,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.database import Database, Game
@@ -52,10 +53,21 @@ JS = """JSON.stringify((() => {
   return {
     ready:true,
     parent:root.parentElement?.id,
+    compositionHidden:(root.parentElement?.id==="left-list" ||
+      root.parentElement?.id==="right-list") &&
+      getComputedStyle(root).display==="none",
     listShown:root.classList.contains("r06-shown"),
+    motionKind:root.dataset.r06StandaloneMotionKind || "idle",
+    combinedSync:root.dataset.r06CombinedSync || "idle",
+    phase:root.dataset.r06StandalonePhase || "idle",
+    motionDuration:Number(root.dataset.r06StandaloneLastMotionDurationMs || 0),
+    holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
     listHeight:box(layer).height, chatHeight:box(chat).height,
     rootHeight:box(root).height,
     chatCount:messages?.children.length ?? -1,
+    chatText:messages?.textContent ?? "",
+    sameChildDocument:!window.__r06OriginalChildDocument ||
+      doc===window.__r06OriginalChildDocument,
     childURL:doc?.location?.href ?? null,
     childReady:doc?.readyState ?? null,
     childRenderType:typeof frame?.contentWindow?.IOLRenderEmbeddedChatState,
@@ -68,9 +80,71 @@ JS = """JSON.stringify((() => {
     gameCutoutWidth:Number(gameCutout?.getAttribute("width")||0),
     cameraCutoutWidth:Number(cameraCutout?.getAttribute("width")||0),
     panelOpacity:s.opacity, panelTransform:s.transform, panelTransition:s.transitionDuration,
-    chatTransition:c.transitionDuration
+    chatTransition:c.transitionDuration,
+    observedHold:(window.__r06EmptyTrace?.frames || []).some(
+      p => p.phase==="hold" && p.shown && p.listHeight>20 &&
+           p.chatHeight<2 && p.rootHeight>50 && p.panelOpacity>=0.99),
+    observedHoldAgeMs:(window.__r06EmptyTrace?.frames || []).find(
+      p => p.phase==="hold" && p.shown && p.listHeight>20 &&
+           p.chatHeight<2 && p.rootHeight>50 && p.panelOpacity>=0.99)?.holdAge ?? null,
+    traceFrames:(window.__r06EmptyTrace?.frames || []).length,
+    traceTail:(window.__r06EmptyTrace?.frames || []).slice(-12)
   };
 })())"""
+
+
+def enable_browser_phase_trace(page) -> None:
+    """Record real Chromium phase changes even when Qt polls are delayed.
+
+    The trace never changes List state, CSS, timers or network requests.
+    It only samples the already accepted Browser Source's painted geometry.
+    """
+    done = []
+    page.runJavaScript("""(() => {
+      const root=document.getElementById("list-composition"),
+            list=document.getElementById("list-layer"),
+            chat=document.getElementById("list-chat"),
+            panel=document.getElementById("list-panel");
+      if (!root || !list || !chat || !panel) return false;
+      window.__r06EmptyTrace?.stop?.();
+      const trace={frames:[], stop:null}, started=performance.now();
+      window.__r06EmptyTrace=trace;
+      let last="";
+      const record=() => {
+        const phase=root.dataset.r06StandalonePhase || "idle";
+        const shown=root.classList.contains("r06-shown");
+        const visible=getComputedStyle(root).display!=="none";
+        const signature=phase+":"+shown+":"+visible;
+        const phaseChanged=signature!==last;
+        if (!phaseChanged && phase!=="hold" && phase!=="enter") return;
+        last=signature;
+        const holdStart=Number(root.dataset.r06StandaloneHoldStartMs||0);
+        const row={
+          t:performance.now()-started, phase, shown, visible,
+          listHeight:list.getBoundingClientRect().height,
+          chatHeight:chat.getBoundingClientRect().height,
+          rootHeight:root.getBoundingClientRect().height,
+          panelOpacity:Number(getComputedStyle(panel).opacity),
+          holdDuration:Number(root.dataset.r06StandaloneHoldDurationMs||0),
+          holdAge:holdStart?performance.now()-holdStart:null
+        };
+        trace.frames.push(row);
+        if (trace.frames.length>800) trace.frames.shift();
+      };
+      const observer=new MutationObserver(record);
+      observer.observe(root, {
+        attributes:true,
+        attributeFilter:["class","style","data-r06-standalone-phase"]
+      });
+      const tick=setInterval(record,75);
+      trace.stop=()=>{clearInterval(tick);observer.disconnect();};
+      record();
+      return true;
+    })()""", done.append)
+    deadline = time.monotonic() + 8
+    while not done and time.monotonic() < deadline:
+        wait_with_http_workers(25)
+    assert done == [True], ("Chromium phase trace was not installed", done)
 
 
 class ManualClock:
@@ -97,13 +171,13 @@ def inspect(page):
     page.runJavaScript(JS, values.append)
     end = time.monotonic() + 8
     while not values and time.monotonic() < end:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not values:
         raise AssertionError("R06 empty-container Chromium JS callback timed out")
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
 
 
-def until(page, predicate, label: str, timeout: float = 25, *, api=None):
+def until(page, predicate, label: str, timeout: float = 25, *, api=None, dynamic_chat=False):
     end = time.monotonic() + timeout
     latest = None
     while time.monotonic() < end:
@@ -120,10 +194,11 @@ def until(page, predicate, label: str, timeout: float = 25, *, api=None):
             assert float(latest["panelOpacity"]) >= 0.99, (label, latest)
             assert latest["panelTransform"] == "none", (label, latest)
             assert latest["panelTransition"] == "0s", (label, latest)
-            assert latest["chatTransition"] == "0s", (label, latest)
+            if not dynamic_chat:
+                assert latest["chatTransition"] == "0s", (label, latest)
             print("R06_EMPTY_CONTAINER_PASS", label, latest, flush=True)
             return latest
-        QTest.qWait(130)
+        wait_with_http_workers(130)
     if api is not None:
         # Do not heal the browser under test; report actual server snapshots.
         try:
@@ -153,7 +228,8 @@ def main() -> int:
         db.set_settings_bulk({
             "list_overlay_show_mode": "slide",
             "list_slide_command": "!list",
-            "list_slide_duration": "90",
+            "list_slide_duration": "3",
+            "list_slide_animation_seconds": "2.00",
             "combined_list_chat_layout": "split",
             "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
             "overlay_webcam_enabled": "1",
@@ -165,7 +241,7 @@ def main() -> int:
         api = LocalApiServer(db, port=free_port())
         api.set_multichat_state_provider(state.snapshot)
         api.set_list_show_controller(state.configure_list_show)
-        api.configure_list_show("slide", "!list", 90)
+        api.configure_list_show("slide", "!list", 3)
         api.start()
         view = QWebEngineView()
         try:
@@ -177,6 +253,7 @@ def main() -> int:
                 page,
                 lambda m: m["parent"] == "movable-elements" and not m["listShown"],
                 "slide idle with empty hide-empty chat is parked",
+                dynamic_chat=True,
             )
             assert idle["listHeight"] <= 1, idle
 
@@ -196,47 +273,130 @@ def main() -> int:
                 lambda m: m["parent"] == "right-list" and
                 not m["listShown"] and m["chatHeight"] > 10 and
                 m["listHeight"] <= 2 and m["chatCount"] >= 1,
-                "new message restores chat only", api=api,
+                "new message restores chat only", api=api, dynamic_chat=True,
             )
             assert abs(message["gameWidth"] - idle["gameWidth"]) <= 1.0
+            assert "QA visible chat" in message["chatText"], message
+
+            # QA-GATE-107: verify the existing embedded renderer retries a
+            # *same* server snapshot if its DOM ever becomes inconsistent.
+            # This is a controlled DOM-loss regression, not a new message or
+            # a forced reload. The old signature short-circuit left rows
+            # permanently blank even though /api/multichat had msg-1.
+            removed = []
+            page.runJavaScript("""(() => {
+              const frame=document.querySelector("#list-chat iframe"),
+                    doc=frame?.contentDocument,
+                    rows=doc?.getElementById("messages");
+              if (!frame || !doc || !rows ||
+                  !rows.textContent.includes("QA visible chat")) return false;
+              window.__r06OriginalChildDocument=doc;
+              rows.replaceChildren();
+              return rows.children.length===0;
+            })()""", removed.append)
+            until_removed = time.monotonic() + 8
+            while not removed and time.monotonic() < until_removed:
+                wait_with_http_workers(25)
+            assert removed == [True], ("Controlled embedded DOM loss failed", removed)
+            recovered = until(
+                page,
+                lambda m: m["parent"] == "right-list" and
+                not m["listShown"] and m["chatCount"] >= 1 and
+                "QA visible chat" in m["chatText"] and m["sameChildDocument"],
+                "embedded Twitch rows recover same snapshot without iframe remount",
+                api=api, dynamic_chat=True,
+            )
+            assert recovered["sameChildDocument"], recovered
 
             state.delete_message("twitch", "channel", "msg-1")
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "deleted final message releases combined container",
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "deleted final message collapses combined slot without iframe move", dynamic_chat=True,
             )
 
+            # QA-GATE-105: record all actual browser phases first. The
+            # three-second hold must not be lost if Qt observation is slow.
+            enable_browser_phase_trace(page)
             assert state.ingest(ChatMessage(
                 "twitch", "channel", "cmd-1", "tester", "!list",
             ))
             with urlopen(api.base_url + "/api/data", timeout=5) as response:
                 snapshot = json.load(response)
-            assert snapshot["list_show"]["remaining_ms"] >= 89000, snapshot["list_show"]
+            assert snapshot["list_show"]["remaining_ms"] >= 2500, snapshot["list_show"]
             # Removing the command message makes the chat genuinely empty
             # while the application-owned List timer keeps running.
             state.delete_message("twitch", "channel", "cmd-1")
+            entering = until(
+                page,
+                lambda m: m["parent"] == "right-list" and
+                m["listShown"] and m["motionKind"] == "enter" and
+                m["combinedSync"] == "command-enter" and
+                m["rootHeight"] > 50,
+                "command starts real List motion from parked empty chat",
+                api=api, dynamic_chat=True,
+            )
+            assert entering["motionDuration"] == 2000, entering
             shown = until(
                 page,
-                lambda m: m["parent"] == "right-list" and m["listShown"] and
-                m["listHeight"] > 20 and m["chatHeight"] < 2,
-                "command shows only list", api=api,
+                lambda m: m["parent"] == "right-list" and
+                ((m["listShown"] and m["motionKind"] == "idle" and
+                  m["phase"] == "hold" and m["listHeight"] > 20 and
+                  m["chatHeight"] < 2) or m["observedHold"]),
+                "command shows only list after full entrance",
+                api=api, dynamic_chat=True,
             )
+            # Browser-native observations prove the painted List was on air
+            # even if the Qt client missed a short hold while rendering.
+            assert shown["observedHold"], shown
+            assert shown["observedHoldAgeMs"] is not None and (
+                -200 < shown["observedHoldAgeMs"] < 1100
+            ), shown
             assert abs(shown["gameWidth"] - idle["gameWidth"]) <= 1.0
-            # Advance server-owned command time deterministically instead of
-            # letting a 9-second window expire during unrelated Chromium startup.
-            clock.advance(91)
+            # Server time expires deterministically, while the accepted local
+            # Browser Source phase clock finishes its independent 3-second hold.
+            clock.advance(4)
             with urlopen(api.base_url + "/api/data", timeout=5) as response:
                 expired = json.load(response)
             assert expired["list_show"]["remaining_ms"] == 0, expired["list_show"]
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "command expiry parks empty combined container",
-                timeout=25, api=api,
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "command expiry collapses empty combined slot",
+                timeout=25, api=api, dynamic_chat=True,
             )
+            # Do not merely accept a transient hold frame: the List must
+            # stay visible for the independent full three seconds after the
+            # completed entrance. Browser timestamps avoid Qt scheduling lag.
+            trace_results = []
+            page.runJavaScript("""JSON.stringify((() => {
+              const frames=window.__r06EmptyTrace?.frames || [];
+              const holdStart=frames.find(p=>p.phase==="hold" && p.shown);
+              const onAir=frames.find(p=>p.phase==="hold" && p.shown &&
+                p.listHeight>20 && p.chatHeight<2 && p.rootHeight>50);
+              const exit=holdStart && frames.find(
+                p=>p.phase==="exit" && p.t>holdStart.t);
+              window.__r06EmptyTrace?.stop?.();
+              return {
+                holdStart:holdStart || null,
+                onAir:onAir || null, exit:exit || null,
+                total:frames.length, tail:frames.slice(-22)
+              };
+            })())""", trace_results.append)
+            deadline = time.monotonic() + 8
+            while not trace_results and time.monotonic() < deadline:
+                wait_with_http_workers(25)
+            assert trace_results, "Missing native Chromium hold duration trace"
+            timeline = json.loads(trace_results[0])
+            assert timeline["holdStart"] and timeline["onAir"] and timeline["exit"], timeline
+            assert timeline["holdStart"]["holdDuration"] == 3000, timeline
+            # The full 3 seconds start at the actual Chromium hold phase,
+            # not after a separate chat-height CSS settling transition.
+            assert timeline["exit"]["t"] - timeline["holdStart"]["t"] >= 2850, timeline
+            assert timeline["onAir"]["t"] < timeline["exit"]["t"], timeline
+            print("R06_EMPTY_NATIVE_HOLD_DURATION_PASS", timeline, flush=True)
 
             # Independent Always visibility means a real visible widget exists.
             db.set_setting("list_overlay_show_mode", "always")
@@ -265,9 +425,10 @@ def main() -> int:
             )
             until(
                 page,
-                lambda m: m["parent"] == "movable-elements" and
-                not m["listShown"],
-                "hidden list and hidden chat park container",
+                lambda m: (m["parent"] == "movable-elements" or m["compositionHidden"]) and
+                not m["listShown"] and m["rootHeight"] < 2,
+                "hidden list and hidden chat collapse container",
+                dynamic_chat=True,
             )
             print("R06_EMPTY_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:

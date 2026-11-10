@@ -15,9 +15,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "windows")
 if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database
 from streaming_manager.multichat import MultichatState
@@ -52,7 +53,7 @@ def measure(page):
     page.runJavaScript(JS,replies.append)
     end=time.monotonic()+8
     while not replies and time.monotonic()<end:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not replies:
         raise AssertionError("R06 Game Window Chromium JS timeout")
     return json.loads(replies[0]) if isinstance(replies[0],str) else replies[0]
@@ -72,7 +73,7 @@ def until(page, ratio, rgb, label):
                        for v in last["transition"].split(",")),last
             print("R06_GAME_WINDOW_BROWSER_PASS",label,last,flush=True)
             return
-        QTest.qWait(100)
+        wait_with_http_workers(100)
     raise AssertionError(f"R06 {label} timeout: {last!r}")
 
 

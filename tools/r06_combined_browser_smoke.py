@@ -9,6 +9,7 @@ import json
 import os
 import re
 import socket
+import threading
 import sys
 import time
 from pathlib import Path
@@ -23,9 +24,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.constants import STATUS_NOT_PLAYED
 from streaming_manager.database import Database, Game
@@ -44,18 +46,39 @@ JS = """JSON.stringify((() => {
   const rs=root.getBoundingClientRect(), ls=layer.getBoundingClientRect(),
         cs=chat.getBoundingClientRect(), ps=getComputedStyle(panel),
         csStyle=getComputedStyle(chat);
+  const l = ls, c = cs;
+  const coveredTop = Math.max(l.top, c.top);
+  const coveredBottom = Math.min(l.bottom, c.bottom);
+  const chatCenterX = (c.left + c.right) / 2;
+  let coveredChatClipped = false, exposedChatVisible = false;
+  if (coveredBottom - coveredTop > 2) {
+    // Main OBS disables pointer events on its outer container. Enable hit
+    // testing only for this measurement, with no change to its painted mask.
+    const pointerEvents = chat.style.pointerEvents;
+    chat.style.pointerEvents = "auto";
+    coveredChatClipped =
+      !document.elementsFromPoint(chatCenterX, (coveredTop + coveredBottom) / 2).includes(chat);
+    exposedChatVisible = c.bottom - l.bottom > 4 &&
+      document.elementsFromPoint(chatCenterX, (c.bottom + l.bottom) / 2).includes(chat);
+    chat.style.pointerEvents = pointerEvents;
+  }
   return {
     ready:true, shown:root.classList.contains("r06-shown"),
     replace:root.classList.contains("r06-replace"),
     rootHeight:rs.height, rootTop:rs.top, rootLeft:rs.left, rootWidth:rs.width,
     listHeight:ls.height, listTop:ls.top, listBottom:ls.bottom,
+    listPanelHeight:panel.getBoundingClientRect().height,
+    coveredChatClipped, exposedChatVisible,
     listLeft:ls.left, listRight:ls.right, layerTransform:getComputedStyle(layer).transform,
     listClipPath:getComputedStyle(layer).clipPath,
     chatClipPath:csStyle.clipPath,
     lastEntrance:root.dataset.r06StandaloneLastEntrance || "",
     lastExit:root.dataset.r06StandaloneLastExit || "",
+    appliedDirection:root.dataset.r06AppliedListDirection || "",
+    appliedComposeMode:root.dataset.r06AppliedComposeMode || "",
     phase:root.dataset.r06StandalonePhase || "idle",
     holdDurationMs:Number(root.dataset.r06StandaloneHoldDurationMs || 0),
+    holdStartMs:Number(root.dataset.r06StandaloneHoldStartMs || 0),
     holdAgeMs:performance.now()-Number(root.dataset.r06StandaloneHoldStartMs || 0),
     chatHeight:cs.height, chatTop:cs.top, chatBottom:cs.bottom,
     combinedSync:root.dataset.r06CombinedSync || "idle",
@@ -71,6 +94,12 @@ JS = """JSON.stringify((() => {
     sameChatDocument:!window.__r06QaChatDoc || doc===window.__r06QaChatDoc,
     chatTransition:csStyle.transitionDuration,
     panelOpacity:ps.opacity, panelTransform:ps.transform,
+    videoGrowthVerified:window.__r06VideoGrowth?.verified === true,
+    videoGrowthMaxCount:window.__r06VideoGrowth?.maxCount || 0,
+    videoGrowthMaxHeight:window.__r06VideoGrowth?.maxHeight || 0,
+    videoGrowthBaseline:window.__r06VideoGrowth?.baseline || 0,
+    videoGrowthSamples:window.__r06VideoGrowth?.samples || 0,
+    videoGrowthTrace:(window.__r06VideoGrowth?.recent || []).slice(-8),
     obsVisible:document.documentElement.dataset.obsVisible
   };
 })())"""
@@ -87,26 +116,86 @@ def inspect(page):
     page.runJavaScript(JS, values.append)
     expiry = time.monotonic() + 8
     while not values and time.monotonic() < expiry:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not values:
         raise AssertionError("combined Chromium JS callback timed out")
     return json.loads(values[0]) if isinstance(values[0], str) else values[0]
 
 
-def until(page, expected, label, timeout=35):
+def until(page, expected, label, timeout=35, dynamic_chat=False):
     deadline = time.monotonic() + timeout
     latest = None
     while time.monotonic() < deadline:
         latest = inspect(page)
         if latest and latest.get("ready") and expected(latest):
             assert latest["iframeCount"] == 1, (label, latest)
-            assert latest["chatTransition"] == "0s", (label, latest)
+            if not dynamic_chat:
+                assert latest["chatTransition"] == "0s", (label, latest)
             assert float(latest["panelOpacity"]) >= .99, (label, latest)
             assert latest["panelTransform"] == "none", (label, latest)
             print("R06_COMBINED_PASS", label, latest, flush=True)
             return latest
-        QTest.qWait(130)
+        wait_with_http_workers(130)
     raise AssertionError(f"{label} timed out: {latest!r}")
+
+
+def start_native_live_growth_probe(page, baseline):
+    """Sample actual painted Twitch resize while List is entering.
+
+    Qt can deliver a runJavaScript callback after the three-second animation;
+    record valid mid-motion frames *inside Chromium* without altering UI
+    state, timers, messages, request order, or motion duration.
+    """
+    script = """(() => {
+      const root=document.getElementById("list-composition"),
+            chat=document.getElementById("list-chat"),
+            panel=document.getElementById("list-panel"),
+            frame=chat?.querySelector("iframe");
+      if (!root || !chat || !panel || !frame) return false;
+      window.__r06VideoGrowth?.stop?.();
+      const baseline=__BASELINE__;
+      const trace={
+        baseline, verified:false, maxCount:0,
+        maxHeight:0, samples:0, recent:[], stop:null
+      };
+      window.__r06VideoGrowth=trace;
+      const sample=()=>{
+        const doc=frame.contentDocument,
+              cards=doc?.getElementById("messages"),
+              rs=root.getBoundingClientRect(),
+              cs=chat.getBoundingClientRect(),
+              count=cards?.children?.length ?? -1,
+              kind=root.dataset.r06StandaloneMotionKind || "idle";
+        if (kind!=="enter") return;
+        trace.samples++;
+        trace.maxCount=Math.max(trace.maxCount,count);
+        trace.maxHeight=Math.max(trace.maxHeight,cs.height);
+        const anchored=Math.abs(cs.bottom-(rs.top+rs.height))<=4;
+        const opaque=Number(getComputedStyle(panel).opacity)>=.99;
+        const sameFrame=(!window.__r06QaChatFrame ||
+          frame===window.__r06QaChatFrame) &&
+          (!window.__r06QaChatDoc ||
+          doc===window.__r06QaChatDoc);
+        const ok=count>=10 && cs.height>baseline+25 &&
+          anchored && opaque && sameFrame && rs.height>0;
+        if (ok) trace.verified=true;
+        trace.recent.push({
+          kind, count, height:cs.height, baseline, anchored,
+          opaque, sameFrame, ok
+        });
+        if(trace.recent.length>16)trace.recent.shift();
+      };
+      const handle=setInterval(sample,40);
+      trace.stop=()=>clearInterval(handle);
+      sample();
+      return true;
+    })()""".replace("__BASELINE__", json.dumps(float(baseline)))
+    result = []
+    page.runJavaScript(script, result.append)
+    deadline = time.monotonic() + 8
+    while not result and time.monotonic() < deadline:
+        wait_with_http_workers(25)
+    assert result == [True], ("No Chromium video growth recorder", result)
 
 
 def main():
@@ -239,7 +328,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "No intermediate combined animation frames"
             done = until(
                 view.page(),
@@ -251,7 +340,7 @@ def main():
             entrance_count = done["entranceCount"]
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["entranceCount"] == entrance_count, stable
             assert stable["combinedSync"] == "idle", stable
@@ -278,7 +367,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "No intermediate reverse List/chat frames"
             done = until(
                 view.page(),
@@ -291,7 +380,7 @@ def main():
             exit_count = done["exitCount"]
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["exitCount"] == exit_count, stable
             assert stable["combinedSync"] == "idle", stable
@@ -328,7 +417,7 @@ def main():
             )
             capture_deadline = time.monotonic() + 8
             while not capture and time.monotonic() < capture_deadline:
-                QTest.qWait(25)
+                wait_with_http_workers(25)
             assert capture == [True], capture
 
             db.set_setting("list_overlay_show_mode", "always")
@@ -354,7 +443,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "Missing nonempty split-entry intermediate frames"
             done = until(
                 view.page(),
@@ -369,7 +458,7 @@ def main():
             entrance_count = done["entranceCount"]
             db.set_setting("list_overlay_show_mode", "always")
             api.configure_list_show("always", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["entranceCount"] == entrance_count, stable
             assert stable["messageCount"] == 4, stable
@@ -404,7 +493,7 @@ def main():
                     assert abs(frame["chatBottom"] -
                                (frame["rootTop"] + frame["rootHeight"])) < 2, frame
                     assert float(frame["panelOpacity"]) >= .99, frame
-                QTest.qWait(125)
+                wait_with_http_workers(125)
             assert frames, "Missing nonempty split-exit intermediate frames"
             done = until(
                 view.page(),
@@ -420,7 +509,7 @@ def main():
             exit_count = done["exitCount"]
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             stable = inspect(view.page())
             assert stable["exitCount"] == exit_count, stable
             assert stable["messageCount"] == 4, stable
@@ -450,12 +539,14 @@ def main():
                 # their existing 1-second /api/data poll. Wait for the next
                 # full poll before issuing a Twitch command, otherwise this
                 # test races a newly saved direction against the old one.
-                QTest.qWait(1600)
+                wait_with_http_workers(1600)
                 baseline = until(
                     view.page(),
                     lambda a: not a["shown"] and a["motionKind"] == "idle" and
+                              a["appliedDirection"] == direction and
+                              a["appliedComposeMode"] == "split" and
                               abs(a["chatHeight"] - a["rootHeight"]) < 3,
-                    "command idle before " + direction)
+                    "command idle after saved Split direction " + direction)
                 prior_enter = baseline["entranceCount"]
                 prior_exit = baseline["exitCount"]
                 assert state.ingest(ChatMessage(
@@ -495,7 +586,7 @@ def main():
                         chat_clip = frame["chatClipPath"]
                         if direction == "left":
                             assert frame["listLeft"] <= frame["rootLeft"] + 3, frame
-                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            match = re.search(r"polygon\(\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listRight"] - frame["rootLeft"]
@@ -503,14 +594,14 @@ def main():
                         elif direction == "right":
                             assert frame["listLeft"] >= frame["rootLeft"] - 3, frame
                             match = re.search(
-                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                                r"polygon\(\s*0% 0%,\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listLeft"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "top":
                             assert frame["listTop"] <= frame["rootTop"] + 3, frame
-                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            match = re.search(r"inset\(([0-9.eE+-]+)px", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1))
                             list_edge = frame["listBottom"] - frame["rootTop"]
@@ -525,16 +616,16 @@ def main():
                                 frame["rootTop"] + own_slot + 3), frame
                             assert frame["listClipPath"].startswith("inset("), frame
                             mask_match = re.search(
-                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.eE+-]+)px",
                                 chat_clip)
                             list_match = re.search(
-                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                                r"inset\(([0-9.eE+-]+)px", frame["listClipPath"])
                             assert mask_match and list_match, frame
                             # The dividing mask moves with the visible top of
                             # the upward-revealed List, including the 12px gap.
                             assert abs(float(mask_match.group(1)) -
                                        float(list_match.group(1))) < 4, frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(frames) >= 3, (
                     "Insufficient intermediate combined command frames", direction, frames)
                 assert len({a["chatClipPath"] for a in frames}) >= 3, (
@@ -554,7 +645,7 @@ def main():
                 assert 9 <= done["chatTop"] - done["listBottom"] <= 15, done
                 assert all(any(msg in row for row in done["messageTexts"])
                            for msg in chat_lines), done
-                QTest.qWait(600)
+                wait_with_http_workers(600)
                 stable = inspect(view.page())
                 assert stable["entranceCount"] == done["entranceCount"], stable
                 assert stable["phase"] == "hold", stable
@@ -600,20 +691,20 @@ def main():
                         own_slot = (frame["rootHeight"] - 12) / 2
                         chat_clip = frame["chatClipPath"]
                         if direction == "left":
-                            match = re.search(r"polygon\(\s*([0-9.]+)% 0%", chat_clip)
+                            match = re.search(r"polygon\(\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listRight"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "right":
                             match = re.search(
-                                r"polygon\(\s*0% 0%,\s*([0-9.]+)% 0%", chat_clip)
+                                r"polygon\(\s*0% 0%,\s*([0-9.eE+-]+)% 0%", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1)) * frame["rootWidth"] / 100
                             list_edge = frame["listLeft"] - frame["rootLeft"]
                             assert abs(mask_edge - list_edge) < 15, frame
                         elif direction == "top":
-                            match = re.search(r"inset\(([0-9.]+)px", chat_clip)
+                            match = re.search(r"inset\(([0-9.eE+-]+)px", chat_clip)
                             assert match, frame
                             mask_edge = float(match.group(1))
                             list_edge = frame["listBottom"] - frame["rootTop"]
@@ -623,14 +714,14 @@ def main():
                                 frame["rootTop"] + own_slot + 3), frame
                             assert frame["listClipPath"].startswith("inset("), frame
                             mask_match = re.search(
-                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.]+)px",
+                                r"polygon\(\s*0% 0%,\s*100% 0%,\s*100% ([0-9.eE+-]+)px",
                                 chat_clip)
                             list_match = re.search(
-                                r"inset\(([0-9.]+)px", frame["listClipPath"])
+                                r"inset\(([0-9.eE+-]+)px", frame["listClipPath"])
                             assert mask_match and list_match, frame
                             assert abs(float(mask_match.group(1)) -
                                        float(list_match.group(1))) < 4, frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(exit_frames) >= 3, (
                     "Insufficient intermediate reverse expiry frames", direction, exit_frames)
                 assert len({a["chatClipPath"] for a in exit_frames}) >= 3, (
@@ -651,7 +742,7 @@ def main():
                 assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
                 assert all(any(msg in row for row in expired["messageTexts"])
                            for msg in chat_lines), expired
-                QTest.qWait(600)
+                wait_with_http_workers(600)
                 stable_exit = inspect(view.page())
                 assert stable_exit["exitCount"] == expired["exitCount"], stable_exit
                 assert stable_exit["phase"] == "idle", stable_exit
@@ -662,7 +753,7 @@ def main():
                 "list_slide_direction": "top",
             })
             api.configure_list_show("slide", "!list", 0)
-            QTest.qWait(1600)
+            wait_with_http_workers(1600)
             baseline = until(view.page(), lambda a: not a["shown"] and
                              a["motionKind"] == "idle",
                              "combined 0-second command idle")
@@ -678,7 +769,7 @@ def main():
                               a["combinedSync"] == "idle",
                               "combined 0-second List stays visible")
             assert zero_hold["sameChatFrame"] and zero_hold["sameChatDocument"], zero_hold
-            QTest.qWait(1800)
+            wait_with_http_workers(1800)
             retained = inspect(view.page())
             assert retained["shown"] and retained["exitCount"] == baseline["exitCount"], retained
             assert state.ingest(ChatMessage(
@@ -706,15 +797,17 @@ def main():
                 "list_slide_animation_seconds": "2.00",
             })
             api.configure_list_show("slide", "!list", 0)
-            QTest.qWait(1600)
+            wait_with_http_workers(1600)
             for direction in ("left", "right", "top", "bottom"):
                 db.set_setting("list_slide_direction", direction)
-                QTest.qWait(1600)  # Snapshot poll must read the saved direction.
+                wait_with_http_workers(1600)  # Snapshot poll must read the saved direction.
                 prior = until(
                     view.page(), lambda a: not a["shown"] and
                     a["motionKind"] == "idle" and
+                    a["appliedDirection"] == direction and
+                    a["appliedComposeMode"] == "replace" and
                     abs(a["chatHeight"] - a["rootHeight"]) < 3,
-                    "replace zero idle before " + direction)
+                    "replace zero idle after saved direction " + direction)
                 assert state.ingest(ChatMessage(
                     "twitch", "ch", "replace-on-" + direction, "qa_viewer", "!list"
                 )), direction
@@ -736,11 +829,26 @@ def main():
                         assert float(frame["panelOpacity"]) >= .99, frame
                         assert frame["panelTransform"] == "none", frame
                         assert frame["chatClipPath"].startswith("inset("), frame
-                        clip = re.search(
-                            r"inset\(([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px ([-0-9.]+)px\)",
-                            frame["chatClipPath"])
-                        assert clip, frame
-                        top, right, bottom, left = map(float, clip.groups())
+                        # Computed Chromium CSS is allowed to normalize
+                        # inset() to 1, 2, 3 or 4 components. Expand its
+                        # ordinary CSS shorthand before comparing painted
+                        # edges; requiring exactly four caused a false FAIL.
+                        css_inset = frame["chatClipPath"]
+                        assert css_inset.startswith("inset("), frame
+                        values = [float(v) for v in re.findall(
+                            r"(-?(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+))px",
+                            css_inset)]
+                        assert 1 <= len(values) <= 4, frame
+                        if len(values) == 1:
+                            top = right = bottom = left = values[0]
+                        elif len(values) == 2:
+                            top = bottom = values[0]
+                            right = left = values[1]
+                        elif len(values) == 3:
+                            top, right, bottom = values
+                            left = right
+                        else:
+                            top, right, bottom, left = values
                         if direction == "left":
                             edge = frame["listRight"] - frame["rootLeft"]
                             assert abs(left - edge) <= 16, frame
@@ -756,7 +864,7 @@ def main():
                         assert frame["messageCount"] >= 4, frame
                         assert all(any(msg in row for row in frame["messageTexts"])
                                    for msg in chat_lines), frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(samples) >= 3, (direction, samples)
                 assert len({a["chatClipPath"] for a in samples}) >= 3, samples
                 full = until(view.page(), lambda a:
@@ -766,7 +874,7 @@ def main():
                              abs(a["listHeight"] - a["rootHeight"]) < 3,
                              "replace zero toggle holds full area " + direction)
                 assert full["sameChatFrame"] and full["sameChatDocument"], full
-                QTest.qWait(700)
+                wait_with_http_workers(700)
                 retained = inspect(view.page())
                 assert retained["shown"] and retained["replace"], retained
                 assert retained["exitCount"] == prior["exitCount"], retained
@@ -790,7 +898,7 @@ def main():
                         assert frame["sameChatFrame"] and frame["sameChatDocument"], frame
                         assert all(any(msg in row for row in frame["messageTexts"])
                                    for msg in chat_lines), frame
-                    QTest.qWait(125)
+                    wait_with_http_workers(125)
                 assert len(exit_samples) >= 3, (direction, exit_samples)
                 hidden = until(view.page(), lambda a:
                                not a["shown"] and not a["replace"] and
@@ -800,6 +908,481 @@ def main():
                 assert hidden["sameChatFrame"] and hidden["sameChatDocument"], hidden
                 assert all(any(msg in row for row in hidden["messageTexts"])
                            for msg in chat_lines), hidden
+            # Regression: hide-empty Twitch chat has no reserved frame until
+            # messages arrive. Its lower edge stays fixed and grows upward.
+            db.set_settings_bulk({
+                "multichat_appearance_common": json.dumps({"visibility": "hide_empty"}),
+                "list_overlay_show_mode": "slide",
+                "combined_list_chat_layout": "split",
+                "list_slide_duration": "0",
+                "list_slide_animation_seconds": "1.00",
+                "list_animation_seconds": "0.60",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            state.clear_chat("twitch", "ch")
+            empty = until(view.page(), lambda a:
+                          not a["shown"] and a["chatHeight"] <= 2 and
+                          a["motionKind"] == "idle",
+                          "hide-empty combined starts with no chat",
+                          dynamic_chat=True)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-first", "qa_viewer",
+                "R06 dynamic first message"))
+            first = until(view.page(), lambda a:
+                          not a["shown"] and a["messageCount"] == 1 and
+                          10 < a["chatHeight"] < a["rootHeight"] / 2,
+                          "one message occupies compact bottom chat",
+                          dynamic_chat=True)
+            assert first["chatTransition"].startswith("0.6s"), first
+            assert abs(first["chatBottom"] -
+                       (first["rootTop"] + first["rootHeight"])) <= 3, first
+
+            # Share the exact same List WAAPI in Split; no 50/50 reservation
+            # while the chat contains only a few short messages.
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+ 
+                prior_split = until(view.page(), lambda a:
+                      not a["shown"] and a["motionKind"] == "idle" and
+                      a["appliedDirection"] == direction and
+                      a["appliedComposeMode"] == "split",
+                      "Chromium applied hide-empty split "+direction,
+                      dynamic_chat=True)
+
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-on-" + direction,
+                    "qa_viewer", "!list")), direction
+                entered = until(view.page(), lambda a:
+                    a["lastEntrance"] == direction and a["shown"] and
+                    a["entranceCount"] == prior_split["entranceCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "command-enter" and
+                      a["motionKind"] == "enter") or
+                     (a["phase"] == "hold" and a["motionKind"] == "idle" and
+                      a["listHeight"] >= (a["rootHeight"] - 12) / 2 - 4)),
+                    "hide-empty Split enters or completed 1-second motion " + direction,
+                    dynamic_chat=True)
+                assert entered["motionDuration"] == 1000, entered
+                # A compact chat keeps the 12px seam. A taller chat retains
+                # its natural height behind the painted List footprint.
+                held = until(view.page(), lambda a:
+                    a["phase"] == "hold" and a["shown"] and
+                    a["combinedSync"] == "idle" and
+                    abs(a["listHeight"] - (a["rootHeight"] - 12 -
+                       min(a["chatHeight"], (a["rootHeight"] - 12) / 2))) <= 4 and
+                    (a["chatTop"] >= a["listBottom"] - 2 or a["coveredChatClipped"]),
+                    "hide-empty Split List fills free area " + direction,
+                    dynamic_chat=True)
+                assert held["sameChatFrame"] and held["sameChatDocument"], held
+                if held["chatHeight"] < (held["rootHeight"] - 12) / 2 - 4:
+                    assert abs(held["listBottom"] + 12 - held["chatTop"]) <= 4, held
+                if direction == "left":
+                    for n in range(8):
+                        assert state.ingest(ChatMessage(
+                            "twitch", "ch", "hide-empty-grow-" + str(n),
+                            "qa_viewer", "Dynamic message %d preserved" % n))
+                    growing = until(view.page(), lambda a:
+                        a["phase"] == "hold" and a["chatHeight"] > first["chatHeight"] + 50
+                        and a["chatHeight"] <= a["rootHeight"] + 3 and
+                       abs(a["listHeight"] - (a["rootHeight"] - 12 -
+                           min(a["chatHeight"], (a["rootHeight"] - 12) / 2))) <= 4
+                       and (a["chatTop"] >= a["listBottom"] - 2 or a["coveredChatClipped"]),
+                        "new messages expand chat upward under List",
+                        dynamic_chat=True)
+                    assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-off-" + direction,
+                    "qa_viewer", "!list")), direction
+                left = until(view.page(), lambda a:
+                    a["lastExit"] == direction and
+                    a["exitCount"] == prior_split["exitCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "command-exit" and
+                      a["motionKind"] == "exit") or
+                     (a["motionKind"] == "idle" and not a["shown"] and
+                      a["listHeight"] <= 2)),
+                    "hide-empty Split reverses/completes " + direction,
+                    dynamic_chat=True)
+                assert left["motionDuration"] == 1000, left
+                exposed = until(view.page(), lambda a:
+                    not a["shown"] and a["motionKind"] == "idle" and
+                    a["chatHeight"] > 10 and a["chatHeight"] <= a["rootHeight"] + 3,
+                    "hide-empty chat returns to content height " + direction,
+                    dynamic_chat=True)
+                assert exposed["sameChatFrame"] and exposed["sameChatDocument"], exposed
+                assert exposed["messageCount"] >= 1, exposed
+
+            # Replace uses exactly the same command timings but the List covers
+            # the entire parent. The clipped Twitch iframe stays alive.
+            db.set_setting("combined_list_chat_layout", "replace")
+            wait_with_http_workers(1300)
+            for direction in ("left", "right", "top", "bottom"):
+                db.set_setting("list_slide_direction", direction)
+ 
+                prior_replace = until(view.page(), lambda a:
+                      not a["shown"] and a["motionKind"] == "idle" and
+                      a["appliedDirection"] == direction and
+                      a["appliedComposeMode"] == "replace",
+                      "Chromium applied hide-empty replace "+direction,
+                      dynamic_chat=True)
+
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-replace-on-" + direction,
+                    "qa_viewer", "!list")), direction
+                entered = until(view.page(), lambda a:
+                    a["lastEntrance"] == direction and a["shown"] and
+                    a["entranceCount"] == prior_replace["entranceCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "replace-command-enter" and
+                      a["motionKind"] == "enter") or
+                     (a["phase"] == "hold" and a["motionKind"] == "idle" and
+                      a["replace"] and a["listHeight"] >= a["rootHeight"] - 3)),
+                    "hide-empty Replace enters or completes 1-second motion " + direction,
+                    dynamic_chat=True)
+                # FIX-092 uses one exact even-odd subtraction mask for the
+                # List's painted rectangle in EVERY direction. The legacy
+                # polygon/inset expectation predates this transparent-safe
+                # occlusion mechanism and must not force a runtime rollback.
+                expectedMask = "path(evenodd, "
+                occluded = until(view.page(), lambda a:
+                    0 < a["chatHeight"] <= a["rootHeight"] + 3 and
+                    ((a["motionKind"] == "enter" and
+                      a["chatClipPath"].startswith(expectedMask)) or
+                     (a["motionKind"] == "idle" and a["phase"] == "hold" and
+                      a["replace"] and a["listHeight"] >= a["rootHeight"] - 3 and
+                      a["chatClipPath"].startswith("inset("))),
+                    "Replace masks moving List or fully covered hold " + direction,
+                    dynamic_chat=True)
+                assert occluded["sameChatFrame"] and occluded["sameChatDocument"], occluded
+                held = until(view.page(), lambda a:
+                    a["shown"] and a["replace"] and a["phase"] == "hold" and
+                    a["listHeight"] >= a["rootHeight"] - 3,
+                    "hide-empty Replace fully covers " + direction,
+                    dynamic_chat=True)
+                assert held["sameChatFrame"] and held["sameChatDocument"], held
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "hide-empty-replace-off-" + direction,
+                    "qa_viewer", "!list")), direction
+                left = until(view.page(), lambda a:
+                    a["lastExit"] == direction and
+                    a["exitCount"] == prior_replace["exitCount"] + 1 and
+                    a["motionDuration"] == 1000 and
+                    ((a["combinedSync"] == "replace-command-exit" and
+                      a["motionKind"] == "exit") or
+                     (a["motionKind"] == "idle" and not a["shown"] and
+                      a["listHeight"] <= 2)),
+                    "hide-empty Replace reverses/completes " + direction,
+                    dynamic_chat=True)
+                exposed = until(view.page(), lambda a:
+                    not a["shown"] and not a["replace"] and
+                    a["motionKind"] == "idle" and a["chatHeight"] > 10,
+                    "hide-empty Replace returns chat " + direction,
+                    dynamic_chat=True)
+                assert exposed["sameChatFrame"] and exposed["sameChatDocument"], exposed
+                assert exposed["messageCount"] >= held["messageCount"], exposed
+
+            # Video regression: new Twitch messages arrive while the List is
+            # MOVING. The old composer froze layout() until motion finished,
+            # then snapped the chat frame to a new height. Explicitly assert
+            # live content-sized frames and bottom anchoring in both modes.
+            for composition in ("split", "replace"):
+                db.set_settings_bulk({
+                    "combined_list_chat_layout": composition,
+                    "list_slide_animation_seconds": "3.00",
+                    "list_slide_direction": "left",
+                    "list_slide_duration": "0",
+                })
+                api.configure_list_show("slide", "!list", 0)
+                state.clear_chat("twitch", "ch")
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-first-" + composition,
+                    "qa_viewer", "One short Twitch row before motion"))
+                before = until(view.page(), lambda a:
+                    not a["shown"] and a["messageCount"] == 1 and
+                    a["appliedComposeMode"] == composition and
+                    a["appliedDirection"] == "left" and
+                    10 < a["chatHeight"] < a["rootHeight"] / 2,
+                    "natural single-message chat before motion " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-on-" + composition,
+                    "qa_viewer", "!list"))
+                entry = until(view.page(), lambda a:
+                    a["motionKind"] == "enter" and a["motionDuration"] == 3000 and
+                    a["lastEntrance"] == "left",
+                    "three-second dynamic entrance " + composition,
+                    dynamic_chat=True)
+                assert entry["chatHeight"] < entry["rootHeight"] / 2, entry
+                # Capture real in-flight rows and painted height inside
+                # Chromium BEFORE the nine messages arrive. A Qt callback
+                # can lag until hold; it must not invent a failed animation.
+                start_native_live_growth_probe(view.page(), entry["chatHeight"])
+                for index in range(9):
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "video-grow-" + composition + str(index),
+                        "qa_viewer", "Chat row arrives WHILE List moves " + str(index)))
+                growing = until(view.page(), lambda a:
+                    a["videoGrowthVerified"] and
+                    a["videoGrowthBaseline"] == entry["chatHeight"] and
+                    a["videoGrowthMaxCount"] >= 10 and
+                    a["videoGrowthMaxHeight"] > entry["chatHeight"] + 25,
+                    "native Chromium recorded chat growth DURING List entrance " + composition,
+                    dynamic_chat=True)
+                assert growing["sameChatFrame"] and growing["sameChatDocument"], growing
+                view.page().runJavaScript(
+                    "window.__r06VideoGrowth?.stop?.()")
+                held = until(view.page(), lambda a:
+                    a["phase"] == "hold" and a["motionKind"] == "idle",
+                    "new live frame reaches List hold " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-off-" + composition,
+                    "qa_viewer", "!list"))
+                reverse = until(view.page(), lambda a:
+                    a["motionKind"] == "exit" and a["motionDuration"] == 3000 and
+                    a["lastExit"] == "left",
+                    "three-second reverse List exit " + composition,
+                    dynamic_chat=True)
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "video-exit-grow-" + composition,
+                    "qa_viewer", "Additional message while List retreats"))
+                latest = until(view.page(), lambda a:
+                    a["motionKind"] == "exit" and a["messageCount"] >= 11 and
+                    abs(a["chatBottom"] - (a["rootTop"] + a["rootHeight"])) <= 4,
+                    "chat remains bottom-anchored during reverse exit " + composition,
+                    dynamic_chat=True)
+                assert latest["sameChatFrame"] and latest["sameChatDocument"], latest
+                settled = until(view.page(), lambda a:
+                    a["motionKind"] == "idle" and not a["shown"] and
+                    a["messageCount"] >= 11 and
+                    10 < a["chatHeight"] <= a["rootHeight"] + 3,
+                    "chat preserves natural height and messages after exit " + composition,
+                    dynamic_chat=True)
+                assert settled["sameChatFrame"] and settled["sameChatDocument"], settled
+            print("R06_COMBINED_VIDEO_LIVE_RESIZE_PASS", flush=True)
+
+            # Positive five-second hold is independent of a ONE-second
+            # entrance. The preceding mid-motion VIDEO checks intentionally
+            # use three seconds; reset that TEST setting explicitly instead
+            # of consuming the server's five-second command window before
+            # checking the second authenticated command.
+            db.set_settings_bulk({
+                "combined_list_chat_layout": "split",
+                "list_slide_duration": "5",
+                "list_slide_animation_seconds": "1.00",
+                "list_slide_direction": "top",
+            })
+            api.configure_list_show("slide", "!list", 5)
+            wait_with_http_workers(2200)  # Saved Split layout, time and direction
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                before_command = json.load(response)["list_show"]
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-timed-on",
+                "qa_viewer", "!list"))
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                first_command = json.load(response)["list_show"]
+            assert first_command["sequence"] == before_command["sequence"] + 1, (
+                before_command, first_command)
+            assert first_command["remaining_ms"] > 2500, first_command
+            timed = until(view.page(), lambda a:
+                a["shown"] and a["phase"] == "hold" and
+                a["holdDurationMs"] == 5000 and a["motionKind"] == "idle" and
+                a["motionDuration"] == 1000,
+                "hide-empty positive hold begins AFTER one-second entrance",
+                dynamic_chat=True)
+            assert timed["holdAgeMs"] < 1200, timed
+            # Deliberately repeat *within* the active five-second window.
+            # A 1.5-second delay following a three-second entrance was
+            # too close to the independently running server-side deadline.
+            wait_with_http_workers(650)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "hide-empty-timed-extend",
+                "qa_viewer", "!list"))
+            with urlopen(api.base_url + "/api/data", timeout=8) as response:
+                repeated_command = json.load(response)["list_show"]
+            assert repeated_command["sequence"] == first_command["sequence"] + 1, (
+                first_command, repeated_command)
+            assert repeated_command["remaining_ms"] > 2500, repeated_command
+            extended = until(view.page(), lambda a:
+                a["shown"] and a["phase"] == "hold" and
+                a["holdDurationMs"] == 5000 and
+                a["holdStartMs"] > timed["holdStartMs"] + 100 and
+                a["holdAgeMs"] < 1800 and
+                a["exitCount"] == timed["exitCount"],
+                "hide-empty positive repeat restarts full hold without exit",
+                dynamic_chat=True)
+            expired = until(view.page(), lambda a:
+                not a["shown"] and a["phase"] == "idle" and
+                a["lastExit"] == "top" and a["motionKind"] == "idle",
+                "hide-empty positive hold ends with reverse exit",
+                timeout=13, dynamic_chat=True)
+            assert expired["sameChatFrame"] and expired["sameChatDocument"], expired
+            # FIX-092 separate /combined-overlay: reproduce the user's FULL
+            # Twitch history, not just one short row. New List motion must
+            # cover the chat while the frame retains its full height through
+            # entrance, hold and exit. Exercise all directions in both modes.
+            db.set_settings_bulk({
+                "list_slide_duration": "0",
+                "list_slide_animation_seconds": "1.75",
+            })
+            api.configure_list_show("slide", "!list", 0)
+            state.clear_chat("twitch", "ch")
+            for index in range(25):
+                assert state.ingest(ChatMessage(
+                    "twitch", "ch", "fix092-combined-full-" + str(index),
+                    "qa_viewer", "Filled Twitch panel message " + str(index)))
+            for composition in ("split", "replace"):
+                for direction in ("left", "right", "top", "bottom"):
+                    db.set_settings_bulk({
+                        "combined_list_chat_layout": composition,
+                        "list_slide_direction": direction,
+                    })
+                    before = until(view.page(), lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["appliedComposeMode"] == composition and
+                        a["appliedDirection"] == direction and
+                        a["chatHeight"] >= a["rootHeight"] - 2,
+                        "FULL chat before command " + composition + " " + direction,
+                        dynamic_chat=True)
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "fix092-combined-on-" + composition + direction,
+                        "qa_viewer", "!list"))
+                    until(view.page(), lambda a:
+                        a["motionKind"] == "enter" and
+                        a["lastEntrance"] == direction and
+                        a["motionDuration"] == 1750,
+                        "FIX-092 command entrance " + composition + " " + direction,
+                        dynamic_chat=True)
+                    wait_with_http_workers(350)
+                    mid = inspect(view.page())
+                    assert mid["motionKind"] == "enter", mid
+                    assert mid["chatHeight"] >= mid["rootHeight"] * .90, (
+                        "Twitch frame must NOT shrink while List arrives",
+                        composition, direction, mid)
+                    assert mid["chatClipPath"] == "none" or (
+                        mid["chatClipPath"].startswith('path(evenodd, ')), (
+                        "Direction-aware painted List mask", composition, direction, mid)
+                    assert mid["sameChatFrame"] and mid["sameChatDocument"], mid
+                    at_end = until(view.page(), lambda a:
+                        a["phase"] == "hold" and a["motionKind"] == "idle" and
+                        a["listHeight"] >= a["rootHeight"] *
+                            (.47 if composition == "split" else .97),
+                        "List never collapses at full chat handoff " +
+                        composition + " " + direction, dynamic_chat=True)
+                    assert at_end["sameChatFrame"] and at_end["sameChatDocument"], at_end
+                    wait_with_http_workers(1100)
+                    held = inspect(view.page())
+                    assert abs(held["chatHeight"] - before["chatHeight"]) <= 3, held
+                    assert abs(held["listTop"] - held["rootTop"]) <= 3, held
+                    assert abs(held["listPanelHeight"] - held["listHeight"]) <= 3, held
+                    assert held["coveredChatClipped"], held
+                    if composition == "split":
+                        assert .47 <= held["listHeight"] / held["rootHeight"] <= .53, held
+                        assert held["exposedChatVisible"], held
+                    else:
+                        assert abs(held["listHeight"] - held["rootHeight"]) <= 3, held
+                    assert state.ingest(ChatMessage(
+                        "twitch", "ch", "fix092-combined-off-" + composition + direction,
+                        "qa_viewer", "!list"))
+                    exiting = until(view.page(), lambda a:
+                        a["motionKind"] == "exit" and
+                        a["lastExit"] == direction,
+                        "FIX-092 reverse over filled chat " +
+                        composition + " " + direction, dynamic_chat=True)
+                    assert abs(exiting["chatHeight"] - before["chatHeight"]) <= 3, exiting
+                    restored = until(view.page(), lambda a:
+                        not a["shown"] and a["motionKind"] == "idle" and
+                        a["chatHeight"] > a["rootHeight"] * .90,
+                        "FULL chat restored " + composition + " " + direction,
+                        dynamic_chat=True)
+                    assert restored["sameChatFrame"] and restored["sameChatDocument"], restored
+            print("R06_FIX092_COMBINED_FULL_CHAT_ALL_DIRECTIONS_PASS", flush=True)
+            # Also protect the already accepted empty-chat -> first-message
+            # split resize while the List is visible. Both boundaries must
+            # move together, not leave a blank strip as the chat grows.
+            state.clear_chat("twitch", "ch")
+            db.set_settings_bulk({
+                "list_overlay_show_mode": "always",
+                "combined_list_chat_layout": "split",
+                "list_slide_direction": "left",
+            })
+            api.configure_list_show("always", "!list", 0)
+            empty_list = until(view.page(), lambda a:
+                a["shown"] and a["motionKind"] == "idle" and
+                a["chatHeight"] <= 2 and
+                a["listHeight"] >= a["rootHeight"] - 3,
+                "FIX-092 active List before first Twitch row", dynamic_chat=True)
+            assert state.ingest(ChatMessage(
+                "twitch", "ch", "fix092-first-live-row", "qa_viewer",
+                "First message under visible List"))
+            growing = until(view.page(), lambda a:
+                a["shown"] and a["motionKind"] == "idle" and
+                5 < a["chatHeight"] < a["rootHeight"] * .45 and
+                a["listHeight"] + a["chatHeight"] >= a["rootHeight"] - 18,
+                "FIX-092 List and first Twitch row resize TOGETHER",
+                dynamic_chat=True)
+            assert growing["listHeight"] < empty_list["listHeight"] - 4, growing
+            print("R06_FIX092_FIRST_MESSAGE_SPLIT_BOUNDARY_PASS", flush=True)
+
+            # R06/ORDERED-POLL-098: real concurrent HTTP responses from the
+            # existing threaded API, not a main-world window.fetch mock.
+            db.set_setting("list_slide_direction", "left")
+            until(view.page(), lambda a: a["appliedDirection"] == "left" and
+                  a["motionKind"] == "idle",
+                  "combined ordered-poll baseline saved direction left",
+                  dynamic_chat=True)
+            original_stream_payload = db.current_stream_payload
+            first_ready = threading.Event()
+            first_release = threading.Event()
+            first_returned = threading.Event()
+            counter_lock = threading.Lock()
+            request_state = {"started": 0, "completed": 0, "old_direction": None}
+
+            def delayed_stream_payload():
+                with counter_lock:
+                    request_state["started"] += 1
+                    first = request_state["started"] == 1
+                payload = original_stream_payload()
+                if first:
+                    request_state["old_direction"] = payload["overlay"]["list_slide_direction"]
+                    first_ready.set()
+                    if not first_release.wait(45):
+                        raise AssertionError("R06 combined old HTTP reply was never released")
+                    first_returned.set()
+                with counter_lock:
+                    request_state["completed"] += 1
+                return payload
+
+            db.current_stream_payload = delayed_stream_payload
+            try:
+                deadline = time.monotonic() + 12
+                while not first_ready.is_set() and time.monotonic() < deadline:
+                    wait_with_http_workers(100)
+                assert first_ready.is_set(), request_state
+                assert request_state["old_direction"] == "left", request_state
+                db.set_setting("list_slide_direction", "right")
+                until(view.page(), lambda a: a["appliedDirection"] == "right" and
+                      a["motionKind"] == "idle",
+                      "combined real HTTP new Save with older reply blocked",
+                      dynamic_chat=True)
+                assert request_state["started"] >= 2, request_state
+                assert request_state["completed"] >= 1, request_state
+                first_release.set()
+                deadline = time.monotonic() + 8
+                while not first_returned.is_set() and time.monotonic() < deadline:
+                    wait_with_http_workers(50)
+                assert first_returned.is_set(), request_state
+                for _ in range(28):
+                    stable = inspect(view.page())
+                    assert stable["appliedDirection"] == "right", (
+                        "Old combined HTTP reply reverted newer Save", stable)
+                    wait_with_http_workers(60)
+            finally:
+                first_release.set()
+                db.current_stream_payload = original_stream_payload
+            print("R06_COMBINED_ORDERED_POLL_GATE_PASS", flush=True)
+            print("R06_COMBINED_HIDE_EMPTY_SPLIT_REPLACE_PASS", flush=True)
+
             print("R06_REPLACE_ALL_DIRECTIONS_AND_ZERO_PASS", flush=True)
             print("R06_COMBINED_BROWSER_ALL_PASS", flush=True)
         finally:

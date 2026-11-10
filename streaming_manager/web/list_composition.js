@@ -32,7 +32,7 @@
     /* Static end state for Replace. During motion Twitch clipping follows
        the shared List WAAPI clock; neither List nor Twitch content fades. */
     .r06-compose.r06-replace .r06-chat-layer {
-      position:absolute;inset:0;height:100%!important;width:100%;z-index:1;
+      position:absolute;inset:auto 0 0;width:100%;z-index:1;
       clip-path:inset(0 100% 0 0);transition:none!important
     }
     .r06-compose.r06-replace .r06-list-layer {
@@ -94,10 +94,14 @@
     let lastSequence = null;
     let deadline = 0;
     let expiryTimer = null;
-    let lastChatHeight = -1;
+    // A newly populated hide-empty chat must animate from 0 even if the
+    // main OBS composition was previously parked while both were hidden.
+    let lastChatHeight = 0;
     let intrinsicChatHeight = 0;
     let lastEmbeddedChatNeeded = false;
     let lastEmbeddedRefreshAt = -Infinity;
+    let embeddedRefreshPending = false;
+    let embeddedRefreshController = null;
     let lastGeometry = "";
     let chatResizeSeconds = 1;
     // The standalone List has no Twitch layer. Reuse the same List motion
@@ -121,14 +125,114 @@
     let motionTimeout = null;
     let motionAnimation = null;
     let chatMotionAnimation = null;
+    // The existing List WAAPI remains the only motion clock. In hide-empty
+    // composition the Twitch occlusion mask follows its ACTUAL painted edge
+    // every frame, rather than interpolating an unrelated fixed-height inset.
+    let dynamicCommandMotion = false;
+    let dynamicMotionFull = false;
+    let dynamicMaskFrame = null;
+    let motionChatTarget = -1;
+    let motionListTarget = -1;
 
-    function cancelListMotion() {
+    function stopDynamicMask() {
+      if (dynamicMaskFrame !== null) cancelAnimationFrame(dynamicMaskFrame);
+      dynamicMaskFrame = null;
+      dynamicCommandMotion = false;
+      chatLayer.style.clipPath = "";
+      listLayer.style.transition = "";
+      motionChatTarget = -1;
+      motionListTarget = -1;
+    }
+
+    function currentDynamicTargets() {
+      const available = Math.max(1, root.clientHeight);
+      const chatNeeded = chatAvailable && chatHasMessages;
+      const natural = chatNeeded ?
+        Math.max(0, Math.min(available, measureChat())) : 0;
+      const gap = !dynamicMotionFull && chatNeeded ? 12 : 0;
+      const targetChat = dynamicMotionFull ? natural :
+        Math.min(natural, Math.floor((available - gap) / 2));
+      return {natural, targetList: available - targetChat - gap};
+    }
+
+    function syncDynamicMotionGeometry() {
+      if (!dynamicCommandMotion || !motion) return;
+      const {natural: wantedChat, targetList} = currentDynamicTargets();
+      // Keep the bottom-anchored frame at its content height; the mask
+      // covers the overlap as the List moves above it.
+      if (wantedChat !== motionChatTarget) {
+        if (motionChatTarget >= 0) {
+          // A newly arrived message must resize both boundaries together.
+          // Do not keep the original three-second command duration for the
+          // chat while the List reacts in the shorter resize duration.
+          chatLayer.style.transition = `height ${chatResizeSeconds}s ease`;
+        }
+        motionChatTarget = wantedChat;
+        chatLayer.style.height = wantedChat + "px";
+      }
+      if (!dynamicMotionFull && targetList !== motionListTarget) {
+        motionListTarget = targetList;
+        listLayer.style.height = targetList + "px";
+        if (onResize) onResize();
+      }
+      matchEmbeddedChatFrame(chatAvailable && chatHasMessages);
+      // Chromium can defer a hidden embedded iframe's own 500-ms polling.
+      // Reuse the already accepted parent's targeted HTTP->child-render
+      // recovery while the List crosses real Twitch messages. The child
+      // renderer compares snapshots and never remounts its iframe.
+      recoverEmbeddedChat(chatAvailable && chatHasMessages);
+    }
+
+    function paintChatMask() {
+      const list = listLayer.getBoundingClientRect();
+      const chat = chatLayer.getBoundingClientRect();
+      const w = chatLayer.offsetWidth;
+      const h = chatLayer.offsetHeight;
+      let mask = "none";
+      if (chatAvailable && chatHasMessages && chat.width && chat.height && w && h) {
+        // The rectangles are in rendered pixels, while CSS clip paths use
+        // local pixels. The main OBS composition can be scaled.
+        const scaleX = chat.width / w;
+        const scaleY = chat.height / h;
+        const listScaleY = list.height / (listLayer.offsetHeight || 1);
+        // Split's bottom reveal paints only the part inside the List inset.
+        const inset = /^inset\(\s*([\d.]+)px(?:\s+([\d.]+)px)?(?:\s+([\d.]+)px)?/
+          .exec(getComputedStyle(listLayer).clipPath);
+        const listTop = list.top + (inset ? Number(inset[1]) * listScaleY : 0);
+        const listBottom = list.bottom - (inset?.[3] ? Number(inset[3]) * listScaleY : 0);
+        const l = Math.max(0, (list.left - chat.left) / scaleX);
+        const r = Math.min(w, (list.right - chat.left) / scaleX);
+        const t = Math.max(0, (listTop - chat.top) / scaleY);
+        const b = Math.min(h, (listBottom - chat.top) / scaleY);
+        if (r > l && b > t) {
+          // Subtract the actually painted List area, including transparent
+          // pixels, while leaving the iframe and the rest of the chat intact.
+          mask = `path(evenodd, "M 0 0 H ${w} V ${h} H 0 Z ` +
+            `M ${l} ${t} H ${r} V ${b} H ${l} Z")`;
+        }
+      }
+      if (chatLayer.style.clipPath !== mask) chatLayer.style.clipPath = mask;
+    }
+
+    function paintDynamicChatMask() {
+      dynamicMaskFrame = null;
+      if (!dynamicCommandMotion || !motion) return;
+      paintChatMask();
+      dynamicMaskFrame = requestAnimationFrame(paintDynamicChatMask);
+    }
+
+    function cancelListMotion(preserveDynamicHeight = false) {
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = null;
+      // Keep the painted chat height at the end of an approved command. A
+      // pending message-driven height transition must not snap on WAAPI end.
+      const preserve = preserveDynamicHeight && dynamicCommandMotion && !chatAlways;
+      const paintedChatHeight = preserve ? chatLayer.offsetHeight : -1;
       if (motionAnimation) motionAnimation.cancel();
       if (chatMotionAnimation) chatMotionAnimation.cancel();
       motionAnimation = null;
       chatMotionAnimation = null;
+      stopDynamicMask();
       if (combinedMotion) {
         // Restore the existing flex geometry on the same frame as the motion
         // finishes. Neither source gets an independently animated container.
@@ -144,10 +248,11 @@
         chatLayer.style.left = "";
         chatLayer.style.right = "";
         chatLayer.style.zIndex = "";
-        chatLayer.style.height = "";
+        chatLayer.style.height = preserve ? paintedChatHeight + "px" : "";
         chatLayer.style.marginTop = "";
-        chatLayer.style.transition = "";
-        lastChatHeight = -1;
+        chatLayer.style.transition = preserve ?
+          `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "";
+        lastChatHeight = preserve ? paintedChatHeight : -1;
         root.dataset.r06CombinedSync = "idle";
       }
       motion = null;
@@ -171,7 +276,7 @@
       if (!motion) return;
       const wasEntering = motion === "enter";
       const wasExiting = motion === "exit";
-      cancelListMotion();
+      cancelListMotion(true);
       if ((standaloneMotion || combinedMotion) && mode === "slide") {
         if (wasEntering && slidePhase === "enter" && active) beginHold();
         else if (wasExiting && slidePhase === "exit") {
@@ -207,6 +312,9 @@
       }
       motionAnimation.reverse();
       if (chatMotionAnimation) chatMotionAnimation.reverse();
+      // Zero-second toggle uses the same running List animation; the dynamic
+      // chat height retargets without snapping to a stale half/full geometry.
+      if (dynamicCommandMotion) syncDynamicMotionGeometry();
       if (motionTimeout !== null) clearTimeout(motionTimeout);
       motionTimeout = setTimeout(() => {
         if (motionAnimation) finishListMotion();
@@ -274,12 +382,19 @@
     ) {
       // Reuse the List's accepted motion. Settings-driven Always entrance and
       // exit synchronize the chat edge; a command keeps chat full-height while
-      // the List passes above it, restoring static split only after entrance.
+      // the List passes above it, using clipping wherever the layers overlap.
       // Only child layers move; iframe and messages remain the same.
       // The chat bottom and the combined source never move.
       const available = Math.max(1, root.clientHeight);
-      const gap = replaceFull ? 0 : 12;
-      const targetChat = replaceFull ? 0 : Math.floor((available - gap) / 2);
+      const chatNeeded = chatAvailable && (chatAlways || chatHasMessages);
+      const naturalChat = !chatNeeded ? 0 : chatAlways ? available :
+        Math.max(0, Math.min(available, measureChat()));
+      const gap = replaceFull || !chatNeeded ? 0 : 12;
+      const targetChat = replaceFull || !chatNeeded ? 0 : chatAlways ?
+        Math.floor((available - gap) / 2) :
+        Math.min(naturalChat, Math.floor((available - gap) / 2));
+      // Hide-empty chat never reserves a fixed half; the List fills
+      // everything above its current bottom-anchored messages.
       const targetList = available - targetChat - gap;
       // Command entrance and reverse exit share the originally captured
       // duration, even when settings change during the hold.
@@ -297,7 +412,9 @@
       chatLayer.style.bottom = "0px";
       chatLayer.style.left = "0px";
       chatLayer.style.right = "0px";
-      chatLayer.style.height = (commandOverChat || entering ? available : targetChat) + "px";
+      const dynamicCommand = commandOverChat && !chatAlways;
+      chatLayer.style.height = (dynamicCommand ? naturalChat :
+        commandOverChat ? available : entering ? naturalChat : targetChat) + "px";
       chatLayer.style.marginTop = "0px";
       chatLayer.style.zIndex = "1";
       chatLayer.style.transition = "none";
@@ -305,7 +422,15 @@
         (replaceFull ? (entering ? "replace-command-enter" : "replace-command-exit") :
           (entering ? "command-enter" : "command-exit")) :
         entering ? "split-enter" : "split-exit";
-      if (commandOverChat) {
+      if (dynamicCommand) {
+        dynamicCommandMotion = true;
+        dynamicMotionFull = replaceFull;
+        // Do not resize the iframe to 100% just to crop it afterwards. Keep
+        // the frame and messages together at their bottom-anchored height.
+        void chatLayer.offsetHeight;
+        chatLayer.style.transition = `height ${duration / 1000}s ease-in-out`;
+        listLayer.style.transition = `height ${chatResizeSeconds}s ease`;
+      } else if (commandOverChat) {
         // Preserve the full-size iframe during entrance, but reveal the
         // underlying overlay background wherever the List actually passes.
         // Without this moving CHAT clip, transparent List backgrounds show
@@ -317,6 +442,9 @@
         let fromClip;
         let toClip;
         if (replaceFull) {
+          // Replacement masks the incoming List's moving directional edge
+          // across the whole source, including hide-empty Twitch messages.
+          // The List may have a transparent user-selected background.
           // The List crosses the entire shared source. Clip Twitch behind
           // the same moving List edge and preserve existing message nodes.
           fromClip = "inset(0px 0px 0px 0px)";
@@ -352,21 +480,23 @@
           {duration, easing: "ease-in-out", fill: "both"},
         );
       } else {
-        const startChat = entering ? available : targetChat;
-        const endChat = entering ? targetChat : available;
+        const startChat = entering ? naturalChat : targetChat;
+        const endChat = entering ? targetChat : naturalChat;
         chatMotionAnimation = chatLayer.animate(
           [{height: startChat + "px"}, {height: endChat + "px"}],
           {duration, easing: "ease-in-out", fill: "both"},
         );
       }
-      // Shared List engine owns the exact same timing for both layers. The
-      // final static 50/50 flex geometry replaces the completely clipped
-      // full-size chat without an unmasked intermediate frame.
+      // The shared List engine controls both layers' motion timing.
       beginStandaloneListMotion(
         entering, direction, duration, targetList, true,
         commandOverChat && !replaceFull && direction === "bottom" ?
           targetList + gap : null,
       );
+      if (dynamicCommand) {
+        syncDynamicMotionGeometry();
+        paintDynamicChatMask();
+      }
     }
 
     function measureChat() {
@@ -406,30 +536,82 @@
 
     function recoverEmbeddedChat(chatNeeded) {
       if (chatNeeded && !lastEmbeddedChatNeeded && chatHasMessages) {
-        // If the child was suspended while its space was zero, re-open it
-        // once, as in the previously tested non-animation chat recovery.
-        const src = iframe.getAttribute("src");
-        if (src) iframe.setAttribute("src", src);
+        // First message expands the existing child; avoid resetting its DOM.
+        // Recover only if no chat renderer was initialized.
+        let ready = false;
+        try {
+          ready = typeof iframe.contentWindow?.IOLRenderEmbeddedChatState === "function";
+        } catch (_) { /* child not initialized */ }
+        if (!ready && chatAlways) {
+          // Preserve the previously accepted Always-chat recovery when its
+          // child was genuinely suspended before it became ready.
+          const src = iframe.getAttribute("src");
+          if (src) iframe.setAttribute("src", src);
+        } else {
+          // Hide-empty may have just been reattached from main OBS parking.
+          // Reassigning the same src while that iframe is loading causes a
+          // second navigation and loses the first live Twitch messages.
+          // Let its own poll/parent render-state recovery revive it instead.
+          lastEmbeddedRefreshAt = -Infinity;
+        }
       }
       lastEmbeddedChatNeeded = chatNeeded;
+      // Chromium can throttle embedded polling both during List motion and
+      // after a command leaves a populated hide-empty chat parked. Keep the
+      // existing bounded parent resync for BOTH states; the child renderer
+      // leaves unchanged snapshots and DOM rows untouched.
+      const dynamicChat = !chatAlways && chatHasMessages;
+      const movingChat = dynamicChat &&
+        dynamicCommandMotion && motion === "enter";
+      const refreshIntervalMs = movingChat ? 350 : 1000;
+      const now = performance.now();
       if (!chatNeeded || !chatHasMessages ||
-          performance.now() - lastEmbeddedRefreshAt < 1000) return;
+          now - lastEmbeddedRefreshAt < refreshIntervalMs) return;
+      // Reuse the existing 200-ms layout/motion cycle as a watchdog.
+      // A stuck browser HTTP request must not block all future Twitch resyncs.
+      if (embeddedRefreshPending) {
+        if (now - lastEmbeddedRefreshAt < 3000) return;
+        embeddedRefreshController?.abort();
+      }
       try {
-        const messages = iframe.contentDocument?.getElementById("messages");
+        const childDocument = iframe.contentDocument;
+        const messages = childDocument?.getElementById("messages");
         const render = iframe.contentWindow?.IOLRenderEmbeddedChatState;
-        if (!messages || messages.children.length || typeof render !== "function") return;
-        lastEmbeddedRefreshAt = performance.now();
-        fetch("/api/multichat", {cache:"no-store"})
+        if (!messages || (!dynamicChat && messages.children.length) ||
+            typeof render !== "function") return;
+        const controller = new AbortController();
+        lastEmbeddedRefreshAt = now;
+        embeddedRefreshPending = true;
+        embeddedRefreshController = controller;
+        fetch("/api/multichat", {cache:"no-store", signal:controller.signal})
           .then(response => response.ok ? response.json() : null)
           .then(snapshot => {
-            const rows = iframe.contentDocument?.getElementById("messages");
-            if (snapshot && chatAvailable && chatHasMessages &&
-                rows && !rows.children.length) {
+            // A late HTTP response must never replace a newer resync.
+            if (embeddedRefreshController !== controller || !snapshot ||
+                !chatAvailable || !chatHasMessages ||
+                iframe.contentDocument !== childDocument) return;
+            const rows = childDocument.getElementById("messages");
+            if (rows && (dynamicChat || !rows.children.length)) {
               iframe.contentWindow?.IOLRenderEmbeddedChatState?.(snapshot);
             }
           })
-          .catch(() => { /* next parent poll can retry */ });
-      } catch (_) { /* child can be navigating */ }
+          .catch(() => { /* next parent poll can retry */ })
+          .finally(() => {
+            if (embeddedRefreshController === controller) {
+              embeddedRefreshPending = false;
+              embeddedRefreshController = null;
+            }
+          });
+      } catch (_) {
+        // A child navigation must not prevent the next normal recovery poll.
+        embeddedRefreshPending = false;
+        embeddedRefreshController = null;
+      }
+    }
+
+    function hasDynamicSplit() {
+      return combinedMotion && active && mode === "slide" &&
+        composeMode === "split" && !chatAlways && chatAvailable && chatHasMessages;
     }
 
     function layout() {
@@ -443,27 +625,59 @@
       const natural = chatAlways ? available : measureChat();
       const split = active && !replacing && chatNeeded;
       const gap = split ? 12 : 0;
-      const chatCap = active ? Math.max(0, Math.floor((available - gap) / 2)) : available;
-      const desiredChat = !chatNeeded ? 0 :
-        replacing ? available : Math.max(0, Math.min(natural, chatCap));
+      const dynamicSplit = hasDynamicSplit();
+      const splitCap = Math.max(0, Math.floor((available - gap) / 2));
+      const chatCap = active && !replacing && !dynamicSplit ? splitCap : available;
+      const desiredChat = !chatNeeded ? 0 : Math.max(0, Math.min(natural, chatCap));
 
-      // Settle into the static layout when no command movement is active;
-      // a content-sized chat in Split mode keeps its old height behavior.
+      // Settle into static layout; dynamic chat grows upward from the bottom
+      // in both the main and the independent combined Browser Source.
+      const wasReplacing = root.classList.contains("r06-replace");
       root.classList.toggle("r06-shown", active);
       root.classList.toggle("r06-not-shown", !active);
       root.classList.toggle("r06-replace", replacing);
-      listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
-      // Only a content-sized chat in Split mode animates its boundary. An
-      // Always chat starts at its full allocated height and never rises from
-      // the bottom when a message arrives.
-      const animateChat = !noMotion && split && !chatAlways && lastChatHeight >= 0;
+      // A compact chat and List still share the space. Above the split
+      // boundary the List covers the chat without resizing its frame.
+      const animateChat = combinedMotion && !chatAlways && lastChatHeight >= 0 &&
+        !replacing && !wasReplacing;
+      if (dynamicSplit) {
+        listLayer.style.flex = "none";
+        listLayer.style.position = "absolute";
+        listLayer.style.top = "0px";
+        listLayer.style.left = "0px";
+        listLayer.style.right = "0px";
+        listLayer.style.height = (available - Math.min(desiredChat, splitCap) - gap) + "px";
+        listLayer.style.transition = animateChat ?
+          `height ${chatResizeSeconds}s ease` : "none";
+        chatLayer.style.position = "absolute";
+        chatLayer.style.bottom = "0px";
+        chatLayer.style.left = "0px";
+        chatLayer.style.right = "0px";
+        chatLayer.style.marginTop = "0px";
+      } else {
+        listLayer.style.position = "";
+        listLayer.style.top = "";
+        listLayer.style.left = "";
+        listLayer.style.right = "";
+        listLayer.style.height = "";
+        listLayer.style.transition = "";
+        listLayer.style.flex = replacing ? "none" : active ? "1 1 auto" : "0 0 0px";
+        chatLayer.style.position = "";
+        chatLayer.style.bottom = "";
+        chatLayer.style.left = "";
+        chatLayer.style.right = "";
+        chatLayer.style.marginTop = gap + "px";
+        chatLayer.style.clipPath = "";
+      }
+      // Preserve accepted Always layout, timer, and separate List behavior.
       chatLayer.style.transition = animateChat ?
         `height ${chatResizeSeconds}s ease, margin-top ${chatResizeSeconds}s ease` : "none";
-      chatLayer.style.marginTop = gap + "px";
       if (desiredChat !== lastChatHeight) {
         chatLayer.style.height = desiredChat + "px";
         lastChatHeight = desiredChat;
       }
+
+      if (dynamicSplit) paintChatMask();
 
       const key = [active, replacing, desiredChat, available].join(":");
       if (key !== lastGeometry) {
@@ -483,15 +697,13 @@
       if (combinedMotion && seenSnapshot &&
           ((next && reason === "always") ||
            (!next && reason === "hide")) &&
-          composeMode === "split" && chatAvailable && chatAlways &&
-          root.clientHeight > 0) {
+          composeMode === "split" && root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next);
         return;
       }
       if (combinedMotion &&
           ((next && reason === "command") || (!next && reason === "expiry")) &&
-          (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)) &&
+          (composeMode === "replace" || composeMode === "split") &&
           seenSnapshot && root.clientHeight > 0) {
         beginCombinedSplitAlwaysMotion(next, direction, true,
           composeMode === "replace");
@@ -511,8 +723,7 @@
 
     function expire() {
       if (standaloneMotion ||
-          (combinedMotion && (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)))) {
+          (combinedMotion && (composeMode === "replace" || composeMode === "split"))) {
         if (mode === "slide" && slidePhase === "hold" &&
             showUntil && performance.now() >= showUntil) {
           showUntil = 0;
@@ -545,6 +756,11 @@
       mode = nextMode;
       // Standalone List is not allowed to activate a legacy replacement layer.
       composeMode = allowChat && cfg.list_chat_layout === "replace" ? "replace" : "split";
+      // Expose the saved options actually applied by this browser source.
+      // Native Chromium QA must wait for the saved direction/mode before
+      // sending a new authenticated Twitch command.
+      root.dataset.r06AppliedListDirection = cfg.list_slide_direction || "top";
+      root.dataset.r06AppliedComposeMode = composeMode;
       chatAvailable = Boolean(allowChat && chat.enabled);
       chatHasMessages = chat.has_messages === true;
       chatAlways = chat.visibility === "always";
@@ -565,8 +781,7 @@
           ? requestedAnimation : 0.65)) * 1000
       );
       if (standaloneMotion ||
-          (combinedMotion && (composeMode === "replace" ||
-            (composeMode === "split" && chatAvailable && chatAlways)))) {
+          (combinedMotion && (composeMode === "replace" || composeMode === "split"))) {
         // Share the local phase clock with the approved combined command
         // entrance: animation never consumes the fully-visible hold time.
         const requestedShow = Number(cfg.list_slide_duration);
@@ -674,8 +889,22 @@
       }
     }
 
+    if (combinedMotion) {
+      // Keep the held Split mask aligned during live size changes, without
+      // running a frame loop while both layers are stationary.
+      const resizeMask = new ResizeObserver(() => {
+        if (!motion && hasDynamicSplit()) paintChatMask();
+      });
+      resizeMask.observe(chatLayer);
+      resizeMask.observe(listLayer);
+    }
+
     // Chat message count/height may change between /api/data updates.
-    setInterval(() => {expire(); layout();}, 200);
+    setInterval(() => {
+      expire();
+      if (motion && dynamicCommandMotion) syncDynamicMotionGeometry();
+      else layout();
+    }, 200);
     addEventListener("resize", () => {lastGeometry = ""; layout();});
     root.classList.add("r06-not-shown");
     return {

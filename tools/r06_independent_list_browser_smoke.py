@@ -21,9 +21,10 @@ if sys.platform != "win32":
     os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtTest import QTest
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication
+
+from tools.qt_browser_test_wait import wait_with_http_workers
 from streaming_manager.api_server import LocalApiServer
 from streaming_manager.database import Database, Game
 from streaming_manager.constants import STATUS_NOT_PLAYED
@@ -92,7 +93,7 @@ def metrics(page):
     page.runJavaScript(JS, replies.append)
     timeout = time.monotonic() + 8
     while not replies and time.monotonic() < timeout:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not replies:
         raise AssertionError("Standalone List Chromium callback timed out")
     value = replies[0]
@@ -116,7 +117,7 @@ def until(page, condition, label, *, settled=True):
             assert last["animation"] == "none", (label, last)
             print("R06_INDEPENDENT_LIST_PASS", label, last, flush=True)
             return
-        QTest.qWait(100)
+        wait_with_http_workers(100)
     raise AssertionError(f"{label} timed out: {last!r}")
 
 
@@ -127,7 +128,7 @@ def observe_motion(page, label, *, entering, previous_count, direction="top"):
     while time.monotonic() < timeout:
         last = metrics(page)
         if not last or not last.get("ready"):
-            QTest.qWait(30)
+            wait_with_http_workers(30)
             continue
         count = last["entranceCount"] if entering else last["exitCount"]
         if (last["motion"] and count > previous_count and
@@ -138,7 +139,7 @@ def observe_motion(page, label, *, entering, previous_count, direction="top"):
             assert float(last["opacity"]) >= .99, (label, last)
             print("R06_INDEPENDENT_LIST_MOTION_PASS", label, last, flush=True)
             return last
-        QTest.qWait(30)
+        wait_with_http_workers(30)
     raise AssertionError(f"{label}: no Chromium motion frame: {last!r}")
 
 
@@ -198,7 +199,7 @@ def main():
                   v["listHeight"] > 100, "always restored")
             stable = metrics(view.page())
             api.configure_list_show("always", "!list", 15)
-            QTest.qWait(1300)
+            wait_with_http_workers(1300)
             assert not metrics(view.page())["motion"], "Repeated Always Save animated"
             assert metrics(view.page())["entranceCount"] == stable["entranceCount"], (
                 "Repeated Always Save replayed entrance", stable, metrics(view.page())
@@ -258,13 +259,13 @@ def main():
                     # A settings change during the hold must not change the
                     # reversing speed of this already-started command cycle.
                     db.set_setting("list_slide_animation_seconds", "3.00")
-                    QTest.qWait(1150)
+                    wait_with_http_workers(1150)
                 with urlopen(api.base_url + "/api/data", timeout=8) as response:
                     expired_server = json.load(response)
                 assert expired_server["list_show"]["remaining_ms"] == 0, (
                     "Manual server time advance failed", direction, expired_server,
                 )
-                QTest.qWait(1000)
+                wait_with_http_workers(1000)
                 still_held = metrics(view.page())
                 assert still_held["shown"] and still_held["phase"] == "hold", (
                     "Server expiry ended the List hold before local five seconds",
@@ -303,7 +304,7 @@ def main():
             api.configure_list_show("slide", "!list", 0)
             until(view.page(), lambda v: (v["configuredDirection"] == "left" and
                   not v["shown"]), "0-second toggle idle")
-            QTest.qWait(1550)  # Virtual scroll clock advances behind the scene.
+            wait_with_http_workers(1550)  # Virtual scroll clock advances behind the scene.
             before_zero = metrics(view.page())
             self_old_exit = before_zero["exitCount"]
             assert state.ingest(ChatMessage(
@@ -318,7 +319,7 @@ def main():
             assert zero_active["scrollTransform"] not in ("", "translateY(0px)"), (
                 "Hidden List restarted its scrolling position", zero_active
             )
-            QTest.qWait(1900)
+            wait_with_http_workers(1900)
             still_zero = metrics(view.page())
             assert still_zero["shown"] and still_zero["exitCount"] == self_old_exit, (
                 "0-second List expired without a repeated command", still_zero
@@ -334,7 +335,7 @@ def main():
             until(view.page(), lambda v: (not v["shown"] and
                   v["phase"] == "idle" and v["listHeight"] <= 2),
                   "zero held off after second command")
-            QTest.qWait(1400)
+            wait_with_http_workers(1400)
             assert not metrics(view.page())["shown"], "Toggle replayed old command"
             assert state.ingest(ChatMessage(
                 "twitch", "ch", "zero-third", "viewer", "!list"
