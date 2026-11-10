@@ -44,6 +44,6 @@
 
 ## Выпуски
 
-- [Последний официальный выпуск InOneLine](https://github.com/ALL-EX-E/InOneLine/releases/latest).
+- [InOneLine 1.0.10](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10) — актуальный выпуск. [Контрольные суммы установщика и исходников](../SHA256SUMS.txt).
 - [Что нового в 1.0.10](../RELEASE_NOTES_1.0.10.md).
 - [Проверка списка и Twitch-чата в OBS](./qa/R06-hide-empty-combined-motions-checklist.md).

@@ -1,5 +1,9 @@
 # Accepted Release Publication
 
+## InOneLine 1.0.10
+
+[Выпуск v1.0.10](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10) опубликован 10 ноября 2026. Пользователь принял Windows-сборку `f98735cde36026202f03a4aae4f5001aeb5511a0`. Тег закреплён за коммитом `5a70f926c6d2ee3eb5f2aa447c48e5cbfc05e3ff` с тем же проверенным деревом. Установщик и архив исходников взяты из Actions artifact `13751287494`. [Проверка публикации](https://github.com/ALL-EX-E/InOneLine/actions/runs/42802456094) · [SHA‑256](../SHA256SUMS.txt).
+
 InOneLine uses one publication workflow for future accepted releases:
 
 - workflow: `.github/workflows/publish-accepted-release.yml`;
@@ -88,7 +92,7 @@ A historical release may contain later asset maintenance that differs from the o
 Изначальный принятый Actions artifact #12360903842 содержит только один `InOneLine_Setup_1.0.8.exe`, тогда как `tools/release_publication.py` требует минимум два assets. **Нельзя** дублировать путь или ослаблять проверки. Подготовительный workflow `prepare-final-gate-release-bundle.yml` при добавлении одного immutable preparation request копирует EXE из принятого артефакта с повторной проверкой SHA-256 и добавляет `git archive` SOURCE, сформированный только из Git-tracked файлов commit, без пересборки программы. Результат — один Actions artifact с двумя файлами и собственными SHA-256 для штатного неизменного `publish-accepted-release.yml`.
 
 
-## CURRENT 2026-10-22 — нейтральные описания приняты, FINAL GATE release publication pending one CI fix
+## 2026-10-22 — нейтральные описания приняты, FINAL GATE release publication pending one CI fix
 
 - User approved release of accepted FINAL GATE 1.0.8 and neutral public auction/lot terminology. Docs/README/release notes/future-ideas were updated by [PR #356](https://github.com/ALL-EX-E/InOneLine/pull/356); **arbitrary auction categories are NOT IMPLEMENTED**. Preserve legacy data and historical QA facts.
 - Exact accepted EXE SHA256 `318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04`, 47,745,396 bytes. Two-file publication bundle prepared by [#357](https://github.com/ALL-EX-E/InOneLine/pull/357) and immutable preparation [#358](https://github.com/ALL-EX-E/InOneLine/pull/358), Actions #39733626580 SUCCESS, artifact **12406595428** (49,247,058 bytes), internal EXE SHA unchanged; official Git-tracked source ZIP 2,385,164 bytes SHA256 `52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f`, CRC PASS.
@@ -96,7 +100,7 @@ A historical release may contain later asset maintenance that differs from the o
 - Only necessary safety-preserving publisher fix is proposed in **DRAFT [PR #360](https://github.com/ALL-EX-E/InOneLine/pull/360)**: require tag probe exit=2, reject existing-tag exit=0 and unexpected status, then clear LASTEXITCODE; add CI regression. **User's standing approval rule requires explicit consent before merging this out-of-roadmap fix.** Once approved and CI passed, merge, add a distinct NEW immutable publication request filename to retrigger the same tag/assets (do not edit original request), and verify GitHub Release downloaded assets and SHA256.
 - Repo **About/Description metadata** still contains old wording and is **not editable with current GitHub connector permissions**; tracked as [issue #361](https://github.com/ALL-EX-E/InOneLine/issues/361) with exact neutral description for an admin to apply manually. README is neutral and merged. No runtime/DB/schema/version changes; do not claim publication or About update completed.
 
-## CURRENT 2026-10-22 — Official FINAL GATE 1.0.8 GitHub Release published and verified
+## 2026-10-22 — Official FINAL GATE 1.0.8 GitHub Release published and verified
 
 - User explicitly approved this publication. The new **[official GitHub Release v1.0.8-final-gate-2026-10-22](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.8-final-gate-2026-10-22)** is **PUBLISHED / not draft / not prerelease**; tag target is the frozen accepted release-source snapshot commit `2440ff4e974c6a1f96ad03a05152bd867d8553cc`.
 - Existing publisher safeguard required the minimal extra safety-only change [PR #360](https://github.com/ALL-EX-E/InOneLine/pull/360), expressly user approved on 2026-10-22. The fix checks absent tag result 2, rejects existing tags and unexpected failures, then clears PowerShell LASTEXITCODE; regression test added. Native Windows PR check #39734208325 **SUCCESS**, independent main postmerge native Windows #39735652965 **SUCCESS 69/69**, publication wording SUCCESS. No runtime, DB, migration or accepted EXE modifications.
@@ -104,5 +108,5 @@ A historical release may contain later asset maintenance that differs from the o
 - Published `InOneLine_1.0.8_FINAL_GATE_2026-10-22.exe` **47,745,396 bytes** SHA256 `318fcd57e44d62390838ca0ed470a222c14d447dc09e5628c8e64947cc2b2d04` — **exact original user-approved binary**, no rebuild (renamed only on publication).
 - Published `InOneLine_Source_1.0.8_FINAL_GATE_2026-10-22.zip` **2,385,164 bytes** SHA256 `52e4c2c01a405eb978c44584690db6dfdcd63c5b2bb748a046f628b1ff2e2b3f` — verified Git-tracked source snapshot. Both SHA-256 also confirmed independently against the original downloaded two-file Actions bundle (artifact #12406595428) and published GitHub asset metadata.
 - Public README and current-facing terminology use auctions/lots without suggesting arbitrary-category auctions already work. Repo GitHub About description is now neutral (verified via GitHub API 2026-10-22); issue #361 closed. Historical QA/docs/previous releases preserved. `docs/FUTURE_GENERAL_AUCTIONS.md` = **POSSIBLE future development, NOT IMPLEMENTED**, requires fresh explicit user approval.
-- **CURRENT PUBLIC RELEASE = v1.0.8-final-gate-2026-10-22**, version remains **1.0.8**, SQLite schema **19**, **15** named migrations. Historical initial and maintenance tags remain published and unchanged. Further code changes require separate scope and acceptance.
+- **PUBLIC RELEASE ON 2026-10-22 = v1.0.8-final-gate-2026-10-22**, version remains **1.0.8**, SQLite schema **19**, **15** named migrations. Historical initial and maintenance tags remain published and unchanged. Further code changes require separate scope and acceptance.
 

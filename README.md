@@ -4,7 +4,9 @@
 
 ## Скачать
 
-Откройте [последний выпуск на GitHub](https://github.com/ALL-EX-E/InOneLine/releases/latest) и скачайте Windows-установщик из раздела Assets. Для установки не нужны Python и среда разработки. Если Windows предупреждает о неподписанном приложении, проверьте источник и SHA‑256 установщика.
+**[Скачать InOneLine 1.0.10 для Windows](https://github.com/ALL-EX-E/InOneLine/releases/download/v1.0.10/InOneLine_Setup_1.0.10.exe)** · [Страница выпуска](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10) · [Контрольные суммы](./SHA256SUMS.txt).
+
+Для установки не нужны Python и среда разработки. Если Windows предупреждает о неподписанном приложении, проверьте источник и SHA‑256 установщика.
 
 ## Возможности
 

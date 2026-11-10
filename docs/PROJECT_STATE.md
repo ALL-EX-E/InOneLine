@@ -1,10 +1,10 @@
-# InOneLine Roadmap
+# Состояние проекта InOneLine
 
 ## Состояние на 10 ноября 2026
 
-- Публичный выпуск — [InOneLine 1.0.9](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.9). В ветке выпуска готовится версия **1.0.10**.
+- Актуальный публичный выпуск — [InOneLine 1.0.10](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10). Пользователь подтвердил работу установщика версии 1.0.10. Опубликованы проверенный установщик и точный архив исходников из Actions artifact `13751287494`. [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42787015004) · [Публикация и контрольные суммы](https://github.com/ALL-EX-E/InOneLine/actions/runs/42802456094).
 - Пользователь подтвердил работу FIX‑092 в установщике `1701581`. [PR №421](https://github.com/ALL-EX-E/InOneLine/pull/421) слит в `main` коммитом `9e5124a76ecfece10dc30b067ff9b260594f40d3`. Дерево этого коммита совпадает с деревом, проверенным в [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42776409499).
-- Для 1.0.10 меняются версия приложения, версия установщика и документы. Принятая логика OBS и схема SQLite 21 сохранены. Установщик с новым номером проходит собственную проверку до публикации.
+- Тег `v1.0.10` указывает на принятый коммит `5a70f926c6d2ee3eb5f2aa447c48e5cbfc05e3ff`. Принятая логика OBS и схема SQLite 21 сохранены. [SHA‑256](../SHA256SUMS.txt).
 - После выпуска следующий шаг Р06 — самостоятельный OBS-таймер. Ранее принятые режимы показа сохраняются. Вопрос отдельной анимации рассматривается с пользователем.
 
 
@@ -12,7 +12,7 @@
 
 Этот файл — короткий канонический inventory будущей работы. Он восстановлен после повторной сверки чатов «Программа для стрима» 1–31, исторических Drive-roadmap/reconciliation-файлов, GitHub Issues, release notes и exact current source.
 
-## CURRENT
+## Историческое состояние на 10 октября 2026
 
 - Released product version: **1.0.8 / Global Conditional UI Visibility**.
 - Latest accepted 1.0.8 maintenance baseline includes the filesystem/codebase maintenance accepted through **A9**.
