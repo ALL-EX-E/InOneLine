@@ -342,15 +342,31 @@ html, body {
   let standalonePollInFlight = false;
   let combinedRequestId = 0;
   let combinedLastAppliedRequestId = 0;
+  // The combined OBS source allows an old HTTP reply to wait while a newer
+  // Save applies, but never allows unbounded pending /api/data requests.
+  // Standalone List keeps its already accepted single in-flight policy.
+  const combinedInFlight = new Map();
   async function update() {
     if (!isCombined && standalonePollInFlight) return;
     if (!isCombined) standalonePollInFlight = true;
     const requestId = isCombined ? ++combinedRequestId : 0;
+    const controller = isCombined ? new AbortController() : null;
+    if (controller) {
+      combinedInFlight.set(requestId, controller);
+      while (combinedInFlight.size > 3) {
+        const [oldId, oldController] = combinedInFlight.entries().next().value;
+        combinedInFlight.delete(oldId);
+        oldController.abort();
+      }
+    }
     try {
-      const response = await fetch("/api/data", { cache: "no-store" });
+      const response = await fetch("/api/data", {
+        cache: "no-store", ...(controller ? {signal:controller.signal} : {})
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      if (isCombined && requestId < combinedLastAppliedRequestId) return;
+      if (isCombined && (!combinedInFlight.has(requestId) ||
+          requestId < combinedLastAppliedRequestId)) return;
       if (isCombined) combinedLastAppliedRequestId = requestId;
       const overlayConfig = data.overlay || {};
       composer.apply(data, isCombined);
@@ -393,10 +409,12 @@ html, body {
       }
       apiState.classList.remove("visible");
     } catch (err) {
-      if (!isCombined || requestId >= combinedLastAppliedRequestId) {
+      if ((!controller || !controller.signal.aborted) &&
+          (!isCombined || requestId >= combinedLastAppliedRequestId)) {
         apiState.classList.add("visible");
       }
     } finally {
+      if (controller) combinedInFlight.delete(requestId);
       if (!isCombined) standalonePollInFlight = false;
     }
   }
