@@ -61,7 +61,7 @@ def api_smoke() -> None:
         )
         default = db.current_timer_payload()
         assert default["tab_motion"] == {
-            "follow_auction_tab": False, "auction_tab_active": False,
+            "follow_auction_tab": False, "auction_widgets_visible": False,
             "direction": "left", "duration_seconds": 0.65,
         }
         assert default["presentation"]["background"] == "transparent"
@@ -160,12 +160,16 @@ def ui_smoke() -> None:
                 )
             )
 
+            mode_combo = stream.obs_show_modes["timer"]
             assert not stream.timer_follow_auction_tab.isChecked()
+            assert mode_combo.findData("slide") == -1
             assert stream.timer_slide_direction.currentData() == "left"
             assert stream.timer_slide_seconds.value() == 0.65
             assert not stream.timer_slide_direction.isEnabled()
             stream.timer_follow_auction_tab.setChecked(True)
             assert stream.timer_slide_direction.isEnabled()
+            assert mode_combo.itemText(mode_combo.findData("slide")) == "Выезд"
+            mode_combo.setCurrentIndex(mode_combo.findData("slide"))
             stream.timer_slide_direction.setCurrentIndex(
                 stream.timer_slide_direction.findData("top")
             )
@@ -174,13 +178,17 @@ def ui_smoke() -> None:
             with patch.object(QMessageBox, "information"):
                 stream.timer_save_button.click()
             assert read_json(server, "/api/timer")["tab_motion"] == {
-                "follow_auction_tab": True, "auction_tab_active": False,
+                "follow_auction_tab": True, "auction_widgets_visible": False,
                 "direction": "top", "duration_seconds": 1.25,
             }
+            assert read_json(server, "/api/timer")["visibility"]["show_mode"] == "slide"
             stream.timer_follow_auction_tab.setChecked(False)
+            assert mode_combo.findData("slide") == -1
+            assert mode_combo.currentData() == "always"
             stream.timer_slide_seconds.setValue(2)
             stream.refresh()
             assert stream.timer_follow_auction_tab.isChecked()
+            assert mode_combo.currentData() == "slide"
             assert stream.timer_slide_direction.currentData() == "top"
             assert stream.timer_slide_seconds.value() == 1.25
 
@@ -324,7 +332,7 @@ def ui_smoke() -> None:
 def browser_smoke() -> None:
     from PySide6.QtCore import Qt, QUrl
     from PySide6.QtGui import QColor
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QMessageBox
     from PySide6.QtWebEngineWidgets import QWebEngineView
 
     from streaming_manager.app_paths import AppPaths
@@ -430,11 +438,24 @@ def browser_smoke() -> None:
             wait_js(page, "document.querySelector('#root').style.background",
                     "transparent", "Transparent mode")
 
-            db.set_settings_bulk({
-                "timer_overlay_follow_auction_tab": "1",
-                "timer_overlay_slide_seconds": "1.20",
-                "timer_overlay_show_mode": "hidden",
-            })
+            stream = window.stream_tab
+            auction = window.auction_tab
+            button = auction.auction_widgets_button
+            mode_combo = stream.obs_show_modes["timer"]
+
+            def save_mode(mode):
+                mode_combo.setCurrentIndex(mode_combo.findData(mode))
+                assert mode_combo.currentData() == mode
+                with patch.object(QMessageBox, "information"):
+                    stream.timer_save_button.click()
+
+            assert button.isHidden()
+            stream.timer_follow_auction_tab.setChecked(True)
+            stream.timer_slide_seconds.setValue(1.2)
+            assert button.isHidden(), "Unsaved link created a control on Auction"
+            save_mode("hidden")
+            assert not button.isHidden()
+            assert button.text() == "Показать виджеты аукциона"
             visible = "document.documentElement?.dataset.obsVisible"
             mode = "document.documentElement?.dataset.obsShowMode"
             pose = """(() => {
@@ -447,13 +468,25 @@ def browser_smoke() -> None:
             view.load(QUrl(server.base_url + "/timer-overlay"))
             wait_js(page, "location.search", "", "Live source loaded")
             wait_js(page, visible, "false", "Hidden takes priority in live source")
-            window._set_current_main_page(window.auction_tab)
-            assert read_json(server, "/api/timer")["tab_motion"]["auction_tab_active"]
+            window._set_current_main_page(auction)
+            window.resize(1280, 760)
+            wait_with_http_workers(150)
+            rules_button = auction.auction_rules_editor_btn
+            assert button.isVisible()
+            assert button.y() == rules_button.y()
+            assert button.x() > rules_button.geometry().right()
+            window.resize(window.minimumWidth(), 640)
+            wait_with_http_workers(150)
+            viewport = window._main_tab_scroll_by_page[auction].viewport()
+            assert button.mapTo(viewport, button.rect().topRight()).x() < viewport.width()
+            button.click()
+            assert button.text() == "Скрыть виджеты аукциона"
+            assert read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
             assert js(page, visible) == "false"
-            window._set_current_main_page(window.stream_tab)
+            button.click()
 
-            db.set_setting("timer_overlay_show_mode", "always")
-            wait_js(page, mode, "always", "Live source received saved mode")
+            save_mode("slide")
+            wait_js(page, mode, "slide", "Live source received slide mode")
             axis_duration = """(() => {
               const motion = document.querySelector('#root').getAnimations()[0];
               return motion?.effect.getTiming().duration ?? null;
@@ -471,33 +504,60 @@ def browser_smoke() -> None:
                     f"({pose})[{axis}] < {maximum - 10} && ({pose})[{1 - axis}] === 0)"
                 )
 
-                window._set_current_main_page(window.auction_tab)
+                button.click()
+                assert button.text() == "Скрыть виджеты аукциона"
                 wait_js(page, axis_duration, 1200, f"{direction} enter duration")
                 wait_js(page, intermediate, True, f"{direction} moving in")
                 wait_js(page, pose, [0, 0], f"{direction} entered")
                 wait_js(page, axis_duration, None, f"{direction} entry complete")
 
-                window._set_current_main_page(window.stream_tab)
-                assert not read_json(server, "/api/timer")["tab_motion"]["auction_tab_active"]
+                if direction == "left":
+                    window._set_current_main_page(stream)
+                    wait_with_http_workers(1600)
+                    assert js(page, pose) == [0, 0], "Tab change hid the shown timer"
+                    window._set_current_main_page(auction)
+                    assert button.text() == "Скрыть виджеты аукциона"
+
+                button.click()
+                assert button.text() == "Показать виджеты аукциона"
+                assert not read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
                 wait_js(page, axis_duration, 1200, f"{direction} exit duration")
                 wait_js(page, intermediate, True, f"{direction} moving out")
                 wait_js(page, pose, outside, f"{direction} exited")
                 wait_js(page, axis_duration, None, f"{direction} exit complete")
 
             # Reverse before the entry settles and observe the outward leg.
-            window._set_current_main_page(window.auction_tab)
+            window._set_current_main_page(stream)
+            wait_with_http_workers(300)
+            window._set_current_main_page(auction)
+            wait_with_http_workers(300)
+            assert js(page, pose) == [0, 450], "Tab change revealed the hidden timer"
+
+            button.click()
             wait_js(page, f"({pose})[1] < 300 && ({pose})[1] > 160",
-                    True, "Partial entry before rapid tab switch")
-            window._set_current_main_page(window.stream_tab)
+                    True, "Partial entry before pressing Hide")
+            button.click()
             wait_js(page, f"({pose})[1] > 310 && ({pose})[1] < 450",
                     True, "Rapid reversal travels back down")
             wait_js(page, pose, [0, 450], "Rapid reversal finished")
 
-            db.set_setting("timer_overlay_follow_auction_tab", "0")
+            save_mode("always")
+            root_visibility = "getComputedStyle(document.querySelector('#root')).visibility"
+            wait_js(page, root_visibility, "hidden", "Linked always mode waits for Show")
+            button.click()
+            wait_js(page, root_visibility, "visible", "Linked always mode appears immediately")
+            assert js(page, axis_duration) is None
+
+            stream.timer_follow_auction_tab.setChecked(False)
+            save_mode("always")
+            assert button.isHidden()
+            assert not read_json(server, "/api/timer")["tab_motion"]["auction_widgets_visible"]
+            assert mode_combo.findData("slide") == -1
             wait_js(page, pose, [0, 0], "Unlinked widget stays visible")
-            window._set_current_main_page(window.auction_tab)
-            window._set_current_main_page(window.stream_tab)
+            window._set_current_main_page(stream)
+            window._set_current_main_page(auction)
             wait_with_http_workers(400)
+            assert js(page, root_visibility) == "visible"
             assert js(page, pose) == [0, 0] and js(page, axis_duration) is None
         finally:
             view.close()
@@ -508,7 +568,7 @@ def browser_smoke() -> None:
             window.thread_pool.waitForDone(15000)
             app.processEvents()
     print("UI045_TIMER_MEDIA_REAL_CHROMIUM_IMAGE_VIDEO_MISSING_FALLBACK=PASS")
-    print("R06_TIMER_TAB_SLIDE_REAL_CHROMIUM_FOUR_SIDES=PASS")
+    print("R06_TIMER_BUTTON_SLIDE_REAL_CHROMIUM_FOUR_SIDES=PASS")
 
 
 def main():

@@ -215,6 +215,9 @@ class MainWindow(QMainWindow):
         self.api.set_auction_lots_state_provider(
             self.auction_tab.auction_lots_overlay_state
         )
+        self.stream_tab.auctionWidgetBindingSaved.connect(
+            self.auction_tab.refresh_auction_widgets_button
+        )
         self.music_tab.copy_player_overlay_url_btn.clicked.connect(
             self.stream_tab.copy_music_player_overlay_url
         )
@@ -1073,6 +1076,8 @@ class MainWindow(QMainWindow):
         ):
             widget.refresh()
         self.auction_tab.refresh_force()
+        self.auction_tab.refresh_auction_widgets_button()
+        self._queue_responsive_layout_update()
         self._dirty_tabs.clear()
         self._update_status_bar()
 

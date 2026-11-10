@@ -400,15 +400,17 @@ body.preview #api-state.visible { display: block; }
   let lastMotionConfig = "";
 
   function applyTabMotion(policy, motion = {}) {
-    const linked = !preview && ObsVisibility.isVisible(policy) && motion.follow_auction_tab === true;
-    const offset = linked ? slideOffsets[motion.direction] : "";
+    const linked = !preview && motion.follow_auction_tab === true;
+    const shown = !linked || motion.auction_widgets_visible === true;
+    const offset = linked && policy?.show_mode === "slide" ? slideOffsets[motion.direction] : "";
     const config = offset ? String(motion.duration_seconds) + offset : "";
-    // Only tab changes animate. Initialization and saved setting changes
-    // apply the selected tab's current pose immediately.
+    // Only the operator's show/hide command animates. Initialization and
+    // saved setting changes apply the group's current pose immediately.
     root.style.transition = config && config === lastMotionConfig
       ? "transform " + motion.duration_seconds + "s ease-in-out"
       : "none";
-    root.style.transform = offset && !motion.auction_tab_active ? offset : "";
+    root.style.transform = !shown && offset ? offset : "";
+    root.style.visibility = shown || offset ? "" : "hidden";
     lastMotionConfig = config;
   }
 

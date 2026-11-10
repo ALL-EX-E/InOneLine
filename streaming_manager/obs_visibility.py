@@ -32,6 +32,8 @@ _ALWAYS = ("always", "Показывать постоянно")
 _SIMPLE = (_HIDDEN, _ALWAYS)
 
 TIMER_FOLLOW_AUCTION_TAB_KEY = "timer_overlay_follow_auction_tab"
+AUCTION_WIDGET_BINDINGS = {"timer": TIMER_FOLLOW_AUCTION_TAB_KEY}
+TIMER_SLIDE_MODE = ("slide", "Выезд")
 TIMER_SLIDE_DIRECTION_KEY = "timer_overlay_slide_direction"
 TIMER_SLIDE_SECONDS_KEY = "timer_overlay_slide_seconds"
 TIMER_TAB_MOTION_KEYS = (
@@ -53,7 +55,7 @@ MAIN_OVERLAY_SHOW_MODE_CONTROL_ENABLED = False
 WIDGETS = {
     "overlay": WidgetVisibility("overlay_show_mode", "always", _SIMPLE),
     "list": WidgetVisibility("list_overlay_show_mode", "always", (_HIDDEN, _ALWAYS, ("slide", "Выезд"))),
-    "timer": WidgetVisibility("timer_overlay_show_mode", "always", _SIMPLE),
+    "timer": WidgetVisibility("timer_overlay_show_mode", "always", (*_SIMPLE, TIMER_SLIDE_MODE)),
     "music_player": WidgetVisibility(
         MUSIC_PLAYER_OVERLAY_SHOW_MODE_KEY, "track_change",
         (_HIDDEN, ("track_change", "При смене трека"), _ALWAYS),
@@ -65,6 +67,10 @@ WIDGETS = {
         (_HIDDEN, ("context", "Когда колесо используется"), _ALWAYS),
     ),
 }
+
+
+def auction_widget_linked(settings: Mapping[str, Any], widget: str) -> bool:
+    return settings.get(AUCTION_WIDGET_BINDINGS[widget]) == "1"
 
 
 def show_mode(settings: Mapping[str, Any], widget: str) -> str:
@@ -83,6 +89,8 @@ def show_mode(settings: Mapping[str, Any], widget: str) -> str:
         )
         return "always" if legacy == "1" else "hidden"
     mode = str(settings.get(spec.key) or "").strip().casefold()
+    if widget == "timer" and mode == TIMER_SLIDE_MODE[0] and not auction_widget_linked(settings, widget):
+        return spec.default
     return mode if any(mode == value for value, _label in spec.options) else spec.default
 
 
@@ -97,7 +105,7 @@ def timer_tab_motion(settings: Mapping[str, Any]) -> dict[str, Any]:
     if not math.isfinite(seconds):
         seconds = TIMER_SLIDE_DEFAULT_SECONDS
     return {
-        "follow_auction_tab": settings.get(TIMER_FOLLOW_AUCTION_TAB_KEY) == "1",
+        "follow_auction_tab": auction_widget_linked(settings, "timer"),
         "direction": direction,
         "duration_seconds": max(TIMER_SLIDE_MIN_SECONDS, min(TIMER_SLIDE_MAX_SECONDS, seconds)),
     }

@@ -2052,7 +2052,7 @@ class ServicesMixin:
             "visibility": visibility_payload(settings, "timer"),
             "tab_motion": {
                 **timer_tab_motion(settings),
-                "auction_tab_active": runtime.get("auction_tab_active") is True,
+                "auction_widgets_visible": runtime.get("auction_widgets_visible") is True,
             },
             "presentation": {
                 "font_family": family,

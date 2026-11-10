@@ -130,6 +130,7 @@ from ..obs_visibility import (
     TIMER_SLIDE_DIRECTIONS,
     TIMER_SLIDE_MAX_SECONDS,
     TIMER_SLIDE_MIN_SECONDS,
+    TIMER_SLIDE_MODE,
     TIMER_SLIDE_SECONDS_KEY,
     WIDGETS,
     show_mode,
@@ -147,6 +148,7 @@ from .common import (
 
 class StreamTab(QWidget):
     wheelAppearanceSaved = Signal()
+    auctionWidgetBindingSaved = Signal()
 
     def __init__(self, db: Database, api: LocalApiServer):
         super().__init__()
@@ -758,13 +760,14 @@ class StreamTab(QWidget):
         timer_form.setVerticalSpacing(10)
         timer_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         timer_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        add_show_mode("timer", timer_form)
+        timer_show_mode = add_show_mode("timer", timer_form)
 
         self.timer_follow_auction_tab = QCheckBox("Привязать к вкладке „Аукцион“")
         timer_form.addRow(self.timer_follow_auction_tab)
         timer_tab_hint = QLabel(
-            "На вкладке «Аукцион» таймер выезжает с выбранной стороны. "
-            "При переходе на другую вкладку он уезжает обратно за то же время."
+            "Кнопка на вкладке «Аукцион» управляет показом таймера. "
+            "В режиме «Выезд» таймер выезжает с выбранной стороны и остаётся "
+            "видимым до нажатия «Скрыть виджеты аукциона»."
         )
         timer_tab_hint.setWordWrap(True)
         timer_tab_hint.setProperty("muted", True)
@@ -792,6 +795,19 @@ class StreamTab(QWidget):
         timer_slide_time_control.setEnabled(False)
         self.timer_follow_auction_tab.toggled.connect(self.timer_slide_direction.setEnabled)
         self.timer_follow_auction_tab.toggled.connect(timer_slide_time_control.setEnabled)
+
+        def update_timer_slide_mode(linked: bool) -> None:
+            value, label = TIMER_SLIDE_MODE
+            index = timer_show_mode.findData(value)
+            if linked and index < 0:
+                timer_show_mode.addItem(label, value)
+            elif not linked and index >= 0:
+                if timer_show_mode.currentIndex() == index:
+                    timer_show_mode.setCurrentIndex(timer_show_mode.findData("always"))
+                timer_show_mode.removeItem(index)
+
+        update_timer_slide_mode(False)
+        self.timer_follow_auction_tab.toggled.connect(update_timer_slide_mode)
 
         self.timer_overlay_font = ScrollSafeFontComboBox()
         self.timer_overlay_font.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -1474,6 +1490,7 @@ class StreamTab(QWidget):
                 self.timer_background_color_btn.property("fontColor") or TIMER_OVERLAY_BACKGROUND_COLOR_DEFAULT
             ),
         })
+        self.auctionWidgetBindingSaved.emit()
         QMessageBox.information(
             self,
             "OBS Timer",
@@ -2646,6 +2663,8 @@ class StreamTab(QWidget):
         # of appearance options grows.
         settings = self.db.get_settings()
         setting = settings.get
+        motion = timer_tab_motion(settings)
+        self.timer_follow_auction_tab.setChecked(motion["follow_auction_tab"])
         for widget, combo in self.obs_show_modes.items():
             combo.blockSignals(True)
             self._set_combo_by_data(combo, show_mode(settings, widget))
@@ -2768,8 +2787,6 @@ class StreamTab(QWidget):
         self._load_typography_settings(settings)
         self._update_main_overlay_conditional_visibility()
 
-        motion = timer_tab_motion(settings)
-        self.timer_follow_auction_tab.setChecked(motion["follow_auction_tab"])
         self._set_combo_by_data(self.timer_slide_direction, motion["direction"])
         self.timer_slide_seconds.setValue(motion["duration_seconds"])
         self.timer_overlay_font.setCurrentFont(QFont(
