@@ -1336,6 +1336,9 @@ class StreamTab(QWidget):
         rules_form.setRowWrapPolicy(QFormLayout.WrapLongRows)
         rules_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         add_show_mode("rules", rules_form)
+        self._add_auction_widget_motion_controls(
+            "rules", rules_form, "виджет правил", "виджета правил",
+        )
         rules_form.addRow(
             "",
             QLabel("Текст и оформление этого виджета настраиваются "
@@ -1797,14 +1800,15 @@ class StreamTab(QWidget):
         )
 
     def _save_rules_overlay_settings(self) -> None:
-        # Widget show-mode remains a global OBS policy. All five visual
-        # settings moved into the shared Rules template editor Save.
+        # Visibility is global. Text and styling belong to the Rules template.
         self.db.set_settings_bulk({
             WIDGETS["rules"].key: str(self.obs_show_modes["rules"].currentData()),
+            **self._auction_widget_motion_values("rules"),
         })
+        self.auctionWidgetBindingSaved.emit()
         QMessageBox.information(
             self, "OBS Rules",
-            "Режим показа виджета правил сохранён.",
+            "Настройки показа виджета правил сохранены.",
         )
 
     def _save_wheel_overlay_settings(self) -> None:

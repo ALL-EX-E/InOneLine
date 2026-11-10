@@ -32,6 +32,7 @@ from streaming_manager.database import Database, Game
 from streaming_manager.constants import STATUS_NOT_PLAYED, STATUS_PLAYED
 from streaming_manager.media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, managed_media_directory
 from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
+from tools.qt_browser_test_wait import wait_with_http_workers
 
 
 def free_port() -> int:
@@ -45,7 +46,7 @@ def js(page, expression: str):
     page.runJavaScript(expression, result.append)
     end = time.monotonic() + 8
     while not result and time.monotonic() < end:
-        QTest.qWait(25)
+        wait_with_http_workers(25)
     if not result:
         raise AssertionError("Browser JavaScript callback timed out")
     return result[0]
@@ -60,7 +61,7 @@ def wait_js(page, expression: str, expected, label: str, timeout: float = 25):
         if actual == expected:
             print(f"RULES_BROWSER_CHECK_PASS: {label}", flush=True)
             return
-        QTest.qWait(70)
+        wait_with_http_workers(70)
     raise AssertionError(f"{label}: got {actual!r}, expected {expected!r}")
 
 
@@ -99,6 +100,8 @@ def main() -> int:
         settings_before = db.get_settings()
         templates_before = db.list_rule_templates()
         server = LocalApiServer(db, port=free_port())
+        auction_runtime = {"auction_widgets_visible": False}
+        server.set_auction_lots_state_provider(lambda: auction_runtime)
         server.start()
         base_url = server.base_url + "/rules-overlay"
         editor = AuctionRulesEditorDialog(db, rules_overlay_url=lambda: base_url)
@@ -327,6 +330,52 @@ def main() -> int:
             wait_js(preview_page, media_visible, "none", "Missing media hides in preview")
             assert {int(x["id"]) for x in db.list_rule_templates()} == {int(x["id"]) for x in templates_before}, "Unexpected template added or removed"
             assert db.get_settings() == settings_before
+
+            db.set_settings_bulk({
+                "rules_overlay_show_mode": "slide",
+                "rules_overlay_follow_auction_tab": "1",
+                "rules_overlay_slide_seconds": "1.40",
+            })
+            left = "Math.round(document.body.getBoundingClientRect().left)"
+            top = "Math.round(document.body.getBoundingClientRect().top)"
+            duration = "document.body.getAnimations()[0]?.effect.getTiming().duration ?? 0"
+            for side, axis, other_axis, boundary in (
+                ("left", left, top, -width),
+                ("right", left, top, width),
+                ("top", top, left, -height),
+                ("bottom", top, left, height),
+            ):
+                db.set_setting("rules_overlay_slide_direction", side)
+                wait_js(live_page, axis, boundary, f"Rules hidden fully {side}")
+                assert js(live_page, other_axis) == 0
+                if side == "left":
+                    assert js(live_page, """(() => {
+                        document.querySelector('#content').firstElementChild.dataset.motionQa = 'kept';
+                        return true;
+                    })()""")
+                minimum, maximum = sorted((0, boundary))
+                moving = f"({axis}) > {minimum + 10} && ({axis}) < {maximum - 10} && ({other_axis}) === 0"
+
+                auction_runtime["auction_widgets_visible"] = True
+                wait_js(live_page, duration, 1400, f"Rules enter from {side} in 1.40 seconds")
+                wait_js(live_page, moving, True, f"Rules moving in from {side}")
+                wait_js(live_page, duration, 0, f"Rules entry from {side} completed")
+                assert js(live_page, axis) == 0 and js(live_page, other_axis) == 0
+
+                auction_runtime["auction_widgets_visible"] = False
+                wait_js(live_page, duration, 1400, f"Rules exit toward {side} in 1.40 seconds")
+                wait_js(live_page, moving, True, f"Rules moving out toward {side}")
+                wait_js(live_page, axis, boundary, f"Rules left toward {side}")
+                wait_js(live_page, duration, 0, f"Rules exit toward {side} completed")
+
+            assert js(live_page, "document.querySelector('#content').firstElementChild.dataset.motionQa") == "kept"
+            assert js(preview_page, left) == 0 and js(preview_page, top) == 0
+            wait_js(preview_page, expr, "A LIVE", "Editor preview still follows selected A")
+            db.set_setting("rules_overlay_show_mode", "hidden")
+            auction_runtime["auction_widgets_visible"] = True
+            visible = "document.documentElement.dataset.obsVisible"
+            wait_js(live_page, visible, "false", "Rules Never Show has priority")
+            assert js(preview_page, visible) == "true"
         finally:
             for view in views:
                 view.close()
@@ -338,6 +387,7 @@ def main() -> int:
             server.stop()
 
     print("P11_K4_SELECTED_RULES_QT_CHROMIUM_END_TO_END_ISOLATION=PASS")
+    print("R06_RULES_AUCTION_BUTTON_CHROMIUM_FOUR_SIDES=PASS")
     return 0
 
 

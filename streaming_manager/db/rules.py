@@ -19,7 +19,9 @@ from ..constants import (
 )
 from ..media import (MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available,
                      media_kind_for_name, resolve_media_asset_path)
-from ..obs_visibility import WIDGETS, show_mode, visibility_payload
+from ..obs_visibility import (
+    AUCTION_WIDGET_BINDINGS, WIDGETS, auction_widget_motion, show_mode, visibility_payload,
+)
 from ..rules_html import sanitize_rules_html
 from .common import normalize_text_key, utc_now
 
@@ -639,6 +641,7 @@ class RulesMixin:
     def current_rules_payload(
         self, *, preview_template_id: int | None = None,
         preview_draft: dict[str, Any] | None = None,
+        auction_widgets_visible: bool = False,
     ) -> dict[str, Any]:
         """Read-only Rules API. Only preview callers may select another template.
 
@@ -648,6 +651,7 @@ class RulesMixin:
         keys = (
             RULES_OVERLAY_VISIBLE_KEY,
             WIDGETS["rules"].key,
+            *AUCTION_WIDGET_BINDINGS["rules"],
             RULES_OVERLAY_AUTOSCROLL_KEY,
             RULES_OVERLAY_BACKGROUND_KEY,
             RULES_OVERLAY_BACKGROUND_COLOR_KEY,
@@ -750,6 +754,9 @@ class RulesMixin:
         return {
             "visible": show_mode(settings, "rules") != "hidden",
             "visibility": visibility_payload(settings, "rules"),
+            "tab_motion": auction_widget_motion(
+                settings, "rules", auction_widgets_visible=auction_widgets_visible,
+            ),
             "source": source,
             "auction_id": auction_id,
             "template_name": template_name,

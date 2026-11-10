@@ -797,7 +797,11 @@ class LocalApiServer:
                             self._send_json({"error": "template_not_found"}, 404)
                             return
                     else:
-                        payload = db.current_rules_payload()
+                        payload = db.current_rules_payload(
+                            auction_widgets_visible=(
+                                api_server.auction_lots_state().get("auction_widgets_visible") is True
+                            ),
+                        )
                     self._send_json(payload, pretty=pretty)
                     return
                 self._send_json({"error": "not_found"}, 404)
