@@ -587,13 +587,65 @@ def main():
                         assert state.ingest(ChatMessage(
                             "twitch","chan","dynamic-grow-"+str(index),
                             "alice","R06 growing chat "+str(index)))
+                    obs_ids = [row["external_id"] for row in
+                               state.snapshot(for_obs=True)["messages"]]
+                    with urlopen(api.base_url + "/api/multichat", timeout=5) as response:
+                        api_ids = [row["external_id"] for row in
+                                   json.load(response)["messages"]]
+                    assert len(obs_ids) >= 9 and obs_ids == api_ids, (
+                        "Twitch growth not published in authoritative state/API",
+                        obs_ids, api_ids)
                     for page in pages:
-                        grown = until(page, lambda a:
-                            a["shown"] and a["count"] >= 9 and
-                            a["chatHeight"] > first["chatHeight"] + 35 and
-                            a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
-                            a["listHeight"] + a["chatHeight"] <= a["rootHeight"] + 4,
-                            "chat grows upward under live List")
+                        try:
+                            grown = until(page, lambda a:
+                                a["shown"] and a["count"] >= 9 and
+                                a["chatHeight"] > first["chatHeight"] + 35 and
+                                a["chatHeight"] <= a["rootHeight"] / 2 + 4 and
+                                a["listHeight"] + a["chatHeight"] <= a["rootHeight"] + 4,
+                                "chat grows upward under live List")
+                        except AssertionError as original:
+                            # Non-mutating, failure-only browser-network probe.
+                            # Do not monkeypatch fetch or force DOM rendering.
+                            page.runJavaScript("""(() => {
+                              const probe=window.__r06TransportProbe={
+                                parentData:{status:'pending'},
+                                parentChat:{status:'pending'},
+                                childChat:{status:'pending'},
+                                parentXhr:{status:'pending'}
+                              };
+                              function check(context, url, key) {
+                                context.fetch(url, {cache:'no-store'})
+                                  .then(r=>r.ok?r.json():Promise.reject(Error('HTTP '+r.status)))
+                                  .then(value=>probe[key]={
+                                    status:'ok', count:value.messages?.length ?? null,
+                                    hasMessages:value.multichat?.has_messages ?? null
+                                  }).catch(e=>probe[key]={status:'error',error:String(e)});
+                              }
+                              check(window, '/api/data', 'parentData');
+                              check(window, '/api/multichat', 'parentChat');
+                              const frame=document.querySelector('#list-chat iframe');
+                              if(frame?.contentWindow)
+                                check(frame.contentWindow, '/api/multichat', 'childChat');
+                              else probe.childChat={status:'no-frame'};
+                              const xhr=new XMLHttpRequest();
+                              xhr.open('GET','/api/multichat',true);
+                              xhr.onload=()=>{probe.parentXhr={
+                                status:'ok', httpStatus:xhr.status,
+                                count:JSON.parse(xhr.responseText)?.messages?.length ?? null};};
+                              xhr.onerror=()=>{probe.parentXhr={status:'error'};};
+                              xhr.send();
+                            })()""")
+                            QTest.qWait(2200)
+                            probe = evaluate(page, """JSON.stringify((() => {
+                              const iframe=document.querySelector('#list-chat iframe');
+                              return {requests:window.__r06TransportProbe,
+                                      childReady:iframe?.contentDocument?.readyState,
+                                      childRender:typeof iframe?.contentWindow?.IOLRenderEmbeddedChatState,
+                                      cards:iframe?.contentDocument?.getElementById('messages')?.children.length};
+                            })())""")
+                            raise AssertionError("Live Twitch transport diagnostic: " +
+                                repr({"obs_count":len(obs_ids), "http_count":len(api_ids),
+                                      "probe":probe, "original":str(original)})) from original
                         assert grown["hasSentinel"] and grown["iframeStable"], grown
                 assert state.ingest(ChatMessage(
                     "twitch","chan","dynamic-off-"+direction,"alice","!list"))
