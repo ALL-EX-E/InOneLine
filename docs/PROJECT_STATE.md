@@ -7,7 +7,9 @@
 - Тег `v1.0.10` указывает на принятый коммит `5a70f926c6d2ee3eb5f2aa447c48e5cbfc05e3ff`. Принятая логика OBS и схема SQLite 21 сохранены. [SHA‑256](../SHA256SUMS.txt).
 - Пользователь принял выезд таймера OBS и общую кнопку показа на вкладке «Аукцион». [PR №423](https://github.com/ALL-EX-E/InOneLine/pull/423) слит в `main` коммитом `943ca5a76774db0becf2ccb2424143c44dc6bef5`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42825902941) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/15LiBvskdN94N5wkwFlXndVza5r8BW8aB/view?usp=drivesdk).
 - Пользователь принял команду Twitch для показа скрытого плеера OBS. [PR №424](https://github.com/ALL-EX-E/InOneLine/pull/424) слит в `main` коммитом `8256185e0afd7b2e8e8bf091853bfafff48adf17`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42846679366) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/176u_yu-ibM2qk43XdwniWQJ_J6ieRv5c/view?usp=drivesdk).
-- Пользователь решил сохранить текущий показ колеса OBS. Следующий разбор Р06 — самостоятельный OBS-виджет списка лотов аукциона.
+- Пользователь решил сохранить текущий показ колеса OBS.
+- Пользователь принял выезд списка лотов OBS по общей кнопке аукциона. [PR №425](https://github.com/ALL-EX-E/InOneLine/pull/425) слит в `main` коммитом `660b443cfee90abda92d639dbd7f315134363095`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42858374873) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/1G81s-57JJdRevBdoDZvQGKTQFBtLzNAG/view?usp=drivesdk).
+- Следующий разбор Р06 — самостоятельный OBS-виджет правил аукциона.
 
 
 Обновлено: **2026-10-10**
