@@ -6,7 +6,8 @@
 - Пользователь подтвердил работу FIX‑092 в установщике `1701581`. [PR №421](https://github.com/ALL-EX-E/InOneLine/pull/421) слит в `main` коммитом `9e5124a76ecfece10dc30b067ff9b260594f40d3`. Дерево этого коммита совпадает с деревом, проверенным в [Windows CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/42776409499).
 - Тег `v1.0.10` указывает на принятый коммит `5a70f926c6d2ee3eb5f2aa447c48e5cbfc05e3ff`. Принятая логика OBS и схема SQLite 21 сохранены. [SHA‑256](../SHA256SUMS.txt).
 - Пользователь принял выезд таймера OBS и общую кнопку показа на вкладке «Аукцион». [PR №423](https://github.com/ALL-EX-E/InOneLine/pull/423) слит в `main` коммитом `943ca5a76774db0becf2ccb2424143c44dc6bef5`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42825902941) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/15LiBvskdN94N5wkwFlXndVza5r8BW8aB/view?usp=drivesdk).
-- Следующий разбор Р06 — OBS-виджет музыкального плеера. Пользователь хочет дополнить его функции. Конкретные дополнения уточняются отдельно.
+- Пользователь принял команду Twitch для показа скрытого плеера OBS. [PR №424](https://github.com/ALL-EX-E/InOneLine/pull/424) слит в `main` коммитом `8256185e0afd7b2e8e8bf091853bfafff48adf17`. [Windows CI после слияния](https://github.com/ALL-EX-E/InOneLine/actions/runs/42846679366) прошёл на этом коммите. [Принятая тестовая сборка](https://drive.google.com/file/d/176u_yu-ibM2qk43XdwniWQJ_J6ieRv5c/view?usp=drivesdk).
+- Следующий разбор Р06 — появление и скрытие самостоятельного виджета колеса OBS.
 
 
 Обновлено: **2026-10-10**
