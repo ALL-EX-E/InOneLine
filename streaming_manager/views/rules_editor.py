@@ -1309,6 +1309,8 @@ class AuctionRulesEditorDialog(QDialog):
         button.setStyleSheet(
             f"background: {value}; color: {text}; border: 1px solid #60666c; font-weight: 600;"
         )
+        button.ensurePolished()
+        button.setMinimumWidth(button.sizeHint().width())
 
     def _choose_color(self, pipette: bool) -> None:
         # Only foreground color remains editable in the toolbar. Existing

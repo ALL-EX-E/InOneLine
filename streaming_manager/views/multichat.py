@@ -29,6 +29,9 @@ class MultichatTab(QWidget):
         self.twitch_status_provider = twitch_status_provider
         self._operator_feed_key = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
+        # resizeEvent owns this split. Generic row reflow still handles the
+        # descendants, without restoring this layout's initial direction.
+        self.columns.setProperty("responsiveDirectionManaged", True)
         self.columns.setContentsMargins(8, 8, 8, 8)
         self.feed = _ChatFeed()
         self.feed_frame = ChatBackgroundFrame(db, self.feed)

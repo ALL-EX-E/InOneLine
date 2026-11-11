@@ -617,7 +617,7 @@ jobs:
         run: |
           python tools/gui_regression_smoke.py
 
-      - name: Maintenance XLSX switching and Auction refresh regression
+      - name: Maintenance files, Auction refresh and full interface regression
         shell: pwsh
         env:
           QT_QPA_PLATFORM: windows
@@ -626,6 +626,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Public XLSX target-switch regression failed" }
           python -m tools.auction_context_refresh_smoke
           if ($LASTEXITCODE -ne 0) { throw "Auction context and refresh regression failed" }
+          python -m tools.shared_xlsx_switch_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Shared XLSX serialized target switch regression failed" }
+          python -m tools.auction_finish_concurrency_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Auction concurrent finish and timer regression failed" }
+          python -m tools.public_export_atomic_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Public export preservation regression failed" }
+          python -m tools.minimum_button_caption_smoke
+          if ($LASTEXITCODE -ne 0) { throw "Whole-program caption geometry regression failed" }
 
       - name: Common OBS policy, native settings and real browser regression
         shell: pwsh
@@ -1219,6 +1227,7 @@ jobs:
           if ($env:GITHUB_HEAD_REF -eq "candidate/maintenance-conditional-controls-20261111") {
             Copy-Item "docs\qa\MAINTENANCE-conditional-controls-checklist.md" "$out\CHECKLIST_MAINTENANCE.md"
             Copy-Item "docs\qa\MAINTENANCE-followup-checklist.md" "$out\CHECKLIST_MAINTENANCE_PASS2.md"
+            Copy-Item "docs\qa\MAINTENANCE-full-program-audit.md" "$out\CHECKLIST_FULL_AUDIT.md"
           }
           python tools/create_source_snapshot.py "$out\InOneLine_R06_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R06 source snapshot failed" }

@@ -176,6 +176,7 @@ def reflow_narrow_rows(
             if child_widget is not None:
                 collect_widget(child_widget)
 
+    root.layout().activate()
     collect_layout(root.layout())
 
     for layout in layouts:
@@ -242,7 +243,7 @@ def reflow_narrow_rows(
         return max(0, width) + margins.left() + margins.right()
 
     for layout in reversed(layouts):
-        if not isinstance(layout, QBoxLayout):
+        if not isinstance(layout, QBoxLayout) or layout.property("responsiveDirectionManaged"):
             continue
         state = box_states.get(layout)
         if state is None:
@@ -263,21 +264,26 @@ def reflow_narrow_rows(
             continue
 
         if originally_horizontal:
-            parent_width = (
-                parent.contentsRect().width()
-                if parent is not None
-                else available_width
-            )
+            # Nested rows share their parent widget with wider containers.
+            # Compare against this row's allocated width, which includes its
+            # own margins but excludes margins of ancestor layouts.
+            parent_width = layout.geometry().width()
             if parent_width <= 0:
-                parent_width = available_width
+                parent_width = parent.contentsRect().width() if parent is not None else available_width
             # Atomic spin+step-button controls must never be broken into
             # vertical pieces: their fixed minimum fits the narrow workspace.
             keep_horizontal = bool(
                 parent is not None
                 and parent.property("responsiveKeepHorizontal")
             )
+            has_buttons = any(
+                item.widget() is not None
+                and not item.widget().isHidden()
+                and item.widget().inherits("QAbstractButton")
+                for item in (layout.itemAt(index) for index in range(layout.count()))
+            )
             needs_stack = bool(
-                compact
+                (compact or has_buttons)
                 and not keep_horizontal
                 and parent_width > 0
                 and preferred_width(layout) > max(0, parent_width - 2)
@@ -741,6 +747,7 @@ def make_wide_step_control(
     down_btn = QPushButton("▼")
     button_size = max(36, spin.sizeHint().height())
     for button in (up_btn, down_btn):
+        button.setStyleSheet("QPushButton { padding: 0px; }")
         button.setFixedSize(button_size, button_size)
         button.setAutoRepeat(True)
         button.setAutoRepeatDelay(350)

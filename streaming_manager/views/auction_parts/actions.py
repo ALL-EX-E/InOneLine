@@ -316,12 +316,15 @@ class AuctionActionMixin:
                 return
 
         try:
-            result = self.db.finish_auction(int(session["id"]))
+            result = self.db.finish_auction(int(session["id"]), automatic=automatic)
         except Exception as exc:
             QMessageBox.critical(self, "Аукцион", str(exc))
             return
 
         status = str(result.get("status") or "")
+        if status in {"running", "paused"}:
+            self.refresh()
+            return
         self._pending_tie_overtime = False
         # The main timer ending always gives Music Player audible ownership
         # back immediately. For a tie we retain the auction soundtrack

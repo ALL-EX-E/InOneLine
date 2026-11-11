@@ -78,10 +78,11 @@ class AuctionStateMixin:
             and session.get("status") == "running"
             and self.db.auction_remaining_milliseconds(int(session["id"])) <= 0
         ):
-            result = self.db.finish_auction(int(session["id"]))
-            self._finish_auction_soundtrack_phase(
-                str(result.get("status") or "")
-            )
+            result = self.db.finish_auction(int(session["id"]), automatic=True)
+            if result.get("status") not in {"running", "paused"}:
+                self._finish_auction_soundtrack_phase(
+                    str(result.get("status") or "")
+                )
             session = self.db.get_open_auction_session()
             self._sync_auction_timer_activity(session)
             self._active_auction_id = int(session["id"]) if session else None
@@ -154,10 +155,11 @@ class AuctionStateMixin:
             and session.get("status") == "running"
             and self.db.auction_remaining_milliseconds(int(session["id"])) <= 0
         ):
-            result = self.db.finish_auction(int(session["id"]))
-            self._finish_auction_soundtrack_phase(
-                str(result.get("status") or "")
-            )
+            result = self.db.finish_auction(int(session["id"]), automatic=True)
+            if result.get("status") not in {"running", "paused"}:
+                self._finish_auction_soundtrack_phase(
+                    str(result.get("status") or "")
+                )
             self._refresh_visible_state()
             return
         self._update_session_controls(session, refresh_wheel_chances=True)

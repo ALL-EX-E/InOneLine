@@ -1208,6 +1208,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_path: Path | None = None
         self._shared_xlsx_worker: FunctionWorker | None = None
         self._shared_xlsx_worker_kind = ""
+        self._shared_xlsx_pending_target: tuple[Path, bool] | None = None
         self._shared_xlsx_last_signature: tuple[int, int] | None = None
         self._shared_xlsx_observed_signature: tuple[int, int] | None = None
         self._shared_xlsx_failed_signature: tuple[int, int] | None = None
@@ -1288,7 +1289,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             )
             if answer != QMessageBox.Yes:
                 return
-        self._shared_xlsx_start_write(target, connect_after=True)
+        self._shared_xlsx_switch_target(target, create=True)
 
     def _shared_xlsx_connect(self) -> None:
         initial = str(self._shared_xlsx_path.parent) if self._shared_xlsx_path else ""
@@ -1300,7 +1301,23 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         if not path:
             return
-        self._shared_xlsx_activate(Path(path), persist=True, import_now=True)
+        self._shared_xlsx_switch_target(Path(path), create=False)
+
+    def _shared_xlsx_switch_target(self, path: Path, *, create: bool) -> None:
+        if self._shared_xlsx_shutdown:
+            return
+        # A file dialog runs a nested event loop. The previous target can start
+        # importing while it is open, so finish that operation before switching.
+        self._shared_xlsx_write_timer.stop()
+        self._shared_xlsx_write_pending = False
+        self._shared_xlsx_write_retry = False
+        if self._shared_xlsx_worker is not None:
+            self._shared_xlsx_pending_target = (path, create)
+            return
+        if create:
+            self._shared_xlsx_start_write(path, connect_after=True)
+        else:
+            self._shared_xlsx_activate(path, persist=True, import_now=True)
 
     def _shared_xlsx_activate(
         self,
@@ -1314,6 +1331,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         initial_mtime: float | None = None,
     ) -> None:
         self._shared_xlsx_path = Path(path)
+        self.shared_xlsx_modified_label.setText("—")
         self._shared_xlsx_last_hash = str(initial_hash or "")
         self._shared_xlsx_last_presentation_hash = str(
             initial_presentation_hash or ""
@@ -1591,12 +1609,20 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_worker = None
         self._shared_xlsx_worker_kind = ""
         self._shared_xlsx_update_controls()
+        if self._shared_xlsx_shutdown:
+            return
+        if self._shared_xlsx_pending_target is not None:
+            path, create = self._shared_xlsx_pending_target
+            self._shared_xlsx_pending_target = None
+            self._shared_xlsx_switch_target(path, create=create)
+            return
         if self._shared_xlsx_write_pending and self._shared_xlsx_path is not None:
             delay = 1500 if self._shared_xlsx_write_retry else SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS
             self._shared_xlsx_write_timer.start(delay)
 
     def shutdown_shared_xlsx(self) -> None:
         self._shared_xlsx_shutdown = True
+        self._shared_xlsx_pending_target = None
         self._shared_xlsx_poll_timer.stop()
         self._shared_xlsx_write_timer.stop()
 

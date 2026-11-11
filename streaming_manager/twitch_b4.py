@@ -12,6 +12,7 @@ redemption fulfillment/refund semantics remain unchanged.
 import json
 import re
 import threading
+from math import isfinite
 from time import monotonic
 from collections import OrderedDict
 from queue import Empty, Full, PriorityQueue
@@ -974,6 +975,13 @@ class TwitchEventSubRuntime:
             session_id = str(session.get("id") or "") if isinstance(session, dict) else ""
             if not session_id:
                 raise RuntimeError("Twitch EventSub не прислал session_id.")
+            try:
+                keepalive_timeout = float(session.get("keepalive_timeout_seconds") or 30)
+            except (TypeError, ValueError):
+                keepalive_timeout = 30.0
+            if not isfinite(keepalive_timeout) or keepalive_timeout <= 0:
+                keepalive_timeout = 30.0
+            last_message_at = monotonic()
 
             reward_ids = self.service.managed_reward_ids()
             chat_source, chat_ready = self._chat_profile()
@@ -1050,9 +1058,15 @@ class TwitchEventSubRuntime:
                     # websocket-client timeout is expected and is used to poll
                     # local auction state without a second timer thread.
                     if exc.__class__.__name__ in {"WebSocketTimeoutException", "TimeoutError"}:
+                        if monotonic() - last_message_at > keepalive_timeout:
+                            raise RuntimeError(
+                                "Twitch EventSub: истёк срок ожидания keepalive."
+                            ) from exc
                         continue
                     raise
                 message_type = self._message_type(message)
+                if message_type in {"session_keepalive", "notification"}:
+                    last_message_at = monotonic()
                 if message_type == "session_keepalive":
                     continue
                 if message_type == "notification":
