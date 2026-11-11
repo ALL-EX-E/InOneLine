@@ -60,6 +60,14 @@ class CompletedHistorySortingTests(unittest.TestCase):
             for i in range(self.tab.table.rowCount())
         ]
 
+    def test_custom_date_controls_only_visible_for_custom_period(self):
+        fields = (self.tab.date_from, self.tab.date_separator, self.tab.date_to)
+        self.assertTrue(all(field.isHidden() for field in fields))
+        self.tab.period.setCurrentIndex(self.tab.period.findData("custom"))
+        self.assertTrue(all(not field.isHidden() for field in fields))
+        self.tab.period.setCurrentIndex(self.tab.period.findData("7d"))
+        self.assertTrue(all(field.isHidden() for field in fields))
+
     def test_ui_has_exactly_two_date_orders(self):
         self.assertEqual(
             [(self.tab.sort.itemText(i), self.tab.sort.itemData(i))

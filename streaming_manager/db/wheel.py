@@ -255,6 +255,7 @@ class WheelMixin:
         """Atomically persist winner, immutable verification snapshot and audit log."""
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             draw = self._wheel_draw_info_conn(conn, auction_id)
             session = draw["session"]
             if session["status"] != "awaiting_wheel":

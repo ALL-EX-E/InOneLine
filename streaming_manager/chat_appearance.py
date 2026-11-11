@@ -90,22 +90,23 @@ def normalize_common(raw) -> dict:
     return d
 
 
-def _load(db, key: str) -> dict:
+def _decode_settings(raw: str) -> dict:
     try:
-        data = json.loads(db.get_setting(key, "{}"))
+        data = json.loads(raw)
         return data if isinstance(data, dict) else {}
-    except (TypeError, ValueError, json.JSONDecodeError):
+    except (TypeError, ValueError):
         return {}
 
 
 def saved_appearance(db) -> dict:
-    common = normalize_common(_load(db, COMMON_KEY))
+    settings = db.get_settings((COMMON_KEY, LEGACY_OBS_KEY, TWITCH_KEY))
+    common = normalize_common(_decode_settings(settings.get(COMMON_KEY, "{}")))
     # In older builds this separate checkbox overrode the saved visibility.
     # Interpret its OFF state as Hidden until the first explicit new Save.
-    if db.get_setting(LEGACY_OBS_KEY, "1") == "0":
+    if settings.get(LEGACY_OBS_KEY, "1") == "0":
         common["visibility"] = "hidden"
     return {
-        "twitch": normalize_twitch(_load(db, TWITCH_KEY)),
+        "twitch": normalize_twitch(_decode_settings(settings.get(TWITCH_KEY, "{}"))),
         "common": common,
     }
 

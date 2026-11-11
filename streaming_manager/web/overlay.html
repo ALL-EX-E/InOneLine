@@ -400,12 +400,8 @@ body.preview .preview-label { display: flex; }
   const LOGICAL_W = 2560;
   const LOGICAL_H = 1440;
 
-  const LEFT_X = 14;
   const LEFT_TOP = 101;
-  const LEFT_RIGHT = 347;
   const LEFT_BOTTOM = 101;
-  const LEFT_W = LOGICAL_W - LEFT_X - LEFT_RIGHT; // 2199
-  const LEFT_H = LOGICAL_H - LEFT_TOP - LEFT_BOTTOM; // 1238
 
   const overlay = document.getElementById("overlay");
   const titleBanner = document.getElementById("game-title-banner");
@@ -454,7 +450,6 @@ body.preview .preview-label { display: flex; }
   const extraEl = document.getElementById("current-extra");
   const apiState = document.getElementById("api-state");
 
-  const qs = new URLSearchParams(location.search);
   if (ObsVisibility.preview) {
     document.body.classList.add("preview");
   }

@@ -6,6 +6,7 @@ import socket
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 from urllib.request import urlopen
 
 from streaming_manager.api_server import LocalApiServer
@@ -47,7 +48,9 @@ class R06ListApiSmoke(unittest.TestCase):
             clock = Clock()
             state = MultichatState(clock=clock, wall_clock=clock)
             api = LocalApiServer(db, port=port())
-            api.set_multichat_state_provider(state.snapshot)
+            api.set_multichat_state_provider(
+                state.snapshot, overlay_summary=state.obs_overlay_summary,
+            )
             api.set_list_show_controller(state.configure_list_show)
             api.configure_list_show("slide", "!list", 30)
             api.start()
@@ -106,7 +109,9 @@ class R06ListApiSmoke(unittest.TestCase):
                 state.ingest(ChatMessage("twitch", "ch", "first", "viewer", "!list"))
                 self.assertEqual(data()["list_show"]["remaining_ms"], 30000)
                 self.assertEqual(data()["list_show"]["sequence"], 1)
-                self.assertTrue(data()["multichat"]["has_messages"])
+                with patch("streaming_manager.multichat.asdict", side_effect=AssertionError("full chat copied")):
+                    self.assertTrue(data()["multichat"]["has_messages"])
+                self.assertEqual(json.loads(get("/api/multichat"))["messages"][0]["text"], "!list")
                 clock.advance(10)
                 self.assertEqual(data()["list_show"]["remaining_ms"], 20000)
                 state.set_obs_enabled("twitch", False)

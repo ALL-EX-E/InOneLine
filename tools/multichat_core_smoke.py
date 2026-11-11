@@ -75,6 +75,56 @@ class MultichatCoreTests(unittest.TestCase):
         self.clock.advance(1)
         self.assertEqual(self.ids(obs=True), ["2"])
 
+    def test_operator_feed_serializes_only_changes_after_delayed_delivery(self):
+        from unittest.mock import patch
+
+        self.state.configure(delay=2)
+        initial = self.state.operator_feed_snapshot()
+        self.state.ingest(msg(identifier="local"))
+        self.state.ingest(msg(platform="youtube", identifier="other"))
+        self.assertIsNone(self.state.operator_feed_snapshot(initial["key"]))
+
+        self.clock.advance(2)
+        ready = self.state.operator_feed_snapshot(initial["key"])
+        self.assertEqual([m["external_id"] for m in ready["messages"]], ["local"])
+        self.assertEqual(self.ids(obs=True), ["local", "other"])
+        with patch("streaming_manager.multichat.asdict", side_effect=AssertionError("idle copy")):
+            self.assertIsNone(self.state.operator_feed_snapshot(ready["key"]))
+
+    def test_operator_feed_detects_media_and_visibility_changes(self):
+        self.state.ingest(msg(identifier="1"))
+        before = self.state.operator_feed_snapshot()
+        self.state.set_obs_enabled("twitch", False)
+        self.assertIsNone(self.state.operator_feed_snapshot(before["key"]))
+        self.state.configure(show_time=False, show_platform_icons=False)
+        url = "https://static-cdn.jtvnw.net/avatar.png"
+        self.state.set_media_preload("twitch", (url,))
+        changed = self.state.operator_feed_snapshot(before["key"])
+        self.assertFalse(changed["show_time"])
+        self.assertFalse(changed["show_platform_icons"])
+        self.assertEqual(changed["media_preload"], (url,))
+        self.state.delete_message("twitch", "channel", "1")
+        after = self.state.operator_feed_snapshot(changed["key"])
+        self.assertEqual(after["messages"], [])
+
+    def test_obs_overlay_summary_preserves_chat_delay_and_list_hold(self):
+        self.state.configure(delay=3)
+        self.state.configure_list_show("slide", "hello", 0)
+        self.state.ingest(msg(platform="youtube", identifier="youtube"))
+        self.state.ingest(msg(identifier="twitch"))
+        initial = self.state.obs_overlay_summary()
+        self.assertFalse(initial["twitch_has_messages"])
+        self.assertEqual(initial["list_show"], {"remaining_ms": 0, "sequence": 1, "held": True})
+        self.clock.advance(3)
+        ready = self.state.obs_overlay_summary()
+        self.assertTrue(ready["twitch_has_messages"])
+        self.assertEqual(self.state.snapshot(for_obs=True)["list_show"], ready["list_show"])
+        self.state.set_obs_enabled("twitch", False)
+        hidden = self.state.obs_overlay_summary()
+        self.assertFalse(hidden["twitch_has_messages"])
+        self.assertFalse(hidden["obs_enabled"]["twitch"])
+        self.assertTrue(hidden["list_show"]["held"])
+
     def test_list_command_exact_match_shared_timer_and_repeats(self):
         self.state.configure_list_show("slide", "!список", 30)
         self.assertEqual(self.state.snapshot()["list_show"]["remaining_ms"], 0)
@@ -187,7 +237,9 @@ class MultichatCoreTests(unittest.TestCase):
     def test_source_change_clears_only_that_platform(self):
         self.state.ingest(msg())
         self.state.ingest(msg(platform="youtube", identifier="1"))
+        before = self.state.operator_feed_snapshot()
         self.state.change_source("twitch")
+        self.assertEqual(self.state.operator_feed_snapshot(before["key"])["messages"], [])
         self.assertEqual(len(self.ids()), 1)
         self.assertEqual(self.ids(), ["1"])
         self.assertEqual(self.state.snapshot()["messages"][0]["platform"], "youtube")
@@ -207,8 +259,11 @@ class MultichatCoreTests(unittest.TestCase):
     def test_limit_reduces_both_views_without_backfill(self):
         for i in range(15):
             self.state.ingest(msg(identifier=str(i)))
+        before = self.state.operator_feed_snapshot()
         self.state.configure(limit=10)
         self.assertEqual(self.ids(), [str(i) for i in range(5, 15)])
+        after = self.state.operator_feed_snapshot(before["key"])
+        self.assertEqual([m["external_id"] for m in after["messages"]], self.ids())
         self.assertEqual(self.ids(obs=True), self.ids())
         self.state.configure(limit=100)
         self.assertEqual(len(self.ids()), 10)

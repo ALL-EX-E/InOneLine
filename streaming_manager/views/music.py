@@ -33,7 +33,7 @@ from ..media import (
     supported_media_extensions,
 )
 from ..music_player import PLAYER_PAUSE, PLAYER_PLAY, PLAYER_STOP, MusicPlayerController
-from .common import ScrollSafeComboBox, ScrollSafeSpinBox, make_wide_step_control
+from .common import ScrollSafeComboBox, ScrollSafeSpinBox, exec_responsive_message_box, make_wide_step_control
 
 
 class MusicTab(QWidget):
@@ -172,8 +172,6 @@ class MusicTab(QWidget):
         self.controller.playbackError.connect(self._show_playback_error)
 
         self.refresh_library()
-        self._refresh_controls()
-        self._refresh_transport()
 
     @staticmethod
     def _format_ms(value: int) -> str:
@@ -228,8 +226,6 @@ class MusicTab(QWidget):
 
     def refresh(self) -> None:
         self.controller.refresh_library()
-        self._refresh_controls()
-        self._refresh_transport()
 
     def _refresh_transport(self) -> None:
         asset = self.controller.current_asset()
@@ -247,8 +243,10 @@ class MusicTab(QWidget):
         for index in range(self.list_widget.count()):
             row = self.list_widget.item(index)
             font = row.font()
-            font.setBold(int(row.data(Qt.UserRole)) == int(current) if current is not None else False)
-            row.setFont(font)
+            is_current = current is not None and int(row.data(Qt.UserRole)) == current
+            if font.bold() != is_current:
+                font.setBold(is_current)
+                row.setFont(font)
         self._refresh_controls()
         self._position_changed(self.controller.position_ms, self.controller.duration_ms)
 
@@ -389,7 +387,7 @@ class MusicTab(QWidget):
         copy_button = dialog.addButton("Копировать в программу", QMessageBox.ButtonRole.AcceptRole)
         external_button = dialog.addButton("Использовать исходный файл", QMessageBox.ButtonRole.ActionRole)
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         if dialog.clickedButton() is copy_button:
             return MEDIA_STORAGE_MANAGED
         if dialog.clickedButton() is external_button:
@@ -405,7 +403,7 @@ class MusicTab(QWidget):
         replace_button = dialog.addButton("Заменить", QMessageBox.ButtonRole.DestructiveRole)
         separate_button = dialog.addButton("Сохранить отдельную копию", QMessageBox.ButtonRole.ActionRole)
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is use_button:
             return "use", target

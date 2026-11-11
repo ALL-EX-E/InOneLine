@@ -997,15 +997,15 @@ class GamesTab(QWidget):
     def selected_game_id(self) -> int | None:
         return _selected_id(self.table)
 
-    def _apply_action_state(self, game: Game | None, total_games: int) -> None:
-        # CSV import, single permanent delete and full clear are destructive/
-        # mass operations that run in QThreadPool. Keep other game mutations disabled until the
-        # active worker finishes so the same rows cannot be edited concurrently.
-        worker_busy = (
+    def _mutation_worker_busy(self) -> bool:
+        return (
             self._delete_worker is not None
             or self._clear_all_worker is not None
             or self._import_worker is not None
         )
+
+    def _apply_action_state(self, game: Game | None, total_games: int) -> None:
+        worker_busy = self._mutation_worker_busy()
         self.add_btn.setEnabled(not worker_busy)
         self.import_btn.setEnabled(not worker_busy)
         self.import_help_btn.setEnabled(not worker_busy)
@@ -1177,6 +1177,8 @@ class GamesTab(QWidget):
             pass
 
     def add_game(self):
+        if self._mutation_worker_busy():
+            return
         dlg = GameDialog(self, duplicate_lookup=self.db.find_game_by_title)
         result = dlg.exec()
 
@@ -1229,6 +1231,8 @@ class GamesTab(QWidget):
             self.table.setFocus()
 
     def edit_game(self, *_):
+        if self._mutation_worker_busy():
+            return
         game_id = self.selected_game_id()
         if game_id is None:
             return
@@ -1260,6 +1264,8 @@ class GamesTab(QWidget):
                 self.refresh()
 
     def archive_selected(self, archived: bool):
+        if self._mutation_worker_busy():
+            return
         game_id = self.selected_game_id()
         if game_id is None:
             return
@@ -1291,11 +1297,7 @@ class GamesTab(QWidget):
         self.changed()
 
     def clear_all_games(self):
-        if (
-            self._clear_all_worker is not None
-            or self._delete_worker is not None
-            or self._import_worker is not None
-        ):
+        if self._mutation_worker_busy():
             return
 
         open_session = self.db.get_open_auction_session()
@@ -1371,11 +1373,7 @@ class GamesTab(QWidget):
         self._update_action_state()
 
     def delete_selected(self):
-        if (
-            self._delete_worker is not None
-            or self._clear_all_worker is not None
-            or self._import_worker is not None
-        ):
+        if self._mutation_worker_busy():
             return
 
         game_id = self.selected_game_id()
@@ -1527,11 +1525,7 @@ class GamesTab(QWidget):
         )
 
     def import_csv(self):
-        if (
-            self._import_worker is not None
-            or self._delete_worker is not None
-            or self._clear_all_worker is not None
-        ):
+        if self._mutation_worker_busy():
             return
 
         path, _ = QFileDialog.getOpenFileName(

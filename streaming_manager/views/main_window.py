@@ -135,7 +135,10 @@ class MainWindow(QMainWindow):
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
         self.multichat_state = MultichatState()
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
-        self.api.set_multichat_state_provider(self.multichat_state.snapshot)
+        self.api.set_multichat_state_provider(
+            self.multichat_state.snapshot,
+            overlay_summary=self.multichat_state.obs_overlay_summary,
+        )
         self.api.set_list_show_controller(self.multichat_state.configure_list_show)
         self.api.set_music_command_state(self.multichat_state)
         self.api.configure_music_command(db.get_settings())
@@ -385,13 +388,13 @@ class MainWindow(QMainWindow):
         # all hidden synchronized tables catch up only when they are opened.
         self._refresh_visible_or_mark_dirty(owners)
 
-    def _refresh_dirty_search_target(self, widget, *, force: bool = False):
+    def _refresh_dirty_search_target(self, widget):
         """Catch up one dirty hidden table for an explicit Find/Enter selection."""
         if widget not in self._dirty_tabs:
             return
         self._dirty_tabs.discard(widget)
-        if force and hasattr(widget, "refresh_force"):
-            widget.refresh_force()
+        if widget is self.auction_tab:
+            self.auction_tab.refresh_force(refresh_soundtracks=False)
         else:
             widget.refresh()
 
@@ -421,7 +424,7 @@ class MainWindow(QMainWindow):
         # Explicit cross-list Enter only selects Auction lots before the
         # session starts; a running session uses its own local lot search.
         if self.auction_tab._current_session() is None:
-            self._refresh_dirty_search_target(self.auction_tab, force=True)
+            self._refresh_dirty_search_target(self.auction_tab)
             self.auction_tab.select_synced_search_result(game_id)
 
     def _add_main_tab(

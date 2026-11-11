@@ -31,6 +31,7 @@ a = Analysis(
     datas=[
         (str(web_dir), "streaming_manager/web"),
         (str(icon_master), "assets"),
+        (str(root / "assets" / "InOneLine_wheel_default.png"), "assets"),
     ],
     hiddenimports=hiddenimports,
     hookspath=[],

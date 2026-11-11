@@ -612,6 +612,7 @@ class SettingsTab(QWidget):
         self.check_rng_btn.clicked.connect(self.check_random_org_api)
         rng_row.addWidget(save_rng)
         rng_row.addWidget(self.check_rng_btn)
+        self.check_rng_btn.setVisible(bool(self.random_org_key.text().strip()))
         random_layout.addLayout(rng_row)
         self.random_org_status = QLabel("Статус: не проверялся")
         self.random_org_status.setProperty("muted", True)
@@ -827,8 +828,14 @@ class SettingsTab(QWidget):
                 external_enabled
             )
         if hasattr(self, "auto_extend_threshold_duration"):
+            threshold_applicable = (
+                self.auto_extend_leader_enabled.isChecked()
+                or self.auto_extend_new_lot_enabled.isChecked()
+                or self.auto_extend_external_enabled.isChecked()
+            )
+            self.auto_extend_threshold_enabled.setVisible(threshold_applicable)
             self.auto_extend_threshold_duration.setVisible(
-                self.auto_extend_threshold_enabled.isChecked()
+                threshold_applicable and self.auto_extend_threshold_enabled.isChecked()
             )
 
     def _make_auto_extend_duration_editor(self, key: str, default: int) -> QLineEdit:
@@ -868,6 +875,23 @@ class SettingsTab(QWidget):
             editor.setFocus()
             return
         editor.setText(self._format_duration_ms(duration_ms))
+
+    def _read_auto_extend_duration(
+        self, editor: QLineEdit, key: str, default: int, example: str,
+    ) -> int:
+        try:
+            value = self._parse_duration_text(editor.text(), example=example)
+            if not 1 <= value <= AUCTION_AUTO_EXTEND_MAX_MS:
+                raise ValueError(
+                    "Значения автопродления и порога должны быть от "
+                    "00:00:00.001 до 24:00:00.000."
+                )
+            return value
+        except ValueError:
+            if not editor.isHidden():
+                raise
+            # A hidden, unfinished edit cannot prevent saving other settings.
+            return self._saved_auto_extend_duration_ms(key, default)
 
     def _saved_auction_max_amount_duration_ms(self) -> int:
         raw = self.db.get_setting(
@@ -913,30 +937,22 @@ class SettingsTab(QWidget):
                     "00:00:01.000 до 24:00:00.000."
                 )
 
-            leader_extend_ms = self._parse_duration_text(
-                self.auto_extend_leader_duration.text(),
-                example="00:00:30.000",
+            leader_extend_ms = self._read_auto_extend_duration(
+                self.auto_extend_leader_duration, AUCTION_AUTO_EXTEND_LEADER_MS_KEY,
+                AUCTION_AUTO_EXTEND_LEADER_MS_DEFAULT, "00:00:30.000",
             )
-            new_lot_extend_ms = self._parse_duration_text(
-                self.auto_extend_new_lot_duration.text(),
-                example="00:01:00.000",
+            new_lot_extend_ms = self._read_auto_extend_duration(
+                self.auto_extend_new_lot_duration, AUCTION_AUTO_EXTEND_NEW_LOT_MS_KEY,
+                AUCTION_AUTO_EXTEND_NEW_LOT_MS_DEFAULT, "00:01:00.000",
             )
-            external_extend_ms = self._parse_duration_text(
-                self.auto_extend_external_duration.text(),
-                example="00:01:00.000",
+            external_extend_ms = self._read_auto_extend_duration(
+                self.auto_extend_external_duration, AUCTION_AUTO_EXTEND_EXTERNAL_MS_KEY,
+                AUCTION_AUTO_EXTEND_EXTERNAL_MS_DEFAULT, "00:01:00.000",
             )
-            threshold_ms = self._parse_duration_text(
-                self.auto_extend_threshold_duration.text(),
-                example="00:02:00.000",
+            threshold_ms = self._read_auto_extend_duration(
+                self.auto_extend_threshold_duration, AUCTION_AUTO_EXTEND_THRESHOLD_MS_KEY,
+                AUCTION_AUTO_EXTEND_THRESHOLD_MS_DEFAULT, "00:02:00.000",
             )
-            for value in (
-                leader_extend_ms, new_lot_extend_ms, external_extend_ms, threshold_ms
-            ):
-                if not 1 <= value <= AUCTION_AUTO_EXTEND_MAX_MS:
-                    raise ValueError(
-                        "Значения автопродления и порога должны быть от "
-                        "00:00:00.001 до 24:00:00.000."
-                    )
         except ValueError as exc:
             QMessageBox.warning(self, "Настройки аукциона", str(exc))
             return
@@ -1256,7 +1272,6 @@ class SettingsTab(QWidget):
         if self.settings_tabs.currentWidget() is self.conversion_page:
             # Rebuild only if the connected-adapter capability set changed, so
             # ordinary tab switching does not discard unsaved editor text.
-            self._refresh_conversion_rate_rows()
             self._refresh_pending_conversion_rows()
 
     def _refresh_pending_conversion_rows(self) -> None:
@@ -1800,19 +1815,16 @@ class SettingsTab(QWidget):
         card_layout.addLayout(reward_actions)
 
         availability_actions = QHBoxLayout()
-        if config["manual_rewards_enabled"]:
-            toggle_rewards = QPushButton("Отключить награды")
-            toggle_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(False))
-        else:
-            toggle_rewards = QPushButton("Включить награды")
-            toggle_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(True))
-        toggle_allowed = can_manage and existing_ids
-        toggle_rewards.setProperty("integrationAvailable", toggle_allowed)
-        toggle_rewards.setEnabled(toggle_allowed)
-        if not existing_ids:
-            toggle_rewards.setToolTip("Сначала создайте и синхронизируйте Twitch-награды.")
-        availability_actions.addWidget(toggle_rewards)
-        self._integration_buttons.append(toggle_rewards)
+        if existing_ids:
+            manual_enabled = config["manual_rewards_enabled"]
+            toggle_rewards = QPushButton(
+                "Отключить награды" if manual_enabled else "Включить награды"
+            )
+            toggle_rewards.clicked.connect(lambda: self._set_twitch_rewards_manual(not manual_enabled))
+            toggle_rewards.setProperty("integrationAvailable", can_manage)
+            toggle_rewards.setEnabled(can_manage)
+            availability_actions.addWidget(toggle_rewards)
+            self._integration_buttons.append(toggle_rewards)
 
         if deletable_ids:
             delete_rewards = QPushButton("Удалить награды")
@@ -1821,8 +1833,9 @@ class SettingsTab(QWidget):
             delete_rewards.clicked.connect(self._confirm_delete_twitch_rewards)
             availability_actions.addWidget(delete_rewards)
             self._integration_buttons.append(delete_rewards)
-        availability_actions.addStretch()
-        card_layout.addLayout(availability_actions)
+        if deletable_ids:
+            availability_actions.addStretch()
+            card_layout.addLayout(availability_actions)
 
         state = QLabel(
             "Награды сейчас: "
@@ -2423,6 +2436,7 @@ class SettingsTab(QWidget):
     def _random_org_key_edited(self, _text: str) -> None:
         """Report unsaved edits without persisting or validating an API key."""
         key = self.random_org_key.text().strip()
+        self.check_rng_btn.setVisible(bool(key))
         if key != self.db.get_random_org_api_key().strip():
             self.random_org_status.setText("Статус: ключ изменён, но ещё не сохранён")
         elif key:

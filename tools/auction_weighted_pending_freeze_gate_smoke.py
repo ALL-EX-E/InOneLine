@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -70,6 +72,70 @@ class WeightedWheelPendingGateTests(unittest.TestCase):
         before = self.snapshot()
         with self.assertRaisesRegex(RuntimeError, "необработанные поступления"):
             self.db.run_weighted_wheel(self.sid, pick=0)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.db.count_unresolved_auction_conversions(self.sid), 1)
+
+    def test_in_flight_pending_event_blocks_freeze_before_rng_or_snapshot(self):
+        before = self.snapshot()
+        staged, release, committed = threading.Event(), threading.Event(), threading.Event()
+        failures = []
+        original_connect = self.db.connect
+        original_gate = self.db._require_auction_conversions_resolved_conn
+        main_thread = threading.get_ident()
+
+        @contextmanager
+        def controlled_connect():
+            writer = threading.get_ident() != main_thread
+            with original_connect() as conn:
+                if not writer:
+                    conn.set_trace_callback(
+                        lambda sql: release.set()
+                        if sql.strip().upper() == "BEGIN IMMEDIATE" else None
+                    )
+                yield conn
+                if writer:
+                    staged.set()
+                    if not release.wait(5):
+                        raise AssertionError("wheel did not reach its read/write boundary")
+            if writer:
+                committed.set()
+
+        def gate_with_commit_boundary(conn, auction_id):
+            result = original_gate(conn, auction_id)
+            # The old deferred reader sees no uncommitted event. Commit that
+            # event after its gate check and before it freezes a snapshot.
+            release.set()
+            if not committed.wait(5):
+                raise AssertionError("pending event did not commit")
+            return result
+
+        def queue_pending():
+            try:
+                self.pending(self.sid, event_id="in-flight")
+            except BaseException as exc:
+                failures.append(exc)
+                staged.set()
+
+        with (
+            patch.object(self.db, "connect", controlled_connect),
+            patch.object(self.db, "_require_auction_conversions_resolved_conn",
+                         side_effect=gate_with_commit_boundary),
+            patch("streaming_manager.db.wheel.secrets.randbelow", return_value=0) as rng,
+        ):
+            worker = threading.Thread(target=queue_pending)
+            worker.start()
+            try:
+                self.assertTrue(staged.wait(5), "pending event did not reach commit")
+                self.assertFalse(failures)
+                with self.assertRaisesRegex(RuntimeError, "необработанные поступления"):
+                    self.db.run_weighted_wheel(self.sid)
+                rng.assert_not_called()
+            finally:
+                release.set()
+                worker.join(5)
+            self.assertFalse(worker.is_alive())
+            self.assertFalse(failures)
+        self.assertTrue(committed.is_set())
         self.assertEqual(self.snapshot(), before)
         self.assertEqual(self.db.count_unresolved_auction_conversions(self.sid), 1)
 

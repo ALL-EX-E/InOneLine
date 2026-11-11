@@ -72,7 +72,9 @@ class RandomOrgKeyStateTests(unittest.TestCase):
             client.assert_called_once()
 
     def test_unsaved_key_is_tested_without_persisting_or_notifying_auction(self):
+        self.assertTrue(self.tab.check_rng_btn.isHidden())
         self.tab.random_org_key.setText("candidate-not-saved")
+        self.assertFalse(self.tab.check_rng_btn.isHidden())
         self.assertIn("не сохранён", self.tab.random_org_status.text())
         self.verify()
         self.assertEqual(self.db.get_random_org_api_key(), "")
@@ -81,6 +83,8 @@ class RandomOrgKeyStateTests(unittest.TestCase):
         self.assertIn("Запросов осталось: 19", self.tab.random_org_status.text())
         self.assertIn("битов осталось: 580", self.tab.random_org_status.text())
         self.assertNotIn("candidate-not-saved", self.tab.random_org_status.text())
+        self.tab.random_org_key.setText("  ")
+        self.assertTrue(self.tab.check_rng_btn.isHidden())
 
     def test_explicit_save_then_test_recognizes_saved_key(self):
         self.tab.random_org_key.setText("saved-candidate")

@@ -168,10 +168,26 @@ def ui_smoke() -> None:
             assert mode_combo.findData("slide") == -1
             assert stream.timer_slide_direction.currentData() == "left"
             assert stream.timer_slide_seconds.value() == 0.65
-            assert not stream.timer_slide_direction.isEnabled()
+            for widget in ("timer", "auction_lots", "rules"):
+                combo = stream.obs_show_modes[widget]
+                link, direction, seconds = stream._auction_widget_motion_controls[widget]
+                form = getattr(stream, widget + "_overlay_form")
+                fields = (direction, seconds.parentWidget())
+                labels = tuple(form.labelForField(field) for field in fields)
+                assert all(label is not None for label in labels)
+                assert not link.isHidden()
+                assert all(control.isHidden() for control in fields + labels)
+                link.setChecked(True)
+                assert combo.itemText(combo.findData("slide")) == "Выезд"
+                assert all(control.isHidden() for control in fields + labels)
+                combo.setCurrentIndex(combo.findData("slide"))
+                assert all(not control.isHidden() for control in fields + labels)
+                combo.setCurrentIndex(combo.findData("hidden"))
+                assert all(control.isHidden() for control in fields + labels)
+                link.setChecked(False)
+                combo.setCurrentIndex(combo.findData("always"))
+
             stream.timer_follow_auction_tab.setChecked(True)
-            assert stream.timer_slide_direction.isEnabled()
-            assert mode_combo.itemText(mode_combo.findData("slide")) == "Выезд"
             mode_combo.setCurrentIndex(mode_combo.findData("slide"))
             stream.timer_slide_direction.setCurrentIndex(
                 stream.timer_slide_direction.findData("top")
@@ -194,6 +210,8 @@ def ui_smoke() -> None:
             assert mode_combo.currentData() == "slide"
             assert stream.timer_slide_direction.currentData() == "top"
             assert stream.timer_slide_seconds.value() == 1.25
+            assert not stream.timer_slide_direction.isHidden()
+            assert not stream.timer_slide_seconds.parentWidget().isHidden()
 
             # Import exactly one shared external media asset using the original
             # P08 workflow, not an isolated timer registry or separate folder.

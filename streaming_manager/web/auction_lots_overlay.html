@@ -252,7 +252,8 @@ body.preview #api-state.visible { display: block; }
   let autoScroll = false;
   let direction = 1;
   let scrollY = 0;
-  let lastFrame = performance.now();
+  let lastFrame = 0;
+  let scrollFrameId = null;
   let layoutFrameId = null;
   const measureCache = new Map();
 
@@ -536,7 +537,13 @@ body.preview #api-state.visible { display: block; }
       autoScroll = nextAutoScroll;
       const maximum = maximumScroll();
       direction = scrollY >= maximum - 1 && maximum > 0 ? -1 : 1;
-      lastFrame = performance.now();
+      if (autoScroll) {
+        lastFrame = performance.now();
+        scrollFrameId = requestAnimationFrame(scrollFrame);
+      } else {
+        cancelAnimationFrame(scrollFrameId);
+        scrollFrameId = null;
+      }
     }
     // Single observed browser state for native Chromium regression checks.
     // Avoid treating an HTTP resource-start event as a completed API poll.
@@ -560,24 +567,22 @@ body.preview #api-state.visible { display: block; }
   function scrollFrame(now) {
     const dt = Math.min(100, Math.max(0, now - lastFrame));
     lastFrame = now;
-    if (autoScroll) {
-      const maximum = maximumScroll();
-      if (maximum > 0) {
-        scrollY += direction * SPEED_PX_PER_SECOND * dt / 1000;
-        if (scrollY >= maximum) {
-          scrollY = maximum;
-          direction = -1;
-        } else if (scrollY <= 0) {
-          scrollY = 0;
-          direction = 1;
-        }
-        applyScroll();
-      } else if (scrollY !== 0) {
+    const maximum = maximumScroll();
+    if (maximum > 0) {
+      scrollY += direction * SPEED_PX_PER_SECOND * dt / 1000;
+      if (scrollY >= maximum) {
+        scrollY = maximum;
+        direction = -1;
+      } else if (scrollY <= 0) {
         scrollY = 0;
-        applyScroll();
+        direction = 1;
       }
+      applyScroll();
+    } else if (scrollY !== 0) {
+      scrollY = 0;
+      applyScroll();
     }
-    requestAnimationFrame(scrollFrame);
+    scrollFrameId = requestAnimationFrame(scrollFrame);
   }
 
   // One in-flight Browser Source poll: stale overlapping responses must not
@@ -604,7 +609,6 @@ body.preview #api-state.visible { display: block; }
   }).observe(viewport);
 
   setInterval(update, POLL_MS);
-  requestAnimationFrame(scrollFrame);
   update();
 })();
 </script>

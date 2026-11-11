@@ -2497,6 +2497,8 @@ def main() -> int:
         app.processEvents()
         if (
             stream.info_field.isEnabled()
+            or not stream.info_field.isHidden()
+            or not stream.info_form.labelForField(stream.info_field).isHidden()
             or stream.info_position.isHidden() is False
             or stream.frame_color_row_widgets["info"].isHidden() is False
             or stream.info_typography_host.isHidden() is False
@@ -3678,6 +3680,14 @@ def main() -> int:
         games_tab = window.games_tab
         if not games_tab._select_game_row(first_id):
             raise AssertionError("P04-B fixture could not select the first game")
+        # Keyboard shortcuts and double-click call the same handlers as the
+        # disabled buttons. They must obey the ongoing import/delete guard.
+        with patch.object(games_tab, "_import_worker", object()):
+            with patch("streaming_manager.views.games.GameDialog", side_effect=AssertionError("busy list opened a dialog")):
+                games_tab.add_game()
+                games_tab.edit_game()
+            with patch.object(db, "get_game", side_effect=AssertionError("busy list reached archive handler")):
+                games_tab.archive_selected(True)
         games_tab.apply_stat_filter(STATUS_NOT_PLAYED)
         app.processEvents()
         if games_tab.table.rowCount() != 1:
@@ -3762,8 +3772,16 @@ def main() -> int:
         app.processEvents()
         if public_tab.table.rowCount() != 1:
             raise AssertionError("UI-028 Public live-search stopped showing matches")
-        QTest.keyClick(public_tab.search, Qt.Key_Return)
-        app.processEvents()
+        with (
+            patch.object(window.auction_tab, "_refresh_wheel_soundtrack_library") as wheel_scan,
+            patch.object(window.auction_tab, "_refresh_auction_soundtrack_library") as auction_scan,
+        ):
+            QTest.keyClick(public_tab.search, Qt.Key_Return)
+            app.processEvents()
+        wheel_scan.assert_not_called()
+        auction_scan.assert_not_called()
+        if window.auction_tab.selected_conduct_game_id() != first_id:
+            raise AssertionError("Public Enter no longer selects the linked Auction lot")
         if public_tab.selected_game_id() != first_id:
             raise AssertionError("Public Enter search stopped selecting its target")
         if not public_tab.table.hasFocus():
@@ -4775,7 +4793,6 @@ def main() -> int:
         # P12-A: a single table retains Conduct's optional chance column
         # and global one/two-position policy across all Auction modes.
         auction._populate_lot_table(
-            auction.conduct_table,
             position_fixture,
             None,
             position_mode=POSITION_COLUMNS_SINGLE,
@@ -4794,7 +4811,6 @@ def main() -> int:
             raise AssertionError("P12 single-position compact columns are wrong")
 
         auction._populate_lot_table(
-            auction.conduct_table,
             position_fixture,
             None,
             position_mode=POSITION_COLUMNS_START_CURRENT,

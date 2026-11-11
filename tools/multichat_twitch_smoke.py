@@ -104,6 +104,111 @@ class TwitchChatSmoke(unittest.TestCase):
         self.assertEqual({x[3] for x in service.calls}, set(TWITCH_CHAT_EVENT_TYPES))
         self.assertEqual(service.redemptions, [])
 
+    def test_silent_socket_expires_after_provider_keepalive_window(self):
+        now = [100.0]
+        provider_welcome = welcome()
+        provider_welcome["payload"]["session"]["keepalive_timeout_seconds"] = 10
+
+        class SilentSocket(FakeSocket):
+            def recv(self):
+                value = next(self.events)
+                if value == "timeout":
+                    now[0] += 5.1
+                    raise TimeoutError("No WebSocket data")
+                return json.dumps(value)
+
+        service = FakeService(rewards=("reward1",))
+        socket = SilentSocket([provider_welcome, "timeout", "timeout", reconnect()])
+        runtime = TwitchEventSubRuntime(
+            service, chat_state=MultichatState(), socket_factory=lambda _: socket,
+        )
+        runtime._chat_source_id = "channel1"
+        with (
+            patch("streaming_manager.twitch_b4.monotonic", side_effect=lambda: now[0]),
+            patch.object(runtime, "_schedule_media_warmup"),
+            patch.object(runtime, "_schedule_third_party_catalog"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "keepalive"):
+                runtime._run_connection("wss://example/ws", subscriptions_required=True)
+        self.assertTrue(socket.closed)
+        self.assertFalse(runtime.connected)
+        self.assertFalse(runtime.chat_connected)
+
+    def test_notifications_and_keepalive_extend_socket_deadline(self):
+        now = [100.0]
+        provider_welcome = welcome()
+        provider_welcome["payload"]["session"]["keepalive_timeout_seconds"] = 10
+
+        class TimedSocket(FakeSocket):
+            def recv(self):
+                elapsed, value = next(self.events)
+                now[0] += elapsed
+                if value == "timeout":
+                    raise TimeoutError("No WebSocket data")
+                return json.dumps(value)
+
+        service = FakeService(rewards=("reward1",))
+        state = MultichatState()
+        socket = TimedSocket([
+            (0, provider_welcome),
+            (8, {"metadata": {"message_type": "session_keepalive"}, "payload": {}}),
+            (8, notification("channel.chat.message", message("after-keepalive"))),
+            (8, "timeout"),
+            (1, reconnect()),
+        ])
+        runtime = TwitchEventSubRuntime(service, chat_state=state, socket_factory=lambda _: socket)
+        runtime._chat_source_id = "channel1"
+        with (
+            patch("streaming_manager.twitch_b4.monotonic", side_effect=lambda: now[0]),
+            patch.object(runtime, "_schedule_media_warmup"),
+            patch.object(runtime, "_schedule_third_party_catalog"),
+        ):
+            result = runtime._run_connection("wss://example/ws", subscriptions_required=True)
+        self.assertIn("reconnect=1", result)
+        self.assertEqual([m["external_id"] for m in state.snapshot()["messages"]], ["after-keepalive"])
+        self.assertTrue(socket.closed)
+
+    def test_silent_connection_is_replaced_and_subscriptions_are_recreated(self):
+        now = [100.0]
+        provider_welcome = welcome()
+        provider_welcome["payload"]["session"]["keepalive_timeout_seconds"] = 10
+
+        class SilentSocket(FakeSocket):
+            def recv(self):
+                value = next(self.events)
+                if value == "timeout":
+                    now[0] += 11
+                    raise TimeoutError("No WebSocket data")
+                return json.dumps(value)
+
+        class RecoveredSocket(FakeSocket):
+            def recv(self):
+                value = next(self.events)
+                if value["metadata"]["message_type"] == "session_keepalive":
+                    runtime._stop.set()
+                return json.dumps(value)
+
+        service = FakeService(rewards=("reward1",))
+        old = SilentSocket([provider_welcome, "timeout", reconnect()])
+        new = RecoveredSocket([
+            provider_welcome,
+            {"metadata": {"message_type": "session_keepalive"}, "payload": {}},
+        ])
+        sockets = Mock(side_effect=[old, new])
+        runtime = TwitchEventSubRuntime(service, chat_state=MultichatState(), socket_factory=sockets)
+        with (
+            patch("streaming_manager.twitch_b4.monotonic", side_effect=lambda: now[0]),
+            patch.object(runtime, "_wait"),
+            patch.object(runtime, "_schedule_media_warmup"),
+            patch.object(runtime, "_schedule_third_party_catalog"),
+        ):
+            runtime._run()
+        self.assertEqual(sockets.call_count, 2)
+        self.assertEqual(sockets.call_args_list[0], sockets.call_args_list[1])
+        expected_subscriptions = 1 + len(TWITCH_CHAT_EVENT_TYPES)
+        self.assertEqual(len(service.calls), expected_subscriptions * 2)
+        self.assertTrue(old.closed and new.closed)
+
     def test_channel_point_event_stays_on_original_service(self):
         service = FakeService(scopes=(TWITCH_CHAT_READ_SCOPE, TWITCH_MANAGE_SCOPE), rewards=("reward1",))
         state = MultichatState()

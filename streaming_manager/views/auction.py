@@ -411,12 +411,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self.rng_methods_btn.clicked.connect(self.show_rng_methods)
         setup.addWidget(self.rng_methods_btn, 3, 0)
 
-        self.verification_data_btn = QPushButton("Данные проверки")
-        self.verification_data_btn.setToolTip(
-            "Предварительный read-only состав и математические диапазоны будущего вращения"
-        )
-        self.verification_data_btn.clicked.connect(self.show_pre_spin_verification)
-        setup.addWidget(self.verification_data_btn, 3, 1)
         setup.setColumnStretch(2, 1)
 
         self.wheel_format_label = QLabel("Формат колеса:")
@@ -951,8 +945,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         # Keep compatibility for callers reading .table, but do NOT construct
         # a second table. The authoritative operator lot widget is Conduct.
         self.table = self.conduct_table
-        self._lot_title_column = self._conduct_title_column
-        self._lot_compact_columns = self._conduct_compact_columns
 
         # A7/B5: one compact operator-side area.  История keeps the full
         # current-session audit feed; Ставки is a filtered read-only feed of
@@ -1023,6 +1015,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         wheel_heading.setStyleSheet("font-size: 11pt; font-weight: 650;")
         wheel_heading_row.addWidget(wheel_heading)
         wheel_heading_row.addStretch()
+        self.verification_data_btn = QPushButton("Данные проверки")
+        self.verification_data_btn.setToolTip(
+            "Состав и математические диапазоны будущего вращения"
+        )
+        self.verification_data_btn.clicked.connect(self.show_pre_spin_verification)
+        wheel_heading_row.addWidget(self.verification_data_btn)
         wheel_panel_layout.addLayout(wheel_heading_row)
 
         # P13-C/UI-071: move the ONE existing wheel soundtrack editor into
@@ -1145,7 +1143,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
         self.refresh_rng_availability()
         self.refresh()
-        self._handle_prestart_mode_changed()
 
 
 
@@ -1211,6 +1208,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_path: Path | None = None
         self._shared_xlsx_worker: FunctionWorker | None = None
         self._shared_xlsx_worker_kind = ""
+        self._shared_xlsx_pending_target: tuple[Path, bool] | None = None
         self._shared_xlsx_last_signature: tuple[int, int] | None = None
         self._shared_xlsx_observed_signature: tuple[int, int] | None = None
         self._shared_xlsx_failed_signature: tuple[int, int] | None = None
@@ -1291,7 +1289,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             )
             if answer != QMessageBox.Yes:
                 return
-        self._shared_xlsx_start_write(target, connect_after=True)
+        self._shared_xlsx_switch_target(target, create=True)
 
     def _shared_xlsx_connect(self) -> None:
         initial = str(self._shared_xlsx_path.parent) if self._shared_xlsx_path else ""
@@ -1303,7 +1301,23 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         )
         if not path:
             return
-        self._shared_xlsx_activate(Path(path), persist=True, import_now=True)
+        self._shared_xlsx_switch_target(Path(path), create=False)
+
+    def _shared_xlsx_switch_target(self, path: Path, *, create: bool) -> None:
+        if self._shared_xlsx_shutdown:
+            return
+        # A file dialog runs a nested event loop. The previous target can start
+        # importing while it is open, so finish that operation before switching.
+        self._shared_xlsx_write_timer.stop()
+        self._shared_xlsx_write_pending = False
+        self._shared_xlsx_write_retry = False
+        if self._shared_xlsx_worker is not None:
+            self._shared_xlsx_pending_target = (path, create)
+            return
+        if create:
+            self._shared_xlsx_start_write(path, connect_after=True)
+        else:
+            self._shared_xlsx_activate(path, persist=True, import_now=True)
 
     def _shared_xlsx_activate(
         self,
@@ -1317,6 +1331,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         initial_mtime: float | None = None,
     ) -> None:
         self._shared_xlsx_path = Path(path)
+        self.shared_xlsx_modified_label.setText("—")
         self._shared_xlsx_last_hash = str(initial_hash or "")
         self._shared_xlsx_last_presentation_hash = str(
             initial_presentation_hash or ""
@@ -1594,12 +1609,20 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         self._shared_xlsx_worker = None
         self._shared_xlsx_worker_kind = ""
         self._shared_xlsx_update_controls()
+        if self._shared_xlsx_shutdown:
+            return
+        if self._shared_xlsx_pending_target is not None:
+            path, create = self._shared_xlsx_pending_target
+            self._shared_xlsx_pending_target = None
+            self._shared_xlsx_switch_target(path, create=create)
+            return
         if self._shared_xlsx_write_pending and self._shared_xlsx_path is not None:
             delay = 1500 if self._shared_xlsx_write_retry else SHARED_XLSX_LOCAL_WRITE_DEBOUNCE_MS
             self._shared_xlsx_write_timer.start(delay)
 
     def shutdown_shared_xlsx(self) -> None:
         self._shared_xlsx_shutdown = True
+        self._shared_xlsx_pending_target = None
         self._shared_xlsx_poll_timer.stop()
         self._shared_xlsx_write_timer.stop()
 
@@ -2079,8 +2102,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             )
             self.timer_edit.setText(self._format_milliseconds(value))
 
-        self._update_session_controls(None)
-        self._refresh_conduct_wheel_chances_in_place(None)
+        self._update_session_controls(None, refresh_wheel_chances=True)
 
     def _handle_wheel_format_changed(self, _index: int = -1) -> None:
         combo = getattr(self, "wheel_format_combo", None)
@@ -2094,8 +2116,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
         if session is None:
             self._prestart_wheel_format = wheel_format
             self.db.set_setting(AUCTION_WHEEL_FORMAT_KEY, wheel_format)
-            self._update_session_controls(None)
-            self._refresh_conduct_wheel_chances_in_place(None)
+            self._update_session_controls(None, refresh_wheel_chances=True)
             return
 
         if str(session.get("mode") or "") != "weighted_wheel":
@@ -2153,11 +2174,6 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                 "weighted_wheel"
                 if self._timer_context == "wheel"
                 else "max_amount"
-            ),
-            "wheel_format": str(
-                self.wheel_format_combo.currentData()
-                if hasattr(self, "wheel_format_combo")
-                else self._prestart_wheel_format
             ),
             "auto_scroll": bool(self._obs_lot_auto_scroll_enabled),
             "auction_widgets_visible": self._auction_widgets_visible,
@@ -2353,39 +2369,28 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
 
     def _populate_lot_table(
         self,
-        table: QTableWidget,
         rows,
         selected_id: int | None,
         wheel_probabilities: dict[int, float] | None = None,
         position_mode: str = "position",
     ) -> dict[str, float]:
-        is_conduct = table is self.conduct_table
-        if is_conduct:
-            self._clear_history_hover_highlight()
+        table = self.conduct_table
+        self._clear_history_hover_highlight()
+        probabilities = wheel_probabilities or {}
 
         show_start_current = position_mode == "start_current"
         position_column_count = 2 if show_start_current else 1
         name_column = position_column_count
-        chance_column = name_column + 1 if is_conduct else None
-        points_column = name_column + (2 if is_conduct else 1)
+        chance_column = name_column + 1
+        points_column = name_column + 2
         labels = (
             (["СТАРТ", "ТЕКУЩАЯ"] if show_start_current else ["ПОЗИЦИЯ"])
-            + ["НАЗВАНИЕ"]
-            + (["Шанс в колесе"] if is_conduct else [])
-            + ["БАЛЛЫ"]
+            + ["НАЗВАНИЕ", "Шанс в колесе", "БАЛЛЫ"]
         )
-        compact_columns = tuple(range(position_column_count)) + (
-            (chance_column, points_column) if is_conduct else (points_column,)
-        )
-        if is_conduct:
-            self._conduct_title_column = name_column
-            self._conduct_chance_column = int(chance_column)
-            self._conduct_compact_columns = compact_columns
-            self._lot_title_column = name_column
-            self._lot_compact_columns = compact_columns
-        else:
-            self._lot_title_column = name_column
-            self._lot_compact_columns = compact_columns
+        compact_columns = tuple(range(position_column_count)) + (chance_column, points_column)
+        self._conduct_title_column = name_column
+        self._conduct_chance_column = chance_column
+        self._conduct_compact_columns = compact_columns
 
         previous_blocked = table.blockSignals(True)
         table.setUpdatesEnabled(False)
@@ -2429,14 +2434,12 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     if show_start_current
                     else (row.get("current_position") or "",)
                 )
-                values = position_values + (row["title"],)
-                if is_conduct:
-                    probability = (wheel_probabilities or {}).get(
-                        int(row["game_id"]),
-                        0.0,
-                    )
-                    values += (self._format_wheel_probability(probability),)
-                values += (format_points(int(row["total_sm_points"])),)
+                game_id = int(row["game_id"])
+                values = position_values + (
+                    row["title"],
+                    self._format_wheel_probability(probabilities.get(game_id, 0.0)),
+                    format_points(int(row["total_sm_points"])),
+                )
 
                 for column, value in enumerate(values):
                     text = str(value)
@@ -2447,7 +2450,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     if item.text() != text:
                         item.setText(text)
                     if column == 0:
-                        item.setData(Qt.UserRole, int(row["game_id"]))
+                        item.setData(Qt.UserRole, game_id)
                         item.setData(
                             Qt.UserRole + 1,
                             bool(row.get("auction_only")),
@@ -2462,7 +2465,7 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
                     else:
                         item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-                if int(row["game_id"]) == selected_id:
+                if game_id == selected_id:
                     selected_row = r
 
             fill_seconds = time.perf_counter() - fill_started
@@ -2704,10 +2707,11 @@ class AuctionTab(AuctionStateMixin, AuctionSearchMixin, AuctionActionMixin, Auct
             return False
         return bool(item.data(Qt.UserRole + 1))
 
-    def _update_delete_lot_action_state(self, *args, running: bool | None = None):
-        session = self._current_session()
-        if running is None:
-            running = bool(session and session.get("status") == "running")
+    def _update_delete_lot_action_state(self):
+        self._sync_lot_action_state(self._current_session())
+
+    def _sync_lot_action_state(self, session: dict | None):
+        running = bool(session and session.get("status") == "running")
         late_temporary_delete = bool(
             session
             and str(session.get("mode") or "") == "max_amount"

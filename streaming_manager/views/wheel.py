@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import time
-from pathlib import Path
 from datetime import datetime, timezone
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
@@ -65,9 +64,6 @@ class AuctionWheelWidget(QOpenGLWidget):
         self._center_image_movie: QMovie | None = None
         # UI-079: the already bundled application icon is the fallback only.
         # Custom still/animated media always takes precedence over this logo.
-        self._default_center_icon_path = (
-            Path(__file__).resolve().parents[2] / "assets" / "InOneLine_icon_master.png"
-        )
         self._default_center_pixmap = QPixmap.fromImage(default_wheel_icon_image())
         self._spin_id = None
         self._spin_start_monotonic: float | None = None

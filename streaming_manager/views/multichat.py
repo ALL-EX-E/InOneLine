@@ -27,8 +27,11 @@ class MultichatTab(QWidget):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
-        self._last_render = None
+        self._operator_feed_key = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
+        # resizeEvent owns this split. Generic row reflow still handles the
+        # descendants, without restoring this layout's initial direction.
+        self.columns.setProperty("responsiveDirectionManaged", True)
         self.columns.setContentsMargins(8, 8, 8, 8)
         self.feed = _ChatFeed()
         self.feed_frame = ChatBackgroundFrame(db, self.feed)
@@ -130,7 +133,7 @@ class MultichatTab(QWidget):
             "twitch": normalize_twitch(twitch),
             "common": normalize_common(common),
         }
-        self._last_render = None
+        self._operator_feed_key = None
         self.refresh()
 
     def _on_saved_appearance(self, saved):
@@ -177,10 +180,13 @@ class MultichatTab(QWidget):
             info = status
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
-        snapshot = self.state.snapshot()
+        snapshot = self.state.operator_feed_snapshot(self._operator_feed_key)
+        if snapshot is None:
+            return
+        self._operator_feed_key = snapshot["key"]
         # Preload platform media as soon as Twitch connects, before any text
         # messages appear; the Qt image pool retains free slots for live chat.
-        self.feed.prefetch_media(snapshot.get("media_preload", {}).get("twitch", ()))
+        self.feed.prefetch_media(snapshot["media_preload"])
         overflow = snapshot["overflow_count"]
         warning = ("Буфер задержки переполнен: для сохранения сообщений "
                    "часть сообщений показана раньше установленного времени "
@@ -188,18 +194,10 @@ class MultichatTab(QWidget):
         if self.buffer_warning.text() != warning:
             self.buffer_warning.setText(warning)
             self.buffer_warning.setVisible(bool(warning))
-        # Keep multi-provider RAM/API contracts intact, but the current UI is Twitch-only.
-        messages = [m for m in snapshot["messages"] if m["platform"] == "twitch"]
+        messages = snapshot["messages"]
         twitch = self._appearance_draft["twitch"]
         common = self._appearance_draft["common"]
         test_visible = self.appearance_editor.test_visible
-        key = (
-            snapshot["show_time"], snapshot["show_platform_icons"],
-            repr(messages), repr(twitch), repr(common), test_visible,
-        )
-        if key == self._last_render:
-            return
-        self._last_render = key
         self.feed_frame.apply(common, has_content=bool(messages) or test_visible)
         self.feed.display(
             messages,

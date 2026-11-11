@@ -488,22 +488,24 @@ class AuctionSessionMixin:
         session, including entries made inactive by tie-break narrowing. Only
         an A5 operator-removed erroneous temporary lot is excluded.
         """
-        auction_id = int(auction_id)
         with self.connect() as conn:
-            if conn.execute(
-                "SELECT 1 FROM auction_sessions WHERE id=?",
-                (auction_id,),
-            ).fetchone() is None:
-                raise KeyError(auction_id)
-            value = conn.execute(
-                """
-                SELECT COALESCE(SUM(starting_sm_points + bid_sm_points), 0)
-                FROM auction_entries
-                WHERE auction_id=?
-                  AND COALESCE(result, '') <> 'removed'
-                """,
-                (auction_id,),
-            ).fetchone()[0]
+            return self._auction_total_sm_points_conn(conn, int(auction_id))
+
+    def _auction_total_sm_points_conn(self, conn: sqlite3.Connection, auction_id: int) -> int:
+        if conn.execute(
+            "SELECT 1 FROM auction_sessions WHERE id=?",
+            (auction_id,),
+        ).fetchone() is None:
+            raise KeyError(auction_id)
+        value = conn.execute(
+            """
+            SELECT COALESCE(SUM(starting_sm_points + bid_sm_points), 0)
+            FROM auction_entries
+            WHERE auction_id=?
+              AND COALESCE(result, '') <> 'removed'
+            """,
+            (auction_id,),
+        ).fetchone()[0]
         return max(0, int(value or 0))
 
     def _list_auction_entries_conn(
@@ -1503,6 +1505,7 @@ class AuctionSessionMixin:
             raise ValueError("Баллы нового лота не могут быть отрицательными.")
 
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             return self._add_or_increment_auction_lot_conn(
                 conn,
                 auction_id,
@@ -1534,6 +1537,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2038,6 +2042,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2170,6 +2175,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2263,6 +2269,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2358,6 +2365,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2449,6 +2457,7 @@ class AuctionSessionMixin:
         game_id = int(game_id)
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id,winner_game_id "
                 "FROM auction_sessions WHERE id=?",
@@ -2599,6 +2608,7 @@ class AuctionSessionMixin:
             raise ValueError("Введите новое название временного лота.")
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2727,6 +2737,7 @@ class AuctionSessionMixin:
         now = utc_now()
 
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2924,19 +2935,20 @@ class AuctionSessionMixin:
             }
 
     def pause_auction(self, auction_id: int) -> int:
-        session = self.get_auction_session(auction_id)
-        if session is None:
-            raise KeyError(auction_id)
-        if session["status"] != "running":
-            raise RuntimeError("На паузу можно поставить только запущенный аукцион.")
-
-        remaining_ms = self._remaining_ms_from_session(session)
-        remaining = max(0, math.ceil(remaining_ms / 1000))
-        now = utc_now()
-        # If paused before the phase actually starts, preserve that state;
-        # Resume will schedule a fresh lead-in with all time intact.
-        pending_phase = self._pending_timer_phase_start(session)
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            session = self._get_auction_session_conn(conn, auction_id)
+            if session is None:
+                raise KeyError(auction_id)
+            if session["status"] != "running":
+                raise RuntimeError("На паузу можно поставить только запущенный аукцион.")
+
+            remaining_ms = self._remaining_ms_from_session(session)
+            remaining = max(0, math.ceil(remaining_ms / 1000))
+            now = utc_now()
+            # If paused before the phase actually starts, preserve that state;
+            # Resume will schedule a fresh lead-in with all time intact.
+            pending_phase = self._pending_timer_phase_start(session)
             conn.execute(
                 """
                 UPDATE auction_sessions
@@ -2966,7 +2978,7 @@ class AuctionSessionMixin:
                     "remaining_ms": remaining_ms,
                 },
             )
-        return remaining
+            return remaining
 
     def resume_auction(self, auction_id: int) -> int:
         session = self.get_auction_session(auction_id)
@@ -3023,37 +3035,38 @@ class AuctionSessionMixin:
 
     def adjust_auction_time_ms(self, auction_id: int, delta_ms: int) -> int:
         """Changes remaining running/paused time with millisecond precision."""
-        session = self.get_auction_session(auction_id)
-        if session is None:
-            raise KeyError(auction_id)
-        status = str(session.get("status") or "")
-        if status not in ("running", "paused"):
-            raise RuntimeError(
-                "Изменять таймер можно только у запущенного аукциона или на паузе."
-            )
-
-        before_ms = self._remaining_ms_from_session(session)
-        if status == "running" and before_ms <= 0:
-            return 0
-
-        limit_ms = 24 * 60 * 60 * 1000
-        after_ms = max(0, min(limit_ms, before_ms + int(delta_ms)))
-        if after_ms == before_ms:
-            return after_ms
-
-        before_seconds = max(0, math.ceil(before_ms / 1000))
-        after_seconds = max(0, math.ceil(after_ms / 1000))
-        now_dt = datetime.now(timezone.utc)
-        now = now_dt.isoformat(timespec="microseconds")
-        phase_start = self._pending_timer_phase_start(session, now_dt)
-        deadline = (
-            ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
-                timespec="microseconds"
-            )
-            if status == "running" and after_ms > 0
-            else None
-        )
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            session = self._get_auction_session_conn(conn, auction_id)
+            if session is None:
+                raise KeyError(auction_id)
+            status = str(session.get("status") or "")
+            if status not in ("running", "paused"):
+                raise RuntimeError(
+                    "Изменять таймер можно только у запущенного аукциона или на паузе."
+                )
+
+            before_ms = self._remaining_ms_from_session(session)
+            if status == "running" and before_ms <= 0:
+                return 0
+
+            limit_ms = 24 * 60 * 60 * 1000
+            after_ms = max(0, min(limit_ms, before_ms + int(delta_ms)))
+            if after_ms == before_ms:
+                return after_ms
+
+            before_seconds = max(0, math.ceil(before_ms / 1000))
+            after_seconds = max(0, math.ceil(after_ms / 1000))
+            now_dt = datetime.now(timezone.utc)
+            now = now_dt.isoformat(timespec="microseconds")
+            phase_start = self._pending_timer_phase_start(session, now_dt)
+            deadline = (
+                ((phase_start or now_dt) + timedelta(milliseconds=after_ms)).isoformat(
+                    timespec="microseconds"
+                )
+                if status == "running" and after_ms > 0
+                else None
+            )
             conn.execute(
                 """
                 UPDATE auction_sessions
@@ -3080,7 +3093,7 @@ class AuctionSessionMixin:
                     "delta_seconds": int(delta_ms) / 1000,
                 },
             )
-        return after_ms
+            return after_ms
 
     def adjust_auction_time(self, auction_id: int, delta_seconds: int) -> int:
         """Compatibility seconds API used by older callers/tests."""
@@ -3175,10 +3188,14 @@ class AuctionSessionMixin:
         ]
         return maximum, leaders
 
-    def finish_auction(self, auction_id: int) -> dict[str, Any]:
+    def finish_auction(self, auction_id: int, *, automatic: bool = False) -> dict[str, Any]:
         """Останавливает приём ставок и переходит к результату выбранного режима."""
         now = utc_now()
         with self.connect() as conn:
+            # Serialize the leader/deadline read with incoming credited bids.
+            # Deferred SQLite transactions otherwise begin only at UPDATE,
+            # allowing a bid to commit after our read but before our result.
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -3186,6 +3203,11 @@ class AuctionSessionMixin:
             if session is None:
                 raise KeyError(auction_id)
             if session["status"] not in ("running", "paused"):
+                return dict(session)
+            if automatic and (
+                session["status"] != "running"
+                or self._remaining_ms_from_session(dict(session)) > 0
+            ):
                 return dict(session)
 
             mode = str(session["mode"])
@@ -3495,6 +3517,7 @@ class AuctionSessionMixin:
         """Фиксирует результат и переводит выигравшую игру в ПРОХОДИТСЯ."""
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
