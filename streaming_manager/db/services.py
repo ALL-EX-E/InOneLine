@@ -1627,6 +1627,9 @@ class ServicesMixin:
         """
         now = utc_now()
         with self.connect() as conn:
+            # Select the running/provisional branch only after earlier auction
+            # writes commit; a stale running read would skip result correction.
+            conn.execute("BEGIN IMMEDIATE")
             row = conn.execute(
                 """
                 SELECT pc.*,ee.source,ee.external_event_id,ee.event_type,ee.payload_json

@@ -1537,6 +1537,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2174,6 +2175,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2267,6 +2269,7 @@ class AuctionSessionMixin:
 
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2454,6 +2457,7 @@ class AuctionSessionMixin:
         game_id = int(game_id)
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id,winner_game_id "
                 "FROM auction_sessions WHERE id=?",
@@ -2604,6 +2608,7 @@ class AuctionSessionMixin:
             raise ValueError("Введите новое название временного лота.")
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT mode,status,wheel_spin_id FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -2732,6 +2737,7 @@ class AuctionSessionMixin:
         now = utc_now()
 
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),
@@ -3511,6 +3517,7 @@ class AuctionSessionMixin:
         """Фиксирует результат и переводит выигравшую игру в ПРОХОДИТСЯ."""
         now = utc_now()
         with self.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             session = conn.execute(
                 "SELECT * FROM auction_sessions WHERE id=?",
                 (auction_id,),

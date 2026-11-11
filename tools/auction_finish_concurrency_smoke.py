@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -51,7 +52,7 @@ class AuctionFinishConcurrencyTests(unittest.TestCase):
                 self.conn = conn
 
             def execute(self, sql, *args):
-                if sql.lstrip().upper().startswith("UPDATE AUCTION_ENTRIES"):
+                if sql.lstrip().upper().startswith("UPDATE "):
                     release.set()
                     if not committed.wait(5):
                         raise AssertionError("concurrent bid did not commit")
@@ -239,6 +240,108 @@ class AuctionFinishConcurrencyTests(unittest.TestCase):
             )
         self.assertEqual(self.db.get_game(self.challenger).sm_points, 95)
         self.assertEqual(self.db.get_auction_session(self.sid)["status"], "winner_selected")
+
+    def test_pending_apply_recalculates_result_when_finish_commits_first(self):
+        self.db.set_conversion_rate("PLN", "1")
+        now = datetime.now(timezone.utc).isoformat()
+        with self.db.connect() as conn:
+            event_id = int(conn.execute(
+                "INSERT INTO external_events("
+                "source,external_event_id,event_type,payload_json,processing_status,created_at"
+                ") VALUES(?,?,?,?,?,?)",
+                ("test", "concurrent-pending", "donation",
+                 json.dumps({"normalized": {"lot_title": "Challenger"}}),
+                 "awaiting_manual_apply", now),
+            ).lastrowid)
+            pending_id = int(conn.execute(
+                "INSERT INTO pending_conversions("
+                "external_event_row_id,game_id,auction_id,source_amount_text,"
+                "source_unit,source_unit_label,unit_kind,status,created_at"
+                ") VALUES(?,?,?,?,?,?,?,?,?)",
+                (event_id, self.challenger, self.sid, "20", "PLN", "PLN",
+                 "currency", "awaiting_manual_apply", now),
+            ).lastrowid)
+
+        result = self.during_bid(
+            0, lambda: self.db.apply_pending_conversion_event(pending_id),
+            writer_action=lambda: self.db.finish_auction(self.sid),
+            release_on_update=True,
+        )
+        session = self.db.get_auction_session(self.sid)
+        self.assertEqual(result["auction_id"], self.sid)
+        self.assertEqual(session["status"], "winner_selected")
+        self.assertEqual(session["winner_game_id"], self.challenger)
+        self.assertEqual(session["remaining_ms"], 0)
+        self.assertIsNone(session["deadline_at"])
+        self.assertEqual(self.db.get_game(self.challenger).sm_points, 110)
+        self.assertEqual(self.db.get_pending_conversion_event(pending_id)["status"], "applied")
+        with self.db.connect() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM contributions").fetchone()[0], 1)
+
+    def correction_cannot_reopen_confirmed_result(self, correction, *, initial_bid=0):
+        if initial_bid:
+            self.db.add_auction_bid(self.sid, self.challenger, initial_bid)
+        self.db.finish_auction(self.sid)
+        with self.assertRaises(RuntimeError):
+            self.during_bid(
+                0, correction,
+                writer_action=lambda: self.db.confirm_auction_winner(self.sid),
+                release_on_update=True,
+            )
+        self.assertEqual(self.db.get_auction_session(self.sid)["status"], "confirmed")
+        self.assertEqual(self.db.get_game(self.challenger).sm_points, 90 + initial_bid)
+
+    def test_late_lot_cannot_reopen_in_flight_confirmed_result(self):
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.add_post_expiry_manual_lot(self.sid, "Challenger", 20)
+        )
+
+    def test_late_bid_cannot_reopen_in_flight_confirmed_result(self):
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.add_post_expiry_manual_bid(self.sid, self.challenger, 20)
+        )
+
+    def test_late_decrease_cannot_reopen_in_flight_confirmed_result(self):
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.decrease_post_expiry_manual_bid(self.sid, self.challenger, 1),
+            initial_bid=5,
+        )
+
+    def test_confirmation_uses_winner_from_in_flight_late_correction(self):
+        previous = self.db.finish_auction(self.sid)["winner_game_id"]
+        winner = self.during_bid(
+            0, lambda: self.db.confirm_auction_winner(self.sid),
+            writer_action=lambda: self.db.add_post_expiry_manual_bid(
+                self.sid, self.challenger, 20
+            ),
+            release_on_update=True,
+        )
+        self.assertEqual(winner, self.challenger)
+        session = self.db.get_auction_session(self.sid)
+        self.assertEqual(session["status"], "confirmed")
+        self.assertEqual(session["winner_game_id"], self.challenger)
+        self.assertEqual(self.db.get_game(self.challenger).status, "playing")
+        self.assertEqual(self.db.get_game(previous).status, "not_played")
+
+    def test_late_exclusion_cannot_change_in_flight_confirmed_history(self):
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.exclude_post_expiry_permanent_auction_lot(self.sid, self.challenger)
+        )
+        self.assertEqual(len(self.db.list_auction_entries(self.sid)), 2)
+
+    def test_temporary_rename_cannot_change_in_flight_confirmed_history(self):
+        temporary = self.db.add_or_increment_auction_lot(self.sid, "Temporary", 5)["game_id"]
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.rename_post_expiry_temporary_lot(self.sid, temporary, "Renamed")
+        )
+        self.assertEqual(self.db.get_game(temporary).title, "Temporary")
+
+    def test_temporary_delete_cannot_change_in_flight_confirmed_history(self):
+        temporary = self.db.add_or_increment_auction_lot(self.sid, "Temporary", 5)["game_id"]
+        self.correction_cannot_reopen_confirmed_result(
+            lambda: self.db.delete_temporary_auction_lot(self.sid, temporary)
+        )
+        self.assertIsNotNone(self.db.get_game(temporary))
 
 
 if __name__ == "__main__":
