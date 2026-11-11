@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from streaming_manager.app_paths import AppPaths
 from streaming_manager.credentials import MemoryCredentialStore
 from streaming_manager.database import Database
+from streaming_manager.input_guard import WindowsInputGuard
 from streaming_manager.ui_settings import UI_SETTINGS_MIGRATION_KEY, ui_settings_path
 from streaming_manager.views.main_window import MainWindow
 
@@ -98,6 +99,17 @@ def main() -> None:
                 escape(field)
                 assert old_table.selectedItems(), "Escape changed another main tab"
                 assert old_field.text() == "Сохранить этот текст"
+
+                # App installs its native input guard before MainWindow; our
+                # later filter must not bypass a rejected background click.
+                guard = WindowsInputGuard(app)
+                app._streaming_input_guard = guard
+                table.selectRow(0)
+                focus(field)
+                with patch.object(guard, "_foreign_window_owns_input", return_value=True):
+                    QTest.mouseClick(probe, Qt.LeftButton, pos=QPoint(430, 300))
+                assert table.selectedItems(), "R36 bypassed the foreign-window input guard"
+                del app._streaming_input_guard
 
                 # Interactive mouse targets keep their usual action/selection.
                 button = QPushButton("Действие", probe)

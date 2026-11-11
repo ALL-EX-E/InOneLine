@@ -98,6 +98,12 @@ class PageFocusClearFilter(QObject):
                 self._contains(page, watched) and self._neutral_background(watched, page)
             ):
                 return False
+            # QApplication runs filters in reverse installation order. The
+            # existing native guard was installed before MainWindow, so honor
+            # it before consuming a background press here.
+            guard = getattr(app, "_streaming_input_guard", None)
+            if guard is not None and guard.eventFilter(watched, event):
+                return True
             self._clear(page)
             # Do not let a passive custom container handle the same click twice.
             event.accept()
