@@ -140,6 +140,7 @@ from .common import (
     ScrollSafeDoubleSpinBox,
     ScrollSafeFontComboBox,
     ScrollSafeSpinBox,
+    exec_responsive_message_box,
     make_wide_step_control,
     make_screen_color_picker_button,
     pick_screen_color,
@@ -2140,7 +2141,7 @@ class StreamTab(QWidget):
             "Использовать исходный файл", QMessageBox.ButtonRole.ActionRole
         )
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is copy_button:
             return MEDIA_STORAGE_MANAGED

@@ -33,7 +33,7 @@ from ..media import (
     supported_media_extensions,
 )
 from ..music_player import PLAYER_PAUSE, PLAYER_PLAY, PLAYER_STOP, MusicPlayerController
-from .common import ScrollSafeComboBox, ScrollSafeSpinBox, make_wide_step_control
+from .common import ScrollSafeComboBox, ScrollSafeSpinBox, exec_responsive_message_box, make_wide_step_control
 
 
 class MusicTab(QWidget):
@@ -387,7 +387,7 @@ class MusicTab(QWidget):
         copy_button = dialog.addButton("Копировать в программу", QMessageBox.ButtonRole.AcceptRole)
         external_button = dialog.addButton("Использовать исходный файл", QMessageBox.ButtonRole.ActionRole)
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         if dialog.clickedButton() is copy_button:
             return MEDIA_STORAGE_MANAGED
         if dialog.clickedButton() is external_button:
@@ -403,7 +403,7 @@ class MusicTab(QWidget):
         replace_button = dialog.addButton("Заменить", QMessageBox.ButtonRole.DestructiveRole)
         separate_button = dialog.addButton("Сохранить отдельную копию", QMessageBox.ButtonRole.ActionRole)
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is use_button:
             return "use", target

@@ -44,7 +44,7 @@ from ...media import (
     supported_media_extensions,
 )
 from ...workers import FunctionWorker
-from ..common import ScrollSafeComboBox, ScrollSafeSpinBox, make_wide_step_control
+from ..common import ScrollSafeComboBox, ScrollSafeSpinBox, exec_responsive_message_box, make_wide_step_control
 
 
 class AuctionAudioMixin:
@@ -720,7 +720,7 @@ class AuctionAudioMixin:
             "Использовать исходный файл", QMessageBox.ButtonRole.ActionRole
         )
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is copy_button:
             return MEDIA_STORAGE_MANAGED
@@ -747,7 +747,7 @@ class AuctionAudioMixin:
             "Сохранить отдельную копию", QMessageBox.ButtonRole.ActionRole
         )
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is use_button:
             return "use", target
@@ -1118,7 +1118,7 @@ class AuctionAudioMixin:
             "Использовать исходный файл", QMessageBox.ButtonRole.ActionRole
         )
         dialog.addButton(QMessageBox.StandardButton.Cancel)
-        dialog.exec()
+        exec_responsive_message_box(dialog)
         clicked = dialog.clickedButton()
         if clicked is copy_button:
             return MEDIA_STORAGE_MANAGED

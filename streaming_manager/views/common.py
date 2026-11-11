@@ -4,7 +4,7 @@ from PySide6.QtCore import QEventLoop, QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QBoxLayout, QComboBox, QDoubleSpinBox, QFontComboBox, QFormLayout,
-    QHeaderView, QHBoxLayout, QPushButton, QScrollArea, QSpinBox,
+    QDialogButtonBox, QHeaderView, QHBoxLayout, QMessageBox, QPushButton, QScrollArea, QSpinBox,
     QTabWidget, QTableWidget, QWidget,
 )
 
@@ -104,6 +104,29 @@ QFrame[line="true"] { background: #383d42; max-height: 1px; }
 QStatusBar { background: #181a1c; color: #bfc5ca; }
 """
 
+
+
+def exec_responsive_message_box(message_box: QMessageBox) -> int:
+    """Keep custom action labels readable when their row exceeds the screen."""
+    message_box.ensurePolished()
+    buttons = message_box.findChild(QDialogButtonBox)
+    screen = message_box.screen()
+    if buttons is not None and screen is not None:
+        buttons.ensurePolished()
+        margins = message_box.layout().contentsMargins()
+        available = screen.availableGeometry().width() - margins.left() - margins.right() - 32
+        if buttons.minimumSizeHint().width() > available:
+            horizontal_layout = buttons.layout()
+            order = [horizontal_layout.itemAt(index).widget()
+                     for index in range(horizontal_layout.count())
+                     if horizontal_layout.itemAt(index).widget() is not None]
+            buttons.setOrientation(Qt.Vertical)
+            # Qt's vertical role ordering differs on Windows. Keep the same
+            # action sequence the operator sees in the horizontal dialog.
+            for button in reversed(order):
+                buttons.layout().removeWidget(button)
+                buttons.layout().insertWidget(0, button)
+    return message_box.exec()
 
 
 def reflow_narrow_rows(

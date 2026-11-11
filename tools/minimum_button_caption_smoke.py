@@ -14,10 +14,11 @@ def run_worker() -> None:
     from unittest.mock import patch
     import socket
 
-    from PySide6.QtCore import QPoint, QSettings, Qt
+    from PySide6.QtCore import QPoint, QRect, QSettings, Qt, QTimer
+    from PySide6.QtGui import QScreen
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import (
-        QApplication, QAbstractButton, QBoxLayout, QCheckBox, QColorDialog, QDialog,
+        QApplication, QAbstractButton, QBoxLayout, QCheckBox, QColorDialog, QDialog, QDialogButtonBox,
         QFileDialog, QInputDialog, QMessageBox, QPushButton, QRadioButton,
         QScrollArea, QStyle, QStyleOptionButton, QTabWidget,
     )
@@ -32,11 +33,13 @@ def run_worker() -> None:
     from streaming_manager.views.rules_editor import AuctionRulesEditorDialog
     from streaming_manager.views.wheel_center_picker import WheelCenterPickerDialog
     from streaming_manager.views.winner_verification import show_readonly_text_dialog
+    from streaming_manager.views.common import exec_responsive_message_box
 
     app = QApplication.instance() or QApplication([])
     findings = []
     counts = {"dialogs": 0, "captions": 0, "workspaces": 0}
     original_show = QDialog.show
+    narrow_message_boxes = False
 
     def show_without_focus(dialog):
         dialog.setAttribute(Qt.WA_DontShowOnScreen, True)
@@ -115,6 +118,11 @@ def run_worker() -> None:
     def check_dialog(dialog, context=""):
         show_without_focus(dialog)
         settle(dialog)
+        if narrow_message_boxes and isinstance(dialog, QMessageBox):
+            # QScreen is mocked for the Python sizing decision; force the
+            # actual dialog to the runner's 512px logical screen budget too.
+            dialog.setFixedWidth(480)
+            settle(dialog)
         minimum = dialog.minimumSize().expandedTo(dialog.minimumSizeHint())
         widths = sorted({minimum.width(), minimum.width() + 160, max(1100, minimum.width())})
         for width in widths:
@@ -149,6 +157,39 @@ def run_worker() -> None:
     def capture_dialog(dialog):
         check_dialog(dialog)
         return QDialog.Rejected
+
+    for screen_width, orientation in ((512, Qt.Vertical), (3440, Qt.Horizontal)):
+        for selected in range(4):
+            box = QMessageBox()
+            box.setAttribute(Qt.WA_DontShowOnScreen, True)
+            box.setText("В библиотеке уже есть файл.")
+            choices = [box.addButton(label, role) for label, role in (
+                ("Использовать существующий", QMessageBox.AcceptRole),
+                ("Заменить", QMessageBox.DestructiveRole),
+                ("Сохранить отдельную копию", QMessageBox.ActionRole),
+                ("Отмена", QMessageBox.RejectRole),
+            )]
+            box.setDefaultButton(choices[-1])
+            box.setEscapeButton(choices[-1])
+            box.ensurePolished()
+            original_layout = box.findChild(QDialogButtonBox).layout()
+            original_order = [original_layout.itemAt(index).widget()
+                              for index in range(original_layout.count())
+                              if original_layout.itemAt(index).widget() is not None]
+            original_actions = [(button, button.text(), box.buttonRole(button)) for button in box.buttons()]
+            QTimer.singleShot(0, choices[selected].click)
+            with patch.object(QScreen, "availableGeometry", return_value=QRect(0, 0, screen_width, 768)):
+                exec_responsive_message_box(box)
+            if box.findChild(QDialogButtonBox).orientation() != orientation:
+                findings.append(f"{screen_width}px: custom actions use the wrong orientation")
+            if box.clickedButton() is not choices[selected]:
+                findings.append(f"{screen_width}px: custom action selection changed")
+            if box.defaultButton() is not choices[-1] or box.escapeButton() is not choices[-1]:
+                findings.append(f"{screen_width}px: custom default/cancel action changed")
+            if [(button, button.text(), box.buttonRole(button)) for button in box.buttons()] != original_actions:
+                findings.append(f"{screen_width}px: custom button labels, order or roles changed")
+            if sorted(box.buttons(), key=lambda button: (button.y(), button.x())) != original_order:
+                findings.append(f"{screen_width}px: visual custom action order changed")
 
     with TemporaryDirectory(ignore_cleanup_errors=True) as folder:
         paths = AppPaths.from_root(folder)
@@ -203,11 +244,28 @@ def run_worker() -> None:
                 )
                 window.auction_tab._choose_wheel_soundtrack_storage_mode(Path(folder) / "sample.wav")
                 window.auction_tab._choose_auction_soundtrack_storage_mode(Path(folder) / "sample.wav")
+                (window.auction_tab.soundtrack_dir / "sample.wav").write_bytes(b"fixture")
+                window.auction_tab._resolve_soundtrack_copy_target(Path(folder) / "sample.wav")
                 window.stream_tab._choose_background_storage_mode(Path(folder) / "sample.png", editor)
                 editor._choose_save_action()
                 with patch.object(editor, "_is_dirty", return_value=True):
                     editor._confirm_discard_or_save()
                 editor._confirm_save_before_activation()
+
+            narrow_message_boxes = True
+            with (
+                patch.object(QScreen, "availableGeometry", return_value=QRect(0, 0, 512, 768)),
+                patch.object(QMessageBox, "exec", capture_dialog),
+            ):
+                window.music_tab._choose_storage_mode([Path(folder) / "sample.wav"])
+                window.music_tab._duplicate_action(
+                    Path(folder) / "sample.wav", Path(folder) / "existing.wav",
+                )
+                window.auction_tab._choose_wheel_soundtrack_storage_mode(Path(folder) / "sample.wav")
+                window.auction_tab._choose_auction_soundtrack_storage_mode(Path(folder) / "sample.wav")
+                window.auction_tab._resolve_soundtrack_copy_target(Path(folder) / "sample.wav")
+                window.stream_tab._choose_background_storage_mode(Path(folder) / "sample.png", editor)
+            narrow_message_boxes = False
 
             now = datetime.now(timezone.utc).timestamp()
             with patch.object(QDialog, "show", show_without_focus):
