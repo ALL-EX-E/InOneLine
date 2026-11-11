@@ -18,6 +18,7 @@ on:
   pull_request:
     branches:
       - main
+      - candidate/maintenance-conditional-controls-20261111
     paths:
       - "app.py"
       - "streaming_manager/**"
@@ -70,6 +71,14 @@ jobs:
         run: |
           python -m tools.d10_settings_github_smoke
           if ($LASTEXITCODE -ne 0) { throw "D10 Settings GitHub footer regression failed" }
+
+      - name: R36 current-page focus and selection native Windows Qt
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.r36_global_focus_smoke
+          if ($LASTEXITCODE -ne 0) { throw "R36 focus and selection regression failed" }
 
       - name: P11-K4 real Chromium selected Rules preview vs on-air regression
         timeout-minutes: 5
@@ -1000,6 +1009,41 @@ jobs:
         with:
           name: InOneLine_D41-01_PR374_CANDIDATE_QA
           path: ${{ runner.temp }}\D41-01_QA\*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+      - name: Package R36 candidate from tested installer
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r36-global-focus-20261111'
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP\R36_QA"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item "installer\output\InOneLine_Setup_1.0.10.exe" "$out\InOneLine_R36_Setup_CANDIDATE.exe"
+          Copy-Item "docs\qa\R36-global-focus-checklist.md" "$out\CHECKLIST_R36.md"
+          python tools/create_source_snapshot.py "$out\InOneLine_R36_Source.zip" --ref HEAD
+          if ($LASTEXITCODE -ne 0) { throw "R36 source snapshot failed" }
+          $installer = Get-Item "$out\InOneLine_R36_Setup_CANDIDATE.exe"
+          $source = Get-Item "$out\InOneLine_R36_Source.zip"
+          $installerSha = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sourceSha = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          @"
+          status=R36 candidate ONLY; not accepted, merged or released
+          qa_pr=${{ github.event.pull_request.number }}
+          workflow_commit=$env:GITHUB_SHA
+          actual_candidate_head=${{ github.event.pull_request.head.sha }}
+          installer_bytes=$($installer.Length)
+          installer_sha256=$installerSha
+          source_bytes=$($source.Length)
+          source_sha256=$sourceSha
+          "@ | Set-Content "$out\BUILD_INFO.txt" -Encoding UTF8
+
+      - name: Upload R36 candidate QA
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'candidate/r36-global-focus-20261111'
+        uses: actions/upload-artifact@v7
+        with:
+          name: InOneLine_R36_CANDIDATE_QA
+          path: ${{ runner.temp }}\R36_QA\*
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
