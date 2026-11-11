@@ -223,6 +223,14 @@ def main() -> None:
                     escape(history.table)
                 assert history._selected_auction_id is None, "history kept details for cleared row"
                 assert all(label.text() == "—" for label in history.general_labels.values())
+
+                window._set_current_main_page(window.auction_tab)
+                settle()
+                probe, field, table = probes[3]
+                table.selectRow(0)
+                focus(field)
+                QTest.mouseClick(window.auction_tab.conduct_page, Qt.LeftButton, pos=QPoint(1, 1))
+                assert not table.selectedItems(), "auction passive conduct background left selection"
                 print("R36_GLOBAL_FOCUS_ALL_PASS", flush=True)
             finally:
                 for probe, _, _ in probes:
