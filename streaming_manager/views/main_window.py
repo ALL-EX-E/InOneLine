@@ -5,6 +5,7 @@ from PySide6.QtCore import QByteArray, QEvent, QSize, Qt, QThreadPool, QTimer, Q
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QIcon, QKeySequence, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QLabel,
     QMainWindow,
@@ -35,6 +36,7 @@ from ..donationalerts_runtime import DonationAlertsDonationService, DonationAler
 from ..database import Database
 from ..workers import FunctionWorker
 from .common import APP_STYLE, autosize_compact_columns_once, reflow_narrow_rows
+from .focus_clear import PageFocusClearFilter
 from .games import GamesTab
 from .public import PublicTab
 from .stream import StreamTab
@@ -333,6 +335,8 @@ class MainWindow(QMainWindow):
         self._make_menu()
         self._update_status_bar()
         self._restore_ui_state()
+        self._page_focus_clear_filter = PageFocusClearFilter(self)
+        QApplication.instance().installEventFilter(self._page_focus_clear_filter)
         # Initial table population happens while MainWindow is still hidden.
         # Native Windows/QSS may finalize the section font only after show(), so
         # run one event-loop-deferred pass using the real polished metrics.
