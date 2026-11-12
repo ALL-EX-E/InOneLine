@@ -4,7 +4,7 @@
 
 ## Полное описание
 
-README и docs/FEATURES.md сверены с действующим кодом; последние изменения выделены в RELEASE_NOTES_1.0.11.md. Публичная версия пока 1.0.10. Кандидат 1.0.11 — [PR #429](https://github.com/ALL-EX-E/InOneLine/pull/429), HEAD `5644a6be84687f50e0e7c6898956a642c987ed7d`. Автоматическая Windows-проверка [43184622248](https://github.com/ALL-EX-E/InOneLine/actions/runs/43184622248) на момент записи выполняется; приёмка установщика и публикация не объявляются.
+README и docs/FEATURES.md сверены с действующим кодом; последние изменения выделены в RELEASE_NOTES_1.0.11.md. Публичная версия пока 1.0.10. Кандидат 1.0.11 — [PR #429](https://github.com/ALL-EX-E/InOneLine/pull/429), HEAD `5644a6be84687f50e0e7c6898956a642c987ed7d`. Windows-проверка [43184622248](https://github.com/ALL-EX-E/InOneLine/actions/runs/43184622248) прошла: 92 success / 16 skipped. Пользователь принял установщик, Drive readback подтверждён; PR №429 слит как `9ddce421ef6a6e8ba2a72ed39513f969d85132dd`. Независимая Windows-проверка main `43189823708` выполняется, публикация пока не объявляется.
 
 ## Закрытые устаревшие запросы
 
