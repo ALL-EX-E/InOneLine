@@ -35,6 +35,8 @@
 
 ## Аудиты
 
+- [Оформление GitHub перед 1.0.11](./audits/GITHUB_RELEASE_CLEANUP_2026-11-12.md) — проверенные замены 48 старых запросов и сохранённые черновики.
+
 - [Сверка возможностей перед 1.0.11](./audits/RELEASE_1.0.11_CODE_VERIFICATION.md) — исходники, ограничения, план упаковки и проверки нового выпуска.
 
 - [audits/CODEBASE_AUDIT_2026-10-01.md](./audits/CODEBASE_AUDIT_2026-10-01.md) — контрольный аудит exact CURRENT 1.0.8: dead code, reuse-first, performance, QA/release infrastructure.
