@@ -1,3 +1,9 @@
+# InOneLine 1.0.11
+# https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.11
+8556bb3d6be54d2313f2a2417b2a672d292e427b5ca389f36d4301856a23ce3f  InOneLine_Setup_1.0.11.exe
+2a56fd24f091966795cd922e1c4b239ae4ea24ccf91531377acefdf37f4a27c7  InOneLine_Source_1.0.11.zip
+
+# Historical published releases; original checksums preserved below
 # InOneLine 1.0.10
 # https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.10
 be79ac004f148486cdcfd3c634f5a22e46cb62ec438f8139269ec793471b7c62  InOneLine_Setup_1.0.10.exe

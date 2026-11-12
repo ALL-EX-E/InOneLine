@@ -4,7 +4,7 @@
 
 ## Полное описание
 
-README и docs/FEATURES.md сверены с действующим кодом; последние изменения выделены в RELEASE_NOTES_1.0.11.md. Публичная версия пока 1.0.10. Кандидат 1.0.11 — [PR #429](https://github.com/ALL-EX-E/InOneLine/pull/429), HEAD `5644a6be84687f50e0e7c6898956a642c987ed7d`. Windows-проверка [43184622248](https://github.com/ALL-EX-E/InOneLine/actions/runs/43184622248) прошла: 92 success / 16 skipped. Пользователь принял установщик, Drive readback подтверждён; PR №429 слит как `9ddce421ef6a6e8ba2a72ed39513f969d85132dd`. Независимая Windows-проверка main `43189823708` выполняется, публикация пока не объявляется.
+README и docs/FEATURES.md сверены с действующим кодом; последние изменения выделены в RELEASE_NOTES_1.0.11.md. Публичная версия — [1.0.11](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.11). Кандидат 1.0.11 — [PR #429](https://github.com/ALL-EX-E/InOneLine/pull/429), HEAD `5644a6be84687f50e0e7c6898956a642c987ed7d`. Windows-проверка [43184622248](https://github.com/ALL-EX-E/InOneLine/actions/runs/43184622248) прошла: 92 success / 16 skipped. Пользователь принял установщик, Drive readback подтверждён; PR №429 слит как `9ddce421ef6a6e8ba2a72ed39513f969d85132dd`. Независимая Windows-проверка main `43189823708` — SUCCESS. Publisher `43193079477` — SUCCESS; выпуск 1.0.11 опубликован, исходные принятые assets подтверждены повторным скачиванием и SHA-256. После слияния #429 открыты только сохранённые #34, #387 и #408.
 
 ## Закрытые устаревшие запросы
 
