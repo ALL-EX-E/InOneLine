@@ -969,15 +969,15 @@ def main():
             print("R06_MAIN_LIVE_MOTION_RESIZE_VIDEO_PASS", flush=True)
             print("R06_MAIN_HIDE_EMPTY_SPLIT_REPLACE_MOTION_PASS", flush=True)
 
-            # The OBS switch must remove the chat without reserving empty space.
+            # The OBS switch stops new admission; existing OBS rows remain.
             state.set_obs_enabled("twitch", False)
             db.set_setting("list_overlay_show_mode","always")
             api.configure_list_show("always", "!list", 20)
             for page in pages:
-                m=until(page, lambda a: a["shown"] and a["chatHeight"] == 0 and
+                m=until(page, lambda a: a["shown"] and a["chatHeight"] > 0 and
                         a["listHeight"] > 10,
-                        "OBS Twitch disabled / full List")
-                static_check(m, "OBS chat disabled", dynamic_chat=True)
+                        "OBS Twitch intake disabled / prior rows retained")
+                static_check(m, "OBS prior chat retained", dynamic_chat=True)
             # R06/ORDERED-POLL-098: force REAL HTTP responses out of order.
             # The threaded test API snapshots the first old state, holds its
             # response, then serves a newer Save on a different request.

@@ -286,16 +286,15 @@ def main():
                   "saved split mode restored")
 
             state.set_obs_enabled("twitch", False)
-            until(view.page(), lambda a: a["shown"] and a["chatHeight"] < 2
-                  and a["listHeight"] >= a["rootHeight"] - 3,
-                  "chat off, list owns full area")
+            until(view.page(), lambda a: a["shown"] and a["chatHeight"] > 15
+                  and a["listHeight"] > 15,
+                  "chat intake off, existing OBS rows remain")
 
             db.set_setting("list_overlay_show_mode", "hidden")
             api.configure_list_show("hidden", "!list", 15)
             until(view.page(), lambda a: not a["shown"] and
-                  a["chatHeight"] < 2 and a["listHeight"] < 2 and
-                  a["obsVisible"] == "false",
-                  "both hidden, no visible content")
+                  a["chatHeight"] >= a["rootHeight"] - 3 and a["listHeight"] < 2,
+                  "hidden List leaves retained chat visible")
             # First agreed interaction: share the standalone List's top-down
             # animation, and move the empty Always-chat's upper boundary with
             # the List's lower edge. Neither loses opacity or moves the root.
