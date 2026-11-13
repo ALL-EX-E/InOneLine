@@ -104,6 +104,11 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 # Existing OBS rows remain until natural RAM eviction.
                 self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1", "yt1"])
                 self.assertEqual(len(state.snapshot()["messages"]), 3)
+                state.set_obs_enabled("youtube", False)
+                with urllib.request.urlopen(api.base_url + "/api/data", timeout=10) as response:
+                    combined = json.load(response)
+                self.assertTrue(combined["multichat"]["enabled"])
+                self.assertTrue(combined["multichat"]["has_messages"])
 
                 # Invalid delay does not get persisted and is visibly restored.
                 tab.delay.setText("-5")

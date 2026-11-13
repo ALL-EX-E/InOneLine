@@ -678,7 +678,6 @@ class LocalApiServer:
                     chat = api_server.multichat_state(for_obs=True, summary=True)
                     appearance = chat.get("appearance") or {}
                     common = appearance.get("common") or {}
-                    obs_enabled = chat.get("obs_enabled") or {}
                     has_messages = chat.get("has_messages", chat.get("twitch_has_messages"))
                     if has_messages is None:
                         has_messages = any(
@@ -687,7 +686,7 @@ class LocalApiServer:
                             if isinstance(item, dict)
                         )
                     payload["multichat"] = {
-                        "enabled": any(obs_enabled.get(platform, True) is True for platform in ("twitch", "youtube")) and common.get("visibility") != "hidden",
+                        "enabled": common.get("visibility") != "hidden",
                         "has_messages": bool(has_messages),
                         "visibility": common.get("visibility", "hide_empty"),
                     }

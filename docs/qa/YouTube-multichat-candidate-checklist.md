@@ -1,6 +1,6 @@
 # YouTube multichat candidate — manual check
 
-Candidate date: 13 November 2026. [QA ZIP on Google Drive](https://drive.google.com/file/d/1dH7LW5H9a_C1W8YBZ40VfMml4spdVQHI/view), size 68,648,082 bytes, SHA-256 `DF5310C8266B37D90B8CD218A4788938CBE3A8455236C8A48B66010FE3ADCBE3`.
+Candidate date: 13 November 2026. [QA ZIP v2 on Google Drive](https://drive.google.com/file/d/1o25_QBzQQN0M5vN5yB-_2uFS1GGh5zTl/view), size 68,648,577 bytes, SHA-256 `FE95B556C2CBDD685AA74F51E704007CA0CC1C6398A18B483E06EBC23316BA63`.
 
 Extract the portable ZIP into a new directory, then run `InOneLine.exe` from that directory. The candidate keeps its own `data` directory. Do not place it over the installed application.
 
