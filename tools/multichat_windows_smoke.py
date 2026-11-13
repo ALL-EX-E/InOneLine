@@ -31,6 +31,65 @@ class MultichatWindowsSmoke(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_settings_are_grouped_and_disconnected_service_details_are_hidden(self):
+        class RuntimeStub:
+            status = "YouTube: отключён."
+            is_connected = False
+
+            def connect(self, _url):
+                self.status = "YouTube: Подключено"
+                self.is_connected = True
+
+            def stop(self):
+                self.status = "YouTube: отключён."
+                self.is_connected = False
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            paths = AppPaths.from_root(Path(tmp))
+            paths.ensure_runtime_dirs()
+            db = Database(paths.database_path)
+            state = MultichatState()
+            api = LocalApiServer(db, "127.0.0.1", unused_local_port())
+            twitch_status = ["Twitch: чат не подключён."]
+            runtime = RuntimeStub()
+            tab = MultichatTab(
+                db, state, api,
+                twitch_status_provider=lambda: twitch_status[0],
+                youtube_runtime=runtime,
+            )
+            try:
+                self.assertEqual(tab.general_group.title(), "Общие настройки")
+                self.assertEqual(tab.twitch_group.title(), "Twitch")
+                self.assertEqual(tab.youtube_group.title(), "YouTube")
+                self.assertEqual(tab.visibility_group.title(), "Мультичат в OBS")
+                self.assertLess(tab.settings_layout.indexOf(tab.general_group),
+                                tab.settings_layout.indexOf(tab.twitch_group))
+                self.assertLess(tab.settings_layout.indexOf(tab.twitch_group),
+                                tab.settings_layout.indexOf(tab.youtube_group))
+                self.assertTrue(hasattr(tab.common_appearance_editor, "background"))
+                self.assertFalse(hasattr(tab.common_appearance_editor, "mode"))
+                self.assertTrue(hasattr(tab.appearance_editor, "mode"))
+                self.assertFalse(hasattr(tab.appearance_editor, "background"))
+                self.assertFalse(tab.twitch_settings_body.isVisible())
+                self.assertFalse(tab.youtube_settings_body.isVisible())
+
+                twitch_status[0] = "Twitch: чат подключён."
+                runtime.is_connected = True
+                runtime.status = "YouTube: Подключено"
+                tab.refresh()
+                self.assertFalse(tab.twitch_settings_body.isHidden())
+                self.assertFalse(tab.youtube_settings_body.isHidden())
+
+                twitch_status[0] = "Twitch: чат не подключён."
+                runtime.is_connected = False
+                runtime.status = "YouTube: отключён."
+                tab.refresh()
+                self.assertTrue(tab.twitch_settings_body.isHidden())
+                self.assertTrue(tab.youtube_settings_body.isHidden())
+            finally:
+                tab.refresh_timer.stop()
+                tab.close()
+
     def test_existing_http_server_and_operator_view(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             paths = AppPaths.from_root(Path(tmp))
@@ -134,7 +193,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
             api.set_multichat_state_provider(state.snapshot)
             tab = MultichatTab(db, state, api)
             try:
-                combo = tab.appearance_editor.visibility
+                combo = tab.common_appearance_editor.visibility
                 self.assertEqual(
                     [combo.itemText(i) for i in range(combo.count())],
                     ["Не показывать", "Скрывать, когда чат пуст", "Показывать постоянно"],
@@ -148,7 +207,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
                 self.assertEqual(len(api.multichat_state()["messages"]), 1)
                 self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "hide_empty")
-                tab.appearance_editor.save_button.click()
+                tab.common_appearance_editor.save_button.click()
                 self.assertEqual(db.get_setting("multichat_twitch_obs"), "0")
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
                 self.assertEqual(len(api.multichat_state()["messages"]), 1)
@@ -159,7 +218,7 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 # Saved visibility changes the renderer, not message admission.
                 combo.setCurrentIndex(combo.findData("always"))
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
-                tab.appearance_editor.save_button.click()
+                tab.common_appearance_editor.save_button.click()
                 self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
                 self.assertEqual(len(api.multichat_state()["messages"]), 2)

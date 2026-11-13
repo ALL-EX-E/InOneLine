@@ -126,6 +126,23 @@ def save_appearance(db, twitch: dict, common: dict) -> dict:
     return result
 
 
+def save_twitch_appearance(db, twitch: dict) -> dict:
+    """Persist only Twitch cards without rewriting shared or YouTube style."""
+    result = normalize_twitch(twitch)
+    db.set_setting(TWITCH_KEY, json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return result
+
+
+def save_common_appearance(db, common: dict) -> dict:
+    """Persist only shared multichat presentation and its legacy mirror."""
+    result = normalize_common(common)
+    db.set_settings_bulk({
+        COMMON_KEY: json.dumps(result, ensure_ascii=False, sort_keys=True),
+        LEGACY_OBS_KEY: "0" if result["visibility"] == "hidden" else "1",
+    })
+    return result
+
+
 def save_youtube_appearance(db, youtube: dict) -> dict:
     result = normalize_twitch(youtube)
     db.set_setting(YOUTUBE_KEY, json.dumps(result, ensure_ascii=False, sort_keys=True))

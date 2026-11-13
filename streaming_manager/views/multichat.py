@@ -44,10 +44,13 @@ class MultichatTab(QWidget):
         options_scroll.setMinimumSize(0, 0)
         settings_widget = QWidget()
         settings = QVBoxLayout(settings_widget)
+        self.settings_layout = settings
         options_scroll.setWidget(settings_widget)
         self.columns.addWidget(options_scroll, 2)
-        general = QGroupBox("Общие настройки")
-        form = QFormLayout(general)
+        self.general_group = QGroupBox("Общие настройки")
+        general_layout = QVBoxLayout(self.general_group)
+        general_fields = QWidget()
+        form = QFormLayout(general_fields)
         self.delay = QLineEdit(db.get_setting("multichat_delay", "0"))
         self.delay.setAccessibleName("Задержка сообщений, секунд")
         self.delay.editingFinished.connect(self._on_delay)
@@ -75,44 +78,18 @@ class MultichatTab(QWidget):
         )
         self.show_platform_icons.toggled.connect(self._on_platform_icons)
         form.addRow(self.show_platform_icons)
-        settings.addWidget(general)
-        connections = QGroupBox("Подключения и OBS")
-        connections_layout = QVBoxLayout(connections)
-        self.connection_status = QLabel("Twitch: ожидание подключения чата через EventSub")
-        self.connection_status.setWordWrap(True)
-        connections_layout.addWidget(self.connection_status)
-        self.youtube_url = QLineEdit(db.get_setting('youtube_chat_url', ''))
-        self.youtube_url.setPlaceholderText('Ссылка на трансляцию или чат YouTube')
-        connections_layout.addWidget(self.youtube_url)
-        youtube_actions = QHBoxLayout()
-        youtube_connect = QPushButton('Подключить YouTube')
-        youtube_connect.clicked.connect(self._connect_youtube)
-        youtube_disconnect = QPushButton('Отключить YouTube')
-        youtube_disconnect.clicked.connect(self._disconnect_youtube)
-        youtube_actions.addWidget(youtube_connect)
-        youtube_actions.addWidget(youtube_disconnect)
-        connections_layout.addLayout(youtube_actions)
-        self.youtube_status = QLabel('YouTube: отключён.')
-        self.youtube_status.setWordWrap(True)
-        connections_layout.addWidget(self.youtube_status)
-        self.twitch_obs = QCheckBox("Показывать Twitch в OBS")
-        self.youtube_obs = QCheckBox("Показывать YouTube в OBS")
-        self.twitch_obs.setChecked(db.get_setting("multichat_obs_enabled_twitch", "1") == "1")
-        self.youtube_obs.setChecked(db.get_setting("multichat_obs_enabled_youtube", "1") == "1")
-        connections_layout.addWidget(self.twitch_obs)
-        connections_layout.addWidget(self.youtube_obs)
-        self.twitch_obs.toggled.connect(lambda enabled: self._set_platform_obs("twitch", enabled))
-        self.youtube_obs.toggled.connect(lambda enabled: self._set_platform_obs("youtube", enabled))
-        self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
-        self.state.set_obs_enabled("youtube", self.youtube_obs.isChecked())
-        self.buffer_warning = QLabel("")
-        self.buffer_warning.setWordWrap(True)
-        self.buffer_warning.hide()
-        connections_layout.addWidget(self.buffer_warning)
+        general_layout.addWidget(general_fields)
+
+        self.visibility_group = QGroupBox("Мультичат в OBS")
+        visibility_layout = QVBoxLayout(self.visibility_group)
+        visibility_form = QFormLayout()
+        visibility_control = ScrollSafeComboBox()
+        visibility_form.addRow("Отображение:", visibility_control)
+        visibility_layout.addLayout(visibility_form)
         url = f"{api.base_url}/multichat-overlay"
         self.url_edit = QLineEdit(url)
         self.url_edit.setReadOnly(True)
-        connections_layout.addWidget(self.url_edit)
+        visibility_layout.addWidget(self.url_edit)
         actions = QHBoxLayout()
         copy = QPushButton("Копировать URL")
         copy.clicked.connect(lambda: QApplication.clipboard().setText(url))
@@ -120,25 +97,79 @@ class MultichatTab(QWidget):
         preview.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
         actions.addWidget(copy)
         actions.addWidget(preview)
-        connections_layout.addLayout(actions)
-        settings.addWidget(connections)
-        visibility_group = QGroupBox("Чат Twitch в OBS")
-        visibility_form = QFormLayout(visibility_group)
-        visibility_control = ScrollSafeComboBox()
-        visibility_form.addRow("Отображение:", visibility_control)
+        visibility_layout.addLayout(actions)
+        general_layout.addWidget(self.visibility_group)
+        self.common_appearance_editor = ChatAppearanceEditor(
+            db, import_background=import_background,
+            visibility_control=visibility_control, section="common",
+        )
+        self.common_appearance_editor.saved_changed.connect(self._on_saved_appearance)
+        self.common_appearance_editor.changed.connect(self._common_appearance_changed)
+        general_layout.addWidget(self.common_appearance_editor)
+        self.buffer_warning = QLabel("")
+        self.buffer_warning.setWordWrap(True)
+        self.buffer_warning.hide()
+        general_layout.addWidget(self.buffer_warning)
+        settings.addWidget(self.general_group)
+
+        self.twitch_group = QGroupBox("Twitch")
+        twitch_layout = QVBoxLayout(self.twitch_group)
+        self.connection_status = QLabel("Twitch: ожидание подключения чата через EventSub")
+        self.connection_status.setWordWrap(True)
+        twitch_layout.addWidget(self.connection_status)
+        self.twitch_settings_body = QWidget()
+        twitch_body_layout = QVBoxLayout(self.twitch_settings_body)
+        twitch_body_layout.setContentsMargins(0, 0, 0, 0)
+        self.twitch_obs = QCheckBox("Показывать Twitch в мультичате OBS")
+        self.twitch_obs.setChecked(db.get_setting("multichat_obs_enabled_twitch", "1") == "1")
+        self.twitch_obs.toggled.connect(lambda enabled: self._set_platform_obs("twitch", enabled))
+        twitch_body_layout.addWidget(self.twitch_obs)
         self.appearance_editor = ChatAppearanceEditor(
             db, import_background=import_background,
-            visibility_control=visibility_control,
+            platform="twitch", section="platform",
         )
         self.appearance_editor.saved_changed.connect(self._on_saved_appearance)
-        settings.addWidget(visibility_group)
         self.appearance_editor.changed.connect(self._appearance_changed)
-        self._appearance_draft = self.appearance_editor.values()
-        settings.addWidget(self.appearance_editor)
-        self.youtube_appearance_editor = ChatAppearanceEditor(db, platform="youtube")
+        twitch_body_layout.addWidget(self.appearance_editor)
+        twitch_layout.addWidget(self.twitch_settings_body)
+        settings.addWidget(self.twitch_group)
+
+        self.youtube_group = QGroupBox("YouTube")
+        youtube_layout = QVBoxLayout(self.youtube_group)
+        self.youtube_url = QLineEdit(db.get_setting('youtube_chat_url', ''))
+        self.youtube_url.setPlaceholderText('Ссылка на трансляцию или чат YouTube')
+        youtube_layout.addWidget(self.youtube_url)
+        youtube_actions = QHBoxLayout()
+        self.youtube_connect = QPushButton('Подключить YouTube')
+        self.youtube_connect.clicked.connect(self._connect_youtube)
+        self.youtube_disconnect = QPushButton('Отключить YouTube')
+        self.youtube_disconnect.clicked.connect(self._disconnect_youtube)
+        youtube_actions.addWidget(self.youtube_connect)
+        youtube_actions.addWidget(self.youtube_disconnect)
+        youtube_layout.addLayout(youtube_actions)
+        self.youtube_status = QLabel('YouTube: отключён.')
+        self.youtube_status.setWordWrap(True)
+        youtube_layout.addWidget(self.youtube_status)
+        self.youtube_settings_body = QWidget()
+        youtube_body_layout = QVBoxLayout(self.youtube_settings_body)
+        youtube_body_layout.setContentsMargins(0, 0, 0, 0)
+        self.youtube_obs = QCheckBox("Показывать YouTube в мультичате OBS")
+        self.youtube_obs.setChecked(db.get_setting("multichat_obs_enabled_youtube", "1") == "1")
+        self.youtube_obs.toggled.connect(lambda enabled: self._set_platform_obs("youtube", enabled))
+        youtube_body_layout.addWidget(self.youtube_obs)
+        self.youtube_appearance_editor = ChatAppearanceEditor(
+            db, platform="youtube", section="platform"
+        )
         self.youtube_appearance_editor.changed.connect(self._youtube_appearance_changed)
+        youtube_body_layout.addWidget(self.youtube_appearance_editor)
+        youtube_layout.addWidget(self.youtube_settings_body)
+        settings.addWidget(self.youtube_group)
+
+        self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
+        self.state.set_obs_enabled("youtube", self.youtube_obs.isChecked())
+        self._appearance_draft = self.common_appearance_editor.values()
+        self._appearance_draft["twitch"] = self.appearance_editor.values()["twitch"]
         self._appearance_draft["youtube"] = self.youtube_appearance_editor.values()["youtube"]
-        settings.addWidget(self.youtube_appearance_editor)
         settings.addStretch()
         self.state.configure(
             limit=self.limit.value(), show_time=self.show_time.isChecked(),
@@ -155,11 +186,12 @@ class MultichatTab(QWidget):
         self.refresh()
 
     def _appearance_changed(self, twitch, common, test_visible):
-        self._appearance_draft = {
-            "twitch": normalize_twitch(twitch),
-            "common": normalize_common(common),
-            "youtube": self._appearance_draft.get("youtube") if hasattr(self, "_appearance_draft") else normalize_twitch({}),
-        }
+        self._appearance_draft["twitch"] = normalize_twitch(twitch)
+        self._operator_feed_key = None
+        self.refresh()
+
+    def _common_appearance_changed(self, _twitch, common, _test_visible):
+        self._appearance_draft["common"] = normalize_common(common)
         self._operator_feed_key = None
         self.refresh()
 
@@ -225,8 +257,11 @@ class MultichatTab(QWidget):
         self.refresh()
 
     def refresh(self):
+        youtube_connected = False
         if self.youtube_runtime is not None:
             self.youtube_status.setText(self.youtube_runtime.status)
+            youtube_connected = bool(self.youtube_runtime.is_connected)
+        twitch_connected = False
         if self.twitch_status_provider is not None:
             try:
                 status = str(self.twitch_status_provider())
@@ -235,6 +270,9 @@ class MultichatTab(QWidget):
             info = status
             if self.connection_status.text() != info:
                 self.connection_status.setText(info)
+            twitch_connected = "чат подключён" in status.casefold()
+        self.twitch_settings_body.setVisible(twitch_connected)
+        self.youtube_settings_body.setVisible(youtube_connected)
         snapshot = self.state.operator_feed_snapshot(self._operator_feed_key)
         if snapshot is None:
             return

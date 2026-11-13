@@ -1,11 +1,20 @@
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from streaming_manager.multichat import ChatMessage, MultichatState
 from streaming_manager.youtube_runtime import YouTubeChatRuntime
 
 
 class YouTubeMultichatSmoke(unittest.TestCase):
+    def test_runtime_reports_connected_only_for_connected_worker(self):
+        runtime = YouTubeChatRuntime(MultichatState())
+        self.assertFalse(runtime.is_connected)
+        runtime.worker = SimpleNamespace(status=SimpleNamespace(code="connecting"))
+        self.assertFalse(runtime.is_connected)
+        runtime.worker.status.code = "connected"
+        self.assertTrue(runtime.is_connected)
+
     def test_mixed_zero_delay_keeps_arrival_order(self):
         state = MultichatState(clock=lambda: 10, wall_clock=lambda: 100)
         state.ingest(ChatMessage('twitch', 't', '1', 'T', 'first', sent_at=100))

@@ -10,7 +10,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ..chat_appearance import normalize_common, normalize_twitch, saved_appearance, save_appearance, save_youtube_appearance
+from ..chat_appearance import (
+    normalize_common, normalize_twitch, saved_appearance, save_appearance,
+    save_common_appearance, save_twitch_appearance, save_youtube_appearance,
+)
 from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
 from ..media import media_asset_available
 from .common import (
@@ -23,10 +26,19 @@ class ChatAppearanceEditor(QWidget):
     changed = Signal(object, object, bool)  # Twitch style, common style, test-visible
     saved_changed = Signal(object)  # Emitted only after the Save succeeded
 
-    def __init__(self, db, *, import_background=None, visibility_control=None, parent=None, platform="twitch"):
+    def __init__(self, db, *, import_background=None, visibility_control=None,
+                 parent=None, platform="twitch", section="all"):
         super().__init__(parent)
+        if section not in {"all", "platform", "common"}:
+            raise ValueError("Unknown appearance editor section: " + str(section))
         self.db = db
         self.platform = platform
+        self.section = section
+        self._has_platform = section in {"all", "platform"}
+        # The legacy YouTube editor never exposed shared multichat controls.
+        self._has_common = section == "common" or (
+            section == "all" and platform != "youtube"
+        )
         self._import_background = import_background
         self._loading = True
         appearance = saved_appearance(db)
@@ -36,72 +48,74 @@ class ChatAppearanceEditor(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(7)
 
-        twitch_box, twitch_form = self._group(root, "Оформление " + ("YouTube" if platform == "youtube" else "Twitch"))
-        self.mode = ScrollSafeComboBox()
-        self.mode.addItem("Оригинальное оформление", "original")
-        self.mode.addItem("Настраиваемое оформление", "custom")
-        twitch_form.addRow("Режим:", self.mode)
-        self.mode.currentIndexChanged.connect(self._changed)
         self.custom_widgets = []
-        self.text_font = self._font(twitch_form, "Шрифт сообщения:")
-        self.text_size = self._number(twitch_form, "Размер сообщения:", 6, 96, " px")
-        self.text_color = self._color(twitch_form, "Цвет текста:")
-        self.name_font = self._font(twitch_form, "Шрифт никнейма:")
-        self.name_size = self._number(twitch_form, "Размер никнейма:", 6, 96, " px")
-        self.name_color = self._color(twitch_form, "Цвет никнейма:")
-        self.card_color = self._color(twitch_form, "Цвет карточки:")
-        self.card_opacity = self._number(twitch_form, "Непрозрачность карточки:", 0, 100, " %")
-        self.card_border_color = self._color(twitch_form, "Цвет рамки:")
-        self.card_border_width = self._number(twitch_form, "Толщина рамки:", 0, 12, " px")
-        self.card_radius = self._number(twitch_form, "Скругление:", 0, 64, " px")
-        self.avatar_size = self._number(twitch_form, "Размер аватара:", 8, 96, " px")
-        self.badge_size = self._number(twitch_form, "Размер значков ролей:", 8, 64, " px")
-        self.test = QPushButton("Показать тестовое сообщение")
-        self.test.clicked.connect(self._toggle_test)
-        twitch_form.addRow(self.test)
+        if self._has_platform:
+            _platform_box, platform_form = self._group(
+                root, "Оформление " + ("YouTube" if platform == "youtube" else "Twitch")
+            )
+            self.mode = ScrollSafeComboBox()
+            self.mode.addItem("Оригинальное оформление", "original")
+            self.mode.addItem("Настраиваемое оформление", "custom")
+            platform_form.addRow("Режим:", self.mode)
+            self.mode.currentIndexChanged.connect(self._changed)
+            self.text_font = self._font(platform_form, "Шрифт сообщения:")
+            self.text_size = self._number(platform_form, "Размер сообщения:", 6, 96, " px")
+            self.text_color = self._color(platform_form, "Цвет текста:")
+            self.name_font = self._font(platform_form, "Шрифт никнейма:")
+            self.name_size = self._number(platform_form, "Размер никнейма:", 6, 96, " px")
+            self.name_color = self._color(platform_form, "Цвет никнейма:")
+            self.card_color = self._color(platform_form, "Цвет карточки:")
+            self.card_opacity = self._number(platform_form, "Непрозрачность карточки:", 0, 100, " %")
+            self.card_border_color = self._color(platform_form, "Цвет рамки:")
+            self.card_border_width = self._number(platform_form, "Толщина рамки:", 0, 12, " px")
+            self.card_radius = self._number(platform_form, "Скругление:", 0, 64, " px")
+            self.avatar_size = self._number(platform_form, "Размер аватара:", 8, 96, " px")
+            self.badge_size = self._number(platform_form, "Размер значков ролей:", 8, 64, " px")
+            self.test = QPushButton("Показать тестовое сообщение")
+            self.test.clicked.connect(self._toggle_test)
+            platform_form.addRow(self.test)
 
-        common_box, common_form = self._group(root, "Общий фон и контур")
-        if platform == "youtube":
-            common_box.hide()
-        self.background = ScrollSafeComboBox()
-        self.background.addItem("Прозрачный", "transparent")
-        self.background.addItem("Цвет", "color")
-        self.background.addItem("Свой (изображение / GIF / видео)", "media")
-        self.background.currentIndexChanged.connect(self._changed)
-        common_form.addRow("Фон:", self.background)
-        self.background_color = self._color(common_form, "Цвет фона:")
-        self.background_opacity = self._number(common_form, "Непрозрачность:", 0, 100, " %")
-        self.bg_color_control = self.background_color.parentWidget()
-        self.bg_color_label = common_form.labelForField(self.bg_color_control)
-        self.bg_opacity_control = self.background_opacity.parentWidget()
-        self.bg_opacity_label = common_form.labelForField(self.bg_opacity_control)
-        self.media_combo = ScrollSafeComboBox()
-        self.media_combo.currentIndexChanged.connect(self._changed)
-        common_form.addRow("Из библиотеки:", self.media_combo)
-        self.media_label = common_form.labelForField(self.media_combo)
-        self.media_import = QPushButton("Добавить фон…")
-        self.media_import.setEnabled(import_background is not None)
-        self.media_import.clicked.connect(self._import_media)
-        common_form.addRow(self.media_import)
-        self.background_fit = ScrollSafeComboBox()
-        self.background_fit.addItem("Вписать целиком", "contain")
-        self.background_fit.addItem("Заполнить область", "cover")
-        self.background_fit.currentIndexChanged.connect(self._changed)
-        common_form.addRow("Масштабирование:", self.background_fit)
-        self.fit_label = common_form.labelForField(self.background_fit)
-        self.glow = QCheckBox("Светящийся контур")
-        self.glow.toggled.connect(self._changed)
-        common_form.addRow(self.glow)
-        self.glow_color = self._color(common_form, "Цвет контура:")
-        self.glow_color_control = self.glow_color.parentWidget()
-        self.glow_color_label = common_form.labelForField(self.glow_color_control)
-        self.visibility = visibility_control or ScrollSafeComboBox()
-        self.visibility.addItem("Не показывать", "hidden")
-        self.visibility.addItem("Скрывать, когда чат пуст", "hide_empty")
-        self.visibility.addItem("Показывать постоянно", "always")
-        self.visibility.currentIndexChanged.connect(self._changed)
-        if visibility_control is None:
-            common_form.addRow("Видимость OBS:", self.visibility)
+        if self._has_common:
+            _common_box, common_form = self._group(root, "Общий фон и контур")
+            self.background = ScrollSafeComboBox()
+            self.background.addItem("Прозрачный", "transparent")
+            self.background.addItem("Цвет", "color")
+            self.background.addItem("Свой (изображение / GIF / видео)", "media")
+            self.background.currentIndexChanged.connect(self._changed)
+            common_form.addRow("Фон:", self.background)
+            self.background_color = self._color(common_form, "Цвет фона:")
+            self.background_opacity = self._number(common_form, "Непрозрачность:", 0, 100, " %")
+            self.bg_color_control = self.background_color.parentWidget()
+            self.bg_color_label = common_form.labelForField(self.bg_color_control)
+            self.bg_opacity_control = self.background_opacity.parentWidget()
+            self.bg_opacity_label = common_form.labelForField(self.bg_opacity_control)
+            self.media_combo = ScrollSafeComboBox()
+            self.media_combo.currentIndexChanged.connect(self._changed)
+            common_form.addRow("Из библиотеки:", self.media_combo)
+            self.media_label = common_form.labelForField(self.media_combo)
+            self.media_import = QPushButton("Добавить фон…")
+            self.media_import.setEnabled(import_background is not None)
+            self.media_import.clicked.connect(self._import_media)
+            common_form.addRow(self.media_import)
+            self.background_fit = ScrollSafeComboBox()
+            self.background_fit.addItem("Вписать целиком", "contain")
+            self.background_fit.addItem("Заполнить область", "cover")
+            self.background_fit.currentIndexChanged.connect(self._changed)
+            common_form.addRow("Масштабирование:", self.background_fit)
+            self.fit_label = common_form.labelForField(self.background_fit)
+            self.glow = QCheckBox("Светящийся контур")
+            self.glow.toggled.connect(self._changed)
+            common_form.addRow(self.glow)
+            self.glow_color = self._color(common_form, "Цвет контура:")
+            self.glow_color_control = self.glow_color.parentWidget()
+            self.glow_color_label = common_form.labelForField(self.glow_color_control)
+            self.visibility = visibility_control or ScrollSafeComboBox()
+            self.visibility.addItem("Не показывать", "hidden")
+            self.visibility.addItem("Скрывать, когда чат пуст", "hide_empty")
+            self.visibility.addItem("Показывать постоянно", "always")
+            self.visibility.currentIndexChanged.connect(self._changed)
+            if visibility_control is None:
+                common_form.addRow("Видимость OBS:", self.visibility)
 
         # Keep the long Reset label from squeezing Save at narrow widths.
         foot = QVBoxLayout()
@@ -237,36 +251,38 @@ class ChatAppearanceEditor(QWidget):
     def _apply_values(self, data):
         self._loading = True
         t, c = data[self.platform], data["common"]
-        for widget, key in (
-            (self.mode,"mode"), (self.background,"background"),
-            (self.background_fit,"background_fit"), (self.visibility,"visibility"),
-        ):
-            self._set_combo(widget, (t if key == "mode" else c)[key])
-        for widget, key in ((self.text_font,"text_font"),(self.name_font,"name_font")):
-            widget.setCurrentFont(QFont(t[key]))
-            widget.setProperty("requestedFamily", t[key])
-        for widget,key in (
-            (self.text_size,"text_size"),(self.name_size,"name_size"),
-            (self.card_opacity,"card_opacity"),(self.card_border_width,"card_border_width"),
-            (self.card_radius,"card_radius"),(self.avatar_size,"avatar_size"),
-            (self.badge_size,"badge_size"),
-        ):
-            widget.setValue(t[key])
-        for widget,key in ((self.background_opacity,"background_opacity"),):
-            widget.setValue(c[key])
-        for widget,key in (
-            (self.text_color,"text_color"),(self.name_color,"name_color"),
-            (self.card_color,"card_color"),(self.card_border_color,"card_border_color"),
-        ):
-            self._set_color(widget,t[key])
-        self._set_color(self.background_color,c["background_color"])
-        self._set_color(self.glow_color,c["glow_color"])
-        self.glow.setChecked(c["glow"])
-        self._refresh_media(c["background_media_id"])
+        if self._has_platform:
+            self._set_combo(self.mode, t["mode"])
+            for widget, key in ((self.text_font,"text_font"),(self.name_font,"name_font")):
+                widget.setCurrentFont(QFont(t[key]))
+                widget.setProperty("requestedFamily", t[key])
+            for widget,key in (
+                (self.text_size,"text_size"),(self.name_size,"name_size"),
+                (self.card_opacity,"card_opacity"),(self.card_border_width,"card_border_width"),
+                (self.card_radius,"card_radius"),(self.avatar_size,"avatar_size"),
+                (self.badge_size,"badge_size"),
+            ):
+                widget.setValue(t[key])
+            for widget,key in (
+                (self.text_color,"text_color"),(self.name_color,"name_color"),
+                (self.card_color,"card_color"),(self.card_border_color,"card_border_color"),
+            ):
+                self._set_color(widget,t[key])
+        if self._has_common:
+            self._set_combo(self.background, c["background"])
+            self._set_combo(self.background_fit, c["background_fit"])
+            self._set_combo(self.visibility, c["visibility"])
+            self.background_opacity.setValue(c["background_opacity"])
+            self._set_color(self.background_color,c["background_color"])
+            self._set_color(self.glow_color,c["glow_color"])
+            self.glow.setChecked(c["glow"])
+            self._refresh_media(c["background_media_id"])
         self._loading = False
 
     def values(self):
-        t = {
+        t = self.saved[self.platform]
+        if self._has_platform:
+            t = {
             "mode":self.mode.currentData(), "text_font":(
                 self.text_font.property("requestedFamily") or self.text_font.currentFont().family()
             ),
@@ -281,8 +297,10 @@ class ChatAppearanceEditor(QWidget):
             "card_border_width":self.card_border_width.value(),
             "card_radius":self.card_radius.value(),
             "avatar_size":self.avatar_size.value(), "badge_size":self.badge_size.value(),
-        }
-        c = {
+            }
+        c = self.saved["common"]
+        if self._has_common:
+            c = {
             "background":self.background.currentData(),
             "background_color":self.background_color.property("selectedColor"),
             "background_opacity":self.background_opacity.value(),
@@ -291,8 +309,8 @@ class ChatAppearanceEditor(QWidget):
             "glow":self.glow.isChecked(),
             "glow_color":self.glow_color.property("selectedColor"),
             "visibility":self.visibility.currentData(),
-        }
-        return {self.platform:t,"common":self.saved["common"] if self.platform == "youtube" else c}
+            }
+        return {self.platform:t,"common":c}
 
     def is_dirty(self):
         return self.values() != self.saved
@@ -301,24 +319,26 @@ class ChatAppearanceEditor(QWidget):
         if self._loading:
             return
         data = self.values()
-        custom = data[self.platform]["mode"] == "custom"
-        for widget in self.custom_widgets:
-            if widget is not None:
-                widget.setVisible(custom)
-        bg = data["common"]["background"]
-        for widget in (
-            self.bg_color_control, self.bg_color_label,
-            self.bg_opacity_control, self.bg_opacity_label,
-        ):
-            if widget is not None:
-                widget.setVisible(bg == "color")
-        for widget in (self.media_combo,self.media_label,self.media_import,
-                       self.background_fit,self.fit_label):
-            if widget is not None:
-                widget.setVisible(bg == "media")
-        for widget in (self.glow_color_control, self.glow_color_label):
-            if widget is not None:
-                widget.setVisible(data["common"]["glow"])
+        if self._has_platform:
+            custom = data[self.platform]["mode"] == "custom"
+            for widget in self.custom_widgets:
+                if widget is not None:
+                    widget.setVisible(custom)
+        if self._has_common:
+            bg = data["common"]["background"]
+            for widget in (
+                self.bg_color_control, self.bg_color_label,
+                self.bg_opacity_control, self.bg_opacity_label,
+            ):
+                if widget is not None:
+                    widget.setVisible(bg == "color")
+            for widget in (self.media_combo,self.media_label,self.media_import,
+                           self.background_fit,self.fit_label):
+                if widget is not None:
+                    widget.setVisible(bg == "media")
+            for widget in (self.glow_color_control, self.glow_color_label):
+                if widget is not None:
+                    widget.setVisible(data["common"]["glow"])
         self.status.setText("Есть несохранённые изменения" if self.is_dirty() else "Сохранено")
         self.changed.emit(data[self.platform], data["common"], self.test_visible)
 
@@ -330,10 +350,15 @@ class ChatAppearanceEditor(QWidget):
 
     def reset_to_defaults(self):
         """Only replace appearance draft; OBS reads saved settings until Save."""
+        target = (
+            "общего фона и контура мультичата"
+            if self.section == "common"
+            else ("YouTube" if self.platform == "youtube" else "Twitch") + "-чата"
+        )
         choice = QMessageBox.question(
             self,
             "Сбросить оформление чата",
-            "Вернуть настройки внешнего вида " + ("YouTube" if self.platform == "youtube" else "Twitch") + "-чата к значениям "
+            "Вернуть настройки внешнего вида " + target + " к значениям "
             "по умолчанию?\n\n"
             "Сначала изменится только предпросмотр в программе. "
             "Чтобы применить оформление в OBS, нажмите «Сохранить».\n"
@@ -344,15 +369,27 @@ class ChatAppearanceEditor(QWidget):
         if choice != QMessageBox.StandardButton.Yes:
             return
         self._apply_values({
-            self.platform: normalize_twitch({}),
-            "common": self.saved["common"] if self.platform == "youtube" else normalize_common({}),
+            self.platform: (
+                normalize_twitch({}) if self._has_platform else self.saved[self.platform]
+            ),
+            "common": normalize_common({}) if self._has_common else self.saved["common"],
         })
         self._changed()
 
     def save(self):
         data = self.values()
         try:
-            if self.platform == "youtube":
+            if self.section == "common":
+                self.saved = {
+                    self.platform: data[self.platform],
+                    "common": save_common_appearance(self.db, data["common"]),
+                }
+            elif self.section == "platform" and self.platform == "twitch":
+                self.saved = {
+                    "twitch": save_twitch_appearance(self.db, data["twitch"]),
+                    "common": data["common"],
+                }
+            elif self.platform == "youtube":
                 self.saved = {"youtube": save_youtube_appearance(self.db, data["youtube"]),
                               "common": data["common"]}
             else:

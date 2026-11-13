@@ -1099,7 +1099,8 @@ class MainWindow(QMainWindow):
         # terminate Twitch/OBS first and ask about unsaved changes afterwards.
         chat_tab = getattr(self, "multichat_tab", None)
         editors = [getattr(chat_tab, name, None) for name in (
-            "appearance_editor", "youtube_appearance_editor",
+            "common_appearance_editor", "appearance_editor",
+            "youtube_appearance_editor",
         )]
         dirty_editors = [editor for editor in editors if editor is not None and editor.is_dirty()]
         if dirty_editors:
