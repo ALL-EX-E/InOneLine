@@ -15,6 +15,15 @@ class YouTubeChatRuntime:
         self.source = ''
         self.status = 'YouTube: отключён.'
 
+    @property
+    def is_connected(self):
+        with self._lock:
+            return bool(
+                self.worker is not None
+                and getattr(getattr(self.worker, "status", None), "code", None)
+                == "connected"
+            )
+
     def connect(self, url):
         source = parse_video_id(url)
         self.stop()

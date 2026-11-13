@@ -10,7 +10,8 @@ from pathlib import Path
 
 from streaming_manager.chat_appearance import (
     COMMON_KEY, TWITCH_KEY, YOUTUBE_KEY, normalize_common, normalize_twitch,
-    public_appearance, save_appearance, saved_appearance,
+    public_appearance, save_appearance, save_common_appearance,
+    save_twitch_appearance, save_youtube_appearance, saved_appearance,
 )
 
 
@@ -47,6 +48,33 @@ class StubDatabase:
 
 
 class AppearanceModelTests(unittest.TestCase):
+    def test_section_owned_saves_preserve_other_platform_and_common_values(self):
+        with tempfile.TemporaryDirectory() as folder:
+            db = StubDatabase(folder)
+            save_appearance(
+                db,
+                {"mode": "custom", "text_size": 31},
+                {"visibility": "always", "background": "color"},
+            )
+            save_youtube_appearance(db, {"mode": "custom", "text_size": 27})
+            before = saved_appearance(db)
+
+            saved_common = save_common_appearance(
+                db, {"visibility": "hide_empty", "background": "transparent"}
+            )
+            after_common = saved_appearance(db)
+            self.assertEqual(after_common["twitch"], before["twitch"])
+            self.assertEqual(after_common["youtube"], before["youtube"])
+            self.assertEqual(after_common["common"], saved_common)
+
+            saved_twitch = save_twitch_appearance(
+                db, {"mode": "custom", "text_size": 44}
+            )
+            after_twitch = saved_appearance(db)
+            self.assertEqual(after_twitch["twitch"], saved_twitch)
+            self.assertEqual(after_twitch["youtube"], before["youtube"])
+            self.assertEqual(after_twitch["common"], saved_common)
+
     def test_saved_appearance_reads_one_settings_snapshot(self):
         with tempfile.TemporaryDirectory() as folder:
             db = StubDatabase(folder)
@@ -196,6 +224,49 @@ class AppearanceModelTests(unittest.TestCase):
             self.assertFalse(editor.is_dirty())
             self.assertEqual(editor.text_size.value(),31)
             editor.close()
+        app.processEvents()
+
+    def test_sectioned_qt_editors_expose_and_save_only_owned_controls(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from streaming_manager.views.chat_appearance_controls import ChatAppearanceEditor
+        app = QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as folder:
+            db = StubDatabase(folder)
+            save_appearance(
+                db,
+                {"mode": "custom", "text_size": 25},
+                {"visibility": "always", "background": "color"},
+            )
+            save_youtube_appearance(db, {"mode": "custom", "text_size": 22})
+            common = ChatAppearanceEditor(db, section="common")
+            twitch = ChatAppearanceEditor(db, section="platform", platform="twitch")
+            youtube = ChatAppearanceEditor(db, section="platform", platform="youtube")
+            try:
+                self.assertFalse(hasattr(common, "mode"))
+                self.assertTrue(hasattr(common, "background"))
+                self.assertTrue(hasattr(twitch, "mode"))
+                self.assertFalse(hasattr(twitch, "background"))
+                self.assertTrue(hasattr(youtube, "mode"))
+                self.assertFalse(hasattr(youtube, "background"))
+
+                common.visibility.setCurrentIndex(common.visibility.findData("hide_empty"))
+                self.assertTrue(common.save())
+                after_common = saved_appearance(db)
+                self.assertEqual(after_common["twitch"]["text_size"], 25)
+                self.assertEqual(after_common["youtube"]["text_size"], 22)
+                self.assertEqual(after_common["common"]["visibility"], "hide_empty")
+
+                twitch.text_size.setValue(44)
+                self.assertTrue(twitch.save())
+                after_twitch = saved_appearance(db)
+                self.assertEqual(after_twitch["twitch"]["text_size"], 44)
+                self.assertEqual(after_twitch["youtube"]["text_size"], 22)
+                self.assertEqual(after_twitch["common"], after_common["common"])
+            finally:
+                common.close()
+                twitch.close()
+                youtube.close()
         app.processEvents()
 
 
