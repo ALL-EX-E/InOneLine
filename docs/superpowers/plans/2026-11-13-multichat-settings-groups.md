@@ -66,7 +66,7 @@
 - Modify: `docs/Правила_и_дальнейший_распорядок_работ.md`
 - Modify: `docs/qa/InOneLine-Twitch-YouTube-multichat-installer-checklist.md`
 
-- [ ] Run appearance, multichat core/Windows/Twitch/YouTube, GUI, R06 list/chat/combined and wording checks.
-- [ ] Verify the diff changes only the reopened settings-layout package and its tests/docs.
-- [ ] Push a candidate PR and require native Windows CI success.
-- [ ] Download and verify the Windows installer artifact, upload an immutable FIX candidate and focused checklist to Google Drive, then wait for manual PASS/FAIL.
+- [x] Run appearance, multichat core/Windows/Twitch/YouTube and focused regressions; the full native Windows workflow is authoritative for the complete suite.
+- [x] Verify the diff changes only the reopened settings-layout package and its tests/docs.
+- [x] Push a candidate PR and require native Windows CI success.
+- [x] Download and verify the Windows installer artifact, upload an immutable FIX candidate and focused checklist to Google Drive, then wait for manual PASS/FAIL.
