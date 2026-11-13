@@ -68,7 +68,6 @@ class MultichatState:
         self._operator_revision = 0
         self._obs: deque[ChatMessage] = deque(maxlen=self._limit)
         self._obs_enabled: dict[str, bool] = {}
-        self._obs_allowed_since: dict[str, int] = {}
         self._list_mode = "always"
         self._list_command = ""
         self._list_duration = 30
@@ -131,15 +130,7 @@ class MultichatState:
 
     def set_obs_enabled(self, platform: str, enabled: bool) -> None:
         with self._lock:
-            previous = self._obs_enabled.get(platform, True)
             self._obs_enabled[platform] = bool(enabled)
-            if not enabled:
-                self._obs = deque(
-                    (m for m in self._obs if m.platform != platform),
-                    maxlen=self._limit,
-                )
-            elif not previous:
-                self._obs_allowed_since[platform] = self._sequence
 
     def configure_list_show(self, mode: str, command: str, duration: int) -> None:
         """Configure one Twitch command timer shared by the two list sources."""
@@ -314,10 +305,12 @@ class MultichatState:
             self._seen = set(self._seen_order)
 
     def operator_feed_snapshot(self, previous_key: tuple | None = None) -> dict | None:
-        """Flush due messages and copy native Twitch data only when it changed."""
+        """Flush due messages and copy all connected platform messages."""
         with self._lock:
             self._flush_ready(self._clock())
-            media_preload = self._chat_media_preload.get("twitch", ())
+            media_preload = tuple(
+                url for urls in self._chat_media_preload.values() for url in urls
+            )
             key = (
                 self._operator_revision, self._show_time, self._show_platform_icons,
                 media_preload, self._overflow_count,
@@ -326,7 +319,7 @@ class MultichatState:
                 return None
             return {
                 "key": key,
-                "messages": [asdict(m) for m in self._operator if m.platform == "twitch"],
+                "messages": [asdict(m) for m in self._operator],
                 "show_time": self._show_time,
                 "show_platform_icons": self._show_platform_icons,
                 "media_preload": media_preload,
@@ -349,6 +342,7 @@ class MultichatState:
         with self._lock:
             self._flush_ready(self._clock())
             return {
+                "has_messages": bool(self._obs),
                 "twitch_has_messages": any(message.platform == "twitch" for message in self._obs),
                 "obs_enabled": dict(self._obs_enabled),
                 "list_show": self._list_show_snapshot_locked(),
@@ -382,16 +376,14 @@ class MultichatState:
 
     def _publish(self, items: list[tuple[float, int, ChatMessage]]) -> None:
         self._operator_revision += 1
-        items.sort(key=lambda p: (
-            p[2].sent_at if p[2].sent_at is not None else p[2].received_at,
-            p[1],
-        ))
+        if self._delay > 0:
+            items.sort(key=lambda p: (
+                p[2].sent_at if p[2].sent_at is not None else p[2].received_at,
+                p[1],
+            ))
         for _, received_sequence, message in items:
             self._operator.append(message)
-            if (
-                self._obs_enabled.get(message.platform, True)
-                and received_sequence > self._obs_allowed_since.get(message.platform, 0)
-            ):
+            if self._obs_enabled.get(message.platform, True):
                 self._obs.append(message)
 
     def _flush_ready(self, now: float) -> None:

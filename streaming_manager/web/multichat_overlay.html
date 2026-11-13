@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>InOneLine — чат Twitch (OBS)</title>
+<title>InOneLine — мультичат (OBS)</title>
 <style>
 * {box-sizing:border-box}
 html,body {margin:0;width:100%;height:100%;overflow:hidden;background:transparent}
@@ -52,6 +52,7 @@ body {color:#fff;font:18px/1.3 sans-serif}
   const bgVideo = document.getElementById("bg-video");
   let appearanceKey = "";
   let currentTwitch = {};
+  let currentYouTube = {};
   let currentCommon = {};
   const ns = "http://www.w3.org/2000/svg";
   const TWITCH_PATH = "M692.9 535 617 607h-76l-66.5 63v-63H389V337.2h303.9V535zM370 301.2l-95 89.9v323.8h114v89.9l95-89.9h76L730.9 553V301.2H370zM636 403h-38v107.9h38V403zm-142.5-.5h38v107.9h-38V402.5z";
@@ -69,7 +70,9 @@ body {color:#fff;font:18px/1.3 sans-serif}
       const u = new URL(value);
       const host = u.hostname.toLowerCase();
       const roots = ["jtvnw.net","twitchcdn.net","ttvnw.net","tenor.com","giphy.com",
-                     "cdn.betterttv.net","cdn.frankerfacez.com","cdn.7tv.app"];
+                     "cdn.betterttv.net","cdn.frankerfacez.com","cdn.7tv.app",
+                     "yt3.ggpht.com","yt4.ggpht.com","yt3.googleusercontent.com","www.youtube.com",
+                     "fonts.gstatic.com","www.gstatic.com","i.ytimg.com"];
       if (u.protocol !== "https:" || u.username || u.password ||
           (u.port && u.port !== "443") ||
           !roots.some(root => host === root || host.endsWith("." + root))) return "";
@@ -118,7 +121,21 @@ body {color:#fff;font:18px/1.3 sans-serif}
     };
     parent.appendChild(img);
   }
-  function platformIcon(parent) {
+  function platformIcon(parent, platform) {
+    if (platform === 'youtube') {
+      const icon = document.createElementNS(ns, "svg");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("class", "platform-icon");
+      icon.setAttribute("aria-label", "YouTube");
+      const background = document.createElementNS(ns, "path");
+      background.setAttribute("fill", "#FF0033");
+      background.setAttribute("d", "M23.5 6.2a2.9 2.9 0 0 0-2-2C19.7 3.7 12 3.7 12 3.7s-7.7 0-9.5.5a2.9 2.9 0 0 0-2 2A30 30 0 0 0 0 12a30 30 0 0 0 .5 5.8 2.9 2.9 0 0 0 2 2c1.8.5 9.5.5 9.5.5s7.7 0 9.5-.5a2.9 2.9 0 0 0 2-2A30 30 0 0 0 24 12a30 30 0 0 0-.5-5.8Z");
+      const triangle = document.createElementNS(ns, "path");
+      triangle.setAttribute("fill", "white");
+      triangle.setAttribute("d", "m9.6 15.7 6.2-3.7-6.2-3.7Z");
+      icon.append(background, triangle);
+      parent.appendChild(icon); return;
+    }
     const icon = document.createElementNS(ns, "svg");
     icon.setAttribute("viewBox", "0 0 1024 1024");
     icon.setAttribute("class", "platform-icon");
@@ -153,11 +170,13 @@ body {color:#fff;font:18px/1.3 sans-serif}
   function applyAppearance(value) {
     const a = value && typeof value === "object" ? value : {};
     const twitch = a.twitch && typeof a.twitch === "object" ? a.twitch : {};
+    const youtube = a.youtube && typeof a.youtube === "object" ? a.youtube : {};
     const common = a.common && typeof a.common === "object" ? a.common : {};
-    const key = JSON.stringify([twitch,common]);
+    const key = JSON.stringify([twitch,youtube,common]);
     if (key === appearanceKey) return;
     appearanceKey = key;
     currentTwitch = twitch;
+    currentYouTube = youtube;
     currentCommon = common;
     const bg = ["transparent","color","media"].includes(common.background)
       ? common.background : "transparent";
@@ -203,33 +222,35 @@ body {color:#fff;font:18px/1.3 sans-serif}
   function appendMessage(message, showTime, showIcons, target = root) {
     const row = document.createElement("div");
     row.className = "message";
-    const custom = currentTwitch.mode === "custom";
+    const style = message.platform === "youtube" ? currentYouTube : currentTwitch;
+    const custom = style.mode === "custom";
     if (custom) {
-      row.style.background = rgba(currentTwitch.card_color,currentTwitch.card_opacity);
-      const border = bounded(currentTwitch.card_border_width,0,0,12);
-      row.style.border = border+"px solid "+safeColor(currentTwitch.card_border_color,"#FFFFFF");
-      row.style.borderRadius = bounded(currentTwitch.card_radius,0,0,64)+"px";
-      row.style.color = safeColor(currentTwitch.text_color,"#FFFFFF");
-      row.style.fontFamily = safeFont(currentTwitch.text_font);
-      row.style.fontSize = bounded(currentTwitch.text_size,18,6,96)+"px";
+      row.style.background = rgba(style.card_color,style.card_opacity);
+      const border = bounded(style.card_border_width,0,0,12);
+      row.style.border = border+"px solid "+safeColor(style.card_border_color,"#FFFFFF");
+      row.style.borderRadius = bounded(style.card_radius,0,0,64)+"px";
+      row.style.color = safeColor(style.text_color,"#FFFFFF");
+      row.style.fontFamily = safeFont(style.text_font);
+      row.style.fontSize = bounded(style.text_size,18,6,96)+"px";
     }
     const header = document.createElement("div");
     header.className = "header";
-    if (showIcons) platformIcon(header);
+    if (showIcons) platformIcon(header, message.platform);
+    if (custom) { const platform=header.querySelector(".platform-icon"); if(platform) platform.style.height=bounded(style.name_size,18,6,96)+"px"; }
     image(header, message.avatar_url, "avatar", "");
-    if (custom) { const avatar=header.querySelector(".avatar"); if(avatar){const px=bounded(currentTwitch.avatar_size,24,8,96);avatar.style.width=px+"px";avatar.style.height=px+"px";} }
+    if (custom) { const avatar=header.querySelector(".avatar"); if(avatar){const px=bounded(style.avatar_size,24,8,96);avatar.style.width=px+"px";avatar.style.height=px+"px";} }
     // Twitch badge order comes from the original EventSub event.
     if (Array.isArray(message.badges)) {
       for (const badge of message.badges.slice(0,16)) {
         if (badge && typeof badge === "object") image(header, badge.url, "badge", "");
       }
     }
-    if (custom) for(const b of header.querySelectorAll(".badge")) {b.style.height=bounded(currentTwitch.badge_size,18,8,64)+"px";}
+    if (custom) for(const b of header.querySelectorAll(".badge")) {b.style.height=bounded(style.badge_size,18,8,64)+"px";}
     const author = node(header, "span", message.author, "name");
     if (custom) {
-      author.style.color=safeColor(currentTwitch.name_color,"#FFFFFF");
-      author.style.fontFamily=safeFont(currentTwitch.name_font);
-      author.style.fontSize=bounded(currentTwitch.name_size,18,6,96)+"px";
+      author.style.color=safeColor(style.name_color,"#FFFFFF");
+      author.style.fontFamily=safeFont(style.name_font);
+      author.style.fontSize=bounded(style.name_size,18,6,96)+"px";
     } else if (/^#[0-9a-fA-F]{6}$/.test(String(message.color || "")))
       author.style.color = message.color;
     if (showTime) {
@@ -265,10 +286,11 @@ body {color:#fff;font:18px/1.3 sans-serif}
     latestAppliedSequence = sequence;
     try {
       prewarmMedia(state.media_preload && state.media_preload.twitch);
+      prewarmMedia(state.media_preload && state.media_preload.youtube);
       applyAppearance(state.appearance);
       const messages = Array.isArray(state.messages) ?
-        state.messages.filter(message => message.platform === "twitch") : [];
-      const obsEnabled = state.obs_enabled?.twitch !== false && currentCommon.visibility !== "hidden";
+        state.messages.filter(message => ['twitch', 'youtube'].includes(message.platform)) : [];
+      const obsEnabled = currentCommon.visibility !== "hidden";
       const sig = JSON.stringify([state.show_time,state.show_platform_icons,messages,appearanceKey,obsEnabled]);
       // A parked embedded iframe may have a stale/empty DOM even though its
       // last signature matches the server snapshot. Do not strand the first

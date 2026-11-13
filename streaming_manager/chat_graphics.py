@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 _COLOR = re.compile(r"^#[a-fA-F0-9]{6}$")
 _EMOTE_ID = re.compile(r"^[a-zA-Z0-9_-]{1,120}$")
 _ALLOWED_IMAGE_DOMAINS = (
+    "yt3.ggpht.com", "yt4.ggpht.com", "yt3.googleusercontent.com", "www.youtube.com",
+    "fonts.gstatic.com", "www.gstatic.com", "i.ytimg.com",
     "jtvnw.net", "twitchcdn.net", "ttvnw.net",
     "tenor.com", "giphy.com",
     "cdn.betterttv.net", "cdn.frankerfacez.com", "cdn.7tv.app",

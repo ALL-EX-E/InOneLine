@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 
 from streaming_manager.chat_appearance import (
-    COMMON_KEY, TWITCH_KEY, normalize_common, normalize_twitch,
+    COMMON_KEY, TWITCH_KEY, YOUTUBE_KEY, normalize_common, normalize_twitch,
     public_appearance, save_appearance, saved_appearance,
 )
 
@@ -56,7 +56,7 @@ class AppearanceModelTests(unittest.TestCase):
             value = saved_appearance(db)
             self.assertEqual(value["twitch"]["text_size"], 30)
             self.assertEqual(value["common"]["visibility"], "hidden")
-            self.assertEqual(db.settings_reads, [(COMMON_KEY, "multichat_twitch_obs", TWITCH_KEY)])
+            self.assertEqual(db.settings_reads, [(COMMON_KEY, "multichat_twitch_obs", TWITCH_KEY, YOUTUBE_KEY)])
 
     def test_invalid_and_unsafe_values_are_bounded(self):
         t = normalize_twitch({
@@ -124,10 +124,11 @@ class AppearanceModelTests(unittest.TestCase):
         from streaming_manager.database import Database
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
             db = Database(Path(folder) / "streaming.db")
-            baseline = save_appearance(
+            save_appearance(
                 db, {"mode": "original", "text_size": 18}, {"visibility": "always"}
             )
             keys = (TWITCH_KEY, COMMON_KEY, "multichat_twitch_obs")
+            baseline = saved_appearance(db)
             before = db.get_settings(keys)
             self.assertEqual(set(before), set(keys))
             for failed_key in (COMMON_KEY, "multichat_twitch_obs"):
@@ -232,7 +233,7 @@ class AppearanceModelTests(unittest.TestCase):
             original_public = public_appearance(db)
             editor = ChatAppearanceEditor(db)
             editor.resize(520, 360)
-            self.assertEqual(editor.values(),saved)
+            self.assertEqual(editor.values(), {key: saved[key] for key in ("twitch", "common")})
             self.assertFalse(editor.is_dirty())
             updates = []
             editor.changed.connect(
@@ -275,14 +276,14 @@ class AppearanceModelTests(unittest.TestCase):
             # Discard/close without Save restores old custom design.
             editor.discard()
             self.assertFalse(editor.is_dirty())
-            self.assertEqual(editor.values(),saved)
+            self.assertEqual(editor.values(), {key: saved[key] for key in ("twitch", "common")})
             with patch.object(
                 QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes
             ):
                 editor.reset_button.click()
             self.assertTrue(editor.save())
             self.assertFalse(editor.is_dirty())
-            self.assertEqual(saved_appearance(db),defaults)
+            self.assertEqual(saved_appearance(db), {**defaults, "youtube": normalize_twitch({})})
             self.assertEqual(public_appearance(db)["twitch"],defaults["twitch"])
             self.assertEqual(public_appearance(db)["common"]["background"],"transparent")
             self.assertEqual(db.get_setting("multichat_show_time"),"false")

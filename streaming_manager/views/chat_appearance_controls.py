@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from ..chat_appearance import normalize_common, normalize_twitch, saved_appearance, save_appearance
+from ..chat_appearance import normalize_common, normalize_twitch, saved_appearance, save_appearance, save_youtube_appearance
 from ..media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS
 from ..media import media_asset_available
 from .common import (
@@ -23,18 +23,20 @@ class ChatAppearanceEditor(QWidget):
     changed = Signal(object, object, bool)  # Twitch style, common style, test-visible
     saved_changed = Signal(object)  # Emitted only after the Save succeeded
 
-    def __init__(self, db, *, import_background=None, visibility_control=None, parent=None):
+    def __init__(self, db, *, import_background=None, visibility_control=None, parent=None, platform="twitch"):
         super().__init__(parent)
         self.db = db
+        self.platform = platform
         self._import_background = import_background
         self._loading = True
-        self.saved = saved_appearance(db)
+        appearance = saved_appearance(db)
+        self.saved = {platform: appearance[platform], "common": appearance["common"]}
         self.test_visible = False
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(7)
 
-        twitch_box, twitch_form = self._group(root, "Оформление Twitch")
+        twitch_box, twitch_form = self._group(root, "Оформление " + ("YouTube" if platform == "youtube" else "Twitch"))
         self.mode = ScrollSafeComboBox()
         self.mode.addItem("Оригинальное оформление", "original")
         self.mode.addItem("Настраиваемое оформление", "custom")
@@ -59,6 +61,8 @@ class ChatAppearanceEditor(QWidget):
         twitch_form.addRow(self.test)
 
         common_box, common_form = self._group(root, "Общий фон и контур")
+        if platform == "youtube":
+            common_box.hide()
         self.background = ScrollSafeComboBox()
         self.background.addItem("Прозрачный", "transparent")
         self.background.addItem("Цвет", "color")
@@ -106,7 +110,7 @@ class ChatAppearanceEditor(QWidget):
         buttons = QHBoxLayout()
         self.reset_button = QPushButton("Сбросить по умолчанию")
         self.reset_button.setToolTip(
-            "Вернуть исходный вид Twitch-чата и общий фон в локальный "
+            "Вернуть исходный вид чата в локальный "
             "предпросмотр. Для OBS нажмите «Сохранить»."
         )
         self.reset_button.clicked.connect(self.reset_to_defaults)
@@ -232,7 +236,7 @@ class ChatAppearanceEditor(QWidget):
 
     def _apply_values(self, data):
         self._loading = True
-        t, c = data["twitch"], data["common"]
+        t, c = data[self.platform], data["common"]
         for widget, key in (
             (self.mode,"mode"), (self.background,"background"),
             (self.background_fit,"background_fit"), (self.visibility,"visibility"),
@@ -288,7 +292,7 @@ class ChatAppearanceEditor(QWidget):
             "glow_color":self.glow_color.property("selectedColor"),
             "visibility":self.visibility.currentData(),
         }
-        return {"twitch":t,"common":c}
+        return {self.platform:t,"common":self.saved["common"] if self.platform == "youtube" else c}
 
     def is_dirty(self):
         return self.values() != self.saved
@@ -297,7 +301,7 @@ class ChatAppearanceEditor(QWidget):
         if self._loading:
             return
         data = self.values()
-        custom = data["twitch"]["mode"] == "custom"
+        custom = data[self.platform]["mode"] == "custom"
         for widget in self.custom_widgets:
             if widget is not None:
                 widget.setVisible(custom)
@@ -316,7 +320,7 @@ class ChatAppearanceEditor(QWidget):
             if widget is not None:
                 widget.setVisible(data["common"]["glow"])
         self.status.setText("Есть несохранённые изменения" if self.is_dirty() else "Сохранено")
-        self.changed.emit(data["twitch"], data["common"], self.test_visible)
+        self.changed.emit(data[self.platform], data["common"], self.test_visible)
 
     def _toggle_test(self):
         self.test_visible = not self.test_visible
@@ -329,7 +333,7 @@ class ChatAppearanceEditor(QWidget):
         choice = QMessageBox.question(
             self,
             "Сбросить оформление чата",
-            "Вернуть настройки внешнего вида Twitch-чата к значениям "
+            "Вернуть настройки внешнего вида " + ("YouTube" if self.platform == "youtube" else "Twitch") + "-чата к значениям "
             "по умолчанию?\n\n"
             "Сначала изменится только предпросмотр в программе. "
             "Чтобы применить оформление в OBS, нажмите «Сохранить».\n"
@@ -340,15 +344,19 @@ class ChatAppearanceEditor(QWidget):
         if choice != QMessageBox.StandardButton.Yes:
             return
         self._apply_values({
-            "twitch": normalize_twitch({}),
-            "common": normalize_common({}),
+            self.platform: normalize_twitch({}),
+            "common": self.saved["common"] if self.platform == "youtube" else normalize_common({}),
         })
         self._changed()
 
     def save(self):
         data = self.values()
         try:
-            self.saved = save_appearance(self.db,data["twitch"],data["common"])
+            if self.platform == "youtube":
+                self.saved = {"youtube": save_youtube_appearance(self.db, data["youtube"]),
+                              "common": data["common"]}
+            else:
+                self.saved = save_appearance(self.db,data["twitch"],data["common"])
         except Exception as exc:
             QMessageBox.warning(self,"Не удалось сохранить оформление",str(exc))
             return False

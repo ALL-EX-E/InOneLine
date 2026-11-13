@@ -86,7 +86,7 @@ class MultichatCoreTests(unittest.TestCase):
 
         self.clock.advance(2)
         ready = self.state.operator_feed_snapshot(initial["key"])
-        self.assertEqual([m["external_id"] for m in ready["messages"]], ["local"])
+        self.assertEqual([m["external_id"] for m in ready["messages"]], ["local", "other"])
         self.assertEqual(self.ids(obs=True), ["local", "other"])
         with patch("streaming_manager.multichat.asdict", side_effect=AssertionError("idle copy")):
             self.assertIsNone(self.state.operator_feed_snapshot(ready["key"]))
@@ -121,7 +121,7 @@ class MultichatCoreTests(unittest.TestCase):
         self.assertEqual(self.state.snapshot(for_obs=True)["list_show"], ready["list_show"])
         self.state.set_obs_enabled("twitch", False)
         hidden = self.state.obs_overlay_summary()
-        self.assertFalse(hidden["twitch_has_messages"])
+        self.assertTrue(hidden["twitch_has_messages"])
         self.assertFalse(hidden["obs_enabled"]["twitch"])
         self.assertTrue(hidden["list_show"]["held"])
 
@@ -198,21 +198,24 @@ class MultichatCoreTests(unittest.TestCase):
         self.state.ingest(ChatMessage("twitch", "ch", "c3", "viewer", "new"))
         self.assertEqual(self.state.snapshot()["list_show"]["sequence"], 2)
 
-    def test_obs_disable_clears_previous_and_reenable_excludes_delayed_old(self):
+    def test_obs_disable_preserves_previous_and_filters_at_ready_time(self):
         self.state.configure(delay=4)
         self.state.ingest(msg(identifier="old"))
         self.clock.advance(4)
         self.assertEqual(self.ids(obs=True), ["old"])
         self.state.ingest(msg(identifier="pending"))
         self.state.set_obs_enabled("twitch", False)
-        self.assertEqual(self.ids(obs=True), [])
+        self.assertEqual(self.ids(obs=True), ["old"])
+        self.clock.advance(4)
+        self.assertEqual(self.ids(obs=True), ["old"])
+        self.state.ingest(msg(identifier="ready_after_enable"))
         self.state.set_obs_enabled("twitch", True)
         self.clock.advance(4)
-        self.assertEqual(self.ids(obs=True), [])
+        self.assertEqual(self.ids(obs=True), ["old", "ready_after_enable"])
         self.state.ingest(msg(identifier="fresh"))
         self.clock.advance(4)
-        self.assertEqual(self.ids(obs=True), ["fresh"])
-        self.assertEqual(self.ids(), ["old", "pending", "fresh"])
+        self.assertEqual(self.ids(obs=True), ["old", "ready_after_enable", "fresh"])
+        self.assertEqual(self.ids(), ["old", "pending", "ready_after_enable", "fresh"])
 
     def test_list_empty_command_never_matches_and_timer_survives_duration_change(self):
         self.state.configure_list_show("slide", "", 30)
@@ -239,7 +242,7 @@ class MultichatCoreTests(unittest.TestCase):
         self.state.ingest(msg(platform="youtube", identifier="1"))
         before = self.state.operator_feed_snapshot()
         self.state.change_source("twitch")
-        self.assertEqual(self.state.operator_feed_snapshot(before["key"])["messages"], [])
+        self.assertEqual([m['platform'] for m in self.state.operator_feed_snapshot(before['key'])['messages']], ['youtube'])
         self.assertEqual(len(self.ids()), 1)
         self.assertEqual(self.ids(), ["1"])
         self.assertEqual(self.state.snapshot()["messages"][0]["platform"], "youtube")

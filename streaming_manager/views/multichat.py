@@ -23,10 +23,11 @@ from ..chat_appearance import normalize_twitch, normalize_common
 
 class MultichatTab(QWidget):
     def __init__(self, db, state, api, *, twitch_status_provider=None,
-                 import_background=None):
+                 import_background=None, youtube_runtime=None):
         super().__init__()
         self.db, self.state, self.api = db, state, api
         self.twitch_status_provider = twitch_status_provider
+        self.youtube_runtime = youtube_runtime
         self._operator_feed_key = None
         self.columns = QBoxLayout(QBoxLayout.LeftToRight, self)
         # resizeEvent owns this split. Generic row reflow still handles the
@@ -80,6 +81,30 @@ class MultichatTab(QWidget):
         self.connection_status = QLabel("Twitch: ожидание подключения чата через EventSub")
         self.connection_status.setWordWrap(True)
         connections_layout.addWidget(self.connection_status)
+        self.youtube_url = QLineEdit(db.get_setting('youtube_chat_url', ''))
+        self.youtube_url.setPlaceholderText('Ссылка на трансляцию или чат YouTube')
+        connections_layout.addWidget(self.youtube_url)
+        youtube_actions = QHBoxLayout()
+        youtube_connect = QPushButton('Подключить YouTube')
+        youtube_connect.clicked.connect(self._connect_youtube)
+        youtube_disconnect = QPushButton('Отключить YouTube')
+        youtube_disconnect.clicked.connect(self._disconnect_youtube)
+        youtube_actions.addWidget(youtube_connect)
+        youtube_actions.addWidget(youtube_disconnect)
+        connections_layout.addLayout(youtube_actions)
+        self.youtube_status = QLabel('YouTube: отключён.')
+        self.youtube_status.setWordWrap(True)
+        connections_layout.addWidget(self.youtube_status)
+        self.twitch_obs = QCheckBox("Показывать Twitch в OBS")
+        self.youtube_obs = QCheckBox("Показывать YouTube в OBS")
+        self.twitch_obs.setChecked(db.get_setting("multichat_obs_enabled_twitch", "1") == "1")
+        self.youtube_obs.setChecked(db.get_setting("multichat_obs_enabled_youtube", "1") == "1")
+        connections_layout.addWidget(self.twitch_obs)
+        connections_layout.addWidget(self.youtube_obs)
+        self.twitch_obs.toggled.connect(lambda enabled: self._set_platform_obs("twitch", enabled))
+        self.youtube_obs.toggled.connect(lambda enabled: self._set_platform_obs("youtube", enabled))
+        self.state.set_obs_enabled("twitch", self.twitch_obs.isChecked())
+        self.state.set_obs_enabled("youtube", self.youtube_obs.isChecked())
         self.buffer_warning = QLabel("")
         self.buffer_warning.setWordWrap(True)
         self.buffer_warning.hide()
@@ -106,16 +131,15 @@ class MultichatTab(QWidget):
             visibility_control=visibility_control,
         )
         self.appearance_editor.saved_changed.connect(self._on_saved_appearance)
-        self.state.set_obs_enabled(
-            "twitch", self.appearance_editor.saved["common"]["visibility"] != "hidden"
-        )
         settings.addWidget(visibility_group)
         self.appearance_editor.changed.connect(self._appearance_changed)
         self._appearance_draft = self.appearance_editor.values()
         settings.addWidget(self.appearance_editor)
+        self.youtube_appearance_editor = ChatAppearanceEditor(db, platform="youtube")
+        self.youtube_appearance_editor.changed.connect(self._youtube_appearance_changed)
+        self._appearance_draft["youtube"] = self.youtube_appearance_editor.values()["youtube"]
+        settings.addWidget(self.youtube_appearance_editor)
         settings.addStretch()
-        # Platform-specific appearance controls remain hidden until adapters
-        # can confirm that their channels are actually connected.
         self.state.configure(
             limit=self.limit.value(), show_time=self.show_time.isChecked(),
             show_platform_icons=self.show_platform_icons.isChecked(),
@@ -126,19 +150,32 @@ class MultichatTab(QWidget):
         self.refresh_timer.setInterval(250)
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
+        if self.youtube_runtime is not None and self.youtube_url.text().strip() and db.get_setting("youtube_chat_enabled", "1") == "1":
+            self._connect_youtube()
         self.refresh()
 
     def _appearance_changed(self, twitch, common, test_visible):
         self._appearance_draft = {
             "twitch": normalize_twitch(twitch),
             "common": normalize_common(common),
+            "youtube": self._appearance_draft.get("youtube") if hasattr(self, "_appearance_draft") else normalize_twitch({}),
         }
         self._operator_feed_key = None
         self.refresh()
 
+    def _youtube_appearance_changed(self, youtube, _common, _test_visible):
+        self._appearance_draft["youtube"] = normalize_twitch(youtube)
+        self._operator_feed_key = None
+        self.refresh()
+
+    def _set_platform_obs(self, platform, enabled):
+        self.db.set_setting("multichat_obs_enabled_" + platform, "1" if enabled else "0")
+        self.state.set_obs_enabled(platform, enabled)
+
     def _on_saved_appearance(self, saved):
         # A draft selector change must never affect OBS until Save succeeds.
-        self.state.set_obs_enabled("twitch", saved["common"]["visibility"] != "hidden")
+        self._operator_feed_key = None
+        self.refresh()
 
     def _on_delay(self):
         try:
@@ -171,7 +208,25 @@ class MultichatTab(QWidget):
         self.db.set_setting("multichat_show_platform_icons", "1" if enabled else "0")
         self.refresh()
 
+    def _connect_youtube(self):
+        if self.youtube_runtime is None:
+            return
+        try:
+            self.youtube_runtime.connect(self.youtube_url.text())
+            self.db.set_setting('youtube_chat_url', self.youtube_url.text().strip())
+            self.db.set_setting('youtube_chat_enabled', '1')
+        except ValueError as exc:
+            self.youtube_status.setText(str(exc))
+
+    def _disconnect_youtube(self):
+        if self.youtube_runtime is not None:
+            self.youtube_runtime.stop()
+        self.db.set_setting('youtube_chat_enabled', '0')
+        self.refresh()
+
     def refresh(self):
+        if self.youtube_runtime is not None:
+            self.youtube_status.setText(self.youtube_runtime.status)
         if self.twitch_status_provider is not None:
             try:
                 status = str(self.twitch_status_provider())
@@ -198,12 +253,15 @@ class MultichatTab(QWidget):
         twitch = self._appearance_draft["twitch"]
         common = self._appearance_draft["common"]
         test_visible = self.appearance_editor.test_visible
-        self.feed_frame.apply(common, has_content=bool(messages) or test_visible)
+        youtube_test_visible = self.youtube_appearance_editor.test_visible
+        self.feed_frame.apply(common, has_content=bool(messages) or test_visible or youtube_test_visible)
         self.feed.display(
             messages,
             show_time=snapshot["show_time"],
             show_icons=snapshot["show_platform_icons"],
-            appearance=twitch, common=common, test_visible=test_visible,
+            appearance=twitch, youtube_appearance=self._appearance_draft["youtube"],
+            common=common, test_visible=test_visible,
+            youtube_test_visible=youtube_test_visible,
         )
 
     def resizeEvent(self, event):

@@ -81,9 +81,9 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 tab.appearance_editor.test.click()
                 self.assertNotIn("Тестовое сообщение", tab.feed.toPlainText())
                 self.assertIn("<script>hello</script>", tab.feed.toPlainText())
-                state.ingest(ChatMessage("youtube", "future", "yt1", "YouTubeAuthor", "Not in Twitch tab"))
+                state.ingest(ChatMessage("youtube", "future", "yt1", "YouTubeAuthor", "YouTube in multichat"))
                 tab.refresh()
-                self.assertNotIn("Not in Twitch tab", tab.feed.toPlainText())
+                self.assertIn("YouTube in multichat", tab.feed.toPlainText())
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     payload = json.load(response)
                 self.assertEqual(len(payload["messages"]), 2)
@@ -91,8 +91,8 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 with urllib.request.urlopen(api.base_url + "/multichat-overlay", timeout=10) as response:
                     html = response.read().decode("utf-8")
                 self.assertIn("textContent", html)
-                self.assertIn("чат Twitch (OBS)", html)
-                self.assertIn('message.platform === "twitch"', html)
+                self.assertIn("мультичат (OBS)", html)
+                self.assertIn("['twitch', 'youtube'].includes(message.platform)", html)
                 self.assertIn("/api/multichat", html)
                 self.assertIn('iol-version-handshake', html)
 
@@ -101,10 +101,14 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 state.ingest(ChatMessage("twitch", "ch", "m2", "Автор", "Только локально"))
                 with urllib.request.urlopen(api.base_url + "/api/multichat", timeout=10) as response:
                     obs = json.load(response)
-                # R06: disabling OBS immediately clears earlier Twitch rows
-                # from every OBS presentation, preserving other platforms.
-                self.assertEqual([x["external_id"] for x in obs["messages"]], ["yt1"])
+                # Existing OBS rows remain until natural RAM eviction.
+                self.assertEqual([x["external_id"] for x in obs["messages"]], ["m1", "yt1"])
                 self.assertEqual(len(state.snapshot()["messages"]), 3)
+                state.set_obs_enabled("youtube", False)
+                with urllib.request.urlopen(api.base_url + "/api/data", timeout=10) as response:
+                    combined = json.load(response)
+                self.assertTrue(combined["multichat"]["enabled"])
+                self.assertTrue(combined["multichat"]["has_messages"])
 
                 # Invalid delay does not get persisted and is visibly restored.
                 tab.delay.setText("-5")
@@ -136,7 +140,8 @@ class MultichatWindowsSmoke(unittest.TestCase):
                     ["Не показывать", "Скрывать, когда чат пуст", "Показывать постоянно"],
                 )
                 self.assertEqual(combo.currentData(), "hide_empty")
-                self.assertFalse(hasattr(tab, "twitch_obs"))
+                self.assertTrue(tab.twitch_obs.isChecked())
+                self.assertTrue(tab.youtube_obs.isChecked())
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
                 state.ingest(ChatMessage("twitch", "ch", "first", "Автор", "One"))
                 combo.setCurrentIndex(combo.findData("hidden"))
@@ -145,22 +150,57 @@ class MultichatWindowsSmoke(unittest.TestCase):
                 self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "hide_empty")
                 tab.appearance_editor.save_button.click()
                 self.assertEqual(db.get_setting("multichat_twitch_obs"), "0")
-                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], False)
-                self.assertEqual(api.multichat_state()["messages"], [])
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
+                self.assertEqual(len(api.multichat_state()["messages"]), 1)
                 self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "hidden")
                 state.ingest(ChatMessage("twitch", "ch", "second", "Автор", "Local"))
                 self.assertEqual(len(state.snapshot()["messages"]), 2)
-                self.assertEqual(api.multichat_state()["messages"], [])
-                # Saving a new enabled mode reopens OBS without resurrecting history.
+                self.assertEqual(len(api.multichat_state()["messages"]), 2)
+                # Saved visibility changes the renderer, not message admission.
                 combo.setCurrentIndex(combo.findData("always"))
-                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], False)
+                self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
                 tab.appearance_editor.save_button.click()
                 self.assertEqual(db.get_setting("multichat_twitch_obs"), "1")
                 self.assertEqual(state.snapshot()["obs_enabled"]["twitch"], True)
-                self.assertEqual(api.multichat_state()["messages"], [])
+                self.assertEqual(len(api.multichat_state()["messages"]), 2)
                 state.ingest(ChatMessage("twitch", "ch", "third", "Автор", "New"))
-                self.assertEqual([m["external_id"] for m in api.multichat_state()["messages"]], ["third"])
+                self.assertEqual([m["external_id"] for m in api.multichat_state()["messages"]], ["first", "second", "third"])
                 self.assertEqual(api.multichat_state()["appearance"]["common"]["visibility"], "always")
+            finally:
+                tab.refresh_timer.stop()
+                tab.close()
+
+    def test_youtube_style_and_obs_switch_are_independent(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            paths = AppPaths.from_root(Path(tmp))
+            paths.ensure_runtime_dirs()
+            db = Database(paths.database_path)
+            state = MultichatState()
+            api = LocalApiServer(db, "127.0.0.1", unused_local_port())
+            api.set_multichat_state_provider(state.snapshot)
+            tab = MultichatTab(db, state, api)
+            try:
+                yt = tab.youtube_appearance_editor
+                self.assertFalse(yt.is_dirty())
+                self.assertFalse(tab.appearance_editor.is_dirty())
+                yt.mode.setCurrentIndex(yt.mode.findData("custom"))
+                yt.text_size.setValue(30)
+                self.assertTrue(yt.is_dirty())
+                self.assertEqual(api.multichat_state()["appearance"]["youtube"]["text_size"], 18)
+                state.ingest(ChatMessage("youtube", "video", "yt1", "Viewer", "First"))
+                tab.refresh()
+                self.assertIn("First", tab.feed.toPlainText())
+                self.assertEqual(tab._appearance_draft["youtube"]["text_size"], 30)
+                self.assertEqual(tab._appearance_draft["twitch"]["text_size"], 18)
+                self.assertTrue(yt.save())
+                self.assertEqual(api.multichat_state()["appearance"]["youtube"]["text_size"], 30)
+                self.assertEqual(api.multichat_state()["appearance"]["twitch"]["text_size"], 18)
+                tab.youtube_obs.setChecked(False)
+                state.ingest(ChatMessage("youtube", "video", "yt2", "Viewer", "Second"))
+                state.ingest(ChatMessage("twitch", "ch", "tw1", "Viewer", "Twitch"))
+                self.assertEqual([m["external_id"] for m in state.snapshot(for_obs=True)["messages"]], ["yt1", "tw1"])
+                self.assertEqual(len(state.snapshot()["messages"]), 3)
+                self.assertEqual(db.get_setting("multichat_obs_enabled_youtube"), "0")
             finally:
                 tab.refresh_timer.stop()
                 tab.close()

@@ -220,6 +220,16 @@ jobs:
           python -m tools.chat_appearance_smoke
           if ($LASTEXITCODE -ne 0) { throw "D41-06 Twitch chat appearance failed" }
 
+      - name: D41 YouTube multichat adapter and OBS Chromium regression
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python -m tools.youtube_multichat_smoke
+          if ($LASTEXITCODE -ne 0) { throw "YouTube multichat adapter regression failed" }
+          python -m tools.youtube_overlay_browser_smoke
+          if ($LASTEXITCODE -ne 0) { throw "YouTube OBS Chromium regression failed" }
+
       - name: GitHub Actions version regression
         shell: pwsh
         run: |

@@ -13,6 +13,7 @@ from .media import MEDIA_CATEGORY_OVERLAY_BACKGROUNDS, media_asset_available
 from .media import resolve_media_asset_path
 
 TWITCH_KEY = "multichat_appearance_twitch"
+YOUTUBE_KEY = "multichat_appearance_youtube"
 COMMON_KEY = "multichat_appearance_common"
 LEGACY_OBS_KEY = "multichat_twitch_obs"
 
@@ -99,7 +100,7 @@ def _decode_settings(raw: str) -> dict:
 
 
 def saved_appearance(db) -> dict:
-    settings = db.get_settings((COMMON_KEY, LEGACY_OBS_KEY, TWITCH_KEY))
+    settings = db.get_settings((COMMON_KEY, LEGACY_OBS_KEY, TWITCH_KEY, YOUTUBE_KEY))
     common = normalize_common(_decode_settings(settings.get(COMMON_KEY, "{}")))
     # In older builds this separate checkbox overrode the saved visibility.
     # Interpret its OFF state as Hidden until the first explicit new Save.
@@ -107,6 +108,7 @@ def saved_appearance(db) -> dict:
         common["visibility"] = "hidden"
     return {
         "twitch": normalize_twitch(_decode_settings(settings.get(TWITCH_KEY, "{}"))),
+        "youtube": normalize_twitch(_decode_settings(settings.get(YOUTUBE_KEY, "{}"))),
         "common": common,
     }
 
@@ -121,6 +123,12 @@ def save_appearance(db, twitch: dict, common: dict) -> dict:
         COMMON_KEY: json.dumps(result["common"], ensure_ascii=False, sort_keys=True),
         LEGACY_OBS_KEY: "0" if result["common"]["visibility"] == "hidden" else "1",
     })
+    return result
+
+
+def save_youtube_appearance(db, youtube: dict) -> dict:
+    result = normalize_twitch(youtube)
+    db.set_setting(YOUTUBE_KEY, json.dumps(result, ensure_ascii=False, sort_keys=True))
     return result
 
 

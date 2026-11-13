@@ -24,6 +24,7 @@ from ..app_paths import AppPaths
 from ..audio import AudioCoordinator
 from ..music_player import MusicPlayerController
 from ..multichat import MultichatState
+from ..youtube_runtime import YouTubeChatRuntime
 from ..obs_visibility import show_mode
 from ..ui_settings import open_ui_settings
 from ..backup_restore import read_and_clear_restore_result
@@ -67,7 +68,7 @@ _COMPACT_TAB_LABELS = {
     "История аукционов": "Ист",
     "Журнал": "Жур",
     "Стрим / OBS": "OBS",
-    "Чат Twitch": "Чат",
+    "Мультичат": "Чат",
     "Настройки": "Наст",
 }
 _TAB_ICON_COLORS = {
@@ -78,7 +79,7 @@ _TAB_ICON_COLORS = {
     "История аукционов": "#E5C454",
     "Журнал": "#59B8C9",
     "Стрим / OBS": "#EA6F78",
-    "Чат Twitch": "#21D3BD",
+    "Мультичат": "#21D3BD",
     "Настройки": "#87A9FF",
 }
 
@@ -136,6 +137,7 @@ class MainWindow(QMainWindow):
 
         self.api = LocalApiServer(db, DEFAULT_API_HOST, int(db.get_setting("api_port", "8765")))
         self.multichat_state = MultichatState()
+        self.youtube_chat_runtime = YouTubeChatRuntime(self.multichat_state)
         self.twitch_eventsub_runtime.chat_state = self.multichat_state
         self.api.set_multichat_state_provider(
             self.multichat_state.snapshot,
@@ -301,11 +303,12 @@ class MainWindow(QMainWindow):
         self.multichat_tab = MultichatTab(
             db, self.multichat_state, self.api,
             twitch_status_provider=self.twitch_eventsub_runtime.chat_status,
+            youtube_runtime=self.youtube_chat_runtime,
             import_background=lambda callback, owner: self.stream_tab._import_background_media_for(
                 'chat', dialog_parent=owner, on_imported=callback,
             ),
         )
-        self._add_main_tab(self.multichat_tab, "Чат Twitch", QStyle.SP_MessageBoxInformation)
+        self._add_main_tab(self.multichat_tab, "Мультичат", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.completed_history_tab, "История аукционов", QStyle.SP_BrowserReload)
         self._add_main_tab(self.log_tab, "Журнал", QStyle.SP_MessageBoxInformation)
         self._add_main_tab(self.stream_tab, "Стрим / OBS", QStyle.SP_MediaPlay)
@@ -1094,11 +1097,15 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         # D41-06: presentation drafts are local until explicit Save.  Never
         # terminate Twitch/OBS first and ask about unsaved changes afterwards.
-        editor = getattr(getattr(self, "multichat_tab", None), "appearance_editor", None)
-        if editor is not None and editor.is_dirty():
+        chat_tab = getattr(self, "multichat_tab", None)
+        editors = [getattr(chat_tab, name, None) for name in (
+            "appearance_editor", "youtube_appearance_editor",
+        )]
+        dirty_editors = [editor for editor in editors if editor is not None and editor.is_dirty()]
+        if dirty_editors:
             question = QMessageBox(self)
             question.setWindowTitle("Несохранённое оформление чата")
-            question.setText("Сохранить изменения оформления Twitch перед выходом?")
+            question.setText("Сохранить изменения оформления чата перед выходом?")
             save = question.addButton("Сохранить", QMessageBox.ButtonRole.AcceptRole)
             discard = question.addButton("Выйти без сохранения", QMessageBox.ButtonRole.DestructiveRole)
             cancel = question.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
@@ -1107,17 +1114,20 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
             if question.clickedButton() is save:
-                if not editor.save():
-                    event.ignore()
-                    return
+                for editor in dirty_editors:
+                    if not editor.save():
+                        event.ignore()
+                        return
             elif question.clickedButton() is discard:
-                editor.discard()
+                for editor in dirty_editors:
+                    editor.discard()
         if hasattr(self.multichat_tab, "feed_frame"):
             self.multichat_tab.feed_frame.shutdown()
         self._integration_health_timer.stop()
         self.twitch_adapter.cancel_authorization()
         self.donationalerts_adapter.cancel_authorization()
         self.twitch_eventsub_runtime.stop()
+        self.youtube_chat_runtime.stop()
         self.donationalerts_runtime.stop()
         self._save_ui_state()
         self.public_tab.shutdown_public_xlsx()
