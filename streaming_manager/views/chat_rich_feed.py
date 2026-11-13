@@ -26,6 +26,10 @@ _GLITCH = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
 <circle cx="512" cy="512" r="512" fill="#9146ff"/>
 <path fill="#fff" d="M692.9 535 617 607h-76l-66.5 63v-63H389V337.2h303.9V535zM370 301.2l-95 89.9v323.8h114v89.9l95-89.9h76L730.9 553V301.2H370zM636 403h-38v107.9h38V403zm-142.5-.5h38v107.9h-38V402.5z"/>
 </svg>"""
+_YOUTUBE = b"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<path fill="#FF0033" d="M23.5 6.2a2.9 2.9 0 0 0-2-2C19.7 3.7 12 3.7 12 3.7s-7.7 0-9.5.5a2.9 2.9 0 0 0-2 2A30 30 0 0 0 0 12a30 30 0 0 0 .5 5.8 2.9 2.9 0 0 0 2 2c1.8.5 9.5.5 9.5.5s7.7 0 9.5-.5a2.9 2.9 0 0 0 2-2A30 30 0 0 0 24 12a30 30 0 0 0-.5-5.8Z"/>
+<path fill="white" d="m9.6 15.7 6.2-3.7-6.2-3.7Z"/>
+</svg>"""
 _MAX_CACHE_ITEMS = 96
 _MAX_CACHE_BYTES = 14 * 1024 * 1024
 _MAX_LOADED_IMAGE = 2 * 1024 * 1024
@@ -61,7 +65,7 @@ class ChatRichFeed(QTextEdit):
         self.setTextInteractionFlags(Qt.NoTextInteraction)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setPlaceholderText("Ожидание сообщений Twitch")
+        self.setPlaceholderText("Ожидание сообщений")
         self._pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="TwitchChatImage")
         self._jobs: dict[str, object] = {}
         # Value: (raw bytes, decoded small QImage, QMovie, QBuffer, animated)
@@ -76,10 +80,13 @@ class ChatRichFeed(QTextEdit):
         self._show_time = True
         self._show_icons = True
         self._appearance = normalize_twitch({})
+        self._youtube_appearance = normalize_twitch({})
         self._common = normalize_common({})
         self._test_visible = False
+        self._youtube_test_visible = False
         self._signature = None
         self._platform_image = None
+        self._youtube_platform_image = None
         self._make_platform_image()
         # Synthesized local-only preview avatar (never a provider identity).
         self._test_avatar = QImage(44, 44, QImage.Format_ARGB32_Premultiplied)
@@ -110,6 +117,14 @@ class ChatRichFeed(QTextEdit):
         svg.render(painter)
         painter.end()
         self._platform_image = image
+        youtube_svg = QSvgRenderer(QByteArray(_YOUTUBE))
+        if youtube_svg.isValid():
+            youtube_image = QImage(44, 44, QImage.Format_ARGB32_Premultiplied)
+            youtube_image.fill(Qt.transparent)
+            youtube_painter = QPainter(youtube_image)
+            youtube_svg.render(youtube_painter)
+            youtube_painter.end()
+            self._youtube_platform_image = youtube_image
 
     def prefetch_media(self, urls) -> None:
         """Warm a few common assets while the chat is idle.
@@ -200,12 +215,15 @@ class ChatRichFeed(QTextEdit):
         return f'<img src="{res}" height="{size}" width="{width}" />'
 
     def display(self, rows: list[dict], *, show_time: bool, show_icons: bool,
-                appearance=None, common=None, test_visible=False):
+                appearance=None, youtube_appearance=None, common=None,
+                test_visible=False, youtube_test_visible=False):
         appearance = normalize_twitch(appearance)
+        youtube_appearance = normalize_twitch(youtube_appearance)
         common = normalize_common(common)
         signature = (
             bool(show_time), bool(show_icons),
-            repr(appearance), repr(common), bool(test_visible),
+            repr(appearance), repr(youtube_appearance), repr(common),
+            bool(test_visible), bool(youtube_test_visible),
             repr(rows),  # bounded snapshot; no persistence or extra state
         )
         if signature == self._signature:
@@ -215,8 +233,10 @@ class ChatRichFeed(QTextEdit):
         self._show_time = bool(show_time)
         self._show_icons = bool(show_icons)
         self._appearance = appearance
+        self._youtube_appearance = youtube_appearance
         self._common = common
         self._test_visible = bool(test_visible)
+        self._youtube_test_visible = bool(youtube_test_visible)
         self._draw()
 
     def _draw(self):
@@ -224,8 +244,6 @@ class ChatRichFeed(QTextEdit):
         self._wanted_urls = set()
         self._visible_movie_count = 0
         paragraphs = []
-        a = self._appearance
-        custom = a["mode"] == "custom"
         rows = list(self._rows)
         if self._test_visible:
             # Sample is local only: not ingested, persisted, forwarded, or timed.
@@ -234,10 +252,22 @@ class ChatRichFeed(QTextEdit):
                 "author":"Пример Twitch", "text":"Тестовое сообщение 🙂",
                 "color":"#9146FF", "fragments":[{"kind":"text","text":"Тестовое сообщение 🙂"}],
             })
+        if self._youtube_test_visible:
+            rows.append({
+                "platform":"youtube", "_local_test":True,
+                "author":"Пример YouTube", "text":"Тестовое сообщение 🙂",
+                "color":"#FFFFFF", "fragments":[{"kind":"text","text":"Тестовое сообщение 🙂"}],
+            })
         for row in rows:
+            a = self._youtube_appearance if row.get("platform") == "youtube" else self._appearance
+            custom = a["mode"] == "custom"
+            icon_size = a["name_size"] if custom else 18
             header = []
-            if self._show_icons and self._platform_image is not None:
-                header.append('<img src="iol-chat-twitch-logo:" height="18" width="18" />')
+            if self._show_icons:
+                if row.get("platform") == "youtube" and self._youtube_platform_image is not None:
+                    header.append(f'<img src="iol-chat-youtube-logo:" height="{icon_size}" width="{icon_size}" />')
+                elif row.get("platform") == "twitch" and self._platform_image is not None:
+                    header.append(f'<img src="iol-chat-twitch-logo:" height="{icon_size}" width="{icon_size}" />')
             avatar = self._image_tag(row.get("avatar_url",""),"",size=a["avatar_size"] if custom else 24,is_content=False)
             if row.get("_local_test"):
                 sample_size = a["avatar_size"] if custom else 24
@@ -319,6 +349,11 @@ class ChatRichFeed(QTextEdit):
             self.document().addResource(
                 QTextDocument.ImageResource,
                 QUrl("iol-chat-twitch-logo:"), self._platform_image,
+            )
+        if self._youtube_platform_image is not None:
+            self.document().addResource(
+                QTextDocument.ImageResource,
+                QUrl("iol-chat-youtube-logo:"), self._youtube_platform_image,
             )
         for url, (raw, image, movie, buffer, animated) in list(self._cache.items()):
             if url not in self._active_urls:

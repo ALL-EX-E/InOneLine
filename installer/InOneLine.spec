@@ -42,6 +42,13 @@ a = Analysis(
     optimize=1,
 )
 
+# A host-wide Poppler installation may contribute incompatible ICU DLLs to
+# PyInstaller's dependency search path. They are unrelated to this Qt app and
+# override Qt's own ICU dependencies when placed beside the executable.
+a.binaries = [item for item in a.binaries if item[0].lower() not in {
+    "icuuc.dll", "icudt78.dll",
+}]
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
