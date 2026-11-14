@@ -114,6 +114,7 @@ class MusicPlayerController(QObject):
         self._pending_new_track_event = False
         self._pending_seek_ms: int | None = None
         self._shutdown = False
+        self._initializing = True
 
         self.audio_output.setVolume(self._volume_percent / 100.0)
         self._apply_local_audio_route()
@@ -130,6 +131,7 @@ class MusicPlayerController(QObject):
 
         self.refresh_library(emit=False)
         self._restore_saved_current()
+        self._initializing = False
         self._refresh_browser_snapshot()
 
         if self.audio_coordinator is not None:
@@ -746,7 +748,13 @@ class MusicPlayerController(QObject):
         self.playbackError.emit(message)
 
     def _persist_queue(self) -> None:
-        self.db.set_setting(MUSIC_PLAYER_QUEUE_KEY, json.dumps(self._queue, ensure_ascii=False))
+        values = {
+            MUSIC_PLAYER_QUEUE_KEY: json.dumps(self._queue, ensure_ascii=False)
+        }
+        if self._initializing:
+            self.db.initialize_settings(values)
+        else:
+            self.db.set_settings_bulk(values)
 
     def _persist_position(self) -> None:
         if self._shutdown:
@@ -766,20 +774,22 @@ class MusicPlayerController(QObject):
             persisted_position = max(0, int(self._pending_seek_ms))
         else:
             persisted_position = self.position_ms
-        self.db.set_settings_bulk(
-            {
-                MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY: (
-                    str(self._current_media_id) if self._current_media_id is not None else ""
-                ),
-                MUSIC_PLAYER_POSITION_MS_KEY: str(persisted_position),
-                MUSIC_PLAYER_ORDER_MODE_KEY: self._order_mode,
-                MUSIC_PLAYER_QUEUE_KEY: json.dumps(self._queue, ensure_ascii=False),
-                MUSIC_PLAYER_REPEAT_KEY: "1" if self._repeat else "0",
-                MUSIC_PLAYER_OUTPUT_MODE_KEY: self._output_mode,
-                MUSIC_PLAYER_VOLUME_KEY: str(self._volume_percent),
-                MUSIC_PLAYER_MUTE_KEY: "1" if self._muted else "0",
-            }
-        )
+        values = {
+            MUSIC_PLAYER_CURRENT_MEDIA_ID_KEY: (
+                str(self._current_media_id) if self._current_media_id is not None else ""
+            ),
+            MUSIC_PLAYER_POSITION_MS_KEY: str(persisted_position),
+            MUSIC_PLAYER_ORDER_MODE_KEY: self._order_mode,
+            MUSIC_PLAYER_QUEUE_KEY: json.dumps(self._queue, ensure_ascii=False),
+            MUSIC_PLAYER_REPEAT_KEY: "1" if self._repeat else "0",
+            MUSIC_PLAYER_OUTPUT_MODE_KEY: self._output_mode,
+            MUSIC_PLAYER_VOLUME_KEY: str(self._volume_percent),
+            MUSIC_PLAYER_MUTE_KEY: "1" if self._muted else "0",
+        }
+        if self._initializing:
+            self.db.initialize_settings(values)
+        else:
+            self.db.set_settings_bulk(values)
         self._refresh_browser_snapshot()
 
     def _refresh_browser_snapshot(self) -> None:

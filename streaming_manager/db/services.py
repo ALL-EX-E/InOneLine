@@ -181,6 +181,29 @@ class ServicesMixin:
     def get_setting(self, key: str, default: str = "") -> str:
         return self.get_settings((key,)).get(key, default)
 
+    def initialize_settings(self, values: dict[str, Any]) -> int:
+        """Insert missing defaults without presenting them as user changes."""
+        normalized = {str(key): str(value) for key, value in values.items()}
+        forbidden = [key for key in normalized if _setting_key_is_secret(key)]
+        if forbidden:
+            raise ValueError(
+                "Секреты нельзя хранить в SQLite settings; используйте CredentialStore: "
+                + ", ".join(sorted(forbidden))
+            )
+        if not normalized:
+            return 0
+
+        inserted = 0
+        with self.connect() as conn:
+            for key, value in normalized.items():
+                cursor = conn.execute(
+                    "INSERT INTO settings(key,value) VALUES(?,?) "
+                    "ON CONFLICT(key) DO NOTHING",
+                    (key, value),
+                )
+                inserted += max(0, int(cursor.rowcount))
+        return inserted
+
     def set_settings_bulk(self, values: dict[str, Any]) -> int:
         """Atomically writes multiple settings and logs only real changes."""
         normalized = {str(key): str(value) for key, value in values.items()}
