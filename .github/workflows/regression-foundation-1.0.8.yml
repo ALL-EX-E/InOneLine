@@ -565,6 +565,14 @@ jobs:
           python tools/integration_journal_visibility_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "P22-A integration Journal visibility regression failed" }
 
+      - name: Clean-install defaults stay out of Journal
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/clean_install_journal_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Clean-install Journal initialization regression failed" }
+
       - name: P22-B UI-080 completed-auction history date sorting
         shell: pwsh
         env:
