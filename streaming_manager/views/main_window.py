@@ -772,6 +772,12 @@ class MainWindow(QMainWindow):
             # Returning to the tab is an explicit refresh point for files
             # copied/removed outside InOneLine.
             self.music_tab.refresh()
+        elif current is self.log_tab:
+            # Several audited sources (player state, integration lifecycle,
+            # background/provider work) are intentionally decoupled from the
+            # game-data dirty markers. Opening Journal is therefore always an
+            # authoritative refresh point instead of showing a stale snapshot.
+            self.log_tab.refresh()
 
         # После смены основной вкладки держим focus на контейнере вкладок,
         # а не на первом поле ввода новой страницы.

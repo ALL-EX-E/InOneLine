@@ -573,6 +573,14 @@ jobs:
           python tools/clean_install_journal_smoke.py
           if ($LASTEXITCODE -ne 0) { throw "Clean-install Journal initialization regression failed" }
 
+      - name: Journal lifecycle events refresh on visit
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          python tools/journal_lifecycle_refresh_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "Journal lifecycle refresh regression failed" }
+
       - name: P22-B UI-080 completed-auction history date sorting
         shell: pwsh
         env:

@@ -296,14 +296,30 @@ class IntegrationManager:
                 last_error=last_error,
             )
 
+    def record_connection_action(
+        self,
+        service_key: str,
+        action: str,
+        before: dict | None,
+        after: dict | None,
+    ) -> None:
+        """Record one explicit UI lifecycle action, never a background health check."""
+        self.db.log_integration_connection_action(service_key, action, before, after)
+
     def connect(self, service_key: str) -> dict:
-        return self._run_adapter_operation(service_key, "connect")
+        before = self.db.get_integration_connection(service_key)
+        result = self._run_adapter_operation(service_key, "connect")
+        self.record_connection_action(service_key, "connect", before, result)
+        return result
 
     def check_connection(self, service_key: str) -> dict:
         return self._run_adapter_operation(service_key, "check_connection")
 
     def reconnect(self, service_key: str) -> dict:
-        return self._run_adapter_operation(service_key, "reconnect")
+        before = self.db.get_integration_connection(service_key)
+        result = self._run_adapter_operation(service_key, "reconnect")
+        self.record_connection_action(service_key, "reconnect", before, result)
+        return result
 
     def enable(self, service_key: str) -> dict:
         """Explicitly activate a saved source only after a fresh health check.
@@ -312,6 +328,7 @@ class IntegrationManager:
         replace a stored account.  A failed check preserves the disabled state
         so the user can choose the separate Reconnect flow when necessary.
         """
+        before = self.db.get_integration_connection(service_key)
         with self._operation_lock(service_key):
             self._adapter(service_key)
             row = self.db.get_integration_connection(service_key)
@@ -324,11 +341,16 @@ class IntegrationManager:
             checked = self.check_connection(service_key)
             if str(checked.get("status")) != STATUS_CONNECTED:
                 return checked
-            return self.db.upsert_integration_connection(service_key, enabled=True)
+            result = self.db.upsert_integration_connection(service_key, enabled=True)
+        self.record_connection_action(service_key, "enable", before, result)
+        return result
 
     def disconnect(self, service_key: str) -> dict:
+        before = self.db.get_integration_connection(service_key)
         with self._operation_lock(service_key):
-            return self._disconnect_locked(service_key)
+            result = self._disconnect_locked(service_key)
+        self.record_connection_action(service_key, "disconnect", before, result)
+        return result
 
     def _disconnect_locked(self, service_key: str) -> dict:
         adapter = self._adapter(service_key)
@@ -353,6 +375,7 @@ class IntegrationManager:
         )
 
     def remove_connection(self, service_key: str) -> None:
+        before = self.db.get_integration_connection(service_key)
         with self._operation_lock(service_key):
             self._adapter(service_key)
             row = self.db.get_integration_connection(service_key)
@@ -361,6 +384,7 @@ class IntegrationManager:
                 if ref:
                     self.db.credential_store.delete(ref)
             self.db.delete_integration_connection(service_key)
+        self.record_connection_action(service_key, "remove_connection", before, None)
 
     def accept_normalized_event(self, event: NormalizedIntegrationEvent) -> dict:
         """Apply one B3 event through the common provider-neutral engine.
