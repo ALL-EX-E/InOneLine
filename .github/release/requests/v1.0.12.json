@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "release_tag": "v1.0.12",
+  "release_title": "InOneLine 1.0.12",
+  "release_notes": "RELEASE_NOTES_1.0.12.md",
+  "accepted_artifact_id": 14059407980,
+  "accepted_target_commit": "8838cda2e55a927c3ddbc99d592f6be3e059deae",
+  "assets": [
+    {
+      "artifact_path": "InOneLine_Setup_1.0.12.exe",
+      "release_name": "InOneLine_Setup_1.0.12.exe",
+      "sha256": "f1c61859871b64846cfd76db26d5b49a2da45f410ff3d61c42bf4333f7af73fa"
+    },
+    {
+      "artifact_path": "InOneLine_Source_1.0.12.zip",
+      "release_name": "InOneLine_Source_1.0.12.zip",
+      "sha256": "682650de9d8ff70e55deaf009068fce4291391424089c74073c29c76e49e2a0d"
+    }
+  ]
+}
