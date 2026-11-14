@@ -273,7 +273,7 @@ jobs:
           from streaming_manager.constants import APP_VERSION, SCHEMA_VERSION
           from streaming_manager.database import Database
 
-          assert APP_VERSION == "1.0.11"
+          assert APP_VERSION == "1.0.12"
           assert SCHEMA_VERSION == 21
           with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
               path = Path(tmp) / "streaming.db"
@@ -717,7 +717,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Frozen API did not start" }
-            if ($health.version -ne "1.0.11") { throw "Wrong frozen version: $($health.version)" }
+            if ($health.version -ne "1.0.12") { throw "Wrong frozen version: $($health.version)" }
 
             $routes = @(
               "/overlay",
@@ -841,19 +841,19 @@ jobs:
             throw "Inno Setup administrative user-area warning returned"
           }
           Write-Host "INNO_USER_AREAS_WARNING=NONE"
-          $setup = "installer\output\InOneLine_Setup_1.0.11.exe"
+          $setup = "installer\output\InOneLine_Setup_1.0.12.exe"
           if (!(Test-Path $setup)) { throw "Installer output missing" }
           $item = Get-Item $setup
           Write-Host "REGRESSION_SETUP_BYTES=$($item.Length)"
           Write-Host "REGRESSION_SETUP_SHA256=$((Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant())"
-          if ($item.VersionInfo.FileVersion -notlike "1.0.11*") {
+          if ($item.VersionInfo.FileVersion -notlike "1.0.12*") {
             throw "Wrong installer FileVersion: $($item.VersionInfo.FileVersion)"
           }
 
       - name: Silent installer startup regression
         shell: pwsh
         run: |
-          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.11.exe").Path
+          $setup = (Resolve-Path "installer\output\InOneLine_Setup_1.0.12.exe").Path
           $install = "$env:RUNNER_TEMP\InOneLineRegressionInstalled"
           Remove-Item $install -Recurse -Force -ErrorAction SilentlyContinue
           $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$install" -Wait -PassThru
@@ -876,7 +876,7 @@ jobs:
               } catch {}
             }
             if ($null -eq $health) { throw "Installed app API did not start" }
-            if ($health.version -ne "1.0.11") { throw "Wrong installed version: $($health.version)" }
+            if ($health.version -ne "1.0.12") { throw "Wrong installed version: $($health.version)" }
 
             $visibility = Invoke-WebRequest -Uri "http://127.0.0.1:8765/obs-visibility.js" -TimeoutSec 3
             if ($visibility.Content -notmatch "ObsVisibility") { throw "Installed visibility script missing" }
@@ -981,8 +981,8 @@ jobs:
       - name: Preserve Windows installer for manual QA
         uses: actions/upload-artifact@v7
         with:
-          name: InOneLine_1.0.11_WINDOWS_QA
-          path: installer/output/InOneLine_Setup_1.0.11.exe
+          name: InOneLine_1.0.12_WINDOWS_QA
+          path: installer/output/InOneLine_Setup_1.0.12.exe
           if-no-files-found: error
           retention-days: 7
 
@@ -1029,7 +1029,7 @@ jobs:
         run: |
           $out = "$env:RUNNER_TEMP\R36_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "installer\output\InOneLine_Setup_1.0.11.exe" "$out\InOneLine_R36_Setup_CANDIDATE.exe"
+          Copy-Item "installer\output\InOneLine_Setup_1.0.12.exe" "$out\InOneLine_R36_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R36-global-focus-checklist.md" "$out\CHECKLIST_R36.md"
           python tools/create_source_snapshot.py "$out\InOneLine_R36_Source.zip" --ref HEAD
           if ($LASTEXITCODE -ne 0) { throw "R36 source snapshot failed" }
@@ -1249,7 +1249,7 @@ jobs:
         run: |
           $out = "$env:RUNNER_TEMP\R06_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "installer\output\InOneLine_Setup_1.0.11.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
+          Copy-Item "installer\output\InOneLine_Setup_1.0.12.exe" "$out\InOneLine_R06_Setup_CANDIDATE.exe"
           Copy-Item "docs\qa\R06-manual-checklist.md" "$out\CHECKLIST_R06.md"
           if ($env:GITHUB_HEAD_REF -eq "candidate/r06-main-embedded-shared-composition-20261108") {
             Copy-Item "docs\qa\R06-main-embedded-parity-checklist.md" "$out\CHECKLIST_MAIN_OBS_COMBINED.md"
@@ -1312,22 +1312,22 @@ jobs:
           retention-days: 7
           compression-level: 0
 
-      - name: Package 1.0.11 release candidate from tested installer
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'codex/release-1.0.11'
+      - name: Package 1.0.12 release candidate from tested installer
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'codex/release-1.0.12'
         shell: pwsh
         run: |
-          $out = "$env:RUNNER_TEMP\Release_1.0.11_QA"
+          $out = "$env:RUNNER_TEMP\Release_1.0.12_QA"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          Copy-Item "installer\output\InOneLine_Setup_1.0.11.exe" "$out\InOneLine_Setup_1.0.11.exe"
-          Copy-Item "docs\qa\1.0.11-release-checklist.md" "$out\CHECKLIST_1.0.11.md"
-          python tools/create_source_snapshot.py "$out\InOneLine_Source_1.0.11.zip" --ref HEAD
-          if ($LASTEXITCODE -ne 0) { throw "Release 1.0.11 source snapshot failed" }
-          $installer = Get-Item "$out\InOneLine_Setup_1.0.11.exe"
-          $source = Get-Item "$out\InOneLine_Source_1.0.11.zip"
+          Copy-Item "installer\output\InOneLine_Setup_1.0.12.exe" "$out\InOneLine_Setup_1.0.12.exe"
+          Copy-Item "docs\qa\1.0.12-release-checklist.md" "$out\CHECKLIST_1.0.12.md"
+          python tools/create_source_snapshot.py "$out\InOneLine_Source_1.0.12.zip" --ref HEAD
+          if ($LASTEXITCODE -ne 0) { throw "Release 1.0.12 source snapshot failed" }
+          $installer = Get-Item "$out\InOneLine_Setup_1.0.12.exe"
+          $source = Get-Item "$out\InOneLine_Source_1.0.12.zip"
           $installerSha = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           $sourceSha = (Get-FileHash $source.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           @"
-          status=1.0.11 release candidate ONLY; awaiting user manual PASS
+          status=1.0.12 release candidate ONLY; awaiting user manual PASS
           qa_pr=${{ github.event.pull_request.number }}
           workflow_commit=$env:GITHUB_SHA
           actual_candidate_head=${{ github.event.pull_request.head.sha }}
@@ -1337,18 +1337,18 @@ jobs:
           source_sha256=$sourceSha
           "@ | Set-Content "$out\BUILD_INFO.txt" -Encoding UTF8
           @"
-          $installerSha  InOneLine_Setup_1.0.11.exe
-          $sourceSha  InOneLine_Source_1.0.11.zip
+          $installerSha  InOneLine_Setup_1.0.12.exe
+          $sourceSha  InOneLine_Source_1.0.12.zip
           "@ | Set-Content "$out\SHA256SUMS.txt" -Encoding UTF8
-          Write-Host "RELEASE_1_0_11_INSTALLER_SHA256=$installerSha"
-          Write-Host "RELEASE_1_0_11_SOURCE_SHA256=$sourceSha"
+          Write-Host "RELEASE_1_0_12_INSTALLER_SHA256=$installerSha"
+          Write-Host "RELEASE_1_0_12_SOURCE_SHA256=$sourceSha"
 
-      - name: Upload 1.0.11 release candidate QA bundle
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'codex/release-1.0.11'
+      - name: Upload 1.0.12 release candidate QA bundle
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'codex/release-1.0.12'
         uses: actions/upload-artifact@v7
         with:
-          name: InOneLine_1.0.11_RELEASE_CANDIDATE_QA
-          path: ${{ runner.temp }}\Release_1.0.11_QA\*
+          name: InOneLine_1.0.12_RELEASE_CANDIDATE_QA
+          path: ${{ runner.temp }}\Release_1.0.12_QA\*
           if-no-files-found: error
           retention-days: 14
           compression-level: 0

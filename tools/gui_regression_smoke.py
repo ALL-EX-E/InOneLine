@@ -2773,7 +2773,7 @@ def main() -> int:
         stream.refresh()
         print("P09_UI040_WEBCAM_GROUP_SIDEBAR_ORDER=PASS")
 
-        if APP_VERSION != "1.0.11":
+        if APP_VERSION != "1.0.12":
             raise AssertionError(f"wrong app version: {APP_VERSION}")
         if window.minimumWidth() != 520 or window.minimumHeight() != 360:
             raise AssertionError(
