@@ -176,7 +176,9 @@ class MultichatTab(QWidget):
             show_platform_icons=self.show_platform_icons.isChecked(),
         )
         self._applied_delay = 0.0
+        self._initializing = True
         self._on_delay()
+        self._initializing = False
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(250)
         self.refresh_timer.timeout.connect(self.refresh)
@@ -223,7 +225,11 @@ class MultichatTab(QWidget):
             return
         self._applied_delay = seconds
         self.delay.setToolTip("")
-        self.db.set_setting("multichat_delay", str(seconds))
+        values = {"multichat_delay": str(seconds)}
+        if self._initializing:
+            self.db.initialize_settings(values)
+        else:
+            self.db.set_settings_bulk(values)
 
     def _on_limit(self, limit):
         self.state.configure(limit=limit)

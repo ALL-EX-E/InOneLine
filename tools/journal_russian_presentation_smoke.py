@@ -112,7 +112,7 @@ class RussianJournalPresentationSmoke(unittest.TestCase):
         self.assertEqual(len(self.tab._load_rows("test_volume")["rows"]), 1)
         self.assertEqual(self.db.limits[-1], None)
         self.tab._load_rows("")
-        self.assertEqual(self.db.limits[-1], 500)
+        self.assertEqual(self.db.limits[-1], 2500)
         self.assertEqual(self.tab.model.HEADERS,
                          ("ВРЕМЯ", "ОБЪЕКТ", "ID", "ДЕЙСТВИЕ", "ПОДРОБНОСТИ"))
         self.assertEqual(self.tab._search_timer.interval(), 250)

@@ -2326,6 +2326,9 @@ class SettingsTab(QWidget):
                     "twitch",
                     "reconnect_for_channel_points",
                 )
+                self.integration_manager.record_connection_action(
+                    service_key, action, before, result
+                )
             else:
                 result = operation(service_key)
             if twitch_service is not None and action == "remove_connection":

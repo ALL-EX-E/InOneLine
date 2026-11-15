@@ -171,6 +171,41 @@ class IntegrationsMixin:
                 (str(service_key),),
             )
 
+    @staticmethod
+    def _integration_audit_snapshot(service_key: str, row: dict | None) -> dict | None:
+        """Return only operator-facing, non-secret connection metadata."""
+        if row is None:
+            return None
+        config = row.get("provider_config") or {}
+        if not isinstance(config, dict):
+            config = {}
+        account = str(config.get("display_name") or config.get("login") or "").strip()
+        return {
+            "service_key": str(service_key),
+            "enabled": bool(row.get("enabled")),
+            "status": str(row.get("status") or STATUS_NOT_CONFIGURED),
+            "account": account,
+        }
+
+    def log_integration_connection_action(
+        self,
+        service_key: str,
+        action: str,
+        before: dict | None,
+        after: dict | None,
+    ) -> None:
+        """Audit an explicit lifecycle action without credentials/provider payloads."""
+        key = str(service_key).strip()
+        with self.connect() as conn:
+            self._log_conn(
+                conn,
+                "integration_connection",
+                None,
+                str(action),
+                self._integration_audit_snapshot(key, before),
+                self._integration_audit_snapshot(key, after),
+            )
+
     def get_random_org_api_key(self) -> str:
         ref = self.get_setting(self.RANDOM_ORG_CREDENTIAL_REF_KEY, "").strip()
         if not ref:

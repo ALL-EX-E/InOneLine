@@ -88,6 +88,7 @@ class LogTab(QWidget):
         "auction_bid": "Ставка",
         "auction_session": "Аукцион",
         "setting": "Настройка",
+        "integration_connection": "Подключение",
         "integration_event": "Интеграция",
         "external_conversion": "Конвертация",
         "shared_xlsx": "Общий Excel",
@@ -101,6 +102,11 @@ class LogTab(QWidget):
         "decrease": "УМЕНЬШЕНИЕ",
         "apply": "ПРИМЕНЕНО",
         "queue": "ОЖИДАЕТ ПРИМЕНЕНИЯ",
+        "connect": "ПОДКЛЮЧЕНИЕ",
+        "reconnect": "ПЕРЕПОДКЛЮЧЕНИЕ",
+        "enable": "ВКЛЮЧЕНИЕ",
+        "disconnect": "ОТКЛЮЧЕНИЕ",
+        "remove_connection": "УДАЛЕНИЕ",
     }
     INTEGRATION_ACTION_LABELS = {
         "apply": "НАЧИСЛЕНО",
@@ -111,6 +117,7 @@ class LogTab(QWidget):
         "reject_pending": "НЕ ПРИМЕНЕНО",
     }
     AUCTION_ENTITIES = frozenset({"auction_session", "auction_lot", "auction_bid"})
+    DEFAULT_VISIBLE_LIMIT = 2500
 
     def __init__(self, db: Database):
         super().__init__()
@@ -311,6 +318,21 @@ class LogTab(QWidget):
         if row["entity_type"] == "integration_event":
             return self._integration_event_details(row, before, after)
 
+        if row["entity_type"] == "integration_connection":
+            record = after or before
+            service_key = str(record.get("service_key") or "").strip()
+            service = {
+                "twitch": "Twitch",
+                "donationalerts": "DonationAlerts",
+            }.get(service_key.casefold(), service_key or "Интеграция")
+            account = str(record.get("account") or "").strip()
+            old_status = str(before.get("status") or "—")
+            new_status = str(after.get("status") or "—")
+            details = service + (f" ({account})" if account else "")
+            if old_status != new_status:
+                details += f": {old_status} → {new_status}"
+            return details
+
         if row["entity_type"] == "setting":
             key = str(after.get("key") or before.get("key") or "").strip()
             if not key:
@@ -415,8 +437,12 @@ class LogTab(QWidget):
         query = search_text.strip().casefold()
 
         db_started = time.perf_counter()
-        # Keep the accepted 500-row fast window and full audit search.
-        rows = self.db.list_log(limit=None if query else 500)
+        # The lightweight model and worker can retain the former 2,500-event
+        # visible history without rebuilding thousands of QTableWidgetItems on
+        # the UI thread. Search still covers the complete authoritative audit.
+        rows = self.db.list_log(
+            limit=None if query else self.DEFAULT_VISIBLE_LIMIT
+        )
         db_seconds = time.perf_counter() - db_started
 
         format_started = time.perf_counter()
