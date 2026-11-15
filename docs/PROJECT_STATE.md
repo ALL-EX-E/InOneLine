@@ -1,12 +1,12 @@
 # Состояние проекта InOneLine
 
-## Состояние на 14 ноября 2026
+## Состояние на 15 ноября 2026
 
-- **Актуальный публичный выпуск — [InOneLine 1.0.12](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.12).** В README функция описана как мультичат Twitch + YouTube. Пользователь принял установленный кандидат; [PR №434](https://github.com/ALL-EX-E/InOneLine/pull/434) слит как `8838cda2e55a927c3ddbc99d592f6be3e059deae`. [Независимый main CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/43562782812) — SUCCESS, 109/109; [wording gate](https://github.com/ALL-EX-E/InOneLine/actions/runs/43562782666) — SUCCESS. [Publisher](https://github.com/ALL-EX-E/InOneLine/actions/runs/43564617529) — SUCCESS и повторно проверил опубликованные файлы. Тег указывает на `8838cda2...`; опубликованы ровно принятые bytes artifact `14059407980`: EXE `f1c61859...`, source ZIP `682650de...`; схема 21. [Полный каталог функций](./FEATURES.md) · [SHA-256](../SHA256SUMS.txt).
-- **Состав 1.0.12:** мультичат Twitch + YouTube, единая лента и OBS-источник, аватары, emoji, удаления сообщений, независимое оформление платформ и три группы настроек «Общие настройки», «Twitch», «YouTube».
+- **Актуальный публичный выпуск — [InOneLine 1.0.13](https://github.com/ALL-EX-E/InOneLine/releases/tag/v1.0.13).** Пользователь принял установленный кандидат словами «Всё работает. Принимаю.»; [PR №436](https://github.com/ALL-EX-E/InOneLine/pull/436) слит как `1027aa953077fca9f3c07734b5f9074bef1743b4`. [Независимый main CI](https://github.com/ALL-EX-E/InOneLine/actions/runs/43711650895) и [wording gate](https://github.com/ALL-EX-E/InOneLine/actions/runs/43711650922) завершены SUCCESS. [Publisher](https://github.com/ALL-EX-E/InOneLine/actions/runs/43713623030) скачал artifact `14140218736`, опубликовал и повторно проверил ровно принятые EXE/source ZIP. Тег указывает на `1027aa95...`; схема базы остаётся 21. [Полный каталог функций](./FEATURES.md) · [SHA-256](../SHA256SUMS.txt).
+- **Состав 1.0.13:** чистая установка не создаёт служебные строки журнала; реальные изменения плеера и явные действия Twitch/DonationAlerts отображаются при открытии журнала. Мультичат Twitch + YouTube из 1.0.12 сохранён.
 
 
-- **Все** публичные возможности сверены с кодом: [описание](./FEATURES.md), [аудит выпуска 1.0.12](./audits/RELEASE_1.0.12_CODE_VERIFICATION.md), [заметки 1.0.12](../RELEASE_NOTES_1.0.12.md). Предыдущая 1.0.11 остаётся доступна в истории выпусков.
+- **Все** публичные возможности сверены с кодом: [описание](./FEATURES.md), [аудит выпуска 1.0.13](./audits/RELEASE_1.0.13_CODE_VERIFICATION.md), [заметки 1.0.13](../RELEASE_NOTES_1.0.13.md). Предыдущая 1.0.12 остаётся доступна в истории выпусков и не изменена.
 
 Новые задачи начинаются только по прямой команде пользователя. После выпуска 1.0.11 пользователь отдельно возобновил работу над YouTube-мультичатом; этот пакет принят и слит, а остальные отложенные пункты не возобновляются автоматически.
 
